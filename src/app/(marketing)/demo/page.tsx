@@ -1,0 +1,65 @@
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
+export default function DemoPage() {
+  return (
+    <div className="app-container space-y-8 py-8 sm:py-12">
+      <div className="space-y-2">
+        <p className="text-xs tracking-[0.08em] text-muted-foreground">交互预览</p>
+        <h1 className="text-4xl font-semibold">产品演示</h1>
+        <p className="max-w-2xl text-muted-foreground">
+          快速查看完整学习流程：阅读课程、点选短语、理解用法、加入复习。
+        </p>
+      </div>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>课程卡片示例</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm">
+            <p className="font-medium">城市新生活的早晨节奏</p>
+            <p className="text-muted-foreground">预计时间 12 分钟 · 难度 中级</p>
+            <Link
+              href="/lesson/morning-routines"
+              className="inline-flex h-7 cursor-pointer items-center justify-center rounded-lg bg-primary px-2.5 text-[0.8rem] font-medium text-primary-foreground transition hover:bg-primary/90 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+            >
+              打开课程
+            </Link>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>已选内容示例</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm">
+            <p className="rounded-lg bg-muted p-3">as soon as - 一……就……</p>
+            <p className="text-muted-foreground">
+              用于连接两个动作，后一个动作紧接前一个动作发生。
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>今日任务示例</CardTitle>
+          </CardHeader>
+          <CardContent className="text-sm text-muted-foreground">
+            1 节课程、8 条复习项和 1 条输出练习，保持稳定学习节奏。
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>复习卡片示例</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm">
+            <p className="font-medium">pick up useful expressions</p>
+            <p className="text-muted-foreground">在语境中自然习得实用表达</p>
+            <Button size="sm" variant="secondary">
+              开始复习
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}

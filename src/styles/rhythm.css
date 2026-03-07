@@ -1,0 +1,6 @@
+@layer base {
+  :root {
+    --space-section: clamp(2rem, 3.2vw, 3.5rem);
+    --space-card: clamp(0.9rem, 1.2vw, 1.3rem);
+  }
+}
