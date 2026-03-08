@@ -1,7 +1,21 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
-import { Clock3, Headphones, Languages, Play, Sparkles, Volume2 } from "lucide-react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+} from "react";
+import {
+  Clock3,
+  Headphones,
+  Languages,
+  Play,
+  Sparkles,
+  Volume2,
+} from "lucide-react";
 import { toast } from "sonner";
 import { appCopy } from "@/lib/constants/copy";
 import {
@@ -41,7 +55,10 @@ type InteractionAction =
   | { type: "SENTENCE_SELECTED_FROM_SELECTION"; payload: SelectionState }
   | { type: "SENTENCE_CONTEXT_SET"; payload: { sentenceId: string } }
   | { type: "SELECTION_CLEARED" }
-  | { type: "CHUNK_ACTIVATED"; payload: { sentenceId: string; chunkKey: string } }
+  | {
+      type: "CHUNK_ACTIVATED";
+      payload: { sentenceId: string; chunkKey: string };
+    }
   | { type: "CHUNK_HOVERED"; payload: { chunkKey: string | null } };
 
 type MobileSentenceGroup = {
@@ -52,7 +69,9 @@ type MobileSentenceGroup = {
   relatedChunks: string[];
 };
 
-function groupSentencesForMobile(sentences: Lesson["sections"][number]["sentences"]) {
+function groupSentencesForMobile(
+  sentences: Lesson["sections"][number]["sentences"],
+) {
   const groups: Array<typeof sentences> = [];
   let index = 0;
 
@@ -85,7 +104,10 @@ function groupSentencesForMobile(sentences: Lesson["sections"][number]["sentence
 
 const TOOLBAR_WIDTH = 256;
 
-function interactionReducer(state: InteractionState, action: InteractionAction): InteractionState {
+function interactionReducer(
+  state: InteractionState,
+  action: InteractionAction,
+): InteractionState {
   switch (action.type) {
     case "SENTENCE_SELECTED_FROM_SELECTION":
       return {
@@ -142,8 +164,10 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
   const playFromIndexRef = useRef<(index: number) => void>(() => {});
   const sentenceLoopRef = useRef<string | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [mobileGroupTranslationOpenMap, setMobileGroupTranslationOpenMap] = useState<Record<string, boolean>>({});
-  const [mobileActiveGroup, setMobileActiveGroup] = useState<MobileSentenceGroup | null>(null);
+  const [mobileGroupTranslationOpenMap, setMobileGroupTranslationOpenMap] =
+    useState<Record<string, boolean>>({});
+  const [mobileActiveGroup, setMobileActiveGroup] =
+    useState<MobileSentenceGroup | null>(null);
   const [autoPlayActive, setAutoPlayActive] = useState(false);
   const [, setAutoPlayIndex] = useState(0);
   const [state, dispatch] = useReducer(interactionReducer, {
@@ -159,7 +183,11 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
   }, []);
 
   const sentenceCount = useMemo(
-    () => lesson.sections.reduce((total, section) => total + section.sentences.length, 0),
+    () =>
+      lesson.sections.reduce(
+        (total, section) => total + section.sentences.length,
+        0,
+      ),
     [lesson.sections],
   );
   const sentenceOrder = useMemo(
@@ -168,7 +196,10 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
   );
 
   const currentSentence = useMemo(
-    () => (state.activeSentenceId ? getSentenceById(lesson, state.activeSentenceId) ?? null : null),
+    () =>
+      state.activeSentenceId
+        ? (getSentenceById(lesson, state.activeSentenceId) ?? null)
+        : null,
     [lesson, state.activeSentenceId],
   );
 
@@ -186,21 +217,29 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
     if (!state.activeSentenceId) return lesson.sections[0] ?? null;
     return (
       lesson.sections.find((section) =>
-        section.sentences.some((sentence) => sentence.id === state.activeSentenceId),
+        section.sentences.some(
+          (sentence) => sentence.id === state.activeSentenceId,
+        ),
       ) ?? null
     );
   }, [lesson.sections, state.activeSentenceId]);
 
   const relatedChunks = isMobile
-    ? mobileActiveGroup?.relatedChunks ?? currentSentence?.chunks ?? []
-    : currentSentence?.chunks ?? [];
+    ? (mobileActiveGroup?.relatedChunks ?? currentSentence?.chunks ?? [])
+    : (currentSentence?.chunks ?? []);
 
   const chunkDetail = useMemo<SelectionChunkLayer | null>(() => {
     if (!currentSentence || !state.activeChunkKey) return null;
-    return getChunkLayerFromLesson(lesson, currentSentence, state.activeChunkKey);
+    return getChunkLayerFromLesson(
+      lesson,
+      currentSentence,
+      state.activeChunkKey,
+    );
   }, [currentSentence, lesson, state.activeChunkKey]);
   const speakingSentenceId = useMemo(
-    () => sentenceOrder.find((sentence) => sentence.text === speakingText)?.id ?? null,
+    () =>
+      sentenceOrder.find((sentence) => sentence.text === speakingText)?.id ??
+      null,
     [sentenceOrder, speakingText],
   );
 
@@ -215,9 +254,16 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
       selectionText: state.selectionState?.text ?? null,
       activeChunkKey: state.activeChunkKey,
       hoveredChunkKey: state.hoveredChunkKey,
-      explanationRenderSource: state.activeChunkKey ? `activeChunk:${state.activeChunkKey}` : "neutral",
+      explanationRenderSource: state.activeChunkKey
+        ? `activeChunk:${state.activeChunkKey}`
+        : "neutral",
     });
-  }, [state.activeSentenceId, state.selectionState?.text, state.activeChunkKey, state.hoveredChunkKey]);
+  }, [
+    state.activeSentenceId,
+    state.selectionState?.text,
+    state.activeChunkKey,
+    state.hoveredChunkKey,
+  ]);
 
   useEffect(() => {
     console.log("[mobile-sheet-state]", { isMobile, sheetOpen });
@@ -232,7 +278,10 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
     (range: Range) => {
       const getSentenceIdFromNode = (node: Node | null) => {
         const element = node instanceof Element ? node : node?.parentElement;
-        return (element?.closest("[data-sentence-id]") as HTMLElement | null)?.dataset.sentenceId ?? "";
+        return (
+          (element?.closest("[data-sentence-id]") as HTMLElement | null)
+            ?.dataset.sentenceId ?? ""
+        );
       };
 
       const startId = getSentenceIdFromNode(range.startContainer);
@@ -283,7 +332,10 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
 
   const handleMobileGroupTap = useCallback(
     (group: MobileSentenceGroup) => {
-      console.log("[mobile-tap] sentence-group", { groupKey: group.key, sentenceIds: group.sentenceIds });
+      console.log("[mobile-tap] sentence-group", {
+        groupKey: group.key,
+        sentenceIds: group.sentenceIds,
+      });
       const anchorSentenceId = group.sentenceIds[0];
       const anchorSentence = findSentenceById(anchorSentenceId);
       dispatchAction({
@@ -301,14 +353,18 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
 
   const extractSelectionInReader = useCallback(() => {
     const selection = window.getSelection();
-    if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return null;
+    if (!selection || selection.rangeCount === 0 || selection.isCollapsed)
+      return null;
 
     const text = selection.toString().trim();
     if (!text) return null;
 
     const range = selection.getRangeAt(0);
     const rootNode = range.commonAncestorContainer;
-    const element = rootNode.nodeType === Node.TEXT_NODE ? rootNode.parentElement : (rootNode as Element);
+    const element =
+      rootNode.nodeType === Node.TEXT_NODE
+        ? rootNode.parentElement
+        : (rootNode as Element);
     if (!element || !readerRef.current?.contains(element)) return null;
 
     const rect = range.getBoundingClientRect();
@@ -322,7 +378,10 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
     const fallbackTop = rect.bottom + 6;
     const top = preferredTop > 8 ? preferredTop : fallbackTop;
     const centeredLeft = rect.left + rect.width / 2 - TOOLBAR_WIDTH / 2;
-    const left = Math.min(viewportWidth - TOOLBAR_WIDTH - 8, Math.max(8, centeredLeft));
+    const left = Math.min(
+      viewportWidth - TOOLBAR_WIDTH - 8,
+      Math.max(8, centeredLeft),
+    );
 
     return {
       text,
@@ -395,7 +454,10 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
   const startSequentialPlay = useCallback(
     (startIndex = 0) => {
       if (sentenceOrder.length === 0) return;
-      const nextIndex = Math.max(0, Math.min(startIndex, sentenceOrder.length - 1));
+      const nextIndex = Math.max(
+        0,
+        Math.min(startIndex, sentenceOrder.length - 1),
+      );
       const target = sentenceOrder[nextIndex];
       autoPlayActiveRef.current = true;
       const success = speak(target.text, {
@@ -458,7 +520,10 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
         return;
       }
 
-      dispatchAction({ type: "SENTENCE_SELECTED_FROM_SELECTION", payload: current });
+      dispatchAction({
+        type: "SENTENCE_SELECTED_FROM_SELECTION",
+        payload: current,
+      });
     };
 
     const onMouseUp = () => window.setTimeout(syncSelection, 0);
@@ -511,14 +576,22 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
         onPronounce={() => handlePronounce(state.selectionState?.text ?? "")}
       />
 
-      <div ref={readerRef} className={cn("space-y-5", isMobile && "space-y-0.5")}>
+      <div
+        ref={readerRef}
+        className={cn("space-y-5", isMobile && "space-y-0.5")}
+      >
         <Card
           className={cn(
             "bg-card/95",
             isMobile && "border-0 bg-muted/30 shadow-none",
           )}
         >
-          <CardContent className={cn("space-y-4 p-5 sm:p-6", isMobile && "space-y-1 p-2.5")}>
+          <CardContent
+            className={cn(
+              "space-y-4 p-5 sm:p-6",
+              isMobile && "space-y-1 p-2.5",
+            )}
+          >
             {isMobile ? (
               <>
                 <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
@@ -537,17 +610,31 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
                   </Button>
                 </div>
                 <p className="text-[10px] leading-4 whitespace-nowrap text-muted-foreground/80">
-                  {lesson.difficulty === "Beginner" ? "入门" : lesson.difficulty === "Advanced" ? "进阶" : "中级"} · {lesson.estimatedMinutes}分钟 · {sentenceCount}句
+                  {lesson.difficulty === "Beginner"
+                    ? "入门"
+                    : lesson.difficulty === "Advanced"
+                      ? "进阶"
+                      : "中级"}{" "}
+                  · {lesson.estimatedMinutes}分钟 · {sentenceCount}句
                 </p>
               </>
             ) : null}
-            <h1 className={cn("text-3xl font-semibold sm:text-4xl", isMobile && "hidden")}>
+            <h1
+              className={cn(
+                "text-3xl font-semibold sm:text-4xl",
+                isMobile && "hidden",
+              )}
+            >
               {lesson.title}
             </h1>
             {isMobile ? null : (
-              <p className="max-w-2xl text-sm text-muted-foreground sm:text-base">{lesson.subtitle}</p>
+              <p className="max-w-2xl text-sm text-muted-foreground sm:text-base">
+                {lesson.subtitle}
+              </p>
             )}
-            {!isMobile ? <LessonProgress value={lesson.completionRate} /> : null}
+            {!isMobile ? (
+              <LessonProgress value={lesson.completionRate} />
+            ) : null}
             {!isMobile ? (
               <>
                 <div className="flex flex-wrap items-center gap-2">
@@ -563,7 +650,9 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
                     size="sm"
                     variant="outline"
                     className="cursor-pointer transition-all duration-150 hover:border-primary/40 hover:bg-accent"
-                    onClick={() => handlePronounce(currentSentence?.text ?? lesson.title)}
+                    onClick={() =>
+                      handlePronounce(currentSentence?.text ?? lesson.title)
+                    }
                   >
                     <Headphones className="size-4" />
                     播放本节发音
@@ -577,27 +666,39 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
                     快速练习
                   </Button>
                 </div>
-                <p className="text-xs text-muted-foreground">{appCopy.lesson.prompt}</p>
+                <p className="text-xs text-muted-foreground">
+                  {appCopy.lesson.prompt}
+                </p>
               </>
             ) : null}
           </CardContent>
         </Card>
 
         {isMobile ? (
-          <div className="space-y-0.5">
+          <div className="overflow-hidden border-y border-[#ebe7e1] bg-transparent">
             {lesson.sections.map((section) => {
               const active = currentSection?.id === section.id;
-              const groupedSentences = groupSentencesForMobile(section.sentences);
+              const groupedSentences = groupSentencesForMobile(
+                section.sentences,
+              );
 
               return (
-                <div key={section.id} className="space-y-0.5">
+                <div key={section.id} className="space-y-0">
                   {groupedSentences.map((group, groupIndex) => {
                     const groupKey = `${section.id}-group-${groupIndex}`;
-                    const groupText = group.map((sentence) => sentence.text).join(" ");
-                    const groupTranslation = group.map((sentence) => sentence.translation).join(" ");
+                    const groupText = group
+                      .map((sentence) => sentence.text)
+                      .join(" ");
+                    const groupTranslation = group
+                      .map((sentence) => sentence.translation)
+                      .join(" ");
                     const groupPlaying = speakingText === groupText;
-                    const groupSelected = group.some((sentence) => sentence.id === state.activeSentenceId);
-                    const translationOpen = Boolean(mobileGroupTranslationOpenMap[groupKey]);
+                    const groupSelected = group.some(
+                      (sentence) => sentence.id === state.activeSentenceId,
+                    );
+                    const translationOpen = Boolean(
+                      mobileGroupTranslationOpenMap[groupKey],
+                    );
                     const groupRelatedChunks = Array.from(
                       new Set(group.flatMap((sentence) => sentence.chunks)),
                     );
@@ -613,15 +714,16 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
                       <Card
                         key={groupKey}
                         className={cn(
-                          "rounded-none border-x-0 border-y border-border/10 bg-muted/10 shadow-none transition-all duration-150",
+                          "rounded-none border-0 bg-transparent shadow-none transition-colors duration-150",
+                          groupIndex !== 0 && "border-t border-[#ebe7e1]",
                           groupSelected
-                            ? "bg-accent/12"
+                            ? "bg-accent/10"
                             : active
-                              ? "bg-muted/14"
-                              : "hover:bg-muted/16",
+                              ? "bg-muted/10"
+                              : "hover:bg-muted/8",
                         )}
                       >
-                        <div className="px-2.5 py-0.5">
+                        <div className="px-3 py-3">
                           <div
                             className={cn(
                               "cursor-pointer transition-colors",
@@ -631,14 +733,14 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
                           >
                             <div
                               className={cn(
-                                "mb-0 flex items-center justify-end gap-1.5",
+                                "mb-1 flex items-center justify-end gap-2",
                                 groupSelected && "text-primary",
                               )}
                             >
                               <button
                                 type="button"
                                 className={cn(
-                                  "inline-flex cursor-pointer items-center gap-1 text-[10px] transition-colors active:opacity-70",
+                                  "inline-flex cursor-pointer items-center gap-1 text-[11px] leading-none transition-colors active:opacity-70",
                                   groupSelected
                                     ? "text-primary/80 hover:text-primary/95"
                                     : "text-muted-foreground/70 hover:text-muted-foreground",
@@ -657,7 +759,7 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
                               <button
                                 type="button"
                                 className={cn(
-                                  "inline-flex cursor-pointer items-center gap-1 text-[10px] transition-colors active:opacity-70",
+                                  "inline-flex cursor-pointer items-center gap-1 text-[11px] leading-none transition-colors active:opacity-70",
                                   groupSelected
                                     ? "text-primary/80 hover:text-primary/95"
                                     : "text-muted-foreground/70 hover:text-muted-foreground",
@@ -667,21 +769,31 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
                                   handleLoopSentence(groupText);
                                 }}
                               >
-                                <Volume2 className={cn("size-3", groupPlaying && "animate-pulse text-primary")} />
+                                <Volume2
+                                  className={cn(
+                                    "size-3",
+                                    groupPlaying &&
+                                      "animate-pulse text-primary",
+                                  )}
+                                />
                                 {groupPlaying ? "停止" : "播放"}
                               </button>
                             </div>
+
                             <div
                               className={cn(
                                 "grid overflow-hidden transition-all duration-200",
-                                translationOpen ? "mt-0.5 grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
+                                translationOpen
+                                  ? "mb-2 grid-rows-[1fr] opacity-100"
+                                  : "grid-rows-[0fr] opacity-0",
                               )}
                             >
-                              <p className="min-h-0 rounded-md bg-muted/45 px-2 py-1 text-sm leading-6 text-muted-foreground">
+                              <p className="min-h-0 rounded-sm bg-muted/35 px-2.5 py-1.5 text-[13px] leading-6 text-muted-foreground">
                                 {groupTranslation}
                               </p>
                             </div>
                           </div>
+
                           <div
                             ref={(node) => {
                               for (const sentence of group) {
@@ -693,7 +805,7 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
                           >
                             <p
                               className={cn(
-                                "text-[1rem] leading-[1.62] text-foreground",
+                                "text-[16px] leading-[1.72] font-normal tracking-[0.01em] text-foreground/95",
                                 groupSelected && "text-primary",
                               )}
                             >
@@ -713,7 +825,9 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
             <section key={section.id} className="space-y-3">
               <div className="space-y-1 px-1">
                 <h2 className="text-xl font-semibold">{section.title}</h2>
-                <p className="text-sm text-muted-foreground">{section.summary}</p>
+                <p className="text-sm text-muted-foreground">
+                  {section.summary}
+                </p>
               </div>
               <div className="space-y-3">
                 {section.sentences.map((sentence) => (
@@ -729,7 +843,10 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
                       activateChunk(meta.sentenceId, chunk);
                     }}
                     onHoverChunk={(chunkKey) =>
-                      dispatchAction({ type: "CHUNK_HOVERED", payload: { chunkKey } })
+                      dispatchAction({
+                        type: "CHUNK_HOVERED",
+                        payload: { chunkKey },
+                      })
                     }
                   />
                 ))}
@@ -742,7 +859,9 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
       <div
         className={cn(
           "transition-all duration-200",
-          currentSentence || chunkDetail ? "opacity-100 translate-x-0" : "opacity-95 translate-x-0.5",
+          currentSentence || chunkDetail
+            ? "opacity-100 translate-x-0"
+            : "opacity-95 translate-x-0.5",
         )}
       >
         <SelectionDetailPanel
@@ -759,7 +878,9 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
               const matchSentenceId =
                 mobileActiveGroup.sentenceIds.find((id) => {
                   const sentence = findSentenceById(id);
-                  return sentence?.chunks.some((item) => item.toLowerCase() === chunk.toLowerCase());
+                  return sentence?.chunks.some(
+                    (item) => item.toLowerCase() === chunk.toLowerCase(),
+                  );
                 }) ?? mobileActiveGroup.sentenceIds[0];
               if (!matchSentenceId) return;
               activateChunk(matchSentenceId, chunk);
@@ -792,7 +913,9 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
             const matchSentenceId =
               mobileActiveGroup.sentenceIds.find((id) => {
                 const sentence = findSentenceById(id);
-                return sentence?.chunks.some((item) => item.toLowerCase() === chunk.toLowerCase());
+                return sentence?.chunks.some(
+                  (item) => item.toLowerCase() === chunk.toLowerCase(),
+                );
               }) ?? mobileActiveGroup.sentenceIds[0];
             if (!matchSentenceId) return;
             activateChunk(matchSentenceId, chunk);
