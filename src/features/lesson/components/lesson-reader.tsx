@@ -579,13 +579,13 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
         </Card>
 
         {isMobile ? (
-          <div className="space-y-4">
+          <div className="space-y-2.5">
             {lesson.sections.map((section) => {
               const active = currentSection?.id === section.id;
               const groupedSentences = groupSentencesForMobile(section.sentences);
 
               return (
-                <div key={section.id} className="space-y-4">
+                <div key={section.id} className="space-y-2.5">
                   {groupedSentences.map((group, groupIndex) => {
                     const groupKey = `${section.id}-group-${groupIndex}`;
                     const groupText = group.map((sentence) => sentence.text).join(" ");
@@ -608,15 +608,15 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
                       <Card
                         key={groupKey}
                         className={cn(
-                          "border-border/70 bg-card/95 shadow-sm transition-all duration-150",
+                          "border-border/35 bg-card/85 shadow-none transition-all duration-150",
                           groupSelected
-                            ? "border-primary/30 bg-accent/30"
+                            ? "border-primary/20 bg-accent/20"
                             : active
-                              ? "border-primary/25"
-                              : "hover:bg-muted/20",
+                              ? "border-primary/15"
+                              : "hover:bg-muted/10",
                         )}
                       >
-                        <div className="px-3 py-2.5">
+                        <div className="px-2.5 py-2">
                           <div
                             className={cn(
                               "cursor-pointer transition-colors",
@@ -626,17 +626,17 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
                           >
                             <div
                               className={cn(
-                                "mb-1 flex items-center justify-end gap-2",
+                                "mb-0.5 flex items-center justify-end gap-1.5",
                                 groupSelected && "text-primary",
                               )}
                             >
                               <button
                                 type="button"
                                 className={cn(
-                                  "inline-flex cursor-pointer items-center gap-1 text-[11px] transition-colors active:opacity-70",
+                                  "inline-flex cursor-pointer items-center gap-1 text-[10px] transition-colors active:opacity-70",
                                   groupSelected
-                                    ? "text-primary/90 hover:text-primary"
-                                    : "text-muted-foreground/90 hover:text-foreground",
+                                    ? "text-primary/80 hover:text-primary/95"
+                                    : "text-muted-foreground/70 hover:text-muted-foreground",
                                 )}
                                 onClick={(event) => {
                                   event.stopPropagation();
@@ -652,10 +652,10 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
                               <button
                                 type="button"
                                 className={cn(
-                                  "inline-flex cursor-pointer items-center gap-1 text-[11px] transition-colors active:opacity-70",
+                                  "inline-flex cursor-pointer items-center gap-1 text-[10px] transition-colors active:opacity-70",
                                   groupSelected
-                                    ? "text-primary/90 hover:text-primary"
-                                    : "text-muted-foreground/90 hover:text-foreground",
+                                    ? "text-primary/80 hover:text-primary/95"
+                                    : "text-muted-foreground/70 hover:text-muted-foreground",
                                 )}
                                 onClick={(event) => {
                                   event.stopPropagation();
@@ -669,10 +669,10 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
                             <div
                               className={cn(
                                 "grid overflow-hidden transition-all duration-200",
-                                translationOpen ? "mt-1 grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
+                                translationOpen ? "mt-0.5 grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
                               )}
                             >
-                              <p className="min-h-0 rounded-md bg-muted/65 px-2 py-1.5 text-sm leading-6 text-muted-foreground">
+                              <p className="min-h-0 rounded-md bg-muted/45 px-2 py-1 text-sm leading-6 text-muted-foreground">
                                 {groupTranslation}
                               </p>
                             </div>
@@ -688,7 +688,7 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
                           >
                             <p
                               className={cn(
-                                "text-[1rem] leading-[1.7] text-foreground",
+                                "text-[1rem] leading-[1.62] text-foreground",
                                 groupSelected && "text-primary",
                               )}
                             >
