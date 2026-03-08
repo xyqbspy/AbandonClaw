@@ -115,12 +115,12 @@ export function SelectionDetailSheet({
             </div>
           ) : (
             <div className="space-y-4 animate-in fade-in-0 slide-in-from-bottom-1 duration-200">
-              <section className="space-y-2 rounded-xl border border-border/70 p-3">
+              <section className="rounded-xl border border-border/70 p-3">
                 <h3 className="text-sm font-medium">当前句子</h3>
                 {currentSentence ? (
                   <>
-                    <p className="text-sm leading-7 break-words">{currentSentence.text}</p>
-                    <div className="flex items-center gap-3">
+                    <p className="mt-1 text-sm leading-7 break-words">{currentSentence.text}</p>
+                    <div className="mt-1.5 flex items-center gap-3">
                       <button
                         type="button"
                         className="inline-flex cursor-pointer items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground active:opacity-70"
@@ -140,7 +140,7 @@ export function SelectionDetailSheet({
                     <div
                       className={cn(
                         "grid overflow-hidden transition-all duration-200",
-                        showSentenceTranslation ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
+                        showSentenceTranslation ? "mt-1.5 grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
                       )}
                     >
                       <p className="min-h-0 rounded-lg bg-muted px-3 py-2 text-sm leading-6">{currentSentence.translation}</p>
