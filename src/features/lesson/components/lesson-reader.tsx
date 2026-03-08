@@ -620,10 +620,20 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
                             )}
                             onClick={() => handleMobileGroupTap(groupContext)}
                           >
-                            <div className="mb-1 flex items-center justify-end gap-2">
+                            <div
+                              className={cn(
+                                "mb-0 flex items-center justify-end gap-2",
+                                groupSelected && "text-primary",
+                              )}
+                            >
                               <button
                                 type="button"
-                                className="inline-flex cursor-pointer items-center gap-1 text-[11px] text-muted-foreground/90 transition-colors hover:text-foreground active:opacity-70"
+                                className={cn(
+                                  "inline-flex cursor-pointer items-center gap-1 text-[11px] transition-colors active:opacity-70",
+                                  groupSelected
+                                    ? "text-primary/90 hover:text-primary"
+                                    : "text-muted-foreground/90 hover:text-foreground",
+                                )}
                                 onClick={(event) => {
                                   event.stopPropagation();
                                   setMobileGroupTranslationOpenMap((prev) => ({
@@ -637,7 +647,12 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
                               </button>
                               <button
                                 type="button"
-                                className="inline-flex cursor-pointer items-center gap-1 text-[11px] text-muted-foreground/90 transition-colors hover:text-foreground active:opacity-70"
+                                className={cn(
+                                  "inline-flex cursor-pointer items-center gap-1 text-[11px] transition-colors active:opacity-70",
+                                  groupSelected
+                                    ? "text-primary/90 hover:text-primary"
+                                    : "text-muted-foreground/90 hover:text-foreground",
+                                )}
                                 onClick={(event) => {
                                   event.stopPropagation();
                                   handleLoopSentence(groupText);
@@ -671,7 +686,7 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
                                 }}
                                 className={cn(
                                   "cursor-pointer px-3 py-1.5 transition-colors",
-                                  "first:pt-2 last:pb-2",
+                                  "first:pt-1 last:pb-2",
                                   selected ? "text-primary" : "hover:text-foreground",
                                 )}
                                 onClick={() => handleMobileGroupTap(groupContext)}
