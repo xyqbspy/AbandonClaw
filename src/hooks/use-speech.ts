@@ -6,6 +6,9 @@ type SpeakOptions = {
   lang?: string;
   rate?: number;
   pitch?: number;
+  onStart?: () => void;
+  onEnd?: () => void;
+  onError?: () => void;
 };
 
 export function useSpeech() {
@@ -35,9 +38,18 @@ export function useSpeech() {
       utter.lang = options?.lang ?? "en-US";
       utter.rate = options?.rate ?? 1;
       utter.pitch = options?.pitch ?? 1;
-      utter.onstart = () => setSpeakingText(clean);
-      utter.onend = () => setSpeakingText((prev) => (prev === clean ? null : prev));
-      utter.onerror = () => setSpeakingText((prev) => (prev === clean ? null : prev));
+      utter.onstart = () => {
+        setSpeakingText(clean);
+        options?.onStart?.();
+      };
+      utter.onend = () => {
+        setSpeakingText((prev) => (prev === clean ? null : prev));
+        options?.onEnd?.();
+      };
+      utter.onerror = () => {
+        setSpeakingText((prev) => (prev === clean ? null : prev));
+        options?.onError?.();
+      };
 
       utterRef.current = utter;
       window.speechSynthesis.speak(utter);

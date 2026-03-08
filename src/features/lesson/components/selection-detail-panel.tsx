@@ -1,12 +1,12 @@
 import { CirclePlay, Volume2 } from "lucide-react";
-import { SelectionExplainResponse } from "@/lib/types";
+import { LessonSentence, SelectionChunkLayer } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
-const highlightSelected = (sentence: string, selected: string) => {
+const highlightSelected = (sentence: string, selected?: string) => {
   if (!sentence || !selected) return sentence;
   const lowerSentence = sentence.toLowerCase();
   const lowerSelected = selected.toLowerCase();
@@ -25,21 +25,29 @@ const highlightSelected = (sentence: string, selected: string) => {
 const isLongChunk = (text: string) => text.length > 22;
 
 export function SelectionDetailPanel({
-  detail,
+  currentSentence,
+  chunkDetail,
+  relatedChunks,
   loading,
   speakingText,
   onSave,
   onReview,
   onPronounce,
   onSelectRelated,
+  hoveredChunkKey,
+  onHoverChunk,
 }: {
-  detail: SelectionExplainResponse | null;
+  currentSentence: LessonSentence | null;
+  chunkDetail: SelectionChunkLayer | null;
+  relatedChunks: string[];
   loading: boolean;
   speakingText: string | null;
   onSave: () => void;
   onReview: () => void;
   onPronounce: (text: string) => void;
   onSelectRelated: (chunk: string) => void;
+  hoveredChunkKey: string | null;
+  onHoverChunk: (chunkKey: string | null) => void;
 }) {
   return (
     <div className="sticky top-20 hidden space-y-4 lg:block">
@@ -52,31 +60,31 @@ export function SelectionDetailPanel({
             <Skeleton className="h-12 w-full" />
             <Skeleton className="h-10 w-full" />
           </CardContent>
-        ) : detail ? (
+        ) : currentSentence ? (
           <CardContent
-            key={`sentence-${detail.chunk.text}`}
+            key={`sentence-${currentSentence.id}-${chunkDetail?.text ?? "none"}`}
             className="space-y-3 pt-4 animate-in fade-in-0 slide-in-from-right-1 duration-200"
           >
             <div className="rounded-lg border border-border/70 bg-background px-3 py-2 text-sm leading-7 break-words">
-              {highlightSelected(detail.sentence.text, detail.chunk.text)}
+              {highlightSelected(currentSentence.text, chunkDetail?.text)}
             </div>
             <div className="rounded-lg border border-border/70 bg-muted/30 px-3 py-2">
               <p className="text-xs tracking-[0.08em] text-muted-foreground">整句翻译</p>
-              <p className="mt-1 text-sm">{detail.sentence.translation}</p>
+              <p className="mt-1 text-sm">{currentSentence.translation}</p>
             </div>
             <Button
               size="sm"
               variant="outline"
               className="w-full cursor-pointer justify-center transition-all duration-150 hover:border-primary/40"
-              onClick={() => onPronounce(detail.sentence.ttsText)}
+              onClick={() => onPronounce(currentSentence.text)}
             >
-              <Volume2 className={speakingText === detail.sentence.ttsText ? "size-4 animate-pulse" : "size-4"} />
+              <Volume2 className={speakingText === currentSentence.text ? "size-4 animate-pulse" : "size-4"} />
               播放整句发音
             </Button>
           </CardContent>
         ) : (
           <CardContent className="pt-4 text-sm text-muted-foreground">
-            在课程中点选短语后，这里会显示整句理解内容。
+            先选择一句内容，查看整句理解。
           </CardContent>
         )}
       </Card>
@@ -91,107 +99,119 @@ export function SelectionDetailPanel({
             <Skeleton className="h-12 w-full" />
             <Skeleton className="h-16 w-full" />
           </CardContent>
-        ) : detail ? (
-          <CardContent
-            key={`chunk-${detail.chunk.text}`}
-            className="space-y-4 pt-4 animate-in fade-in-0 slide-in-from-right-1 duration-200"
-          >
-            <div>
-              <p className="text-xs tracking-[0.08em] text-muted-foreground">已选短语</p>
-              {isLongChunk(detail.chunk.text) ? (
-                <div className="mt-1 rounded-lg border border-border/70 bg-background px-3 py-2 text-sm leading-6 break-words">
-                  {detail.chunk.text}
-                </div>
-              ) : (
-                <div className="mt-1 flex items-center gap-2">
-                  <Badge>{detail.chunk.text}</Badge>
-                </div>
-              )}
-            </div>
-
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                className="cursor-pointer"
-                onClick={() => onPronounce(detail.chunk.text)}
-              >
-                <Volume2 className={speakingText === detail.chunk.text ? "size-4 animate-pulse" : "size-4"} />
-                发音
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                aria-label="播放例句发音"
-                onClick={() => onPronounce(detail.chunk.examples[0] ?? detail.chunk.text)}
-              >
-                <CirclePlay className="size-4" />
-              </Button>
-            </div>
-
-            <div>
-              <p className="text-xs tracking-[0.08em] text-muted-foreground">中文释义</p>
-              <p className="mt-1 text-sm">{detail.chunk.translation}</p>
-            </div>
-            <div>
-              <p className="text-xs tracking-[0.08em] text-muted-foreground">当前句中含义</p>
-              <p className="mt-1 text-sm text-muted-foreground">{detail.chunk.meaningInSentence}</p>
-            </div>
-            <div>
-              <p className="text-xs tracking-[0.08em] text-muted-foreground">常见用法</p>
-              <p className="mt-1 text-sm leading-7">{detail.chunk.usageNote}</p>
-            </div>
-
+        ) : (
+          <CardContent className="space-y-4 pt-4">
             <div className="space-y-2">
-              <p className="text-xs tracking-[0.08em] text-muted-foreground">例句</p>
-              {detail.chunk.examples.slice(0, 2).map((example) => (
-                <div key={example} className="flex items-center gap-2 rounded-lg border border-border/60 bg-background px-3 py-2 text-sm">
-                  <p className="flex-1 break-words">{example}</p>
-                  <Button
-                    size="icon-sm"
-                    variant="ghost"
-                    aria-label="播放例句发音"
-                    onClick={() => onPronounce(example)}
-                  >
-                    <CirclePlay className={speakingText === example ? "size-4 animate-pulse" : "size-4"} />
-                  </Button>
-                </div>
-              ))}
-            </div>
-
-            {detail.relatedChunks.length > 0 ? (
-              <div className="space-y-2">
-                <p className="text-xs tracking-[0.08em] text-muted-foreground">本句相关短语</p>
+              <p className="text-xs tracking-[0.08em] text-muted-foreground">本句相关短语</p>
+              {relatedChunks.length > 0 ? (
                 <div className="flex flex-wrap gap-2">
-                  {detail.relatedChunks.map((chunk) => (
+                  {relatedChunks.map((chunk) => (
                     <button
                       key={chunk}
                       type="button"
                       onClick={() => onSelectRelated(chunk)}
+                      onMouseEnter={() => onHoverChunk(chunk)}
+                      onMouseLeave={() => onHoverChunk(null)}
+                      onFocus={() => onHoverChunk(chunk)}
+                      onBlur={() => onHoverChunk(null)}
                       className={cn(
                         "cursor-pointer rounded-full border border-border/70 bg-background px-2.5 py-1 text-xs transition-all duration-150",
                         "hover:border-primary/40 hover:bg-accent active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+                        chunkDetail?.text.toLowerCase() === chunk.toLowerCase() && "border-primary/50 bg-accent",
+                        hoveredChunkKey?.toLowerCase() === chunk.toLowerCase() &&
+                          chunkDetail?.text.toLowerCase() !== chunk.toLowerCase() &&
+                          "border-primary/40 bg-accent",
                       )}
                     >
                       {chunk}
                     </button>
                   ))}
                 </div>
-              </div>
-            ) : null}
-
-            <div className="grid grid-cols-2 gap-2 pt-1">
-              <Button size="sm" onClick={onSave}>
-                收藏短语
-              </Button>
-              <Button size="sm" variant="secondary" onClick={onReview}>
-                加入复习
-              </Button>
+              ) : (
+                <p className="text-sm text-muted-foreground">当前句暂无可用短语。</p>
+              )}
             </div>
-          </CardContent>
-        ) : (
-          <CardContent className="pt-4 text-sm text-muted-foreground">
-            选择短语后，这里会显示对应解析内容。
+
+            {chunkDetail ? (
+              <div
+                key={`chunk-${chunkDetail.text}`}
+                className="space-y-4 animate-in fade-in-0 slide-in-from-right-1 duration-200"
+              >
+                <div>
+                  <p className="text-xs tracking-[0.08em] text-muted-foreground">已选短语</p>
+                  {isLongChunk(chunkDetail.text) ? (
+                    <div className="mt-1 rounded-lg border border-border/70 bg-background px-3 py-2 text-sm leading-6 break-words">
+                      {chunkDetail.text}
+                    </div>
+                  ) : (
+                    <div className="mt-1 flex items-center gap-2">
+                      <Badge>{chunkDetail.text}</Badge>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="cursor-pointer"
+                    onClick={() => onPronounce(chunkDetail.text)}
+                  >
+                    <Volume2 className={speakingText === chunkDetail.text ? "size-4 animate-pulse" : "size-4"} />
+                    发音
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label="播放例句发音"
+                    onClick={() => onPronounce(chunkDetail.examples[0] ?? chunkDetail.text)}
+                  >
+                    <CirclePlay className="size-4" />
+                  </Button>
+                </div>
+
+                <div>
+                  <p className="text-xs tracking-[0.08em] text-muted-foreground">中文释义</p>
+                  <p className="mt-1 text-sm">{chunkDetail.translation}</p>
+                </div>
+                <div>
+                  <p className="text-xs tracking-[0.08em] text-muted-foreground">当前句中含义</p>
+                  <p className="mt-1 text-sm text-muted-foreground">{chunkDetail.meaningInSentence}</p>
+                </div>
+                <div>
+                  <p className="text-xs tracking-[0.08em] text-muted-foreground">常见用法</p>
+                  <p className="mt-1 text-sm leading-7">{chunkDetail.usageNote}</p>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-xs tracking-[0.08em] text-muted-foreground">例句</p>
+                  {chunkDetail.examples.slice(0, 2).map((example) => (
+                    <div key={example} className="flex items-center gap-2 rounded-lg border border-border/60 bg-background px-3 py-2 text-sm">
+                      <p className="flex-1 break-words">{example}</p>
+                      <Button
+                        size="icon-sm"
+                        variant="ghost"
+                        aria-label="播放例句发音"
+                        onClick={() => onPronounce(example)}
+                      >
+                        <CirclePlay className={speakingText === example ? "size-4 animate-pulse" : "size-4"} />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <Button size="sm" onClick={onSave}>
+                    收藏短语
+                  </Button>
+                  <Button size="sm" variant="secondary" onClick={onReview}>
+                    加入复习
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">点击下方短语查看解析与例句</p>
+            )}
           </CardContent>
         )}
       </Card>
