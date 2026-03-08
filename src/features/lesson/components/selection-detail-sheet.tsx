@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { CirclePlay, Languages, Volume2, X } from "lucide-react";
+import { Languages, Volume2, X } from "lucide-react";
 import { LessonSentence, SelectionChunkLayer } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -186,7 +186,19 @@ export function SelectionDetailSheet({
               </section>
 
               <section className="space-y-3 rounded-xl border border-border/70 p-3">
-                <h3 className="text-sm font-medium">{topHint}</h3>
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="text-sm font-medium">{topHint}</h3>
+                  {chunkDetail ? (
+                    <button
+                      type="button"
+                      className="inline-flex cursor-pointer items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground active:opacity-70"
+                      onClick={() => onPronounce(chunkDetail.text)}
+                    >
+                      <Volume2 className={cn("size-3.5", speakingText === chunkDetail.text && "animate-pulse text-primary")} />
+                      发音
+                    </button>
+                  ) : null}
+                </div>
                 {chunkDetail ? (
                   <div key={`mobile-chunk-${chunkDetail.text}`} className="space-y-3 animate-in fade-in-0 slide-in-from-bottom-1 duration-200">
                     {isLongChunk(chunkDetail.text) ? (
@@ -196,16 +208,6 @@ export function SelectionDetailSheet({
                     ) : (
                       <Badge>{chunkDetail.text}</Badge>
                     )}
-                    <div className="grid grid-cols-2 gap-2">
-                      <Button size="sm" variant="outline" className="cursor-pointer" onClick={() => onPronounce(chunkDetail.text)}>
-                        <Volume2 className={cn("size-4", speakingText === chunkDetail.text && "animate-pulse")} />
-                        发音
-                      </Button>
-                      <Button size="sm" variant="ghost" className="cursor-pointer" onClick={() => onPronounce(chunkDetail.examples[0] ?? chunkDetail.text)}>
-                        <CirclePlay className="size-4" />
-                        例句发音
-                      </Button>
-                    </div>
                     <div>
                       <p className="text-xs tracking-[0.08em] text-muted-foreground">中文释义</p>
                       <p className="mt-1 text-sm">{chunkDetail.translation}</p>
@@ -221,11 +223,8 @@ export function SelectionDetailSheet({
                     <div className="space-y-2">
                       <p className="text-xs tracking-[0.08em] text-muted-foreground">例句</p>
                       {chunkDetail.examples.slice(0, 2).map((example) => (
-                        <div key={example} className="flex items-center gap-2 rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-sm">
-                          <p className="flex-1 break-words leading-6">{example}</p>
-                          <Button size="icon-sm" variant="ghost" className="cursor-pointer" aria-label="播放例句发音" onClick={() => onPronounce(example)}>
-                            <CirclePlay className={cn("size-4", speakingText === example && "animate-pulse")} />
-                          </Button>
+                        <div key={example} className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-sm">
+                          <p className="break-words leading-6">{example}</p>
                         </div>
                       ))}
                     </div>
