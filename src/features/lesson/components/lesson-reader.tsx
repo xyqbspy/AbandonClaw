@@ -101,6 +101,7 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
   const sentenceNodeMapRef = useRef<Record<string, HTMLDivElement | null>>({});
   const autoPlayActiveRef = useRef(false);
   const playFromIndexRef = useRef<(index: number) => void>(() => {});
+  const sentenceLoopRef = useRef<string | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [mobileTranslationOpenMap, setMobileTranslationOpenMap] = useState<Record<string, boolean>>({});
   const [autoPlayActive, setAutoPlayActive] = useState(false);
@@ -295,6 +296,48 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
 
       const success = speak(text, { lang: "en-US" });
       if (!success) toast.error("发音失败，请稍后重试");
+    },
+    [speak, speakingText, stop, supported],
+  );
+
+  const handleLoopSentence = useCallback(
+    (text: string) => {
+      const clean = text.trim();
+      if (!clean) return;
+      if (!supported) {
+        toast.error("当前浏览器不支持发音功能");
+        return;
+      }
+
+      if (sentenceLoopRef.current === clean && speakingText === clean) {
+        sentenceLoopRef.current = null;
+        stop();
+        return;
+      }
+
+      autoPlayActiveRef.current = false;
+      setAutoPlayActive(false);
+      sentenceLoopRef.current = clean;
+
+      const speakLoop = () => {
+        if (sentenceLoopRef.current !== clean) return;
+        const success = speak(clean, {
+          lang: "en-US",
+          onEnd: () => {
+            if (sentenceLoopRef.current !== clean) return;
+            window.setTimeout(speakLoop, 80);
+          },
+          onError: () => {
+            sentenceLoopRef.current = null;
+          },
+        });
+        if (!success) {
+          sentenceLoopRef.current = null;
+          toast.error("播放失败，请稍后重试");
+        }
+      };
+
+      speakLoop();
     },
     [speak, speakingText, stop, supported],
   );
@@ -543,7 +586,7 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
                                 className="inline-flex cursor-pointer items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground active:opacity-70"
                                 onClick={(event) => {
                                   event.stopPropagation();
-                                  handlePronounce(sentence.text);
+                                  handleLoopSentence(sentence.text);
                                 }}
                               >
                                 <Volume2 className={cn("size-3.5", playing && "animate-pulse text-primary")} />
