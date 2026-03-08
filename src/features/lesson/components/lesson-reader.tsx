@@ -515,7 +515,7 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
         <Card
           className={cn(
             "bg-card/95",
-            isMobile && "border-border/10 bg-muted/35 shadow-none",
+            isMobile && "border-0 bg-muted/35 shadow-none",
           )}
         >
           <CardContent className={cn("space-y-4 p-5 sm:p-6", isMobile && "space-y-1 p-2.5")}>
@@ -621,7 +621,7 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
                               : "hover:bg-muted/20",
                         )}
                       >
-                        <div className="px-2.5 py-1">
+                        <div className="px-2.5 py-0.5">
                           <div
                             className={cn(
                               "cursor-pointer transition-colors",
@@ -631,7 +631,7 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
                           >
                             <div
                               className={cn(
-                                "mb-0.5 flex items-center justify-end gap-1.5",
+                                "mb-0 flex items-center justify-end gap-1.5",
                                 groupSelected && "text-primary",
                               )}
                             >
