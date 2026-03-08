@@ -609,20 +609,24 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
                         key={groupKey}
                         className={cn(
                           "border-border/70 bg-card/95 shadow-sm transition-all duration-150",
-                          active && "border-primary/35",
+                          groupSelected
+                            ? "border-primary/30 bg-accent/30"
+                            : active
+                              ? "border-primary/25"
+                              : "hover:bg-muted/20",
                         )}
                       >
-                        <div className="overflow-hidden rounded-xl border border-border/60 bg-transparent">
+                        <div className="px-3 py-2.5">
                           <div
                             className={cn(
-                              "cursor-pointer px-3 py-2 transition-colors",
-                              groupPlaying ? "bg-primary/10" : groupSelected ? "bg-accent/40" : "hover:bg-muted/35",
+                              "cursor-pointer transition-colors",
+                              groupPlaying ? "text-primary" : "",
                             )}
                             onClick={() => handleMobileGroupTap(groupContext)}
                           >
                             <div
                               className={cn(
-                                "mb-0 flex items-center justify-end gap-2",
+                                "mb-1 flex items-center justify-end gap-2",
                                 groupSelected && "text-primary",
                               )}
                             >
@@ -673,35 +677,24 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
                               </p>
                             </div>
                           </div>
-                          {group.map((sentence) => {
-                            const selected =
-                              mobileActiveGroup?.sentenceIds.includes(sentence.id) ??
-                              currentSentence?.id === sentence.id;
-
-                            return (
-                              <div
-                                key={sentence.id}
-                                ref={(node) => {
-                                  sentenceNodeMapRef.current[sentence.id] = node;
-                                }}
-                                className={cn(
-                                  "cursor-pointer px-3 py-1.5 transition-colors",
-                                  "first:pt-1 last:pb-2",
-                                  selected ? "text-primary" : "hover:text-foreground",
-                                )}
-                                onClick={() => handleMobileGroupTap(groupContext)}
-                              >
-                                <p
-                                  className={cn(
-                                    "text-[1rem] leading-[1.65] text-foreground",
-                                    selected && "text-primary",
-                                  )}
-                                >
-                                  {sentence.text}
-                                </p>
-                              </div>
-                            );
-                          })}
+                          <div
+                            ref={(node) => {
+                              for (const sentence of group) {
+                                sentenceNodeMapRef.current[sentence.id] = node;
+                              }
+                            }}
+                            className="cursor-pointer transition-colors"
+                            onClick={() => handleMobileGroupTap(groupContext)}
+                          >
+                            <p
+                              className={cn(
+                                "text-[1rem] leading-[1.7] text-foreground",
+                                groupSelected && "text-primary",
+                              )}
+                            >
+                              {groupText}
+                            </p>
+                          </div>
                         </div>
                       </Card>
                     );
