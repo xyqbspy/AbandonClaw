@@ -515,7 +515,7 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
         <Card
           className={cn(
             "bg-card/95",
-            isMobile && "border-0 bg-muted/35 shadow-none",
+            isMobile && "border-0 bg-muted/30 shadow-none",
           )}
         >
           <CardContent className={cn("space-y-4 p-5 sm:p-6", isMobile && "space-y-1 p-2.5")}>
@@ -613,12 +613,12 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
                       <Card
                         key={groupKey}
                         className={cn(
-                          "border-border/10 bg-muted/16 shadow-none transition-all duration-150",
+                          "rounded-none border-x-0 border-y border-border/10 bg-muted/10 shadow-none transition-all duration-150",
                           groupSelected
-                            ? "bg-accent/14"
+                            ? "bg-accent/12"
                             : active
-                              ? "bg-muted/18"
-                              : "hover:bg-muted/20",
+                              ? "bg-muted/14"
+                              : "hover:bg-muted/16",
                         )}
                       >
                         <div className="px-2.5 py-0.5">
