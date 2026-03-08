@@ -511,27 +511,32 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
         onPronounce={() => handlePronounce(state.selectionState?.text ?? "")}
       />
 
-      <div ref={readerRef} className={cn("space-y-5", isMobile && "space-y-3")}>
-        <Card className={cn("bg-card/95", isMobile && "border-border/70 bg-card shadow-sm")}>
-          <CardContent className={cn("space-y-4 p-5 sm:p-6", isMobile && "space-y-2 p-3")}>
+      <div ref={readerRef} className={cn("space-y-5", isMobile && "space-y-2.5")}>
+        <Card
+          className={cn(
+            "bg-card/95",
+            isMobile && "border-transparent bg-muted/25 shadow-none",
+          )}
+        >
+          <CardContent className={cn("space-y-4 p-5 sm:p-6", isMobile && "space-y-1.5 p-2.5")}>
             {isMobile ? (
               <>
                 <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
-                  <h1 className="line-clamp-2 text-[1.05rem] font-semibold leading-6">
+                  <h1 className="line-clamp-2 text-[1rem] font-semibold leading-6">
                     {lesson.title}
                   </h1>
                   <Button
                     type="button"
                     size="sm"
                     variant="ghost"
-                    className="h-6 shrink-0 cursor-pointer gap-1 px-2 text-[11px] text-muted-foreground"
+                    className="h-6 shrink-0 cursor-pointer gap-1 px-1.5 text-[10px] text-muted-foreground/80"
                     onClick={toggleSequentialPlay}
                   >
                     <Play className="size-3" />
                     {autoPlayActive ? "停止循环" : "循环播放"}
                   </Button>
                 </div>
-                <p className="text-[11px] leading-4 whitespace-nowrap text-muted-foreground">
+                <p className="text-[10px] leading-4 whitespace-nowrap text-muted-foreground/80">
                   {lesson.difficulty === "Beginner" ? "入门" : lesson.difficulty === "Advanced" ? "进阶" : "中级"} · {lesson.estimatedMinutes}分钟 · {sentenceCount}句
                 </p>
               </>
@@ -579,13 +584,13 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
         </Card>
 
         {isMobile ? (
-          <div className="space-y-2.5">
+          <div className="space-y-2">
             {lesson.sections.map((section) => {
               const active = currentSection?.id === section.id;
               const groupedSentences = groupSentencesForMobile(section.sentences);
 
               return (
-                <div key={section.id} className="space-y-2.5">
+                <div key={section.id} className="space-y-2">
                   {groupedSentences.map((group, groupIndex) => {
                     const groupKey = `${section.id}-group-${groupIndex}`;
                     const groupText = group.map((sentence) => sentence.text).join(" ");
@@ -608,12 +613,12 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
                       <Card
                         key={groupKey}
                         className={cn(
-                          "border-border/35 bg-card/85 shadow-none transition-all duration-150",
+                          "border-transparent bg-muted/20 shadow-none transition-all duration-150",
                           groupSelected
-                            ? "border-primary/20 bg-accent/20"
+                            ? "bg-accent/18"
                             : active
-                              ? "border-primary/15"
-                              : "hover:bg-muted/10",
+                              ? "bg-muted/24"
+                              : "hover:bg-muted/26",
                         )}
                       >
                         <div className="px-2.5 py-2">
