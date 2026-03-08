@@ -126,7 +126,7 @@ export function SelectionDetailSheet({
                         className="inline-flex cursor-pointer items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground active:opacity-70"
                         onClick={() => setShowSentenceTranslation((prev) => !prev)}
                       >
-                        译文
+                        翻译
                       </button>
                       <button
                         type="button"
@@ -140,7 +140,9 @@ export function SelectionDetailSheet({
                     <div
                       className={cn(
                         "grid overflow-hidden transition-all duration-200",
-                        showSentenceTranslation ? "mt-1.5 grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
+                        showSentenceTranslation
+                          ? "mt-1.5 grid-rows-[1fr] opacity-100"
+                          : "mt-0.5 grid-rows-[0fr] opacity-0",
                       )}
                     >
                       <p className="min-h-0 rounded-lg bg-muted px-3 py-2 text-sm leading-6">{currentSentence.translation}</p>
