@@ -13,6 +13,7 @@ type SpeakOptions = {
 
 export function useSpeech() {
   const [speakingText, setSpeakingText] = useState<string | null>(null);
+  const [paused, setPaused] = useState(false);
   const utterRef = useRef<SpeechSynthesisUtterance | null>(null);
 
   const supported =
@@ -25,6 +26,23 @@ export function useSpeech() {
     window.speechSynthesis.cancel();
     utterRef.current = null;
     setSpeakingText(null);
+    setPaused(false);
+  }, [supported]);
+
+  const pause = useCallback(() => {
+    if (!supported) return false;
+    if (!window.speechSynthesis.speaking || window.speechSynthesis.paused) return false;
+    window.speechSynthesis.pause();
+    setPaused(true);
+    return true;
+  }, [supported]);
+
+  const resume = useCallback(() => {
+    if (!supported) return false;
+    if (!window.speechSynthesis.paused) return false;
+    window.speechSynthesis.resume();
+    setPaused(false);
+    return true;
   }, [supported]);
 
   const speak = useCallback(
@@ -40,14 +58,17 @@ export function useSpeech() {
       utter.pitch = options?.pitch ?? 1;
       utter.onstart = () => {
         setSpeakingText(clean);
+        setPaused(false);
         options?.onStart?.();
       };
       utter.onend = () => {
         setSpeakingText((prev) => (prev === clean ? null : prev));
+        setPaused(false);
         options?.onEnd?.();
       };
       utter.onerror = () => {
         setSpeakingText((prev) => (prev === clean ? null : prev));
+        setPaused(false);
         options?.onError?.();
       };
 
@@ -61,7 +82,10 @@ export function useSpeech() {
   return {
     speak,
     stop,
+    pause,
+    resume,
     supported,
     speakingText,
+    paused,
   };
 }

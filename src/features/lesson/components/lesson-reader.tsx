@@ -94,7 +94,7 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
 
   const firstSentence = getFirstSentence(lesson) ?? null;
   const isMobile = useMobile();
-  const { speak, stop, supported, speakingText } = useSpeech();
+  const { speak, pause, resume, supported, speakingText, paused } = useSpeech();
   const toolbarRef = useRef<HTMLDivElement | null>(null);
   const readerRef = useRef<HTMLDivElement | null>(null);
   const suppressSelectionClearRef = useRef(false);
@@ -290,10 +290,22 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
         toast.error("当前浏览器不支持发音功能");
         return;
       }
+
+      if (speakingText === text) {
+        if (paused) {
+          const resumed = resume();
+          if (!resumed) toast.error("继续播放失败，请稍后重试");
+          return;
+        }
+        const pausedOk = pause();
+        if (!pausedOk) toast.error("暂停播放失败，请稍后重试");
+        return;
+      }
+
       const success = speak(text, { lang: "en-US" });
       if (!success) toast.error("发音失败，请稍后重试");
     },
-    [speak, supported],
+    [pause, paused, resume, speak, speakingText, supported],
   );
   const toggleMobileTranslation = useCallback((sentenceId: string) => {
     setMobileTranslationOpenMap((prev) => ({
@@ -341,16 +353,19 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
     }
     if (autoPlayActive && !autoPlayPaused) {
       autoPlayPausedRef.current = true;
-      stop();
+      pause();
       setAutoPlayPaused(true);
       return;
     }
     if (autoPlayActive && autoPlayPaused) {
-      startSequentialPlay(autoPlayIndex);
+      const resumed = resume();
+      if (!resumed) startSequentialPlay(autoPlayIndex);
+      setAutoPlayPaused(false);
+      autoPlayPausedRef.current = false;
       return;
     }
     startSequentialPlay(0);
-  }, [autoPlayActive, autoPlayIndex, autoPlayPaused, startSequentialPlay, stop, supported]);
+  }, [autoPlayActive, autoPlayIndex, autoPlayPaused, pause, resume, startSequentialPlay, supported]);
 
   const handleSave = useCallback(() => toast.success("已收藏短语"), []);
   const handleAddReview = useCallback(() => toast.success("已加入复习"), []);
@@ -550,7 +565,7 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
                                 }}
                               >
                                 <Volume2 className={cn("size-3.5", playing && "animate-pulse text-primary")} />
-                                {playing ? "播放中" : "播放"}
+                                {playing ? (paused ? "继续播放" : "播放中") : "播放"}
                               </button>
                               <button
                                 type="button"
@@ -561,7 +576,7 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
                                 }}
                               >
                                 <Languages className="size-3.5" />
-                                {translationOpen ? "收起" : "译文"}
+                                {translationOpen ? "译文" : "翻译"}
                               </button>
                             </div>
                             <div
@@ -647,6 +662,7 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
         open={sheetOpen}
         loading={false}
         speakingText={speakingText}
+        speechPaused={paused}
         onOpenChange={setSheetOpen}
         onSave={handleSave}
         onReview={handleAddReview}
