@@ -307,17 +307,14 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
       if (sentenceOrder.length === 0) return;
       const nextIndex = Math.max(0, Math.min(startIndex, sentenceOrder.length - 1));
       const target = sentenceOrder[nextIndex];
+      autoPlayActiveRef.current = true;
+      autoPlayPausedRef.current = false;
       const success = speak(target.text, {
         lang: "en-US",
         onEnd: () => {
           setAutoPlayIndex((prevIndex) => {
-            const next = prevIndex + 1;
+            const next = (prevIndex + 1) % sentenceOrder.length;
             if (!autoPlayActiveRef.current || autoPlayPausedRef.current) return prevIndex;
-            if (next >= sentenceOrder.length) {
-              setAutoPlayActive(false);
-              setAutoPlayPaused(false);
-              return 0;
-            }
             window.setTimeout(() => playFromIndexRef.current(next), 80);
             return next;
           });
@@ -343,6 +340,7 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
       return;
     }
     if (autoPlayActive && !autoPlayPaused) {
+      autoPlayPausedRef.current = true;
       stop();
       setAutoPlayPaused(true);
       return;
@@ -444,7 +442,7 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
                   onClick={toggleSequentialPlay}
                 >
                   <Play className="size-3.5" />
-                  {autoPlayActive ? (autoPlayPaused ? "继续" : "暂停") : "连播"}
+                  {autoPlayActive ? (autoPlayPaused ? "继续循环" : "暂停循环") : "循环播放"}
                 </Button>
               </div>
             ) : null}
