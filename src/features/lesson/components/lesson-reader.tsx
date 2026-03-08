@@ -518,35 +518,11 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
                               sentenceNodeMapRef.current[sentence.id] = node;
                             }}
                             className={cn(
-                              "px-3 py-2 transition-colors",
+                              "relative px-3 py-2 transition-colors",
                               playing ? "bg-primary/10" : selected ? "bg-accent/40" : "hover:bg-muted/40",
                             )}
                           >
-                            <button
-                              type="button"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                console.log("[mobile-tap] sentence-button", { sentenceId: sentence.id });
-                                handleMobileSentenceTap(sentence.id);
-                              }}
-                              className="block w-full cursor-pointer text-left focus-visible:outline-none"
-                            >
-                              <p className={cn("text-[1rem] leading-7 text-foreground", selected && "text-primary")}>
-                                {sentence.text}
-                              </p>
-                            </button>
-                            <div className="mt-1 flex items-center gap-3">
-                              <button
-                                type="button"
-                                className="inline-flex cursor-pointer items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground active:opacity-70"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  handlePronounce(sentence.text);
-                                }}
-                              >
-                                <Volume2 className={cn("size-3.5", playing && "animate-pulse text-primary")} />
-                                {playing ? "停止" : "播放"}
-                              </button>
+                            <div className="absolute right-3 top-2 flex items-center gap-3">
                               <button
                                 type="button"
                                 className="inline-flex cursor-pointer items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground active:opacity-70"
@@ -558,7 +534,31 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
                                 <Languages className="size-3.5" />
                                 {translationOpen ? "收起" : "翻译"}
                               </button>
+                              <button
+                                type="button"
+                                className="inline-flex cursor-pointer items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground active:opacity-70"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  handlePronounce(sentence.text);
+                                }}
+                              >
+                                <Volume2 className={cn("size-3.5", playing && "animate-pulse text-primary")} />
+                                {playing ? "停止" : "播放"}
+                              </button>
                             </div>
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                console.log("[mobile-tap] sentence-button", { sentenceId: sentence.id });
+                                handleMobileSentenceTap(sentence.id);
+                              }}
+                              className="block w-full cursor-pointer pr-28 text-left focus-visible:outline-none"
+                            >
+                              <p className={cn("text-[1rem] leading-7 text-foreground", selected && "text-primary")}>
+                                {sentence.text}
+                              </p>
+                            </button>
                             <div
                               className={cn(
                                 "grid overflow-hidden transition-all duration-200",
