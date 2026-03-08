@@ -152,37 +152,37 @@ export function SelectionDetailSheet({
                     >
                       <p className="min-h-0 rounded-lg bg-muted px-3 py-2 text-sm leading-6">{currentSentence.translation}</p>
                     </div>
+
+                    <div className="mt-3 space-y-2">
+                      <p className="text-xs tracking-[0.08em] text-muted-foreground">本句相关短语</p>
+                      <div className="flex flex-wrap gap-2">
+                        {relatedChunks.map((chunk) => (
+                          <button
+                            key={chunk}
+                            type="button"
+                            className={cn(
+                              "cursor-pointer rounded-full border border-border/70 bg-background px-2.5 py-1 text-xs transition",
+                              "hover:border-primary/40 hover:bg-accent active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+                              chunkDetail?.text.toLowerCase() === chunk.toLowerCase() && "border-primary/50 bg-accent",
+                              hoveredChunkKey?.toLowerCase() === chunk.toLowerCase() &&
+                                chunkDetail?.text.toLowerCase() !== chunk.toLowerCase() &&
+                                "border-primary/40 bg-accent",
+                            )}
+                            onClick={() => onSelectRelated(chunk)}
+                            onMouseEnter={() => onHoverChunk(chunk)}
+                            onMouseLeave={() => onHoverChunk(null)}
+                            onFocus={() => onHoverChunk(chunk)}
+                            onBlur={() => onHoverChunk(null)}
+                          >
+                            {chunk}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   </>
                 ) : (
                   <p className="text-sm text-muted-foreground">点按左侧句子开始学习。</p>
                 )}
-              </section>
-
-              <section className="space-y-2 rounded-xl border border-border/70 p-3">
-                <p className="text-xs tracking-[0.08em] text-muted-foreground">本句相关短语</p>
-                <div className="flex flex-wrap gap-2">
-                  {relatedChunks.map((chunk) => (
-                    <button
-                      key={chunk}
-                      type="button"
-                      className={cn(
-                        "cursor-pointer rounded-full border border-border/70 bg-background px-2.5 py-1 text-xs transition",
-                        "hover:border-primary/40 hover:bg-accent active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
-                        chunkDetail?.text.toLowerCase() === chunk.toLowerCase() && "border-primary/50 bg-accent",
-                        hoveredChunkKey?.toLowerCase() === chunk.toLowerCase() &&
-                          chunkDetail?.text.toLowerCase() !== chunk.toLowerCase() &&
-                          "border-primary/40 bg-accent",
-                      )}
-                      onClick={() => onSelectRelated(chunk)}
-                      onMouseEnter={() => onHoverChunk(chunk)}
-                      onMouseLeave={() => onHoverChunk(null)}
-                      onFocus={() => onHoverChunk(chunk)}
-                      onBlur={() => onHoverChunk(null)}
-                    >
-                      {chunk}
-                    </button>
-                  ))}
-                </div>
               </section>
 
               <section className="space-y-3 rounded-xl border border-border/70 p-3">
