@@ -612,7 +612,7 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
                           active && "border-primary/35",
                         )}
                       >
-                        <div className="overflow-hidden divide-y divide-border/50 rounded-xl border border-border/60 bg-transparent">
+                        <div className="overflow-hidden rounded-xl border border-border/60 bg-transparent">
                           <div
                             className={cn(
                               "cursor-pointer px-3 py-2 transition-colors",
@@ -670,14 +670,15 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
                                   sentenceNodeMapRef.current[sentence.id] = node;
                                 }}
                                 className={cn(
-                                  "cursor-pointer px-3 py-2.5 transition-colors",
-                                  selected ? "bg-accent/35" : "hover:bg-muted/30",
+                                  "cursor-pointer px-3 py-1.5 transition-colors",
+                                  "first:pt-2 last:pb-2",
+                                  selected ? "text-primary" : "hover:text-foreground",
                                 )}
                                 onClick={() => handleMobileGroupTap(groupContext)}
                               >
                                 <p
                                   className={cn(
-                                    "text-[1rem] leading-7 text-foreground",
+                                    "text-[1rem] leading-[1.65] text-foreground",
                                     selected && "text-primary",
                                   )}
                                 >
