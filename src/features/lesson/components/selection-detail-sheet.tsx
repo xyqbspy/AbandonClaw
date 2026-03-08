@@ -22,6 +22,7 @@ export function SelectionDetailSheet({
   onSave,
   onReview,
   onPronounce,
+  onLoopSentence,
   onSelectRelated,
   hoveredChunkKey,
   onHoverChunk,
@@ -36,6 +37,7 @@ export function SelectionDetailSheet({
   onSave: () => void;
   onReview: () => void;
   onPronounce: (text: string) => void;
+  onLoopSentence: (text: string) => void;
   onSelectRelated: (chunk: string) => void;
   hoveredChunkKey: string | null;
   onHoverChunk: (chunkKey: string | null) => void;
@@ -131,7 +133,7 @@ export function SelectionDetailSheet({
                       <button
                         type="button"
                         className="inline-flex cursor-pointer items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground active:opacity-70"
-                        onClick={() => onPronounce(currentSentence.text)}
+                        onClick={() => onLoopSentence(currentSentence.text)}
                       >
                         <Volume2 className={cn("size-3.5", speakingText === currentSentence.text && "animate-pulse text-primary")} />
                         {speakingText === currentSentence.text ? "停止" : "播放"}

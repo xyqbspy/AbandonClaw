@@ -693,6 +693,7 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
         onSave={handleSave}
         onReview={handleAddReview}
         onPronounce={handlePronounce}
+        onLoopSentence={handleLoopSentence}
         onSelectRelated={(chunk) => {
           if (!state.activeSentenceId) return;
           activateChunk(state.activeSentenceId, chunk);
