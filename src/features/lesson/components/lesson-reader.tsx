@@ -12,7 +12,7 @@ import {
 } from "@/lib/data/mock-lessons";
 import { useMobile } from "@/hooks/use-mobile";
 import { useSpeech } from "@/hooks/use-speech";
-import { Lesson, SelectionChunkLayer } from "@/lib/types";
+import { Lesson, LessonSentence, SelectionChunkLayer } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -43,6 +43,14 @@ type InteractionAction =
   | { type: "SELECTION_CLEARED" }
   | { type: "CHUNK_ACTIVATED"; payload: { sentenceId: string; chunkKey: string } }
   | { type: "CHUNK_HOVERED"; payload: { chunkKey: string | null } };
+
+type MobileSentenceGroup = {
+  key: string;
+  sentenceIds: string[];
+  text: string;
+  translation: string;
+  relatedChunks: string[];
+};
 
 function groupSentencesForMobile(sentences: Lesson["sections"][number]["sentences"]) {
   const groups: Array<typeof sentences> = [];
@@ -135,6 +143,7 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
   const sentenceLoopRef = useRef<string | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [mobileGroupTranslationOpenMap, setMobileGroupTranslationOpenMap] = useState<Record<string, boolean>>({});
+  const [mobileActiveGroup, setMobileActiveGroup] = useState<MobileSentenceGroup | null>(null);
   const [autoPlayActive, setAutoPlayActive] = useState(false);
   const [, setAutoPlayIndex] = useState(0);
   const [state, dispatch] = useReducer(interactionReducer, {
@@ -163,6 +172,16 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
     [lesson, state.activeSentenceId],
   );
 
+  const mobileDisplaySentence = useMemo<LessonSentence | null>(() => {
+    if (!isMobile || !mobileActiveGroup) return currentSentence;
+    return {
+      id: mobileActiveGroup.key,
+      text: mobileActiveGroup.text,
+      translation: mobileActiveGroup.translation,
+      chunks: mobileActiveGroup.relatedChunks,
+    };
+  }, [currentSentence, isMobile, mobileActiveGroup]);
+
   const currentSection = useMemo(() => {
     if (!state.activeSentenceId) return lesson.sections[0] ?? null;
     return (
@@ -172,7 +191,9 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
     );
   }, [lesson.sections, state.activeSentenceId]);
 
-  const relatedChunks = currentSentence?.chunks ?? [];
+  const relatedChunks = isMobile
+    ? mobileActiveGroup?.relatedChunks ?? currentSentence?.chunks ?? []
+    : currentSentence?.chunks ?? [];
 
   const chunkDetail = useMemo<SelectionChunkLayer | null>(() => {
     if (!currentSentence || !state.activeChunkKey) return null;
@@ -260,16 +281,22 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
     [dispatchAction, isMobile],
   );
 
-  const handleMobileSentenceTap = useCallback(
-    (sentenceId: string) => {
-      console.log("[mobile-tap] sentence", { sentenceId });
-      const sentence = findSentenceById(sentenceId);
-      handleSentenceTap(sentenceId);
+  const handleMobileGroupTap = useCallback(
+    (group: MobileSentenceGroup) => {
+      console.log("[mobile-tap] sentence-group", { groupKey: group.key, sentenceIds: group.sentenceIds });
+      const anchorSentenceId = group.sentenceIds[0];
+      const anchorSentence = findSentenceById(anchorSentenceId);
+      dispatchAction({
+        type: "SENTENCE_CONTEXT_SET",
+        payload: { sentenceId: anchorSentenceId },
+      });
+      dispatchAction({ type: "SELECTION_CLEARED" });
+      setMobileActiveGroup(group);
       setSheetOpen(true);
-      const firstChunk = sentence?.chunks[0];
-      if (firstChunk) activateChunk(sentenceId, firstChunk);
+      const firstChunk = anchorSentence?.chunks[0];
+      if (firstChunk) activateChunk(anchorSentenceId, firstChunk);
     },
-    [activateChunk, findSentenceById, handleSentenceTap],
+    [activateChunk, dispatchAction, findSentenceById],
   );
 
   const extractSelectionInReader = useCallback(() => {
@@ -564,8 +591,18 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
                     const groupText = group.map((sentence) => sentence.text).join(" ");
                     const groupTranslation = group.map((sentence) => sentence.translation).join(" ");
                     const groupPlaying = speakingText === groupText;
-                    const groupSelected = group.some((sentence) => sentence.id === currentSentence?.id);
+                    const groupSelected = group.some((sentence) => sentence.id === state.activeSentenceId);
                     const translationOpen = Boolean(mobileGroupTranslationOpenMap[groupKey]);
+                    const groupRelatedChunks = Array.from(
+                      new Set(group.flatMap((sentence) => sentence.chunks)),
+                    );
+                    const groupContext: MobileSentenceGroup = {
+                      key: groupKey,
+                      sentenceIds: group.map((sentence) => sentence.id),
+                      text: groupText,
+                      translation: groupTranslation,
+                      relatedChunks: groupRelatedChunks,
+                    };
 
                     return (
                       <Card
@@ -578,9 +615,10 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
                         <div className="overflow-hidden divide-y divide-border/50 rounded-xl border border-border/60 bg-transparent">
                           <div
                             className={cn(
-                              "px-3 py-2 transition-colors",
+                              "cursor-pointer px-3 py-2 transition-colors",
                               groupPlaying ? "bg-primary/10" : groupSelected ? "bg-accent/40" : "hover:bg-muted/35",
                             )}
+                            onClick={() => handleMobileGroupTap(groupContext)}
                           >
                             <div className="mb-1 flex items-center justify-end gap-2">
                               <button
@@ -621,7 +659,9 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
                             </div>
                           </div>
                           {group.map((sentence) => {
-                            const selected = currentSentence?.id === sentence.id;
+                            const selected =
+                              mobileActiveGroup?.sentenceIds.includes(sentence.id) ??
+                              currentSentence?.id === sentence.id;
 
                             return (
                               <div
@@ -630,28 +670,19 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
                                   sentenceNodeMapRef.current[sentence.id] = node;
                                 }}
                                 className={cn(
-                                  "px-3 py-2.5 transition-colors",
+                                  "cursor-pointer px-3 py-2.5 transition-colors",
                                   selected ? "bg-accent/35" : "hover:bg-muted/30",
                                 )}
+                                onClick={() => handleMobileGroupTap(groupContext)}
                               >
-                                <button
-                                  type="button"
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                    console.log("[mobile-tap] sentence-button", { sentenceId: sentence.id });
-                                    handleMobileSentenceTap(sentence.id);
-                                  }}
-                                  className="block w-full cursor-pointer text-left focus-visible:outline-none"
+                                <p
+                                  className={cn(
+                                    "text-[1rem] leading-7 text-foreground",
+                                    selected && "text-primary",
+                                  )}
                                 >
-                                  <p
-                                    className={cn(
-                                      "text-[1rem] leading-7 text-foreground",
-                                      selected && "text-primary",
-                                    )}
-                                  >
-                                    {sentence.text}
-                                  </p>
-                                </button>
+                                  {sentence.text}
+                                </p>
                               </div>
                             );
                           })}
@@ -701,7 +732,7 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
         )}
       >
         <SelectionDetailPanel
-          currentSentence={currentSentence}
+          currentSentence={mobileDisplaySentence}
           chunkDetail={chunkDetail}
           relatedChunks={relatedChunks}
           loading={false}
@@ -710,6 +741,16 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
           onReview={handleAddReview}
           onPronounce={handlePronounce}
           onSelectRelated={(chunk) => {
+            if (isMobile && mobileActiveGroup) {
+              const matchSentenceId =
+                mobileActiveGroup.sentenceIds.find((id) => {
+                  const sentence = findSentenceById(id);
+                  return sentence?.chunks.some((item) => item.toLowerCase() === chunk.toLowerCase());
+                }) ?? mobileActiveGroup.sentenceIds[0];
+              if (!matchSentenceId) return;
+              activateChunk(matchSentenceId, chunk);
+              return;
+            }
             if (!state.activeSentenceId) return;
             activateChunk(state.activeSentenceId, chunk);
           }}
@@ -721,7 +762,7 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
       </div>
 
       <SelectionDetailSheet
-        currentSentence={currentSentence}
+        currentSentence={mobileDisplaySentence}
         chunkDetail={chunkDetail}
         relatedChunks={relatedChunks}
         open={sheetOpen}
@@ -733,6 +774,16 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
         onPronounce={handlePronounce}
         onLoopSentence={handleLoopSentence}
         onSelectRelated={(chunk) => {
+          if (isMobile && mobileActiveGroup) {
+            const matchSentenceId =
+              mobileActiveGroup.sentenceIds.find((id) => {
+                const sentence = findSentenceById(id);
+                return sentence?.chunks.some((item) => item.toLowerCase() === chunk.toLowerCase());
+              }) ?? mobileActiveGroup.sentenceIds[0];
+            if (!matchSentenceId) return;
+            activateChunk(matchSentenceId, chunk);
+            return;
+          }
           if (!state.activeSentenceId) return;
           activateChunk(state.activeSentenceId, chunk);
         }}
