@@ -511,11 +511,11 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
         onPronounce={() => handlePronounce(state.selectionState?.text ?? "")}
       />
 
-      <div ref={readerRef} className={cn("space-y-5", isMobile && "space-y-2.5")}>
+      <div ref={readerRef} className={cn("space-y-5", isMobile && "space-y-1")}>
         <Card
           className={cn(
             "bg-card/95",
-            isMobile && "border-transparent bg-muted/25 shadow-none",
+            isMobile && "border-0 bg-muted/35 shadow-none",
           )}
         >
           <CardContent className={cn("space-y-4 p-5 sm:p-6", isMobile && "space-y-1.5 p-2.5")}>
@@ -584,13 +584,13 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
         </Card>
 
         {isMobile ? (
-          <div className="space-y-2">
+          <div className="space-y-1">
             {lesson.sections.map((section) => {
               const active = currentSection?.id === section.id;
               const groupedSentences = groupSentencesForMobile(section.sentences);
 
               return (
-                <div key={section.id} className="space-y-2">
+                <div key={section.id} className="space-y-1">
                   {groupedSentences.map((group, groupIndex) => {
                     const groupKey = `${section.id}-group-${groupIndex}`;
                     const groupText = group.map((sentence) => sentence.text).join(" ");
@@ -613,12 +613,12 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
                       <Card
                         key={groupKey}
                         className={cn(
-                          "border-transparent bg-muted/20 shadow-none transition-all duration-150",
+                          "border-0 bg-muted/16 shadow-none transition-all duration-150",
                           groupSelected
-                            ? "bg-accent/18"
+                            ? "bg-accent/14"
                             : active
-                              ? "bg-muted/24"
-                              : "hover:bg-muted/26",
+                              ? "bg-muted/18"
+                              : "hover:bg-muted/20",
                         )}
                       >
                         <div className="px-2.5 py-2">
