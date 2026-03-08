@@ -238,10 +238,13 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
   const handleMobileSentenceTap = useCallback(
     (sentenceId: string) => {
       console.log("[mobile-tap] sentence", { sentenceId });
+      const sentence = findSentenceById(sentenceId);
       handleSentenceTap(sentenceId);
       setSheetOpen(true);
+      const firstChunk = sentence?.chunks[0];
+      if (firstChunk) activateChunk(sentenceId, firstChunk);
     },
-    [handleSentenceTap],
+    [activateChunk, findSentenceById, handleSentenceTap],
   );
 
   const extractSelectionInReader = useCallback(() => {
