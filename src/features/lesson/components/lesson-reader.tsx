@@ -106,13 +106,6 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
   const [mobileTranslationOpenMap, setMobileTranslationOpenMap] = useState<Record<string, boolean>>({});
   const [autoPlayActive, setAutoPlayActive] = useState(false);
   const [, setAutoPlayIndex] = useState(0);
-  const shortSectionTagMap: Record<string, string> = {
-    "醒来与起步": "清晨启动",
-    "早餐与专注": "进入状态",
-    "通勤与输入": "通勤输入",
-    "到达与进入状态": "出门前整理",
-  };
-
   const [state, dispatch] = useReducer(interactionReducer, {
     activeSentenceId: firstSentence?.id ?? null,
     activeChunkKey: null,
@@ -468,29 +461,29 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
       />
 
       <div ref={readerRef} className={cn("space-y-5", isMobile && "space-y-3")}>
-        <Card className={cn("bg-card/95", isMobile && "border-primary/15 bg-gradient-to-b from-card to-muted/30 shadow-sm")}>
-          <CardContent className={cn("space-y-4 p-5 sm:p-6", isMobile && "space-y-1.5 p-3")}>
+        <Card className={cn("bg-card/95", isMobile && "border-border/70 bg-card shadow-sm")}>
+          <CardContent className={cn("space-y-4 p-5 sm:p-6", isMobile && "space-y-2 p-3")}>
             {isMobile ? (
-              <div className="flex items-start justify-between gap-2">
-                <h1 className="min-w-0 flex-1 truncate whitespace-nowrap text-[1.2rem] font-semibold leading-tight">
-                  {lesson.title}
-                </h1>
-                <div className="flex shrink-0 flex-col items-end gap-1">
-                  <p className="text-[11px] text-muted-foreground">
-                    {lesson.difficulty === "Beginner" ? "入门" : lesson.difficulty === "Advanced" ? "进阶" : "中级"} · {lesson.estimatedMinutes}分钟 · {sentenceCount}句
-                  </p>
+              <>
+                <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
+                  <h1 className="line-clamp-2 text-[1.15rem] font-semibold leading-snug">
+                    {lesson.title}
+                  </h1>
                   <Button
                     type="button"
                     size="sm"
                     variant="ghost"
-                    className="h-7 cursor-pointer gap-1 px-2 text-xs text-muted-foreground"
+                    className="h-6 cursor-pointer gap-1 px-2 text-[11px] text-muted-foreground"
                     onClick={toggleSequentialPlay}
                   >
-                    <Play className="size-3.5" />
+                    <Play className="size-3" />
                     {autoPlayActive ? "停止循环" : "循环播放"}
                   </Button>
                 </div>
-              </div>
+                <p className="text-[11px] text-muted-foreground">
+                  {lesson.difficulty === "Beginner" ? "入门" : lesson.difficulty === "Advanced" ? "进阶" : "中级"} · {lesson.estimatedMinutes}分钟 · {sentenceCount}句
+                </p>
+              </>
             ) : null}
             <h1 className={cn("text-3xl font-semibold sm:text-4xl", isMobile && "hidden")}>
               {lesson.title}
@@ -543,16 +536,13 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
                 <Card
                   key={section.id}
                   className={cn(
-                    "border-border/70 p-3 transition-all duration-150",
+                    "border-border/70 bg-card p-3 transition-all duration-150",
                     "bg-card/95 shadow-sm",
                     active && "border-primary/40 bg-accent/20",
                   )}
                 >
                   <div className="space-y-1.5">
-                    <span className="inline-flex w-fit items-center rounded-full border border-border/60 bg-muted/60 px-2 py-0.5 text-[11px] text-muted-foreground">
-                      {shortSectionTagMap[section.title] ?? "学习片段"}
-                    </span>
-                    <div className="divide-y divide-border/40 rounded-xl border border-border/60 bg-background/80">
+                    <div className="divide-y divide-border/50 rounded-xl border border-border/60 bg-transparent">
                       {section.sentences.map((sentence) => {
                         const selected = currentSentence?.id === sentence.id;
                         const translationOpen = Boolean(mobileTranslationOpenMap[sentence.id]);
@@ -565,47 +555,49 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
                               sentenceNodeMapRef.current[sentence.id] = node;
                             }}
                             className={cn(
-                              "px-3 py-2 transition-colors",
+                              "px-3 py-2.5 transition-colors",
                               playing ? "bg-primary/10" : selected ? "bg-accent/40" : "hover:bg-muted/40",
                             )}
                           >
-                            <div className="mb-1 flex items-center justify-end gap-3">
+                            <div className="mb-0.5 flex items-start justify-between gap-2">
                               <button
                                 type="button"
-                                className="inline-flex cursor-pointer items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground active:opacity-70"
                                 onClick={(event) => {
                                   event.stopPropagation();
-                                  toggleMobileTranslation(sentence.id);
+                                  console.log("[mobile-tap] sentence-button", { sentenceId: sentence.id });
+                                  handleMobileSentenceTap(sentence.id);
                                 }}
+                                className="min-w-0 flex-1 cursor-pointer text-left focus-visible:outline-none"
                               >
-                                <Languages className="size-3.5" />
-                                {translationOpen ? "收起" : "翻译"}
+                                <p className={cn("text-[1rem] leading-7 text-foreground", selected && "text-primary")}>
+                                  {sentence.text}
+                                </p>
                               </button>
-                              <button
-                                type="button"
-                                className="inline-flex cursor-pointer items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground active:opacity-70"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  handleLoopSentence(sentence.text);
-                                }}
-                              >
-                                <Volume2 className={cn("size-3.5", playing && "animate-pulse text-primary")} />
-                                {playing ? "停止" : "播放"}
-                              </button>
+                              <div className="mt-0.5 flex shrink-0 items-center gap-2">
+                                <button
+                                  type="button"
+                                  className="inline-flex cursor-pointer items-center gap-1 text-[11px] text-muted-foreground/90 transition-colors hover:text-foreground active:opacity-70"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    toggleMobileTranslation(sentence.id);
+                                  }}
+                                >
+                                  <Languages className="size-3" />
+                                  {translationOpen ? "收起" : "翻译"}
+                                </button>
+                                <button
+                                  type="button"
+                                  className="inline-flex cursor-pointer items-center gap-1 text-[11px] text-muted-foreground/90 transition-colors hover:text-foreground active:opacity-70"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    handleLoopSentence(sentence.text);
+                                  }}
+                                >
+                                  <Volume2 className={cn("size-3", playing && "animate-pulse text-primary")} />
+                                  {playing ? "停止" : "播放"}
+                                </button>
+                              </div>
                             </div>
-                            <button
-                              type="button"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                console.log("[mobile-tap] sentence-button", { sentenceId: sentence.id });
-                                handleMobileSentenceTap(sentence.id);
-                              }}
-                              className="block w-full cursor-pointer text-left focus-visible:outline-none"
-                            >
-                              <p className={cn("text-[1rem] leading-7 text-foreground", selected && "text-primary")}>
-                                {sentence.text}
-                              </p>
-                            </button>
                             <div
                               className={cn(
                                 "grid overflow-hidden transition-all duration-200",
