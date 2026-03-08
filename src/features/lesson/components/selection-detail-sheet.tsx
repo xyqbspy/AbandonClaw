@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { CirclePlay, Volume2, X } from "lucide-react";
+import { CirclePlay, Languages, Volume2, X } from "lucide-react";
 import { LessonSentence, SelectionChunkLayer } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -18,7 +18,6 @@ export function SelectionDetailSheet({
   open,
   loading,
   speakingText,
-  speechPaused,
   onOpenChange,
   onSave,
   onReview,
@@ -33,7 +32,6 @@ export function SelectionDetailSheet({
   open: boolean;
   loading: boolean;
   speakingText: string | null;
-  speechPaused: boolean;
   onOpenChange: (open: boolean) => void;
   onSave: () => void;
   onReview: () => void;
@@ -127,7 +125,8 @@ export function SelectionDetailSheet({
                         className="inline-flex cursor-pointer items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground active:opacity-70"
                         onClick={() => setShowSentenceTranslation((prev) => !prev)}
                       >
-                        {showSentenceTranslation ? "译文" : "翻译"}
+                        <Languages className="size-3.5" />
+                        {showSentenceTranslation ? "收起" : "翻译"}
                       </button>
                       <button
                         type="button"
@@ -135,7 +134,7 @@ export function SelectionDetailSheet({
                         onClick={() => onPronounce(currentSentence.text)}
                       >
                         <Volume2 className={cn("size-3.5", speakingText === currentSentence.text && "animate-pulse text-primary")} />
-                        {speakingText === currentSentence.text ? (speechPaused ? "继续播放" : "播放中") : "播放"}
+                        {speakingText === currentSentence.text ? "停止" : "播放"}
                       </button>
                     </div>
                   ) : null}
