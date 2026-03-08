@@ -466,9 +466,14 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
             {isMobile ? (
               <>
                 <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
-                  <h1 className="line-clamp-2 text-[1.15rem] font-semibold leading-snug">
+                  <h1 className="truncate whitespace-nowrap text-[1.15rem] font-semibold leading-snug">
                     {lesson.title}
                   </h1>
+                  <p className="shrink-0 text-[11px] text-muted-foreground">
+                    {lesson.difficulty === "Beginner" ? "入门" : lesson.difficulty === "Advanced" ? "进阶" : "中级"} · {lesson.estimatedMinutes}分钟 · {sentenceCount}句
+                  </p>
+                </div>
+                <div className="flex justify-end">
                   <Button
                     type="button"
                     size="sm"
@@ -480,9 +485,6 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
                     {autoPlayActive ? "停止循环" : "循环播放"}
                   </Button>
                 </div>
-                <p className="text-[11px] text-muted-foreground">
-                  {lesson.difficulty === "Beginner" ? "入门" : lesson.difficulty === "Advanced" ? "进阶" : "中级"} · {lesson.estimatedMinutes}分钟 · {sentenceCount}句
-                </p>
               </>
             ) : null}
             <h1 className={cn("text-3xl font-semibold sm:text-4xl", isMobile && "hidden")}>
@@ -559,21 +561,7 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
                               playing ? "bg-primary/10" : selected ? "bg-accent/40" : "hover:bg-muted/40",
                             )}
                           >
-                            <div className="mb-0.5 flex items-start justify-between gap-2">
-                              <button
-                                type="button"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  console.log("[mobile-tap] sentence-button", { sentenceId: sentence.id });
-                                  handleMobileSentenceTap(sentence.id);
-                                }}
-                                className="min-w-0 flex-1 cursor-pointer text-left focus-visible:outline-none"
-                              >
-                                <p className={cn("text-[1rem] leading-7 text-foreground", selected && "text-primary")}>
-                                  {sentence.text}
-                                </p>
-                              </button>
-                              <div className="mt-0.5 flex shrink-0 items-center gap-2">
+                            <div className="mb-1 flex items-center justify-end gap-2">
                                 <button
                                   type="button"
                                   className="inline-flex cursor-pointer items-center gap-1 text-[11px] text-muted-foreground/90 transition-colors hover:text-foreground active:opacity-70"
@@ -596,8 +584,20 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
                                   <Volume2 className={cn("size-3", playing && "animate-pulse text-primary")} />
                                   {playing ? "停止" : "播放"}
                                 </button>
-                              </div>
                             </div>
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                console.log("[mobile-tap] sentence-button", { sentenceId: sentence.id });
+                                handleMobileSentenceTap(sentence.id);
+                              }}
+                              className="block w-full cursor-pointer text-left focus-visible:outline-none"
+                            >
+                              <p className={cn("text-[1rem] leading-7 text-foreground", selected && "text-primary")}>
+                                {sentence.text}
+                              </p>
+                            </button>
                             <div
                               className={cn(
                                 "grid overflow-hidden transition-all duration-200",
