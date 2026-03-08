@@ -134,7 +134,7 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
   const playFromIndexRef = useRef<(index: number) => void>(() => {});
   const sentenceLoopRef = useRef<string | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [mobileTranslationOpenMap, setMobileTranslationOpenMap] = useState<Record<string, boolean>>({});
+  const [mobileGroupTranslationOpenMap, setMobileGroupTranslationOpenMap] = useState<Record<string, boolean>>({});
   const [autoPlayActive, setAutoPlayActive] = useState(false);
   const [, setAutoPlayIndex] = useState(0);
   const [state, dispatch] = useReducer(interactionReducer, {
@@ -365,13 +365,6 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
     },
     [speak, speakingText, stop, supported],
   );
-  const toggleMobileTranslation = useCallback((sentenceId: string) => {
-    setMobileTranslationOpenMap((prev) => ({
-      ...prev,
-      [sentenceId]: !prev[sentenceId],
-    }));
-  }, []);
-
   const startSequentialPlay = useCallback(
     (startIndex = 0) => {
       if (sentenceOrder.length === 0) return;
@@ -566,89 +559,106 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
 
               return (
                 <div key={section.id} className="space-y-4">
-                  {groupedSentences.map((group, groupIndex) => (
-                    <Card
-                      key={`${section.id}-group-${groupIndex}`}
-                      className={cn(
-                        "border-border/70 bg-card/95 shadow-sm transition-all duration-150",
-                        active && "border-primary/35",
-                      )}
-                    >
-                      <div className="overflow-hidden divide-y divide-border/50 rounded-xl border border-border/60 bg-transparent">
-                        {group.map((sentence) => {
-                          const selected = currentSentence?.id === sentence.id;
-                          const translationOpen = Boolean(mobileTranslationOpenMap[sentence.id]);
-                          const playing = speakingSentenceId === sentence.id;
+                  {groupedSentences.map((group, groupIndex) => {
+                    const groupKey = `${section.id}-group-${groupIndex}`;
+                    const groupText = group.map((sentence) => sentence.text).join(" ");
+                    const groupTranslation = group.map((sentence) => sentence.translation).join(" ");
+                    const groupPlaying = speakingText === groupText;
+                    const groupSelected = group.some((sentence) => sentence.id === currentSentence?.id);
+                    const translationOpen = Boolean(mobileGroupTranslationOpenMap[groupKey]);
 
-                          return (
-                            <div
-                              key={sentence.id}
-                              ref={(node) => {
-                                sentenceNodeMapRef.current[sentence.id] = node;
-                              }}
-                              className={cn(
-                                "px-3 py-2.5 transition-colors",
-                                playing ? "bg-primary/10" : selected ? "bg-accent/40" : "hover:bg-muted/35",
-                              )}
-                            >
-                              <div className="mb-1 flex items-center justify-end gap-2">
-                                <button
-                                  type="button"
-                                  className="inline-flex cursor-pointer items-center gap-1 text-[11px] text-muted-foreground/90 transition-colors hover:text-foreground active:opacity-70"
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                    toggleMobileTranslation(sentence.id);
-                                  }}
-                                >
-                                  <Languages className="size-3" />
-                                  {translationOpen ? "收起" : "翻译"}
-                                </button>
-                                <button
-                                  type="button"
-                                  className="inline-flex cursor-pointer items-center gap-1 text-[11px] text-muted-foreground/90 transition-colors hover:text-foreground active:opacity-70"
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                    handleLoopSentence(sentence.text);
-                                  }}
-                                >
-                                  <Volume2 className={cn("size-3", playing && "animate-pulse text-primary")} />
-                                  {playing ? "停止" : "播放"}
-                                </button>
-                              </div>
+                    return (
+                      <Card
+                        key={groupKey}
+                        className={cn(
+                          "border-border/70 bg-card/95 shadow-sm transition-all duration-150",
+                          active && "border-primary/35",
+                        )}
+                      >
+                        <div className="overflow-hidden divide-y divide-border/50 rounded-xl border border-border/60 bg-transparent">
+                          <div
+                            className={cn(
+                              "px-3 py-2 transition-colors",
+                              groupPlaying ? "bg-primary/10" : groupSelected ? "bg-accent/40" : "hover:bg-muted/35",
+                            )}
+                          >
+                            <div className="mb-1 flex items-center justify-end gap-2">
                               <button
                                 type="button"
+                                className="inline-flex cursor-pointer items-center gap-1 text-[11px] text-muted-foreground/90 transition-colors hover:text-foreground active:opacity-70"
                                 onClick={(event) => {
                                   event.stopPropagation();
-                                  console.log("[mobile-tap] sentence-button", { sentenceId: sentence.id });
-                                  handleMobileSentenceTap(sentence.id);
+                                  setMobileGroupTranslationOpenMap((prev) => ({
+                                    ...prev,
+                                    [groupKey]: !prev[groupKey],
+                                  }));
                                 }}
-                                className="block w-full cursor-pointer text-left focus-visible:outline-none"
                               >
-                                <p
-                                  className={cn(
-                                    "text-[1rem] leading-7 text-foreground",
-                                    selected && "text-primary",
-                                  )}
-                                >
-                                  {sentence.text}
-                                </p>
+                                <Languages className="size-3" />
+                                {translationOpen ? "收起" : "翻译"}
                               </button>
+                              <button
+                                type="button"
+                                className="inline-flex cursor-pointer items-center gap-1 text-[11px] text-muted-foreground/90 transition-colors hover:text-foreground active:opacity-70"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  handleLoopSentence(groupText);
+                                }}
+                              >
+                                <Volume2 className={cn("size-3", groupPlaying && "animate-pulse text-primary")} />
+                                {groupPlaying ? "停止" : "播放"}
+                              </button>
+                            </div>
+                            <div
+                              className={cn(
+                                "grid overflow-hidden transition-all duration-200",
+                                translationOpen ? "mt-1 grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
+                              )}
+                            >
+                              <p className="min-h-0 rounded-md bg-muted/65 px-2 py-1.5 text-sm leading-6 text-muted-foreground">
+                                {groupTranslation}
+                              </p>
+                            </div>
+                          </div>
+                          {group.map((sentence) => {
+                            const selected = currentSentence?.id === sentence.id;
+
+                            return (
                               <div
+                                key={sentence.id}
+                                ref={(node) => {
+                                  sentenceNodeMapRef.current[sentence.id] = node;
+                                }}
                                 className={cn(
-                                  "grid overflow-hidden transition-all duration-200",
-                                  translationOpen ? "mt-1.5 grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
+                                  "px-3 py-2.5 transition-colors",
+                                  selected ? "bg-accent/35" : "hover:bg-muted/30",
                                 )}
                               >
-                                <p className="min-h-0 rounded-md bg-muted/65 px-2 py-1.5 text-sm leading-6 text-muted-foreground">
-                                  {sentence.translation}
-                                </p>
+                                <button
+                                  type="button"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    console.log("[mobile-tap] sentence-button", { sentenceId: sentence.id });
+                                    handleMobileSentenceTap(sentence.id);
+                                  }}
+                                  className="block w-full cursor-pointer text-left focus-visible:outline-none"
+                                >
+                                  <p
+                                    className={cn(
+                                      "text-[1rem] leading-7 text-foreground",
+                                      selected && "text-primary",
+                                    )}
+                                  >
+                                    {sentence.text}
+                                  </p>
+                                </button>
                               </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </Card>
-                  ))}
+                            );
+                          })}
+                        </div>
+                      </Card>
+                    );
+                  })}
                 </div>
               );
             })}
