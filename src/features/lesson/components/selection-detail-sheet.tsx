@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Languages, Volume2, X } from "lucide-react";
+import { CirclePlay, Languages, Volume2, X } from "lucide-react";
 import { LessonSentence, SelectionChunkLayer } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -223,8 +223,17 @@ export function SelectionDetailSheet({
                     <div className="space-y-2">
                       <p className="text-xs tracking-[0.08em] text-muted-foreground">例句</p>
                       {chunkDetail.examples.slice(0, 2).map((example) => (
-                        <div key={example} className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-sm">
-                          <p className="break-words leading-6">{example}</p>
+                        <div key={example} className="flex items-center gap-2 rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-sm">
+                          <p className="flex-1 break-words leading-6">{example}</p>
+                          <Button
+                            size="icon-sm"
+                            variant="ghost"
+                            className="cursor-pointer"
+                            aria-label="播放例句发音"
+                            onClick={() => onPronounce(example)}
+                          >
+                            <CirclePlay className={cn("size-4", speakingText === example && "animate-pulse")} />
+                          </Button>
                         </div>
                       ))}
                     </div>

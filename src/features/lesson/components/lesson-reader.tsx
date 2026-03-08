@@ -429,29 +429,30 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
           <CardContent className={cn("space-y-4 p-5 sm:p-6", isMobile && "space-y-1.5 p-3")}>
             {isMobile ? (
               <div className="flex items-start justify-between gap-2">
-                <h1 className="text-[1.2rem] font-semibold leading-tight">
+                <h1 className="min-w-0 flex-1 truncate whitespace-nowrap text-[1.2rem] font-semibold leading-tight">
                   {lesson.title}
                 </h1>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  className="h-7 shrink-0 cursor-pointer gap-1 px-2 text-xs text-muted-foreground"
-                  onClick={toggleSequentialPlay}
-                >
-                  <Play className="size-3.5" />
-                  {autoPlayActive ? "停止循环" : "循环播放"}
-                </Button>
+                <div className="flex shrink-0 flex-col items-end gap-1">
+                  <p className="text-[11px] text-muted-foreground">
+                    {lesson.difficulty === "Beginner" ? "入门" : lesson.difficulty === "Advanced" ? "进阶" : "中级"} · {lesson.estimatedMinutes}分钟 · {sentenceCount}句
+                  </p>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 cursor-pointer gap-1 px-2 text-xs text-muted-foreground"
+                    onClick={toggleSequentialPlay}
+                  >
+                    <Play className="size-3.5" />
+                    {autoPlayActive ? "停止循环" : "循环播放"}
+                  </Button>
+                </div>
               </div>
             ) : null}
             <h1 className={cn("text-3xl font-semibold sm:text-4xl", isMobile && "hidden")}>
               {lesson.title}
             </h1>
-            {isMobile ? (
-              <p className="text-xs text-muted-foreground">
-                {lesson.difficulty === "Beginner" ? "入门" : lesson.difficulty === "Advanced" ? "进阶" : "中级"} · {lesson.estimatedMinutes} 分钟 · {sentenceCount} 句
-              </p>
-            ) : (
+            {isMobile ? null : (
               <p className="max-w-2xl text-sm text-muted-foreground sm:text-base">{lesson.subtitle}</p>
             )}
             {!isMobile ? <LessonProgress value={lesson.completionRate} /> : null}
