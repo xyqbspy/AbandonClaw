@@ -544,7 +544,7 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
                   )}
                 >
                   <div className="space-y-1.5">
-                    <div className="divide-y divide-border/50 rounded-xl border border-border/60 bg-transparent">
+                    <div className="overflow-hidden divide-y divide-border/50 rounded-xl border border-border/60 bg-transparent">
                       {section.sentences.map((sentence) => {
                         const selected = currentSentence?.id === sentence.id;
                         const translationOpen = Boolean(mobileTranslationOpenMap[sentence.id]);
