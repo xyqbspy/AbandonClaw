@@ -511,14 +511,14 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
         onPronounce={() => handlePronounce(state.selectionState?.text ?? "")}
       />
 
-      <div ref={readerRef} className={cn("space-y-5", isMobile && "space-y-1")}>
+      <div ref={readerRef} className={cn("space-y-5", isMobile && "space-y-0.5")}>
         <Card
           className={cn(
             "bg-card/95",
-            isMobile && "border-0 bg-muted/35 shadow-none",
+            isMobile && "border-border/10 bg-muted/35 shadow-none",
           )}
         >
-          <CardContent className={cn("space-y-4 p-5 sm:p-6", isMobile && "space-y-1.5 p-2.5")}>
+          <CardContent className={cn("space-y-4 p-5 sm:p-6", isMobile && "space-y-1 p-2.5")}>
             {isMobile ? (
               <>
                 <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
@@ -584,13 +584,13 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
         </Card>
 
         {isMobile ? (
-          <div className="space-y-1">
+          <div className="space-y-0.5">
             {lesson.sections.map((section) => {
               const active = currentSection?.id === section.id;
               const groupedSentences = groupSentencesForMobile(section.sentences);
 
               return (
-                <div key={section.id} className="space-y-1">
+                <div key={section.id} className="space-y-0.5">
                   {groupedSentences.map((group, groupIndex) => {
                     const groupKey = `${section.id}-group-${groupIndex}`;
                     const groupText = group.map((sentence) => sentence.text).join(" ");
@@ -613,7 +613,7 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
                       <Card
                         key={groupKey}
                         className={cn(
-                          "border-0 bg-muted/16 shadow-none transition-all duration-150",
+                          "border-border/10 bg-muted/16 shadow-none transition-all duration-150",
                           groupSelected
                             ? "bg-accent/14"
                             : active
@@ -621,7 +621,7 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
                               : "hover:bg-muted/20",
                         )}
                       >
-                        <div className="px-2.5 py-2">
+                        <div className="px-2.5 py-1">
                           <div
                             className={cn(
                               "cursor-pointer transition-colors",
