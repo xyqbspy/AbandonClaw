@@ -16,7 +16,7 @@ export default function HomePage() {
           <p className="max-w-2xl text-sm leading-7 text-muted-foreground sm:text-lg">{appCopy.marketing.heroSubtitle}</p>
           <div className="flex flex-wrap gap-3">
             <Link
-              href="/signup"
+              href="/scenes"
               className="inline-flex h-9 cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-primary px-5 text-sm font-medium text-primary-foreground transition hover:bg-primary/90 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
             >
               {appCopy.marketing.primaryCta}

@@ -1,16 +1,10 @@
-import { notFound } from "next/navigation";
-import { getLessonBySlug } from "@/lib/data/mock-lessons";
-import { LessonReader } from "@/features/lesson/components/lesson-reader";
+import { redirect } from "next/navigation";
 
-export default async function LessonPage({
+export default async function LegacyLessonPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const lesson = getLessonBySlug(id);
-
-  if (!lesson) return notFound();
-
-  return <LessonReader lesson={lesson} />;
+  redirect(`/scene/${id}`);
 }

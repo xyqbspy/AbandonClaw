@@ -16,7 +16,7 @@ export function AppSidebar() {
       <nav className="grid gap-1">
         {mainNav.map((item) => {
           const Icon = item.icon;
-          const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+          const active = pathname === item.href || pathname.startsWith(`${item.href}/`) || (item.href === "/scenes" && pathname.startsWith("/scene/"));
 
           return (
             <Link

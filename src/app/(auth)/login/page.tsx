@@ -16,9 +16,9 @@ export default function LoginPage() {
     event.preventDefault();
     if (submitting) return;
     setSubmitting(true);
-    toast.success("登录成功，正在进入今日学习");
+    toast.success("登录成功，正在进入场景学习");
     setTimeout(() => {
-      router.push("/today");
+      router.push("/scenes");
     }, 220);
   };
 

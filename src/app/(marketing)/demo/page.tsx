@@ -9,22 +9,22 @@ export default function DemoPage() {
         <p className="text-xs tracking-[0.08em] text-muted-foreground">交互预览</p>
         <h1 className="text-4xl font-semibold">产品演示</h1>
         <p className="max-w-2xl text-muted-foreground">
-          快速查看完整学习流程：阅读课程、点选短语、理解用法、加入复习。
+          快速查看完整学习流程：阅读场景、点选短语、理解用法、加入复习。
         </p>
       </div>
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>课程卡片示例</CardTitle>
+            <CardTitle>场景卡片示例</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
-            <p className="font-medium">城市新生活的早晨节奏</p>
-            <p className="text-muted-foreground">预计时间 12 分钟 · 难度 中级</p>
+            <p className="font-medium">Dinner Plan Cancelled</p>
+            <p className="text-muted-foreground">预计时间 10 分钟 · 难度 中级</p>
             <Link
-              href="/lesson/morning-routines"
+              href="/scene/dinner-plan-cancelled"
               className="inline-flex h-7 cursor-pointer items-center justify-center rounded-lg bg-primary px-2.5 text-[0.8rem] font-medium text-primary-foreground transition hover:bg-primary/90 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
             >
-              打开课程
+              打开场景
             </Link>
           </CardContent>
         </Card>
@@ -44,7 +44,7 @@ export default function DemoPage() {
             <CardTitle>今日任务示例</CardTitle>
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground">
-            1 节课程、8 条复习项和 1 条输出练习，保持稳定学习节奏。
+            1 个场景、8 条复习项和 1 条输出练习，保持稳定学习节奏。
           </CardContent>
         </Card>
         <Card>

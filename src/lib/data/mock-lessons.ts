@@ -2,93 +2,62 @@ import { AIExplanation, Lesson, LessonSentence, SelectionChunkLayer } from "@/li
 
 export const lessons: Lesson[] = [
   {
-    id: "lesson-1",
-    slug: "morning-routines",
-    title: "城市新生活的早晨节奏",
-    subtitle: "用自然短语建立日常表达感。",
-    description:
-      "跟随 Maya 适应新城市的清晨安排，在真实语境中积累可复用表达。",
+    id: "scene-1",
+    slug: "dinner-plan-cancelled",
+    title: "Dinner Plan Cancelled",
+    subtitle: "A quick plan changes because of work pressure.",
+    description: "Practice natural conversation for canceling plans politely and rescheduling.",
     difficulty: "Intermediate",
-    estimatedMinutes: 12,
-    completionRate: 34,
-    tags: ["日常生活", "口语表达", "习惯"],
+    estimatedMinutes: 10,
+    completionRate: 18,
+    tags: ["daily conversation", "plans", "work"],
     sections: [
       {
-        id: "sec-1",
-        title: "醒来与起步",
-        summary: "从闹钟响起到进入清晨节奏。",
+        id: "scene-1-sec-1",
+        title: "Dinner Plan Cancelled",
+        summary: "A casual dinner plan is canceled at the last minute.",
         sentences: [
           {
-            id: "s-1",
-            text: "I used to hit the snooze button three times, but now I get up as soon as my alarm goes off.",
-            translation:
-              "我以前会按三次贪睡，但现在闹钟一响就起床。",
-            chunks: ["used to", "as soon as", "goes off"],
+            id: "dpc-1",
+            text: "Are we still on for dinner?",
+            translation: "我们晚饭的约还算数吗？",
+            chunks: ["on for dinner", "still on"],
           },
           {
-            id: "s-2",
-            text: "Making coffee has become my way of easing into the day.",
-            translation: "做咖啡已经成了我平稳进入一天状态的方式。",
-            chunks: ["has become", "easing into"],
-          },
-        ],
-      },
-      {
-        id: "sec-2",
-        title: "早餐与专注",
-        summary: "先把身体状态稳定下来，再切换到工作模式。",
-        sentences: [
-          {
-            id: "s-3",
-            text: "If I skip breakfast, I lose focus before my first meeting.",
-            translation: "如果不吃早餐，我在第一场会前就会开始分心。",
-            chunks: ["skip breakfast", "lose focus"],
+            id: "dpc-2",
+            text: "I was just about to text you, something came up.",
+            translation: "我正准备给你发消息，突然有事了。",
+            chunks: ["about to", "came up"],
           },
           {
-            id: "s-4",
-            text: "A simple breakfast helps me stay steady before I start planning my day.",
-            translation: "一顿简单早餐能让我在开始安排一天前保持稳定状态。",
-            chunks: ["lose focus"],
-          },
-        ],
-      },
-      {
-        id: "sec-3",
-        title: "通勤与输入",
-        summary: "在通勤路上用短内容积累可复用表达。",
-        sentences: [
-          {
-            id: "s-5",
-            text: "On the train, I read short articles so I can pick up useful expressions in context.",
-            translation:
-              "在地铁上我会读短文，这样能在语境里习得实用表达。",
-            chunks: ["pick up", "in context"],
+            id: "dpc-3",
+            text: "Let me guess, working again?",
+            translation: "我猜猜，又在加班？",
+            chunks: ["let me guess", "working again"],
           },
           {
-            id: "s-6",
-            text: "I pick up new phrases faster when I review them in context on my phone.",
-            translation: "在手机上按语境回看时，我通常能更快掌握新短语。",
-            chunks: ["pick up", "in context"],
-          },
-        ],
-      },
-      {
-        id: "sec-4",
-        title: "到达与进入状态",
-        summary: "完成从日常节奏到工作节奏的切换。",
-        sentences: [
-          {
-            id: "s-7",
-            text: "As soon as I sit down at my desk, I write a short plan for the morning.",
-            translation: "我一坐到工位上，就会先写一份简短的上午计划。",
-            chunks: ["as soon as"],
+            id: "dpc-4",
+            text: "Yeah, I'm stuck at the office.",
+            translation: "是啊，我还被困在办公室。",
+            chunks: ["stuck at", "the office"],
           },
           {
-            id: "s-8",
-            text: "By the time I arrive at the office, I already feel mentally warmed up.",
-            translation:
-              "到办公室时，我的大脑通常已经进入工作状态。",
-            chunks: ["By the time", "warmed up"],
+            id: "dpc-5",
+            text: "You've been crazy busy lately.",
+            translation: "你最近真的忙疯了。",
+            chunks: ["crazy busy", "lately"],
+          },
+          {
+            id: "dpc-6",
+            text: "I know, rain check?",
+            translation: "我知道，要不改天？",
+            chunks: ["rain check", "I know"],
+          },
+          {
+            id: "dpc-7",
+            text: "Sure, we'll do it another time.",
+            translation: "行，我们改天再约。",
+            chunks: ["another time", "we'll do it"],
           },
         ],
       },
@@ -96,35 +65,206 @@ export const lessons: Lesson[] = [
     explanations: [],
   },
   {
-    id: "lesson-2",
-    slug: "workplace-feedback",
-    title: "自信地给出反馈",
-    subtitle: "在职场中说清观点，同时保持礼貌与合作感。",
-    description:
-      "学习如何在保留友好语气的同时，给出清晰、可执行的反馈意见。",
+    id: "scene-2",
+    slug: "long-day-at-work",
+    title: "Long Day at Work",
+    subtitle: "Share frustration after an unproductive afternoon.",
+    description: "Learn how to describe tiredness, meetings, and emotional reactions naturally.",
     difficulty: "Intermediate",
-    estimatedMinutes: 15,
-    completionRate: 12,
-    tags: ["职场", "沟通", "专业表达"],
+    estimatedMinutes: 9,
+    completionRate: 0,
+    tags: ["office", "small talk", "feelings"],
     sections: [
       {
-        id: "sec-3",
-        title: "组织反馈句式",
-        summary: "在不显得生硬的前提下表达明确意见。",
+        id: "scene-2-sec-1",
+        title: "Long Day at Work",
+        summary: "Talking about a draining day and setting boundaries after work.",
         sentences: [
           {
-            id: "s-6",
-            text: "I appreciate the effort, and I think we can make the message clearer for first-time users.",
-            translation:
-              "我认可这次投入，同时我觉得这段信息还可以对新用户更清晰一点。",
-            chunks: ["I appreciate", "first-time users"],
+            id: "ldw-1",
+            text: "You look exhausted. Long day?",
+            translation: "你看起来很累，今天很漫长吧？",
+            chunks: ["look exhausted", "long day"],
           },
           {
-            id: "s-7",
-            text: "Could we tighten this section so the main idea stands out right away?",
-            translation:
-              "这段是否可以再收紧一些，让核心观点更快被看到？",
-            chunks: ["tighten this section", "stands out"],
+            id: "ldw-2",
+            text: "Meetings all afternoon, nothing got decided.",
+            translation: "整个下午都在开会，结果什么都没定下来。",
+            chunks: ["all afternoon", "got decided"],
+          },
+          {
+            id: "ldw-3",
+            text: "That's the worst, talking for hours and going nowhere.",
+            translation: "这最折磨人了，说了几个小时却毫无进展。",
+            chunks: ["the worst", "going nowhere"],
+          },
+          {
+            id: "ldw-4",
+            text: "Exactly, by the end everyone just wanted to leave.",
+            translation: "就是，到最后大家只想赶紧走。",
+            chunks: ["by the end", "wanted to leave"],
+          },
+          {
+            id: "ldw-5",
+            text: "At least that's over now.",
+            translation: "至少现在都结束了。",
+            chunks: ["at least", "over now"],
+          },
+          {
+            id: "ldw-6",
+            text: "True, I'm not opening my laptop tonight.",
+            translation: "也是，我今晚绝不再打开电脑。",
+            chunks: ["true", "not opening my laptop"],
+          },
+        ],
+      },
+    ],
+    explanations: [],
+  },
+  {
+    id: "scene-3",
+    slug: "stayed-up-too-late",
+    title: "Stayed Up Too Late",
+    subtitle: "A realistic chat about poor sleep and low energy.",
+    description: "Use practical spoken English for habits, regret, and recovering from tiredness.",
+    difficulty: "Intermediate",
+    estimatedMinutes: 11,
+    completionRate: 0,
+    tags: ["sleep", "habits", "daily life"],
+    sections: [
+      {
+        id: "scene-3-sec-1",
+        title: "Stayed Up Too Late",
+        summary: "A casual check-in after a night of little sleep.",
+        sentences: [
+          {
+            id: "sutl-1",
+            text: "You look tired today.",
+            translation: "你今天看起来很累。",
+            chunks: ["look tired", "today"],
+          },
+          {
+            id: "sutl-2",
+            text: "Yeah, I stayed up too late last night.",
+            translation: "是啊，我昨晚睡得太晚了。",
+            chunks: ["stayed up too late", "last night"],
+          },
+          {
+            id: "sutl-3",
+            text: "Working or messing around?",
+            translation: "在工作，还是在瞎刷？",
+            chunks: ["messing around", "working"],
+          },
+          {
+            id: "sutl-4",
+            text: "Honestly, just watching videos and scrolling.",
+            translation: "老实说，就是在看视频和刷手机。",
+            chunks: ["honestly", "scrolling"],
+          },
+          {
+            id: "sutl-5",
+            text: "That happens. Did you at least get some sleep?",
+            translation: "这种情况很常见。你至少睡了一点吗？",
+            chunks: ["that happens", "at least"],
+          },
+          {
+            id: "sutl-6",
+            text: "Not really, about five hours.",
+            translation: "也没怎么睡，大概五个小时。",
+            chunks: ["not really", "about five hours"],
+          },
+          {
+            id: "sutl-7",
+            text: "No wonder you're exhausted.",
+            translation: "难怪你这么疲惫。",
+            chunks: ["no wonder", "exhausted"],
+          },
+          {
+            id: "sutl-8",
+            text: "Exactly, I'm grabbing coffee and calling it a day.",
+            translation: "可不是嘛，我先去买杯咖啡，今天就这样了。",
+            chunks: ["grabbing coffee", "calling it a day"],
+          },
+        ],
+      },
+    ],
+    explanations: [],
+  },
+  {
+    id: "scene-4",
+    slug: "subway-commute-morning",
+    title: "Subway Commute Morning",
+    subtitle: "Complain about a packed commute and low morning energy.",
+    description: "Understand natural back-and-forth conversation about commuting stress.",
+    difficulty: "Intermediate",
+    estimatedMinutes: 12,
+    completionRate: 0,
+    tags: ["commute", "morning", "daily conversation"],
+    sections: [
+      {
+        id: "scene-4-sec-1",
+        title: "Subway Commute Morning",
+        summary: "A short dialogue after a crowded subway ride.",
+        sentences: [
+          {
+            id: "scm-1",
+            text: "You look exhausted today.",
+            translation: "你今天看起来很疲惫。",
+            chunks: ["look exhausted", "today"],
+          },
+          {
+            id: "scm-2",
+            text: "Yeah, the subway was packed again.",
+            translation: "是啊，地铁今天又挤爆了。",
+            chunks: ["packed again", "the subway"],
+          },
+          {
+            id: "scm-3",
+            text: "Didn't get a seat?",
+            translation: "没抢到座位吗？",
+            chunks: ["get a seat"],
+          },
+          {
+            id: "scm-4",
+            text: "Not this time.",
+            translation: "这次没坐上。",
+            chunks: ["not this time"],
+          },
+          {
+            id: "scm-5",
+            text: "That commute is brutal.",
+            translation: "那段通勤真是折磨人。",
+            chunks: ["commute", "brutal"],
+          },
+          {
+            id: "scm-6",
+            text: "Tell me about it.",
+            translation: "可不是嘛。",
+            chunks: ["tell me about it"],
+          },
+          {
+            id: "scm-7",
+            text: "How long does it take now?",
+            translation: "现在要花多久？",
+            chunks: ["how long", "take now"],
+          },
+          {
+            id: "scm-8",
+            text: "Almost an hour door to door.",
+            translation: "门到门差不多一个小时。",
+            chunks: ["door to door", "almost an hour"],
+          },
+          {
+            id: "scm-9",
+            text: "No wonder you're tired.",
+            translation: "难怪你这么累。",
+            chunks: ["no wonder", "tired"],
+          },
+          {
+            id: "scm-10",
+            text: "Yeah, I need coffee before anything else.",
+            translation: "是啊，我得先喝杯咖啡再说。",
+            chunks: ["before anything else", "need coffee"],
           },
         ],
       },
@@ -132,55 +272,55 @@ export const lessons: Lesson[] = [
     explanations: [],
   },
 ];
+
+export const scenes = lessons;
 
 const explanationSeed: AIExplanation[] = [
   {
-    key: "used to",
-    text: "used to",
-    translation: "过去常常",
-    explanation:
-      "表示过去经常发生、但现在不再持续的习惯或状态。",
-    examples: [
-      "I used to study late at night.",
-      "She used to live near the station.",
-      "We used to work on weekends.",
-    ],
-    breakdown: ["used to + 动词原形", "强调过去习惯", "不用于单次事件"],
-    pronunciation: "/juːst tə/",
+    key: "rain check",
+    text: "rain check",
+    translation: "改天再约",
+    explanation: "用于礼貌地表示这次先取消，改到别的时间再进行。",
+    examples: ["Can we take a rain check?", "Let's do a rain check for Friday."],
+    breakdown: ["口语高频", "用于改期", "语气友好"],
+    pronunciation: "/reɪn tʃek/",
   },
   {
-    key: "as soon as",
-    text: "as soon as",
-    translation: "一……就……",
-    explanation:
-      "连接两个动作，后一个动作紧接前一个动作发生。",
-    examples: [
-      "Call me as soon as you arrive.",
-      "He smiled as soon as he heard the news.",
-    ],
-    breakdown: ["连接短语", "谈将来时常配合一般现在时"],
-    pronunciation: "/əz suːn əz/",
+    key: "by the end",
+    text: "by the end",
+    translation: "到最后",
+    explanation: "表示某个过程推进到末尾时的状态或结果。",
+    examples: ["By the end, everyone was tired.", "By the end of the week, we finished it."],
+    breakdown: ["时间短语", "常与过去时搭配"],
+    pronunciation: "/baɪ ði end/",
   },
   {
-    key: "pick up",
-    text: "pick up",
-    translation: "逐步掌握",
-    explanation:
-      "在语言学习中，指通过反复接触在语境里自然学会。",
-    examples: [
-      "I picked up useful phrases from podcasts.",
-      "Children pick up accents quickly.",
-    ],
-    breakdown: ["动词短语", "口语中非常常见"],
-    pronunciation: "/pɪk ʌp/",
+    key: "stayed up too late",
+    text: "stayed up too late",
+    translation: "熬夜太晚",
+    explanation: "表示睡觉时间严重延后，导致休息不足。",
+    examples: ["I stayed up too late again.", "She stayed up too late studying."],
+    breakdown: ["stay up", "描述昨晚状态"],
+    pronunciation: "/steɪd ʌp tuː leɪt/",
+  },
+  {
+    key: "door to door",
+    text: "door to door",
+    translation: "门到门",
+    explanation: "指从出发地门口到目的地门口的完整通勤耗时。",
+    examples: ["It's 50 minutes door to door.", "Door to door takes almost an hour."],
+    breakdown: ["通勤语境高频", "强调全程时间"],
+    pronunciation: "/dɔːr tə dɔːr/",
   },
 ];
 
-lessons[0].explanations = explanationSeed;
-lessons[1].explanations = explanationSeed;
+for (const lesson of lessons) {
+  lesson.explanations = explanationSeed;
+}
 
-export const getLessonBySlug = (slug: string) =>
-  lessons.find((lesson) => lesson.slug === slug);
+export const getLessonBySlug = (slug: string) => lessons.find((lesson) => lesson.slug === slug);
+
+export const getSceneBySlug = (slug: string) => getLessonBySlug(slug);
 
 export const getSentenceById = (lesson: Lesson, sentenceId: string) => {
   for (const section of lesson.sections) {
@@ -220,119 +360,96 @@ const toChunkLayer = (
       pronunciation?: string;
     }
   > = {
-    "lose focus": {
-      translation: "分心；不专注",
-      meaningInSentence: "这里表示在第一场会议前就开始分心，难以保持专注。",
-      usageNote:
-        "表示注意力从当前任务上移开，常用于学习、工作、开会等需要持续专注的场景。",
+    "on for dinner": {
+      translation: "晚饭约仍然有效",
+      meaningInSentence: "这里在确认原本的晚饭安排是否还按计划进行。",
+      usageNote: "be on 常用于确认活动、约会、会议是否照常进行。",
       examples: [
-        "I lose focus when my phone keeps buzzing.",
-        "He lost focus halfway through the presentation.",
-      ],
-      notes: ["常和 when / during 等时间语境连用"],
-    },
-    "used to": {
-      translation: "过去常常",
-      meaningInSentence: "这里表示她以前有按贪睡键的习惯，现在已经改变。",
-      usageNote:
-        "用于描述过去经常发生、现在不再持续的习惯或状态，后面通常接动词原形。",
-      examples: [
-        "I used to drink coffee at night.",
-        "They used to live near the station.",
-      ],
-      pronunciation: "/juːst tə/",
-    },
-    "as soon as": {
-      translation: "一……就……",
-      meaningInSentence: "这里表示闹钟一响，她就马上起床。",
-      usageNote:
-        "用于连接两个连续动作，强调后一个动作几乎立刻发生。",
-      examples: [
-        "Call me as soon as you arrive.",
-        "She left as soon as the meeting ended.",
-      ],
-      pronunciation: "/əz suːn əz/",
-    },
-    "goes off": {
-      translation: "响起",
-      meaningInSentence: "这里表示闹钟开始响起的那个瞬间。",
-      usageNote:
-        "常用于闹钟、警报、计时器等设备发出声音或触发提醒的场景。",
-      examples: [
-        "My alarm goes off at 6:30.",
-        "The fire alarm went off suddenly.",
+        "Is the meeting still on for tomorrow?",
+        "Are we still on for lunch?",
       ],
     },
-    "skip breakfast": {
-      translation: "不吃早餐",
-      meaningInSentence: "这里表示她早上不吃早餐，导致后续状态变差。",
-      usageNote:
-        "用于描述因为赶时间或习惯原因而省略早餐这一行为。",
+    "came up": {
+      translation: "突然有事",
+      meaningInSentence: "这里表示临时出现了打乱计划的事情。",
+      usageNote: "come up 常用于日常对话，表示突发情况或临时问题。",
       examples: [
-        "I never skip breakfast on weekdays.",
-        "She skipped breakfast and felt tired by 10 a.m.",
+        "Sorry, something came up at work.",
+        "Can we reschedule? Something came up.",
       ],
     },
-    "has become": {
-      translation: "已经变成",
-      meaningInSentence: "这里表示做咖啡已经逐渐变成固定习惯。",
-      usageNote:
-        "表示某件事经历变化后形成稳定状态，常用于描述习惯、角色或关系变化。",
+    "stuck at": {
+      translation: "被困在",
+      meaningInSentence: "这里表示人还被工作困在办公室，无法离开。",
+      usageNote: "stuck at + 地点/状态，用于表达无法脱身的语感。",
+      examples: ["I'm stuck at the airport.", "She was stuck at work late."],
+    },
+    "rain check": {
+      translation: "改天再约",
+      meaningInSentence: "这里是礼貌提议把这次见面改到下次。",
+      usageNote: "口语中用于临时取消后提出延期，语气轻松不生硬。",
+      examples: ["Can we do a rain check?", "Rain check for this weekend?"],
+      pronunciation: "/reɪn tʃek/",
+    },
+    "got decided": {
+      translation: "被定下来",
+      meaningInSentence: "这里表示开了很久会，但没有任何事项真正拍板。",
+      usageNote: "get decided 常见于会议语境，强调结果是否被确定。",
       examples: [
-        "Reading has become part of my morning routine.",
-        "This café has become our team’s favorite spot.",
+        "Nothing got decided in the meeting.",
+        "We need this to get decided today.",
       ],
     },
-    "easing into": {
-      translation: "慢慢进入",
-      meaningInSentence: "这里强调以平缓方式进入一天的节奏。",
-      usageNote:
-        "常用于描述逐步进入某种状态，语气比 start 更柔和自然。",
-      examples: [
-        "I’m easing into the new schedule.",
-        "She likes easing into work with music.",
-      ],
+    "by the end": {
+      translation: "到最后",
+      meaningInSentence: "这里强调会开到后段时，大家都已疲惫。",
+      usageNote: "用于描述过程推进到末尾时的状态变化。",
+      examples: ["By the end, everyone went quiet.", "By the end, I was done."],
+      pronunciation: "/baɪ ði end/",
     },
-    "pick up": {
-      translation: "逐步掌握",
-      meaningInSentence: "这里表示通过阅读在语境里慢慢学会实用表达。",
-      usageNote:
-        "常用于描述在反复接触中自然学会语言、技巧或习惯。",
-      examples: [
-        "I picked up useful phrases from podcasts.",
-        "Kids pick up accents quickly.",
-      ],
-      pronunciation: "/pɪk ʌp/",
+    "stayed up too late": {
+      translation: "熬夜太晚",
+      meaningInSentence: "这里表示昨晚睡得过晚，直接影响今天精神状态。",
+      usageNote: "用于描述睡眠不足的原因，日常表达非常高频。",
+      examples: ["I stayed up too late gaming.", "He stayed up too late again."],
+      pronunciation: "/steɪd ʌp tuː leɪt/",
     },
-    "in context": {
-      translation: "在语境中",
-      meaningInSentence: "这里强调不是孤立记词，而是在完整语境中理解表达。",
-      usageNote:
-        "常用于语言学习和内容理解场景，强调结合上下文获取准确含义。",
-      examples: [
-        "Try to learn vocabulary in context.",
-        "The phrase is clearer in context.",
-      ],
+    "messing around": {
+      translation: "瞎刷打发时间",
+      meaningInSentence: "这里表示并非认真工作，而是在随意消磨时间。",
+      usageNote: "mess around 常用于轻松语境，表示做事不专注或随便玩。",
+      examples: ["I was just messing around online.", "Stop messing around and start."],
     },
-    "by the time": {
-      translation: "到……时候",
-      meaningInSentence: "这里表示到达办公室时，前面的准备已基本完成。",
-      usageNote:
-        "用于描述两个时间点的先后关系，强调某个时点前结果已出现。",
-      examples: [
-        "By the time I got home, dinner was ready.",
-        "By the time we arrived, the show had started.",
-      ],
+    "calling it a day": {
+      translation: "今天就到这",
+      meaningInSentence: "这里表示决定结束当天安排，不再继续忙下去。",
+      usageNote: "常用于工作、学习结束时，语气自然、口语化。",
+      examples: ["Let's call it a day.", "I'm calling it a day after this."],
     },
-    "warmed up": {
-      translation: "进入状态",
-      meaningInSentence: "这里表示大脑已经从清晨状态切换到工作状态。",
-      usageNote:
-        "常用于描述身体或思维从冷启动到活跃状态的过程。",
-      examples: [
-        "After a short walk, I felt warmed up.",
-        "My brain gets warmed up after reading for 15 minutes.",
-      ],
+    "packed again": {
+      translation: "又很拥挤",
+      meaningInSentence: "这里说明地铁早高峰再次挤满了人。",
+      usageNote: "packed 常用于交通、场馆、人群密集场景。",
+      examples: ["The train was packed this morning.", "It gets packed after 8 a.m."],
+    },
+    "door to door": {
+      translation: "门到门",
+      meaningInSentence: "这里表示从家门到公司门口全程将近一小时。",
+      usageNote: "用于估算完整通勤时间，比单程车程更完整。",
+      examples: ["It's an hour door to door.", "Door to door takes 45 minutes."],
+      pronunciation: "/dɔːr tə dɔːr/",
+    },
+    "before anything else": {
+      translation: "先把这件事做了",
+      meaningInSentence: "这里强调在做其他事情前，先喝咖啡恢复状态。",
+      usageNote: "用于表达优先级，常见于日常安排和工作语境。",
+      examples: ["I need water before anything else.", "Stretch before anything else."],
+    },
+    "no wonder": {
+      translation: "难怪",
+      meaningInSentence: "这里用于顺着前文原因，得出合理结果。",
+      usageNote: "口语里用于表示理解或恍然大悟，语气自然。",
+      examples: ["No wonder you're late.", "No wonder she looked tired."],
     },
   };
 

@@ -36,7 +36,7 @@ export function MobileNav() {
         </SheetHeader>
         <div className="grid gap-1 px-4 pb-6">
           {mainNav.map((item) => {
-            const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+            const active = pathname === item.href || pathname.startsWith(`${item.href}/`) || (item.href === "/scenes" && pathname.startsWith("/scene/"));
             return (
               <Link
                 key={item.href}

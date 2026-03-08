@@ -18,7 +18,7 @@ export function SiteHeader() {
             </Link>
           ))}
           <Link
-            href="/signup"
+            href="/scenes"
             className="inline-flex h-8 cursor-pointer items-center justify-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:bg-primary/90 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
           >
             开始学习
@@ -32,7 +32,7 @@ export function SiteHeader() {
             登录
           </Link>
           <Link
-            href="/signup"
+            href="/scenes"
             className="inline-flex h-7 cursor-pointer items-center justify-center rounded-lg bg-primary px-2.5 text-[0.8rem] font-medium text-primary-foreground transition hover:bg-primary/90 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
           >
             开始学习

@@ -18,7 +18,7 @@ export default function SignupPage() {
     setSubmitting(true);
     toast.success("注册完成，欢迎开始学习");
     setTimeout(() => {
-      router.push("/today");
+      router.push("/scenes");
     }, 220);
   };
 
@@ -54,3 +54,4 @@ export default function SignupPage() {
     </div>
   );
 }
+

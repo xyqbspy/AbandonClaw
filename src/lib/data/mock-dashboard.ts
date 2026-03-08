@@ -3,11 +3,11 @@ import { DailyTask, ProgressSummary } from "@/lib/types";
 export const dailyTasks: DailyTask[] = [
   {
     id: "task-1",
-    title: "完成一节课程阅读",
-    description: "继续当前课程，至少收藏 2 条短语。",
+    title: "完成一个场景学习",
+    description: "继续当前场景，至少收藏 2 条短语。",
     durationMinutes: 12,
     done: false,
-    actionHref: "/lesson/morning-routines",
+    actionHref: "/scene/dinner-plan-cancelled",
   },
   {
     id: "task-2",
