@@ -19,6 +19,8 @@ export interface LessonSentence {
   text: string;
   translation: string;
   chunks: string[];
+  speaker?: string;
+  audioText?: string;
 }
 
 export interface LessonSection {
@@ -50,6 +52,7 @@ export interface Lesson {
   tags: string[];
   sections: LessonSection[];
   explanations: AIExplanation[];
+  sourceType?: "system" | "custom";
 }
 
 export interface Chunk {

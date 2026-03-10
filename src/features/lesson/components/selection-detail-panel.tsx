@@ -66,6 +66,11 @@ export function SelectionDetailPanel({
             className="space-y-3 pt-4 animate-in fade-in-0 slide-in-from-right-1 duration-200"
           >
             <div className="rounded-lg border border-border/70 bg-background px-3 py-2 text-sm leading-7 break-words">
+              {currentSentence.speaker ? (
+                <p className="mb-1 text-[10px] tracking-[0.08em] text-muted-foreground uppercase">
+                  {currentSentence.speaker}
+                </p>
+              ) : null}
               {highlightSelected(currentSentence.text, chunkDetail?.text)}
             </div>
             <div className="rounded-lg border border-border/70 bg-muted/30 px-3 py-2">

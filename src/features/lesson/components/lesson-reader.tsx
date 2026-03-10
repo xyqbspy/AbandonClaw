@@ -67,6 +67,7 @@ type MobileSentenceGroup = {
   text: string;
   translation: string;
   relatedChunks: string[];
+  speaker?: string;
 };
 
 function groupSentencesForMobile(
@@ -79,8 +80,9 @@ function groupSentencesForMobile(
     const current = sentences[index];
     const next = sentences[index + 1];
     const isCurrentLong = current.text.length > 95;
+    const hasSpeaker = Boolean(current.speaker || next?.speaker);
 
-    if (isCurrentLong || !next) {
+    if (isCurrentLong || !next || hasSpeaker) {
       groups.push([current]);
       index += 1;
       continue;
@@ -210,6 +212,8 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
       text: mobileActiveGroup.text,
       translation: mobileActiveGroup.translation,
       chunks: mobileActiveGroup.relatedChunks,
+      speaker: mobileActiveGroup.speaker,
+      audioText: mobileActiveGroup.text,
     };
   }, [currentSentence, isMobile, mobileActiveGroup]);
 
@@ -708,6 +712,8 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
                       text: groupText,
                       translation: groupTranslation,
                       relatedChunks: groupRelatedChunks,
+                      speaker:
+                        group.length === 1 ? group[0]?.speaker : undefined,
                     };
 
                     return (
@@ -803,6 +809,11 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
                             className="cursor-pointer transition-colors"
                             onClick={() => handleMobileGroupTap(groupContext)}
                           >
+                            {groupContext.speaker ? (
+                              <p className="mb-1 text-[10px] tracking-[0.08em] text-muted-foreground/80 uppercase">
+                                {groupContext.speaker}
+                              </p>
+                            ) : null}
                             <p
                               className={cn(
                                 "text-[16px] leading-[1.72] font-normal tracking-[0.01em] text-foreground/95",
@@ -834,8 +845,10 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
                   <SentenceBlock
                     key={sentence.id}
                     sentence={sentence}
+                    speaking={speakingText === (sentence.audioText ?? sentence.text)}
                     activeChunkKey={state.activeChunkKey}
                     hoveredChunkKey={state.hoveredChunkKey}
+                    onPronounce={handlePronounce}
                     onSentenceTap={handleSentenceTap}
                     mobileTapEnabled={isMobile}
                     onSelectText={(chunk, meta) => {

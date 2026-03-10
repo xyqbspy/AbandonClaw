@@ -7,7 +7,7 @@ export const dailyTasks: DailyTask[] = [
     description: "继续当前场景，至少收藏 2 条短语。",
     durationMinutes: 12,
     done: false,
-    actionHref: "/scene/dinner-plan-cancelled",
+    actionHref: "/scenes",
   },
   {
     id: "task-2",

@@ -183,6 +183,11 @@ export function SelectionDetailSheet({
                 </div>
                 {currentSentence ? (
                   <>
+                    {currentSentence.speaker ? (
+                      <p className="text-[10px] tracking-[0.08em] text-muted-foreground uppercase">
+                        {currentSentence.speaker}
+                      </p>
+                    ) : null}
                     <p className="mt-1 text-sm leading-7 break-words">{currentSentence.text}</p>
                     <div
                       className={cn(
