@@ -1,4 +1,6 @@
-import Link from "next/link";
+"use client";
+
+import { MotionCardLink } from "@/components/shared/motion-card-link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -13,21 +15,24 @@ export default function DemoPage() {
         </p>
       </div>
       <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>场景卡片示例</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2 text-sm">
-            <p className="font-medium">Dinner Plan Cancelled（晚餐计划取消）</p>
-            <p className="text-muted-foreground">预计时间 10 分钟 · 难度 中级</p>
-            <Link
-              href="/scene/dinner-plan-cancelled"
-              className="inline-flex h-7 cursor-pointer items-center justify-center rounded-lg bg-primary px-2.5 text-[0.8rem] font-medium text-primary-foreground transition hover:bg-primary/90 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+        <MotionCardLink href="/scene/dinner-plan-cancelled" motionId="demo-scene-card" className="group block">
+          {(motionStateAttrs) => (
+            <Card
+              data-pressed={motionStateAttrs["data-pressed"]}
+              data-activated={motionStateAttrs["data-activated"]}
+              className="scene-card-motion h-full border-border/70 transition-colors hover:bg-muted/30"
             >
-              打开场景
-            </Link>
-          </CardContent>
-        </Card>
+              <CardHeader>
+                <CardTitle>场景卡片示例</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm">
+                <p className="font-medium">Dinner Plan Cancelled（晚餐计划取消）</p>
+                <p className="text-muted-foreground">预计时间 10 分钟 · 难度 中级</p>
+                <p className="text-xs text-muted-foreground">点击卡片进入场景</p>
+              </CardContent>
+            </Card>
+          )}
+        </MotionCardLink>
         <Card>
           <CardHeader>
             <CardTitle>已选内容示例</CardTitle>

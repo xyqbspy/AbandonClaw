@@ -106,4 +106,121 @@
   .app-container {
     @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
   }
+
+  .scene-card-motion {
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+    transform: translateZ(0);
+    will-change: transform, box-shadow;
+    transition:
+      transform 120ms ease-out,
+      box-shadow 140ms ease-out,
+      border-color 140ms ease-out;
+  }
+
+  .scene-card-motion::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 44%;
+    height: 1px;
+    opacity: 0;
+    transform: translateX(-140%);
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      oklch(0.75 0.05 220 / 0.2) 28%,
+      oklch(0.8 0.055 220 / 0.55) 52%,
+      oklch(0.75 0.05 220 / 0.2) 72%,
+      transparent 100%
+    );
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  .scene-card-motion::after {
+    content: "";
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    opacity: 0;
+    border-radius: 999px;
+    pointer-events: none;
+    z-index: 1;
+    background: radial-gradient(
+      circle,
+      oklch(0.82 0.05 220 / 0.65) 0%,
+      oklch(0.78 0.045 220 / 0.34) 42%,
+      transparent 76%
+    );
+    filter: blur(0.15px);
+    transform: translate3d(-20%, 74%, 0) scale(0.9);
+  }
+
+  .scene-card-motion[data-pressed="true"] {
+    transform: scale(0.988);
+    box-shadow:
+      0 10px 22px -18px oklch(0.22 0.02 245 / 0.5),
+      inset 0 0 0 1px oklch(0.67 0.04 220 / 0.22);
+  }
+
+  .scene-card-motion[data-activated="true"]::before {
+    animation: scene-card-top-sweep 620ms cubic-bezier(0.2, 0.62, 0.28, 1);
+  }
+
+  .scene-card-motion[data-activated="true"]::after {
+    animation: scene-card-dot-arc 760ms cubic-bezier(0.18, 0.68, 0.24, 1) 1 both;
+  }
+}
+
+@keyframes scene-card-top-sweep {
+  0% {
+    opacity: 0;
+    transform: translateX(-130%);
+  }
+  20% {
+    opacity: 0.7;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(260%);
+  }
+}
+
+@keyframes scene-card-dot-arc {
+  0% {
+    opacity: 0;
+    transform: translate3d(8%, 76%, 0) scale(0.86);
+  }
+  25% {
+    opacity: 0.55;
+  }
+  55% {
+    opacity: 0.42;
+    transform: translate3d(46%, 48%, 0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(84%, 16%, 0) scale(0.9);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scene-card-motion {
+    transition:
+      border-color 100ms ease-out,
+      box-shadow 100ms ease-out;
+  }
+
+  .scene-card-motion[data-pressed="true"] {
+    transform: none;
+  }
+
+  .scene-card-motion[data-activated="true"]::before,
+  .scene-card-motion[data-activated="true"]::after {
+    animation: none;
+    opacity: 0;
+  }
 }

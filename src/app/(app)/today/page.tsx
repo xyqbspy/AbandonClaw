@@ -1,8 +1,11 @@
+"use client";
+
 import Link from "next/link";
 import { ArrowRight, BookOpenCheck, Flame } from "lucide-react";
 import { dailyTasks, progressSummary } from "@/lib/data/mock-dashboard";
 import { scenes } from "@/lib/data/mock-lessons";
 import { TodayTaskList } from "@/features/today/components/today-task-list";
+import { MotionCardLink } from "@/components/shared/motion-card-link";
 import { PageHeader } from "@/components/shared/page-header";
 import { StatCard } from "@/components/shared/stat-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -52,14 +55,23 @@ export default function TodayPage() {
           </CardHeader>
           <CardContent className="space-y-2">
             {scenes.slice(0, 2).map((scene) => (
-              <Link
+              <MotionCardLink
                 key={scene.id}
                 href={`/scene/${scene.slug}`}
-                className="block rounded-lg border border-border/70 p-3 text-sm hover:bg-muted"
+                motionId={`today-reco-${scene.id}`}
+                className="block"
               >
-                <p className="font-medium">{scene.title}</p>
-                <p className="text-muted-foreground">预计时间 {scene.estimatedMinutes} 分钟</p>
-              </Link>
+                {(motionStateAttrs) => (
+                  <div
+                    data-pressed={motionStateAttrs["data-pressed"]}
+                    data-activated={motionStateAttrs["data-activated"]}
+                    className="scene-card-motion rounded-lg border border-border/70 p-3 text-sm transition-colors hover:bg-muted"
+                  >
+                    <p className="font-medium">{scene.title}</p>
+                    <p className="text-muted-foreground">预计时间 {scene.estimatedMinutes} 分钟</p>
+                  </div>
+                )}
+              </MotionCardLink>
             ))}
           </CardContent>
         </Card>
