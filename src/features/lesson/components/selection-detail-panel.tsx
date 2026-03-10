@@ -23,6 +23,10 @@ const highlightSelected = (sentence: string, selected?: string) => {
 };
 
 const isLongChunk = (text: string) => text.length > 22;
+const parseExampleFallback = (example: string) => {
+  const [en] = example.split("｜");
+  return (en ?? example).trim();
+};
 
 export function SelectionDetailPanel({
   currentSentence,
@@ -169,7 +173,9 @@ export function SelectionDetailPanel({
                     variant="ghost"
                     size="icon-sm"
                     aria-label="播放例句发音"
-                    onClick={() => onPronounce(chunkDetail.examples[0] ?? chunkDetail.text)}
+                    onClick={() =>
+                      onPronounce(parseExampleFallback(chunkDetail.examples[0] ?? chunkDetail.text))
+                    }
                   >
                     <CirclePlay className="size-4" />
                   </Button>
@@ -185,24 +191,29 @@ export function SelectionDetailPanel({
                 </div>
                 <div>
                   <p className="text-xs tracking-[0.08em] text-muted-foreground">常见用法</p>
-                  <p className="mt-1 text-sm leading-7">{chunkDetail.usageNote}</p>
+                  <p className="mt-1 text-sm leading-7">
+                    {chunkDetail.grammarLabel ? `${chunkDetail.grammarLabel}｜` : ""}
+                    {chunkDetail.usageNote}
+                  </p>
                 </div>
 
                 <div className="space-y-2">
                   <p className="text-xs tracking-[0.08em] text-muted-foreground">例句</p>
-                  {chunkDetail.examples.slice(0, 2).map((example) => (
+                  {chunkDetail.examples.slice(0, 2).map((example) => {
+                    const exampleText = parseExampleFallback(example);
+                    return (
                     <div key={example} className="flex items-center gap-2 rounded-lg border border-border/60 bg-background px-3 py-2 text-sm">
-                      <p className="flex-1 break-words">{example}</p>
+                      <p className="flex-1 break-words">{exampleText}</p>
                       <Button
                         size="icon-sm"
                         variant="ghost"
                         aria-label="播放例句发音"
-                        onClick={() => onPronounce(example)}
+                        onClick={() => onPronounce(exampleText)}
                       >
-                        <CirclePlay className={speakingText === example ? "size-4 animate-pulse" : "size-4"} />
+                        <CirclePlay className={speakingText === exampleText ? "size-4 animate-pulse" : "size-4"} />
                       </Button>
                     </div>
-                  ))}
+                  )})}
                 </div>
 
                 <div className="grid grid-cols-2 gap-2 pt-1">

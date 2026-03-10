@@ -21,6 +21,23 @@ export interface LessonSentence {
   chunks: string[];
   speaker?: string;
   audioText?: string;
+  chunkDetails?: SentenceChunkDetail[];
+}
+
+export interface ChunkExample {
+  en: string;
+  zh: string;
+}
+
+export interface SentenceChunkDetail {
+  text: string;
+  translation: string;
+  grammarLabel: string;
+  meaningInSentence: string;
+  usageNote: string;
+  examples: ChunkExample[];
+  pronunciation?: string;
+  synonyms?: string[];
 }
 
 export interface LessonSection {
@@ -36,8 +53,10 @@ export interface AIExplanation {
   translation: string;
   explanation: string;
   examples: string[];
+  exampleTranslations: string[];
   breakdown: string[];
   pronunciation: string;
+  grammarLabel: string;
 }
 
 export interface Lesson {
@@ -123,9 +142,11 @@ export interface SelectionChunkLayer {
   text: string;
   translation: string;
   pronunciation?: string;
+  grammarLabel?: string;
   meaningInSentence: string;
   usageNote: string;
   examples: string[];
+  exampleTranslations?: string[];
   notes?: string[];
 }
 

@@ -5,7 +5,7 @@ export const lessons: Lesson[] = [
     id: "scene-1",
     slug: "dinner-plan-cancelled",
     title: "Dinner Plan Cancelled（晚餐计划取消）",
-    subtitle: "A quick plan changes because of work pressure.",
+    subtitle: "A quick plan change because of work pressure.",
     description: "Practice natural conversation for canceling plans politely and rescheduling.",
     difficulty: "Intermediate",
     estimatedMinutes: 10,
@@ -21,250 +21,223 @@ export const lessons: Lesson[] = [
             id: "dpc-1",
             text: "Are we still on for dinner?",
             translation: "我们晚饭的约还算数吗？",
-            chunks: ["on for dinner", "still on"],
+            chunks: ["still on", "on for dinner"],
+            chunkDetails: [
+              {
+                text: "still on",
+                translation: "还照常进行",
+                grammarLabel: "固定搭配 / 状态确认",
+                meaningInSentence: "这里用来确认原本的安排现在是不是还有效。",
+                usageNote: "be still on 常用于确认约会、会议、计划是否继续进行。",
+                examples: [
+                  { en: "Is the meeting still on?", zh: "会议还照常开吗？" },
+                  { en: "Are we still on for tomorrow?", zh: "我们明天的安排还照旧吗？" },
+                ],
+                pronunciation: "/stɪl ɑːn/",
+                synonyms: ["still happening", "still scheduled"],
+              },
+              {
+                text: "on for dinner",
+                translation: "晚饭约还在",
+                grammarLabel: "固定搭配 / 约定表达",
+                meaningInSentence: "表示晚饭这件事仍然按计划进行。",
+                usageNote: "be on for + 活动，表示某活动照常进行。",
+                examples: [
+                  { en: "Are we on for lunch?", zh: "我们午饭还约吗？" },
+                  { en: "The date is still on for Friday.", zh: "周五的约会还照常。" },
+                ],
+                pronunciation: "/ɑːn fər ˈdɪnər/",
+              },
+            ],
           },
           {
             id: "dpc-2",
             text: "I was just about to text you, something came up.",
             translation: "我正准备给你发消息，突然有事了。",
             chunks: ["about to", "came up"],
+            chunkDetails: [
+              {
+                text: "about to",
+                translation: "正要；马上就要",
+                grammarLabel: "语法 chunk / be about to do",
+                meaningInSentence: "表示某个动作即将发生，这里是“正准备给你发消息”。",
+                usageNote: "be about to do 用于表示‘马上要做某事’，很口语也很高频。",
+                examples: [
+                  { en: "I’m about to leave.", zh: "我正要走。" },
+                  { en: "She was about to call you.", zh: "她刚刚正要给你打电话。" },
+                ],
+                pronunciation: "/əˈbaʊt tuː/",
+              },
+              {
+                text: "came up",
+                translation: "突然发生；临时有事",
+                grammarLabel: "动词短语 / come up",
+                meaningInSentence: "这里表示突然出现了一个打乱计划的事情。",
+                usageNote: "something came up 是口语里极高频的临时取消理由。",
+                examples: [
+                  { en: "Sorry, something came up at work.", zh: "抱歉，工作上突然有事。" },
+                  { en: "Can we talk later? Something came up.", zh: "我们晚点聊吧，突然有点事。" },
+                ],
+                pronunciation: "/keɪm ʌp/",
+                synonyms: ["happened", "turned up unexpectedly"],
+              },
+            ],
           },
           {
             id: "dpc-3",
             text: "Let me guess, working again?",
             translation: "我猜猜，又在加班？",
             chunks: ["let me guess", "working again"],
+            chunkDetails: [
+              {
+                text: "let me guess",
+                translation: "我猜猜看",
+                grammarLabel: "口语起手句",
+                meaningInSentence: "说话人先抛出一个半开玩笑的猜测。",
+                usageNote: "常用于熟人之间，表示你大概知道答案了。",
+                examples: [
+                  { en: "Let me guess, you forgot again?", zh: "我猜猜，你又忘了？" },
+                  { en: "Let me guess, traffic was bad?", zh: "我猜猜，路上堵车了？" },
+                ],
+                pronunciation: "/let mi ɡes/",
+              },
+              {
+                text: "working again",
+                translation: "又在工作；又在加班",
+                grammarLabel: "现在分词短语 / 状态追问",
+                meaningInSentence: "这里省略了完整句，实际语气是“你又在工作吗？”",
+                usageNote: "口语中常用这种简短省略句，语气更自然。",
+                examples: [
+                  { en: "Studying again?", zh: "又在学习啊？" },
+                  { en: "Late again?", zh: "又晚了啊？" },
+                ],
+              },
+            ],
           },
           {
             id: "dpc-4",
             text: "Yeah, I'm stuck at the office.",
             translation: "是啊，我还被困在办公室。",
             chunks: ["stuck at", "the office"],
+            chunkDetails: [
+              {
+                text: "stuck at",
+                translation: "被困在；脱不开身",
+                grammarLabel: "固定搭配 / stuck at + 地点",
+                meaningInSentence: "这里不是字面上的困住，而是指因为工作走不开。",
+                usageNote: "stuck at 常表示因为某种原因无法离开某地。",
+                examples: [
+                  { en: "I’m stuck at work.", zh: "我被工作困住了，走不开。" },
+                  { en: "She’s stuck at the airport.", zh: "她被困在机场了。" },
+                ],
+                pronunciation: "/stʌk æt/",
+              },
+              {
+                text: "the office",
+                translation: "办公室",
+                grammarLabel: "高频场景名词",
+                meaningInSentence: "这里强调说话人还在办公室，没法赴约。",
+                usageNote: "office 在职场口语中非常高频，常和 at / in 搭配。",
+                examples: [
+                  { en: "I’m still at the office.", zh: "我还在办公室。" },
+                  { en: "He left the office late.", zh: "他很晚才离开办公室。" },
+                ],
+              },
+            ],
           },
           {
             id: "dpc-5",
             text: "You've been crazy busy lately.",
             translation: "你最近真的忙疯了。",
             chunks: ["crazy busy", "lately"],
+            chunkDetails: [
+              {
+                text: "crazy busy",
+                translation: "忙疯了；特别忙",
+                grammarLabel: "程度表达 / 口语强化",
+                meaningInSentence: "crazy 在这里是加强语气，不是真的‘疯狂’。",
+                usageNote: "crazy + 形容词 是口语里很自然的强调方式。",
+                examples: [
+                  { en: "I’ve been crazy busy this week.", zh: "我这周忙疯了。" },
+                  { en: "Things are crazy busy right now.", zh: "最近事情特别多。" },
+                ],
+                pronunciation: "/ˈkreɪzi ˈbɪzi/",
+              },
+              {
+                text: "lately",
+                translation: "最近",
+                grammarLabel: "时间副词",
+                meaningInSentence: "表示这一段时间持续如此。",
+                usageNote: "lately 常和现在完成时连用，表示最近一段时间。",
+                examples: [
+                  { en: "I haven’t slept well lately.", zh: "我最近睡得不太好。" },
+                  { en: "She’s been stressed lately.", zh: "她最近压力很大。" },
+                ],
+                pronunciation: "/ˈleɪtli/",
+              },
+            ],
           },
           {
             id: "dpc-6",
             text: "I know, rain check?",
             translation: "我知道，要不改天？",
-            chunks: ["rain check", "I know"],
+            chunks: ["I know", "rain check"],
+            chunkDetails: [
+              {
+                text: "I know",
+                translation: "我知道",
+                grammarLabel: "回应句 / 承接情绪",
+                meaningInSentence: "这里不是单纯陈述事实，而是承认对方说得对。",
+                usageNote: "I know 在口语里常用来接住对方情绪，显得自然。",
+                examples: [
+                  { en: "I know, it’s been a lot.", zh: "我知道，最近确实很多事。" },
+                  { en: "I know, I’ve been terrible at replying.", zh: "我知道，我最近回消息很差劲。" },
+                ],
+              },
+              {
+                text: "rain check",
+                translation: "改天再约",
+                grammarLabel: "固定表达 / 礼貌改期",
+                meaningInSentence: "表示这次先取消，但保留以后再约的意思。",
+                usageNote: "非常适合约饭、看电影、见面等社交场景。",
+                examples: [
+                  { en: "Can we take a rain check?", zh: "我们可以改天吗？" },
+                  { en: "Rain check for this weekend?", zh: "这个周末改天行吗？" },
+                ],
+                pronunciation: "/reɪn tʃek/",
+              },
+            ],
           },
           {
             id: "dpc-7",
             text: "Sure, we'll do it another time.",
             translation: "行，我们改天再约。",
             chunks: ["another time", "we'll do it"],
-          },
-        ],
-      },
-    ],
-    explanations: [],
-  },
-  {
-    id: "scene-2",
-    slug: "long-day-at-work",
-    title: "Long Day at Work（漫长工作日）",
-    subtitle: "Share frustration after an unproductive afternoon.",
-    description: "Learn how to describe tiredness, meetings, and emotional reactions naturally.",
-    difficulty: "Intermediate",
-    estimatedMinutes: 9,
-    completionRate: 0,
-    tags: ["office", "small talk", "feelings"],
-    sections: [
-      {
-        id: "scene-2-sec-1",
-        title: "Long Day at Work（漫长工作日）",
-        summary: "Talking about a draining day and setting boundaries after work.",
-        sentences: [
-          {
-            id: "ldw-1",
-            text: "You look exhausted. Long day?",
-            translation: "你看起来很累，今天很漫长吧？",
-            chunks: ["look exhausted", "long day"],
-          },
-          {
-            id: "ldw-2",
-            text: "Meetings all afternoon, nothing got decided.",
-            translation: "整个下午都在开会，结果什么都没定下来。",
-            chunks: ["all afternoon", "got decided"],
-          },
-          {
-            id: "ldw-3",
-            text: "That's the worst, talking for hours and going nowhere.",
-            translation: "这最折磨人了，说了几个小时却毫无进展。",
-            chunks: ["the worst", "going nowhere"],
-          },
-          {
-            id: "ldw-4",
-            text: "Exactly, by the end everyone just wanted to leave.",
-            translation: "就是，到最后大家只想赶紧走。",
-            chunks: ["by the end", "wanted to leave"],
-          },
-          {
-            id: "ldw-5",
-            text: "At least that's over now.",
-            translation: "至少现在都结束了。",
-            chunks: ["at least", "over now"],
-          },
-          {
-            id: "ldw-6",
-            text: "True, I'm not opening my laptop tonight.",
-            translation: "也是，我今晚绝不再打开电脑。",
-            chunks: ["true", "not opening my laptop"],
-          },
-        ],
-      },
-    ],
-    explanations: [],
-  },
-  {
-    id: "scene-3",
-    slug: "stayed-up-too-late",
-    title: "Stayed Up Too Late（熬夜太晚）",
-    subtitle: "A realistic chat about poor sleep and low energy.",
-    description: "Use practical spoken English for habits, regret, and recovering from tiredness.",
-    difficulty: "Intermediate",
-    estimatedMinutes: 11,
-    completionRate: 0,
-    tags: ["sleep", "habits", "daily life"],
-    sections: [
-      {
-        id: "scene-3-sec-1",
-        title: "Stayed Up Too Late（熬夜太晚）",
-        summary: "A casual check-in after a night of little sleep.",
-        sentences: [
-          {
-            id: "sutl-1",
-            text: "You look tired today.",
-            translation: "你今天看起来很累。",
-            chunks: ["look tired", "today"],
-          },
-          {
-            id: "sutl-2",
-            text: "Yeah, I stayed up too late last night.",
-            translation: "是啊，我昨晚睡得太晚了。",
-            chunks: ["stayed up too late", "last night"],
-          },
-          {
-            id: "sutl-3",
-            text: "Working or messing around?",
-            translation: "在工作，还是在瞎刷？",
-            chunks: ["messing around", "working"],
-          },
-          {
-            id: "sutl-4",
-            text: "Honestly, just watching videos and scrolling.",
-            translation: "老实说，就是在看视频和刷手机。",
-            chunks: ["honestly", "scrolling"],
-          },
-          {
-            id: "sutl-5",
-            text: "That happens. Did you at least get some sleep?",
-            translation: "这种情况很常见。你至少睡了一点吗？",
-            chunks: ["that happens", "at least"],
-          },
-          {
-            id: "sutl-6",
-            text: "Not really, about five hours.",
-            translation: "也没怎么睡，大概五个小时。",
-            chunks: ["not really", "about five hours"],
-          },
-          {
-            id: "sutl-7",
-            text: "No wonder you're exhausted.",
-            translation: "难怪你这么疲惫。",
-            chunks: ["no wonder", "exhausted"],
-          },
-          {
-            id: "sutl-8",
-            text: "Exactly, I'm grabbing coffee and calling it a day.",
-            translation: "可不是嘛，我先去买杯咖啡，今天就这样了。",
-            chunks: ["grabbing coffee", "calling it a day"],
-          },
-        ],
-      },
-    ],
-    explanations: [],
-  },
-  {
-    id: "scene-4",
-    slug: "subway-commute-morning",
-    title: "Subway Commute Morning（早高峰地铁通勤）",
-    subtitle: "Complain about a packed commute and low morning energy.",
-    description: "Understand natural back-and-forth conversation about commuting stress.",
-    difficulty: "Intermediate",
-    estimatedMinutes: 12,
-    completionRate: 0,
-    tags: ["commute", "morning", "daily conversation"],
-    sections: [
-      {
-        id: "scene-4-sec-1",
-        title: "Subway Commute Morning（早高峰地铁通勤）",
-        summary: "A short dialogue after a crowded subway ride.",
-        sentences: [
-          {
-            id: "scm-1",
-            text: "You look exhausted today.",
-            translation: "你今天看起来很疲惫。",
-            chunks: ["look exhausted", "today"],
-          },
-          {
-            id: "scm-2",
-            text: "Yeah, the subway was packed again.",
-            translation: "是啊，地铁今天又挤爆了。",
-            chunks: ["packed again", "the subway"],
-          },
-          {
-            id: "scm-3",
-            text: "Didn't get a seat?",
-            translation: "没抢到座位吗？",
-            chunks: ["get a seat"],
-          },
-          {
-            id: "scm-4",
-            text: "Not this time.",
-            translation: "这次没坐上。",
-            chunks: ["not this time"],
-          },
-          {
-            id: "scm-5",
-            text: "That commute is brutal.",
-            translation: "那段通勤真是折磨人。",
-            chunks: ["commute", "brutal"],
-          },
-          {
-            id: "scm-6",
-            text: "Tell me about it.",
-            translation: "可不是嘛。",
-            chunks: ["tell me about it"],
-          },
-          {
-            id: "scm-7",
-            text: "How long does it take now?",
-            translation: "现在要花多久？",
-            chunks: ["how long", "take now"],
-          },
-          {
-            id: "scm-8",
-            text: "Almost an hour door to door.",
-            translation: "门到门差不多一个小时。",
-            chunks: ["door to door", "almost an hour"],
-          },
-          {
-            id: "scm-9",
-            text: "No wonder you're tired.",
-            translation: "难怪你这么累。",
-            chunks: ["no wonder", "tired"],
-          },
-          {
-            id: "scm-10",
-            text: "Yeah, I need coffee before anything else.",
-            translation: "是啊，我得先喝杯咖啡再说。",
-            chunks: ["before anything else", "need coffee"],
+            chunkDetails: [
+              {
+                text: "another time",
+                translation: "改天；另找时间",
+                grammarLabel: "时间表达 / 改期",
+                meaningInSentence: "表示不纠结这次，换个时间再做。",
+                usageNote: "another time 比 later 更完整，更像正式说‘下次再说’。",
+                examples: [
+                  { en: "Let’s talk another time.", zh: "我们改天再聊。" },
+                  { en: "We can do lunch another time.", zh: "我们可以改天再一起吃午饭。" },
+                ],
+                pronunciation: "/əˈnʌðər taɪm/",
+              },
+              {
+                text: "we'll do it",
+                translation: "我们到时候再做",
+                grammarLabel: "未来安排表达",
+                meaningInSentence: "这里的 it 指代 dinner plan，表示以后会补上。",
+                usageNote: "we’ll do it 是很自然的口语表达，表示以后补做这件事。",
+                examples: [
+                  { en: "We’ll do it next week.", zh: "我们下周再弄。" },
+                  { en: "Don’t worry, we’ll do it soon.", zh: "别担心，我们很快会做的。" },
+                ],
+              },
+            ],
           },
         ],
       },
@@ -282,8 +255,10 @@ const explanationSeed: AIExplanation[] = [
     translation: "改天再约",
     explanation: "用于礼貌地表示这次先取消，改到别的时间再进行。",
     examples: ["Can we take a rain check?", "Let's do a rain check for Friday."],
+    exampleTranslations: ["我们可以改天吗？", "我们改到周五吧。"],
     breakdown: ["口语高频", "用于改期", "语气友好"],
     pronunciation: "/reɪn tʃek/",
+    grammarLabel: "固定表达 / 礼貌改期",
   },
   {
     key: "by the end",
@@ -291,8 +266,10 @@ const explanationSeed: AIExplanation[] = [
     translation: "到最后",
     explanation: "表示某个过程推进到末尾时的状态或结果。",
     examples: ["By the end, everyone was tired.", "By the end of the week, we finished it."],
+    exampleTranslations: ["到最后大家都累了。", "到周末时我们把它完成了。"],
     breakdown: ["时间短语", "常与过去时搭配"],
     pronunciation: "/baɪ ði end/",
+    grammarLabel: "时间短语",
   },
   {
     key: "stayed up too late",
@@ -300,17 +277,10 @@ const explanationSeed: AIExplanation[] = [
     translation: "熬夜太晚",
     explanation: "表示睡觉时间严重延后，导致休息不足。",
     examples: ["I stayed up too late again.", "She stayed up too late studying."],
+    exampleTranslations: ["我又熬夜太晚了。", "她为了学习熬夜太晚。"],
     breakdown: ["stay up", "描述昨晚状态"],
     pronunciation: "/steɪd ʌp tuː leɪt/",
-  },
-  {
-    key: "door to door",
-    text: "door to door",
-    translation: "门到门",
-    explanation: "指从出发地门口到目的地门口的完整通勤耗时。",
-    examples: ["It's 50 minutes door to door.", "Door to door takes almost an hour."],
-    breakdown: ["通勤语境高频", "强调全程时间"],
-    pronunciation: "/dɔːr tə dɔːr/",
+    grammarLabel: "动词短语 / 睡眠表达",
   },
 ];
 
@@ -459,9 +429,11 @@ const toChunkLayer = (
       text: chunkText,
       translation: picked.translation,
       pronunciation: picked.pronunciation ?? explanation?.pronunciation,
+      grammarLabel: explanation?.grammarLabel,
       meaningInSentence: picked.meaningInSentence,
       usageNote: picked.usageNote,
       examples: picked.examples.slice(0, 2),
+      exampleTranslations: explanation?.exampleTranslations?.slice(0, 2),
       notes: picked.notes ?? explanation?.breakdown,
     };
   }
@@ -471,10 +443,12 @@ const toChunkLayer = (
       text: chunkText,
       translation: explanation.translation,
       pronunciation: explanation.pronunciation,
+      grammarLabel: explanation.grammarLabel,
       meaningInSentence: `这里可以理解为：${sentence.translation}`,
       usageNote:
         "常用于口语和写作中表达状态、动作或语气变化，建议结合真实语境反复接触。",
       examples: explanation.examples.slice(0, 2),
+      exampleTranslations: explanation.exampleTranslations.slice(0, 2),
       notes: explanation.breakdown,
     };
   }
@@ -498,6 +472,24 @@ export const getChunkLayerFromLesson = (
   sentence: LessonSentence,
   chunkText: string,
 ): SelectionChunkLayer => {
+  const localChunk = sentence.chunkDetails?.find(
+    (item) => item.text.toLowerCase() === chunkText.toLowerCase(),
+  );
+
+  if (localChunk) {
+    return {
+      text: localChunk.text,
+      translation: localChunk.translation,
+      pronunciation: localChunk.pronunciation,
+      grammarLabel: localChunk.grammarLabel,
+      meaningInSentence: localChunk.meaningInSentence,
+      usageNote: localChunk.usageNote,
+      examples: localChunk.examples.map((item) => item.en),
+      exampleTranslations: localChunk.examples.map((item) => item.zh),
+      notes: localChunk.synonyms ?? [],
+    };
+  }
+
   const explanation = lesson.explanations.find(
     (item) => item.key.toLowerCase() === chunkText.toLowerCase(),
   );
