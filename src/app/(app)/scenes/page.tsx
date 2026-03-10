@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
-import { ArrowRight, Clock3, Plus, X } from "lucide-react";
+import { Plus, X } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/shared/page-header";
 import { Badge } from "@/components/ui/badge";
@@ -77,29 +77,30 @@ export default function ScenesPage() {
         description="从高频生活语境开始，逐句理解，再进入短语解析与复习。"
       />
 
-      <Card className="border-dashed border-primary/35 bg-primary/5">
-        <CardContent className="p-4 sm:p-5">
-          <div className="flex items-start justify-between gap-3">
-            <div className="space-y-1">
-              <p className="text-sm font-semibold">自定义场景</p>
-              <p className="text-sm text-muted-foreground">
-                粘贴一段真实英语对话，生成可学习的场景内容
+      <Card className="border-border/70 bg-card">
+        <CardContent className="p-3 sm:p-3.5">
+          <div className="flex items-center justify-between gap-2.5">
+            <div className="min-w-0 space-y-0.5">
+              <p className="text-sm font-semibold leading-5">自定义场景</p>
+              <p className="line-clamp-1 text-xs text-muted-foreground">
+                粘贴英语对话，导入到场景列表
               </p>
+              <p className="text-xs text-muted-foreground/90">自定义 · 导入对话</p>
             </div>
             <Button
               type="button"
               size="sm"
-              className="cursor-pointer shrink-0"
+              className="h-8 cursor-pointer shrink-0 px-2.5 text-xs"
               onClick={() => setDialogOpen(true)}
             >
-              <Plus className="size-4" />
+              <Plus className="size-3.5" />
               导入场景
             </Button>
           </div>
         </CardContent>
       </Card>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {allScenes.map((scene) => {
           const sentenceCount = scene.sections.reduce(
             (total, section) => total + section.sentences.length,
@@ -108,32 +109,23 @@ export default function ScenesPage() {
 
           return (
             <Link key={scene.id} href={`/scene/${scene.slug}`} className="group block">
-              <Card className="h-full cursor-pointer border-border/70 transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md">
-                <CardHeader className="space-y-2">
+              <Card className="h-full cursor-pointer border-border/70 transition-all duration-150 hover:border-primary/40 hover:shadow-sm">
+                <CardHeader className="space-y-1.5 p-3.5 pb-3">
                   <div className="flex items-center gap-2">
-                    <CardTitle className="line-clamp-2 text-lg leading-7">{scene.title}</CardTitle>
+                    <CardTitle className="line-clamp-1 text-base leading-6">{scene.title}</CardTitle>
                     {scene.sourceType === "custom" ? (
-                      <Badge variant="outline" className="shrink-0">
+                      <Badge variant="outline" className="h-5 shrink-0 px-1.5 text-[10px]">
                         自定义
                       </Badge>
                     ) : null}
                   </div>
-                  <p className="text-sm text-muted-foreground">{scene.subtitle}</p>
+                  <p className="line-clamp-1 text-xs text-muted-foreground">{scene.subtitle}</p>
                 </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                    <Badge variant="outline">{difficultyLabel[scene.difficulty] ?? "中级"}</Badge>
-                    <Badge variant="outline">{sentenceCount} 句</Badge>
-                    <Badge variant="outline">
-                      <Clock3 className="mr-1 size-3" />
-                      {scene.estimatedMinutes} 分钟
-                    </Badge>
-                  </div>
-                  <p className="text-sm text-muted-foreground">{scene.description}</p>
-                  <div className="inline-flex items-center gap-1 text-sm font-medium text-primary">
-                    进入场景
-                    <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
-                  </div>
+                <CardContent className="p-3.5 pt-0">
+                  <p className="text-xs text-muted-foreground">
+                    {difficultyLabel[scene.difficulty] ?? "中级"} · {sentenceCount}句 ·{" "}
+                    {scene.estimatedMinutes}分钟
+                  </p>
                 </CardContent>
               </Card>
             </Link>
