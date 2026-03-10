@@ -318,6 +318,12 @@ const toChunkLayer = (
   sentence: LessonSentence,
   chunkText: string,
 ): SelectionChunkLayer => {
+  const toExamplePairs = (examples: string[], translations?: string[]) =>
+    examples.slice(0, 2).map((en, index) => ({
+      en,
+      zh: translations?.[index] ?? "",
+    }));
+
   const key = chunkText.toLowerCase();
   const curated: Record<
     string,
@@ -326,6 +332,8 @@ const toChunkLayer = (
       meaningInSentence: string;
       usageNote: string;
       examples: string[];
+      exampleTranslations?: string[];
+      grammarLabel?: string;
       notes?: string[];
       pronunciation?: string;
     }
@@ -338,6 +346,7 @@ const toChunkLayer = (
         "Is the meeting still on for tomorrow?",
         "Are we still on for lunch?",
       ],
+      exampleTranslations: ["明天的会议还照常吗？", "我们午饭还按原计划吗？"],
     },
     "came up": {
       translation: "突然有事",
@@ -347,18 +356,21 @@ const toChunkLayer = (
         "Sorry, something came up at work.",
         "Can we reschedule? Something came up.",
       ],
+      exampleTranslations: ["抱歉，工作上突然有事。", "我们能改时间吗？临时有事了。"],
     },
     "stuck at": {
       translation: "被困在",
       meaningInSentence: "这里表示人还被工作困在办公室，无法离开。",
       usageNote: "stuck at + 地点/状态，用于表达无法脱身的语感。",
       examples: ["I'm stuck at the airport.", "She was stuck at work late."],
+      exampleTranslations: ["我被困在机场了。", "她在公司拖到很晚才走。"],
     },
     "rain check": {
       translation: "改天再约",
       meaningInSentence: "这里是礼貌提议把这次见面改到下次。",
       usageNote: "口语中用于临时取消后提出延期，语气轻松不生硬。",
       examples: ["Can we do a rain check?", "Rain check for this weekend?"],
+      exampleTranslations: ["我们改天再约可以吗？", "这个周末改天约怎么样？"],
       pronunciation: "/reɪn tʃek/",
     },
     "got decided": {
@@ -369,12 +381,14 @@ const toChunkLayer = (
         "Nothing got decided in the meeting.",
         "We need this to get decided today.",
       ],
+      exampleTranslations: ["会议里什么都没定下来。", "这件事今天必须定下来。"],
     },
     "by the end": {
       translation: "到最后",
       meaningInSentence: "这里强调会开到后段时，大家都已疲惫。",
       usageNote: "用于描述过程推进到末尾时的状态变化。",
       examples: ["By the end, everyone went quiet.", "By the end, I was done."],
+      exampleTranslations: ["到最后大家都不说话了。", "到最后我已经彻底没力气了。"],
       pronunciation: "/baɪ ði end/",
     },
     "stayed up too late": {
@@ -382,6 +396,7 @@ const toChunkLayer = (
       meaningInSentence: "这里表示昨晚睡得过晚，直接影响今天精神状态。",
       usageNote: "用于描述睡眠不足的原因，日常表达非常高频。",
       examples: ["I stayed up too late gaming.", "He stayed up too late again."],
+      exampleTranslations: ["我昨晚打游戏熬太晚了。", "他昨晚又熬夜太晚了。"],
       pronunciation: "/steɪd ʌp tuː leɪt/",
     },
     "messing around": {
@@ -389,24 +404,28 @@ const toChunkLayer = (
       meaningInSentence: "这里表示并非认真工作，而是在随意消磨时间。",
       usageNote: "mess around 常用于轻松语境，表示做事不专注或随便玩。",
       examples: ["I was just messing around online.", "Stop messing around and start."],
+      exampleTranslations: ["我当时就是在网上随便刷刷。", "别再磨蹭了，赶紧开始吧。"],
     },
     "calling it a day": {
       translation: "今天就到这",
       meaningInSentence: "这里表示决定结束当天安排，不再继续忙下去。",
       usageNote: "常用于工作、学习结束时，语气自然、口语化。",
       examples: ["Let's call it a day.", "I'm calling it a day after this."],
+      exampleTranslations: ["今天就到这吧。", "做完这个我今天就收工了。"],
     },
     "packed again": {
       translation: "又很拥挤",
       meaningInSentence: "这里说明地铁早高峰再次挤满了人。",
       usageNote: "packed 常用于交通、场馆、人群密集场景。",
       examples: ["The train was packed this morning.", "It gets packed after 8 a.m."],
+      exampleTranslations: ["今天早上地铁特别挤。", "早上八点后就会变得很拥挤。"],
     },
     "door to door": {
       translation: "门到门",
       meaningInSentence: "这里表示从家门到公司门口全程将近一小时。",
       usageNote: "用于估算完整通勤时间，比单程车程更完整。",
       examples: ["It's an hour door to door.", "Door to door takes 45 minutes."],
+      exampleTranslations: ["门到门要一个小时。", "门到门大概 45 分钟。"],
       pronunciation: "/dɔːr tə dɔːr/",
     },
     "before anything else": {
@@ -414,12 +433,14 @@ const toChunkLayer = (
       meaningInSentence: "这里强调在做其他事情前，先喝咖啡恢复状态。",
       usageNote: "用于表达优先级，常见于日常安排和工作语境。",
       examples: ["I need water before anything else.", "Stretch before anything else."],
+      exampleTranslations: ["我现在得先喝点水再说。", "先拉伸一下，再做别的事。"],
     },
     "no wonder": {
       translation: "难怪",
       meaningInSentence: "这里用于顺着前文原因，得出合理结果。",
       usageNote: "口语里用于表示理解或恍然大悟，语气自然。",
       examples: ["No wonder you're late.", "No wonder she looked tired."],
+      exampleTranslations: ["难怪你迟到了。", "难怪她看起来那么累。"],
     },
   };
 
@@ -429,11 +450,13 @@ const toChunkLayer = (
       text: chunkText,
       translation: picked.translation,
       pronunciation: picked.pronunciation ?? explanation?.pronunciation,
-      grammarLabel: explanation?.grammarLabel,
+      grammarLabel: picked.grammarLabel ?? explanation?.grammarLabel,
       meaningInSentence: picked.meaningInSentence,
       usageNote: picked.usageNote,
-      examples: picked.examples.slice(0, 2),
-      exampleTranslations: explanation?.exampleTranslations?.slice(0, 2),
+      examples: toExamplePairs(
+        picked.examples,
+        picked.exampleTranslations ?? explanation?.exampleTranslations,
+      ),
       notes: picked.notes ?? explanation?.breakdown,
     };
   }
@@ -447,8 +470,7 @@ const toChunkLayer = (
       meaningInSentence: `这里可以理解为：${sentence.translation}`,
       usageNote:
         "常用于口语和写作中表达状态、动作或语气变化，建议结合真实语境反复接触。",
-      examples: explanation.examples.slice(0, 2),
-      exampleTranslations: explanation.exampleTranslations.slice(0, 2),
+      examples: toExamplePairs(explanation.examples, explanation.exampleTranslations),
       notes: explanation.breakdown,
     };
   }
@@ -460,8 +482,14 @@ const toChunkLayer = (
     usageNote:
       "常用于日常交流中补充动作细节或状态变化，建议放进完整句子里记忆。",
     examples: [
-      `Try using "${chunkText}" in your own sentence.`,
-      `I saved "${chunkText}" for review.`,
+      {
+        en: `Try using "${chunkText}" in your own sentence.`,
+        zh: `试着在你自己的句子里使用“${chunkText}”。`,
+      },
+      {
+        en: `I saved "${chunkText}" for review.`,
+        zh: `我把“${chunkText}”保存进复习了。`,
+      },
     ],
     notes: ["优先记忆短语与完整句子搭配"],
   };
@@ -484,8 +512,7 @@ export const getChunkLayerFromLesson = (
       grammarLabel: localChunk.grammarLabel,
       meaningInSentence: localChunk.meaningInSentence,
       usageNote: localChunk.usageNote,
-      examples: localChunk.examples.map((item) => item.en),
-      exampleTranslations: localChunk.examples.map((item) => item.zh),
+      examples: localChunk.examples.slice(0, 2),
       notes: localChunk.synonyms ?? [],
     };
   }

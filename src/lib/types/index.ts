@@ -141,12 +141,11 @@ export interface SelectionSentenceLayer {
 export interface SelectionChunkLayer {
   text: string;
   translation: string;
-  pronunciation?: string;
   grammarLabel?: string;
+  pronunciation?: string;
   meaningInSentence: string;
   usageNote: string;
-  examples: string[];
-  exampleTranslations?: string[];
+  examples: ChunkExample[];
   notes?: string[];
 }
 

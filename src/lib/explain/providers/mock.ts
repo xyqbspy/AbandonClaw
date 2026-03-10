@@ -40,8 +40,11 @@ export function explainWithMock(
         usageNote:
           "用于连接两个动作，强调后一个动作紧接前一个动作发生。常用于口语和叙事表达。",
         examples: [
-          "Call me as soon as you arrive.",
-          "She left the office as soon as the meeting ended.",
+          { en: "Call me as soon as you arrive.", zh: "你一到就给我打电话。" },
+          {
+            en: "She left the office as soon as the meeting ended.",
+            zh: "会议一结束她就离开办公室了。",
+          },
         ],
         notes: ["将来语境中从句常用一般现在时"],
       },
@@ -60,8 +63,8 @@ export function explainWithMock(
         usageNote:
           "表示过去习惯或状态，暗含现在不同。后面通常接动词原形。",
         examples: [
-          "I used to work late every night.",
-          "They used to live near the river.",
+          { en: "I used to work late every night.", zh: "我过去每天晚上都工作到很晚。" },
+          { en: "They used to live near the river.", zh: "他们过去住在河边。" },
         ],
         notes: ["不用于只发生一次的过去事件"],
       },
@@ -78,8 +81,14 @@ export function explainWithMock(
       usageNote:
         "建议优先记忆“短语 + 完整句子”。先理解它在当前句子里承担的作用，再迁移到自己的表达中。",
       examples: [
-        `I saved "${selected}" as a useful phrase.`,
-        `Try using "${selected}" in your next sentence.`,
+        {
+          en: `I saved "${selected}" as a useful phrase.`,
+          zh: `我把“${selected}”保存成了一个有用短语。`,
+        },
+        {
+          en: `Try using "${selected}" in your next sentence.`,
+          zh: `试着在下一句里用上“${selected}”。`,
+        },
       ],
       notes: ["加入复习后建议 24 小时内回看一次"],
     },

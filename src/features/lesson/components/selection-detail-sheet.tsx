@@ -11,14 +11,6 @@ import { cn } from "@/lib/utils";
 
 const isLongChunk = (text: string) => text.length > 22;
 
-const parseExampleFallback = (example: string) => {
-  const [en, zh] = example.split("｜");
-  return {
-    en: (en ?? example).trim(),
-    zh: (zh ?? "").trim(),
-  };
-};
-
 export function SelectionDetailSheet({
   currentSentence,
   chunkDetail,
@@ -249,14 +241,10 @@ export function SelectionDetailSheet({
                     <div className="space-y-2">
                       <p className="text-xs tracking-[0.08em] text-muted-foreground">例句</p>
                       {chunkDetail.examples.slice(0, 2).map((example, index) => {
-                        const parsed = parseExampleFallback(example);
-                        const exampleText = parsed.en;
-                        const translation =
-                          chunkDetail.exampleTranslations?.[index] ??
-                          parsed.zh ??
-                          "该例句翻译待补充。";
+                        const exampleText = example.en;
+                        const translation = example.zh;
                         return (
-                        <div key={`${example}-${index}`} className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-sm">
+                        <div key={`${example.en}-${index}`} className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-sm">
                           <div className="flex items-center justify-end gap-3">
                             <button
                               type="button"
@@ -286,7 +274,7 @@ export function SelectionDetailSheet({
                             )}
                           >
                             <p className="min-h-0 rounded-lg bg-background px-2.5 py-1.5 text-sm leading-6 text-muted-foreground">
-                              {translation}
+                              {translation || "该例句翻译待补充。"}
                             </p>
                           </div>
                         </div>
