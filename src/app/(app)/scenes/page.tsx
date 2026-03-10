@@ -121,25 +121,27 @@ export default function ScenesPage() {
 
           return (
             <Link key={scene.id} href={`/scene/${scene.slug}`} className="group block">
-              <Card className="relative h-full cursor-pointer border-border/70 transition-all duration-150 hover:border-primary/40 hover:shadow-sm">
-                {isCustom ? (
-                  <button
-                    type="button"
-                    aria-label="删除自定义场景"
-                    className="absolute top-1.5 right-1.5 z-10 inline-flex h-6 w-6 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                    onClick={(event) => {
-                      event.preventDefault();
-                      event.stopPropagation();
-                      handleDeleteCustomScene(scene);
-                    }}
-                  >
-                    <Trash2 className="size-3.5" />
-                  </button>
-                ) : null}
+              <Card className="h-full cursor-pointer border-border/70 transition-all duration-150 hover:border-primary/40 hover:shadow-sm">
                 <CardHeader className="space-y-0.5 p-2.5 pb-1.5 sm:p-3 sm:pb-2">
-                  <CardTitle className="line-clamp-1 pr-8 text-[15px] leading-5 sm:text-base">
-                    {scene.title}
-                  </CardTitle>
+                  <div className="flex items-start gap-2">
+                    <CardTitle className="min-w-0 flex-1 line-clamp-1 text-[15px] leading-5 sm:text-base">
+                      {scene.title}
+                    </CardTitle>
+                    {isCustom ? (
+                      <button
+                        type="button"
+                        aria-label="删除自定义场景"
+                        className="inline-flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                        onClick={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          handleDeleteCustomScene(scene);
+                        }}
+                      >
+                        <Trash2 className="size-3.5" />
+                      </button>
+                    ) : null}
+                  </div>
                   <p className="line-clamp-1 text-[11px] text-muted-foreground">{scene.subtitle}</p>
                 </CardHeader>
                 <CardContent className="p-2.5 pt-0 sm:p-3 sm:pt-0">
