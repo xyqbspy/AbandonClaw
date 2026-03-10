@@ -2,10 +2,9 @@
 
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
-import { Plus, X } from "lucide-react";
+import { Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/shared/page-header";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -14,6 +13,7 @@ import { Lesson } from "@/lib/types";
 import { parseCustomScenario } from "@/lib/utils/custom-scenario-parser";
 import {
   getCustomScenariosSnapshot,
+  removeCustomScenarioFromStorage,
   saveCustomScenarioToStorage,
 } from "@/lib/utils/custom-scenario-storage";
 
@@ -35,11 +35,13 @@ export default function ScenesPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [input, setInput] = useState("");
   const [error, setError] = useState("");
+  const [refreshTick, setRefreshTick] = useState(0);
   const customScenes = useSyncExternalStore<Lesson[]>(
     subscribeNoop,
     () => getCustomScenariosSnapshot(),
     () => EMPTY_CUSTOM_SCENES,
   );
+  void refreshTick;
   const allScenes = useMemo(() => [...customScenes, ...scenes], [customScenes]);
 
   useEffect(() => {
@@ -64,13 +66,22 @@ export default function ScenesPage() {
     }
 
     saveCustomScenarioToStorage(result.value);
+    setRefreshTick((prev) => prev + 1);
     setInput("");
     closeDialog();
     toast.success("自定义场景已导入");
   };
 
+  const handleDeleteCustomScene = (scene: Lesson) => {
+    const confirmed = window.confirm(`确认删除「${scene.title}」吗？`);
+    if (!confirmed) return;
+    removeCustomScenarioFromStorage(scene.id);
+    setRefreshTick((prev) => prev + 1);
+    toast.success("已删除自定义场景");
+  };
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <PageHeader
         eyebrow="场景学习"
         title="选择一个真实对话场景"
@@ -78,51 +89,61 @@ export default function ScenesPage() {
       />
 
       <Card className="border-border/70 bg-card">
-        <CardContent className="p-3 sm:p-3.5">
-          <div className="flex items-center justify-between gap-2.5">
-            <div className="min-w-0 space-y-0.5">
+        <CardContent className="p-2.5 sm:p-3">
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0 space-y-0">
               <p className="text-sm font-semibold leading-5">自定义场景</p>
-              <p className="line-clamp-1 text-xs text-muted-foreground">
+              <p className="line-clamp-1 text-[11px] text-muted-foreground">
                 粘贴英语对话，导入到场景列表
               </p>
-              <p className="text-xs text-muted-foreground/90">自定义 · 导入对话</p>
+              <p className="text-[11px] text-muted-foreground/90">自定义 · 导入对话</p>
             </div>
             <Button
               type="button"
               size="sm"
-              className="h-8 cursor-pointer shrink-0 px-2.5 text-xs"
+              className="h-7 cursor-pointer shrink-0 px-2 text-[11px]"
               onClick={() => setDialogOpen(true)}
             >
-              <Plus className="size-3.5" />
+              <Plus className="size-3" />
               导入场景
             </Button>
           </div>
         </CardContent>
       </Card>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
         {allScenes.map((scene) => {
           const sentenceCount = scene.sections.reduce(
             (total, section) => total + section.sentences.length,
             0,
           );
+          const isCustom = scene.sourceType === "custom";
 
           return (
             <Link key={scene.id} href={`/scene/${scene.slug}`} className="group block">
-              <Card className="h-full cursor-pointer border-border/70 transition-all duration-150 hover:border-primary/40 hover:shadow-sm">
-                <CardHeader className="space-y-1.5 p-3.5 pb-3">
-                  <div className="flex items-center gap-2">
-                    <CardTitle className="line-clamp-1 text-base leading-6">{scene.title}</CardTitle>
-                    {scene.sourceType === "custom" ? (
-                      <Badge variant="outline" className="h-5 shrink-0 px-1.5 text-[10px]">
-                        自定义
-                      </Badge>
-                    ) : null}
-                  </div>
-                  <p className="line-clamp-1 text-xs text-muted-foreground">{scene.subtitle}</p>
+              <Card className="relative h-full cursor-pointer border-border/70 transition-all duration-150 hover:border-primary/40 hover:shadow-sm">
+                {isCustom ? (
+                  <button
+                    type="button"
+                    aria-label="删除自定义场景"
+                    className="absolute top-1.5 right-1.5 z-10 inline-flex h-6 w-6 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      handleDeleteCustomScene(scene);
+                    }}
+                  >
+                    <Trash2 className="size-3.5" />
+                  </button>
+                ) : null}
+                <CardHeader className="space-y-0.5 p-2.5 pb-1.5 sm:p-3 sm:pb-2">
+                  <CardTitle className="line-clamp-1 pr-8 text-[15px] leading-5 sm:text-base">
+                    {scene.title}
+                  </CardTitle>
+                  <p className="line-clamp-1 text-[11px] text-muted-foreground">{scene.subtitle}</p>
                 </CardHeader>
-                <CardContent className="p-3.5 pt-0">
-                  <p className="text-xs text-muted-foreground">
+                <CardContent className="p-2.5 pt-0 sm:p-3 sm:pt-0">
+                  <p className="text-[11px] text-muted-foreground">
                     {difficultyLabel[scene.difficulty] ?? "中级"} · {sentenceCount}句 ·{" "}
                     {scene.estimatedMinutes}分钟
                   </p>
