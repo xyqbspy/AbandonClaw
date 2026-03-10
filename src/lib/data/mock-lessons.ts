@@ -4,7 +4,7 @@ export const lessons: Lesson[] = [
   {
     id: "scene-1",
     slug: "dinner-plan-cancelled",
-    title: "Dinner Plan Cancelled",
+    title: "Dinner Plan Cancelled（晚餐计划取消）",
     subtitle: "A quick plan changes because of work pressure.",
     description: "Practice natural conversation for canceling plans politely and rescheduling.",
     difficulty: "Intermediate",
@@ -14,7 +14,7 @@ export const lessons: Lesson[] = [
     sections: [
       {
         id: "scene-1-sec-1",
-        title: "Dinner Plan Cancelled",
+        title: "Dinner Plan Cancelled（晚餐计划取消）",
         summary: "A casual dinner plan is canceled at the last minute.",
         sentences: [
           {
@@ -67,7 +67,7 @@ export const lessons: Lesson[] = [
   {
     id: "scene-2",
     slug: "long-day-at-work",
-    title: "Long Day at Work",
+    title: "Long Day at Work（漫长工作日）",
     subtitle: "Share frustration after an unproductive afternoon.",
     description: "Learn how to describe tiredness, meetings, and emotional reactions naturally.",
     difficulty: "Intermediate",
@@ -77,7 +77,7 @@ export const lessons: Lesson[] = [
     sections: [
       {
         id: "scene-2-sec-1",
-        title: "Long Day at Work",
+        title: "Long Day at Work（漫长工作日）",
         summary: "Talking about a draining day and setting boundaries after work.",
         sentences: [
           {
@@ -124,7 +124,7 @@ export const lessons: Lesson[] = [
   {
     id: "scene-3",
     slug: "stayed-up-too-late",
-    title: "Stayed Up Too Late",
+    title: "Stayed Up Too Late（熬夜太晚）",
     subtitle: "A realistic chat about poor sleep and low energy.",
     description: "Use practical spoken English for habits, regret, and recovering from tiredness.",
     difficulty: "Intermediate",
@@ -134,7 +134,7 @@ export const lessons: Lesson[] = [
     sections: [
       {
         id: "scene-3-sec-1",
-        title: "Stayed Up Too Late",
+        title: "Stayed Up Too Late（熬夜太晚）",
         summary: "A casual check-in after a night of little sleep.",
         sentences: [
           {
@@ -193,7 +193,7 @@ export const lessons: Lesson[] = [
   {
     id: "scene-4",
     slug: "subway-commute-morning",
-    title: "Subway Commute Morning",
+    title: "Subway Commute Morning（早高峰地铁通勤）",
     subtitle: "Complain about a packed commute and low morning energy.",
     description: "Understand natural back-and-forth conversation about commuting stress.",
     difficulty: "Intermediate",
@@ -203,7 +203,7 @@ export const lessons: Lesson[] = [
     sections: [
       {
         id: "scene-4-sec-1",
-        title: "Subway Commute Morning",
+        title: "Subway Commute Morning（早高峰地铁通勤）",
         summary: "A short dialogue after a crowded subway ride.",
         sentences: [
           {

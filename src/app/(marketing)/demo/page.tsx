@@ -18,7 +18,7 @@ export default function DemoPage() {
             <CardTitle>场景卡片示例</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
-            <p className="font-medium">Dinner Plan Cancelled</p>
+            <p className="font-medium">Dinner Plan Cancelled（晚餐计划取消）</p>
             <p className="text-muted-foreground">预计时间 10 分钟 · 难度 中级</p>
             <Link
               href="/scene/dinner-plan-cancelled"
