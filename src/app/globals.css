@@ -35,6 +35,10 @@
 :root {
   --background: oklch(0.985 0.007 95);
   --foreground: oklch(0.24 0.02 245);
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", Arial, sans-serif;
+  --font-serif: ui-serif, Georgia, "Times New Roman", "Songti SC", "STSong",
+    "Noto Serif CJK SC", serif;
   --card: oklch(0.998 0.005 95);
   --card-foreground: oklch(0.24 0.02 245);
   --popover: oklch(1 0 0);

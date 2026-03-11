@@ -1,18 +1,7 @@
 import type { Metadata } from "next";
-import { Noto_Sans_SC, Noto_Serif_SC } from "next/font/google";
 import { ThemeProvider } from "@/components/shared/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
-
-const sans = Noto_Sans_SC({
-  variable: "--font-sans",
-  subsets: ["latin"],
-});
-
-const serif = Noto_Serif_SC({
-  variable: "--font-serif",
-  subsets: ["latin"],
-});
 
 export const metadata: Metadata = {
   title: {
@@ -30,7 +19,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="zh-CN" suppressHydrationWarning>
-      <body className={`${sans.variable} ${serif.variable} antialiased`}>
+      <body className="antialiased">
         <ThemeProvider
           attribute="class"
           defaultTheme="light"

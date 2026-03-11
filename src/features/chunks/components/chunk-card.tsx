@@ -1,7 +1,12 @@
+"use client";
+
+import Link from "next/link";
+import { toast } from "sonner";
 import { Chunk } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 export function ChunkCard({ chunk }: { chunk: Chunk }) {
   const difficultyLabel =
@@ -25,12 +30,23 @@ export function ChunkCard({ chunk }: { chunk: Chunk }) {
         </div>
       </CardContent>
       <CardFooter className="gap-2">
-        <Button size="sm" variant="secondary">
+        <Button
+          size="sm"
+          variant="secondary"
+          className="cursor-pointer"
+          onClick={() => toast.success("已加入复习（示例）")}
+        >
           加入复习
         </Button>
-        <Button size="sm" variant="ghost">
+        <Link
+          href="/scenes"
+          className={cn(
+            buttonVariants({ size: "sm", variant: "ghost" }),
+            "cursor-pointer",
+          )}
+        >
           查看来源课程
-        </Button>
+        </Link>
       </CardFooter>
     </Card>
   );

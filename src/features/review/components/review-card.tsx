@@ -1,3 +1,6 @@
+"use client";
+
+import { toast } from "sonner";
 import { ReviewItem } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,8 +27,19 @@ export function ReviewCard({ item }: { item: ReviewItem }) {
         </div>
       </CardContent>
       <CardFooter className="gap-2">
-        <Button size="sm">开始复习</Button>
-        <Button size="sm" variant="outline">
+        <Button
+          size="sm"
+          className="cursor-pointer"
+          onClick={() => toast.message("复习流程待接入（示例交互已补齐）")}
+        >
+          开始复习
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          className="cursor-pointer"
+          onClick={() => toast.success("已标记稍后再学（示例）")}
+        >
           稍后再学
         </Button>
       </CardFooter>

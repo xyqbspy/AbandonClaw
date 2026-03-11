@@ -64,22 +64,6 @@ export function SelectionDetailSheet({
     };
   }, [open]);
 
-  useEffect(() => {
-    const rect = panelRef.current?.getBoundingClientRect();
-    const style = panelRef.current ? window.getComputedStyle(panelRef.current) : null;
-    console.log("[mobile-sheet-stable]", {
-      open,
-      overlayRendered: open,
-      panelRendered: Boolean(panelRef.current),
-      panelRectTop: rect?.top ?? null,
-      panelRectBottom: rect?.bottom ?? null,
-      panelHeight: rect?.height ?? null,
-      panelTransform: style?.transform ?? null,
-      panelOpacity: style?.opacity ?? null,
-      panelVisibility: style?.visibility ?? null,
-    });
-  }, [open]);
-
   if (!open || typeof document === "undefined") return null;
 
   return createPortal(
@@ -87,9 +71,8 @@ export function SelectionDetailSheet({
       <button
         type="button"
         aria-label="关闭学习详情"
-        className="absolute inset-0 bg-black/20 backdrop-blur-[1px]"
+        className="absolute inset-0 bg-black/20 backdrop-blur-[1px] animate-in fade-in-0 duration-200"
         onClick={() => {
-          console.log("[mobile-sheet-stable] outside-close");
           onOpenChange(false);
         }}
       />
@@ -98,7 +81,7 @@ export function SelectionDetailSheet({
         role="dialog"
         aria-modal="true"
         aria-label="学习详情"
-        className="absolute inset-x-0 bottom-0 z-[71] h-[78vh] max-h-[78vh] rounded-t-2xl border border-border/70 bg-background shadow-xl"
+        className="absolute inset-x-0 bottom-0 z-[71] h-[78vh] max-h-[78vh] rounded-t-2xl border border-border/70 bg-background shadow-xl animate-in slide-in-from-bottom-6 fade-in-0 duration-200"
       >
         <header className="flex items-start justify-between border-b border-border/70 px-4 pb-3 pt-3">
           <div>

@@ -587,7 +587,7 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
         <Card
           className={cn(
             "bg-card/95",
-            isMobile && "border-0 bg-muted/30 shadow-none",
+            isMobile && "border-0 ring-0 bg-primary/[0.035] shadow-none",
           )}
         >
           <CardContent
@@ -679,7 +679,7 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
         </Card>
 
         {isMobile ? (
-          <div className="overflow-hidden border-y border-[#ebe7e1] bg-transparent">
+          <div className="overflow-hidden bg-transparent">
             {lesson.sections.map((section) => {
               const active = currentSection?.id === section.id;
               const groupedSentences = groupSentencesForMobile(
@@ -720,8 +720,7 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
                       <Card
                         key={groupKey}
                         className={cn(
-                          "rounded-none border-0 bg-transparent shadow-none transition-colors duration-150",
-                          groupIndex !== 0 && "border-t border-[#ebe7e1]",
+                          "rounded-xl border-t border-[#ebe7e1] bg-transparent shadow-none ring-0 transition-colors duration-150",
                           groupSelected
                             ? "bg-accent/10"
                             : active
@@ -729,7 +728,7 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
                               : "hover:bg-muted/8",
                         )}
                       >
-                        <div className="px-3 py-3">
+                        <div className="px-3 py-1">
                           <div
                             className={cn(
                               "cursor-pointer transition-colors",

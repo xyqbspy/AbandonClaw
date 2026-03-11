@@ -173,14 +173,14 @@ export default function ScenesPage() {
       </div>
 
       {dialogOpen ? (
-        <div className="fixed inset-0 z-50 flex items-end bg-black/25 p-3 sm:items-center sm:justify-center sm:p-6">
+        <div className="fixed inset-0 z-50 flex items-end bg-black/25 p-3 animate-in fade-in-0 duration-200 sm:items-center sm:justify-center sm:p-6">
           <button
             type="button"
             aria-label="关闭导入弹框"
             className="absolute inset-0"
             onClick={closeDialog}
           />
-          <Card className="relative z-10 w-full max-w-2xl border-border/80">
+          <Card className="relative z-10 w-full max-w-2xl border-border/80 animate-in slide-in-from-bottom-6 fade-in-0 duration-200 sm:slide-in-from-bottom-0 sm:zoom-in-95">
             <CardHeader className="space-y-2">
               <div className="flex items-start justify-between gap-3">
                 <div>
