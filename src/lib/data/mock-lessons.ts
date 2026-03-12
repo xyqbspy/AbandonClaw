@@ -1,4 +1,6 @@
 import { AIExplanation, Lesson, LessonSentence, SelectionChunkLayer } from "@/lib/types";
+import { mapParsedSceneToLesson } from "@/lib/adapters/scene-parser-adapter";
+import { takeTheMorningOffParserResponse } from "@/lib/data/mock-scene-parser-response";
 
 const ex = (en: string, zh: string) => ({ en, zh });
 const cd = (
@@ -219,6 +221,14 @@ export const lessons: Lesson[] = [
   },
 ];
 
+const parsedTakeTheMorningOffLesson = mapParsedSceneToLesson(takeTheMorningOffParserResponse);
+const parsedTakeTheMorningOffIndex = lessons.findIndex(
+  (lesson) => lesson.slug === parsedTakeTheMorningOffLesson.slug,
+);
+if (parsedTakeTheMorningOffIndex >= 0) {
+  lessons[parsedTakeTheMorningOffIndex] = parsedTakeTheMorningOffLesson;
+}
+
 export const scenes = lessons;
 
 const explanationSeed: AIExplanation[] = [
@@ -239,7 +249,11 @@ const explanationSeed: AIExplanation[] = [
   { key: "running on empty", text: "running on empty", translation: "靠最后一口气硬撑", explanation: "形象表达精力快耗尽。", examples: ["I'm running on empty today.", "She was running on empty all week."], exampleTranslations: ["我今天全靠硬撑。", "她这周都在硬撑。"], breakdown: ["低能量状态", "新高频"], pronunciation: "/ˈrʌnɪŋ ɑːn ˈempti/", grammarLabel: "口语块" },
 ];
 
-for (const lesson of lessons) lesson.explanations = explanationSeed;
+for (const lesson of lessons) {
+  if (lesson.explanations.length === 0) {
+    lesson.explanations = explanationSeed;
+  }
+}
 
 export const getLessonBySlug = (slug: string) => lessons.find((lesson) => lesson.slug === slug);
 export const getSceneBySlug = (slug: string) => getLessonBySlug(slug);

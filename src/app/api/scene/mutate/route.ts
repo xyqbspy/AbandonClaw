@@ -1,0 +1,133 @@
+﻿import { NextResponse } from "next/server";
+import { callGlmChatCompletion } from "@/lib/server/glm-client";
+import {
+  buildSceneMutateUserPrompt,
+  SCENE_MUTATE_SYSTEM_PROMPT,
+} from "@/lib/server/prompts/scene-mutate-prompt";
+import {
+  isValidParsedScene,
+  parseJsonWithFallback,
+} from "@/lib/server/scene-json";
+import { MutateSceneRequest, SceneMutateResponse } from "@/lib/types/scene-parser";
+
+const clamp = (value: number, min: number, max: number) =>
+  Math.min(max, Math.max(min, value));
+
+const sanitizeVariantCount = (value: unknown) => {
+  if (typeof value !== "number" || Number.isNaN(value)) return 2;
+  return clamp(Math.round(value), 1, 3);
+};
+
+const sanitizeRetainChunkRatio = (value: unknown) => {
+  if (typeof value !== "number" || Number.isNaN(value)) return 0.6;
+  return clamp(value, 0.5, 0.7);
+};
+
+const toValidMutatePayload = (
+  payload: Partial<MutateSceneRequest>,
+):
+  | {
+      ok: true;
+      value: {
+        scene: MutateSceneRequest["scene"];
+        variantCount: number;
+        retainChunkRatio: number;
+        theme?: string;
+      };
+    }
+  | { ok: false; error: string } => {
+  if (!isValidParsedScene(payload.scene)) {
+    return { ok: false, error: "Invalid payload.scene structure." };
+  }
+
+  const variantCount = sanitizeVariantCount(payload.variantCount);
+  const retainChunkRatio = sanitizeRetainChunkRatio(payload.retainChunkRatio);
+  const theme =
+    typeof payload.theme === "string" && payload.theme.trim()
+      ? payload.theme.trim()
+      : undefined;
+
+  return {
+    ok: true,
+    value: {
+      scene: payload.scene,
+      variantCount,
+      retainChunkRatio,
+      theme,
+    },
+  };
+};
+
+const normalizeMutateResponseVersion = (value: unknown): unknown => {
+  if (!value || typeof value !== "object") return value;
+  const record = value as { version?: unknown };
+
+  if (record.version === "1") {
+    return {
+      ...(value as Record<string, unknown>),
+      version: "v1",
+    };
+  }
+
+  return value;
+};
+
+const isValidSceneMutateResponse = (
+  value: unknown,
+): value is SceneMutateResponse => {
+  if (!value || typeof value !== "object") return false;
+  const response = value as SceneMutateResponse;
+
+  if (response.version !== "v1") return false;
+  if (!Array.isArray(response.variants) || response.variants.length === 0) {
+    return false;
+  }
+
+  return response.variants.every(isValidParsedScene);
+};
+
+export async function POST(request: Request) {
+  try {
+    const payload = (await request.json()) as Partial<MutateSceneRequest>;
+    const normalized = toValidMutatePayload(payload);
+
+    if (!normalized.ok) {
+      return NextResponse.json({ error: normalized.error }, { status: 400 });
+    }
+
+    const { scene, variantCount, retainChunkRatio, theme } = normalized.value;
+
+    const rawModelText = await callGlmChatCompletion({
+      systemPrompt: SCENE_MUTATE_SYSTEM_PROMPT,
+      userPrompt: buildSceneMutateUserPrompt({
+        sceneJson: JSON.stringify(scene),
+        variantCount,
+        retainChunkRatio,
+        theme,
+      }),
+      temperature: 0.3,
+    });
+
+    const parsed = normalizeMutateResponseVersion(
+      parseJsonWithFallback(rawModelText),
+    );
+
+    if (!isValidSceneMutateResponse(parsed)) {
+      return NextResponse.json(
+        {
+          error: "Model output JSON does not match SceneMutateResponse basic structure.",
+        },
+        { status: 500 },
+      );
+    }
+
+    return NextResponse.json(parsed, { status: 200 });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Failed to mutate scene.";
+    return NextResponse.json(
+      { error: `Scene mutate failed: ${message}` },
+      { status: 500 },
+    );
+  }
+}
