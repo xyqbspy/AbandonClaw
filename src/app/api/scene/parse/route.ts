@@ -6,7 +6,6 @@ import {
 } from "@/lib/server/prompts/scene-parse-prompt";
 import {
   extractJsonCandidate,
-  isValidSceneParserResponse,
   normalizeSceneParserResponseVersion,
 } from "@/lib/server/scene-json";
 import { ParseSceneRequest } from "@/lib/types/scene-parser";
@@ -85,7 +84,56 @@ const normalizeSceneResponse = (value: unknown): unknown => {
     scene.glossary = normalizedTop.glossary;
   }
 
-  // 3) fill missing chunk.key from chunk.text.
+  // 3) normalize glossary item aliases (only when glossary is an array).
+  if (Array.isArray(scene.glossary)) {
+    scene.glossary = scene.glossary.map((item) => {
+      if (!isObject(item)) return item;
+
+      const keyAlias =
+        typeof item.key === "string"
+          ? item.key
+          : typeof item.text === "string"
+            ? item.text
+            : typeof item.term === "string"
+              ? item.term
+              : undefined;
+
+      const textAlias =
+        typeof item.text === "string"
+          ? item.text
+          : typeof item.term === "string"
+            ? item.term
+            : typeof item.key === "string"
+              ? item.key
+              : undefined;
+
+      const translationAlias =
+        typeof item.translation === "string"
+          ? item.translation
+          : typeof item.definition === "string"
+            ? item.definition
+            : "";
+
+      const explanationAlias =
+        typeof item.explanation === "string"
+          ? item.explanation
+          : typeof item.definition === "string"
+            ? item.definition
+            : typeof item.translation === "string"
+              ? item.translation
+              : "";
+
+      return {
+        ...item,
+        ...(keyAlias !== undefined ? { key: keyAlias } : {}),
+        ...(textAlias !== undefined ? { text: textAlias } : {}),
+        translation: translationAlias,
+        explanation: explanationAlias,
+      };
+    });
+  }
+
+  // 4) fill missing chunk.key from chunk.text.
   if (Array.isArray(scene.sections)) {
     scene.sections = scene.sections.map((section) => {
       if (!isObject(section)) return section;
@@ -96,14 +144,28 @@ const normalizeSceneResponse = (value: unknown): unknown => {
 
         const nextChunks = sentence.chunks.map((chunk) => {
           if (!isObject(chunk)) return chunk;
-          if (typeof chunk.key === "string" && chunk.key.trim()) return chunk;
-          if (typeof chunk.text === "string" && chunk.text.trim()) {
+          const nextChunk =
+            Array.isArray(chunk.examples) &&
+            chunk.examples.every((example) => typeof example === "string")
+              ? {
+                  ...chunk,
+                  examples: chunk.examples.map((example) => ({
+                    en: example,
+                    zh: "",
+                  })),
+                }
+              : chunk;
+
+          if (typeof nextChunk.key === "string" && nextChunk.key.trim()) {
+            return nextChunk;
+          }
+          if (typeof nextChunk.text === "string" && nextChunk.text.trim()) {
             return {
-              ...chunk,
-              key: chunk.text,
+              ...nextChunk,
+              key: nextChunk.text,
             };
           }
-          return chunk;
+          return nextChunk;
         });
 
         return {
@@ -122,6 +184,74 @@ const normalizeSceneResponse = (value: unknown): unknown => {
   return {
     ...normalizedTop,
     scene,
+  };
+};
+
+type TranslationFallbackInfo = {
+  sectionIndex: number;
+  sentenceIndex: number;
+  sentenceId: string;
+};
+
+const applySentenceTranslationFallback = (
+  value: unknown,
+): { nextValue: unknown; fallbacks: TranslationFallbackInfo[] } => {
+  if (!isObject(value) || !isObject(value.scene)) {
+    return { nextValue: value, fallbacks: [] };
+  }
+
+  const scene = value.scene as Record<string, unknown>;
+  if (!Array.isArray(scene.sections)) {
+    return { nextValue: value, fallbacks: [] };
+  }
+
+  const fallbacks: TranslationFallbackInfo[] = [];
+  const nextSections = scene.sections.map((section, sectionIndex) => {
+    if (!isObject(section) || !Array.isArray(section.sentences)) return section;
+
+    const nextSentences = section.sentences.map((sentence, sentenceIndex) => {
+      if (!isObject(sentence)) return sentence;
+
+      const text =
+        typeof sentence.text === "string" ? sentence.text.trim() : "";
+      const translation =
+        typeof sentence.translation === "string"
+          ? sentence.translation.trim()
+          : "";
+      if (!text || translation) return sentence;
+
+      const sentenceId =
+        typeof sentence.id === "string" && sentence.id.trim()
+          ? sentence.id
+          : `section-${sectionIndex + 1}-sentence-${sentenceIndex + 1}`;
+
+      fallbacks.push({
+        sectionIndex,
+        sentenceIndex,
+        sentenceId,
+      });
+
+      return {
+        ...sentence,
+        translation: text,
+      };
+    });
+
+    return {
+      ...section,
+      sentences: nextSentences,
+    };
+  });
+
+  return {
+    nextValue: {
+      ...value,
+      scene: {
+        ...scene,
+        sections: nextSections,
+      },
+    },
+    fallbacks,
   };
 };
 
@@ -145,6 +275,20 @@ const validateSceneParserResponse = (
   }
 
   const scene = value.scene as Record<string, unknown>;
+
+  if (typeof scene.title !== "string" || !scene.title.trim()) {
+    return { ok: false, error: "scene.title is required and must be a non-empty string." };
+  }
+
+  if (typeof scene.description !== "string" || !scene.description.trim()) {
+    if (typeof scene.summary === "string" && scene.summary.trim()) {
+      return {
+        ok: false,
+        error: "scene.description is required; scene.summary is not accepted as a replacement.",
+      };
+    }
+    return { ok: false, error: "scene.description is required." };
+  }
 
   if (!Array.isArray(scene.sections)) {
     return { ok: false, error: "scene.sections must be an array." };
@@ -215,6 +359,30 @@ const validateSceneParserResponse = (
             error: `scene.sections[${i}].sentences[${j}].chunks[${k}] missing text/key.`,
           };
         }
+
+        if (!Array.isArray(chunk.examples)) {
+          return {
+            ok: false,
+            error: `scene.sections[${i}].sentences[${j}].chunks[${k}].examples must be an array.`,
+          };
+        }
+
+        for (let m = 0; m < chunk.examples.length; m += 1) {
+          const example = chunk.examples[m];
+          if (!isObject(example)) {
+            return {
+              ok: false,
+              error: `scene.sections[${i}].sentences[${j}].chunks[${k}].examples[${m}] must be an object.`,
+            };
+          }
+
+          if (typeof example.en !== "string" || typeof example.zh !== "string") {
+            return {
+              ok: false,
+              error: `scene.sections[${i}].sentences[${j}].chunks[${k}].examples[${m}] must include string en/zh.`,
+            };
+          }
+        }
       }
     }
   }
@@ -263,20 +431,21 @@ export async function POST(request: Request) {
     });
 
     const { jsonCandidate, parsed: parsedJson } = parseWithDiagnostics(rawModelText);
-    const parsed = normalizeSceneResponse(parsedJson);
+    const normalized = normalizeSceneResponse(parsedJson);
+    const { nextValue: parsed, fallbacks } =
+      applySentenceTranslationFallback(normalized);
+    if (fallbacks.length > 0) {
+      console.warn(
+        "[scene-parse][fallback-translation] Applied temporary translation fallback:",
+        JSON.stringify(fallbacks),
+      );
+    }
 
-    // Temporary diagnostics for schema mismatch debugging.
-    console.log("[scene-parse][rawModelText]", rawModelText);
-    console.log("[scene-parse][jsonCandidate]", jsonCandidate);
-    console.log("[scene-parse][parsed]", JSON.stringify(parsed, null, 2));
-
-    if (!isValidSceneParserResponse(parsed)) {
-      const validation = validateSceneParserResponse(parsed);
+    const validation = validateSceneParserResponse(parsed);
+    if (!validation.ok) {
       return NextResponse.json(
         {
-          error: validation.ok
-            ? "Model output JSON does not match SceneParserResponse basic structure."
-            : validation.error,
+          error: validation.error,
         },
         { status: 500 },
       );

@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  ReactNode,
   useCallback,
   useEffect,
   useMemo,
@@ -13,7 +14,6 @@ import {
   Headphones,
   Languages,
   Play,
-  Sparkles,
   Volume2,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -147,7 +147,13 @@ function interactionReducer(
   }
 }
 
-export function LessonReader({ lesson }: { lesson: Lesson }) {
+export function LessonReader({
+  lesson,
+  headerTools,
+}: {
+  lesson: Lesson;
+  headerTools?: ReactNode;
+}) {
   const difficultyLabel =
     lesson.difficulty === "Beginner"
       ? "难度 入门"
@@ -621,6 +627,11 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
                       : "中级"}{" "}
                   · {lesson.estimatedMinutes}分钟 · {sentenceCount}句
                 </p>
+                {headerTools ? (
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {headerTools}
+                  </div>
+                ) : null}
               </>
             ) : null}
             <h1
@@ -654,6 +665,15 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
                     size="sm"
                     variant="outline"
                     className="cursor-pointer transition-all duration-150 hover:border-primary/40 hover:bg-accent"
+                    onClick={toggleSequentialPlay}
+                  >
+                    <Play className="size-4" />
+                    {autoPlayActive ? "停止循环" : "循环播放"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="cursor-pointer transition-all duration-150 hover:border-primary/40 hover:bg-accent"
                     onClick={() =>
                       handlePronounce(currentSentence?.text ?? lesson.title)
                     }
@@ -661,14 +681,7 @@ export function LessonReader({ lesson }: { lesson: Lesson }) {
                     <Headphones className="size-4" />
                     播放本节发音
                   </Button>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    className="cursor-pointer transition-all duration-150 hover:brightness-95"
-                  >
-                    <Sparkles className="size-4" />
-                    快速练习
-                  </Button>
+                  {headerTools}
                 </div>
                 <p className="text-xs text-muted-foreground">
                   {appCopy.lesson.prompt}

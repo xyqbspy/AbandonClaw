@@ -4,7 +4,10 @@ import {
   buildPracticeGenerateUserPrompt,
   PRACTICE_GENERATE_SYSTEM_PROMPT,
 } from "@/lib/server/prompts/practice-generate-prompt";
-import { isValidParsedScene, parseJsonWithFallback } from "@/lib/server/scene-json";
+import {
+  extractJsonCandidate,
+  isValidParsedScene,
+} from "@/lib/server/scene-json";
 import {
   PracticeExerciseType,
   PracticeGenerateRequest,
@@ -21,6 +24,34 @@ const sanitizeExerciseCount = (value: unknown) => {
 
 const isValidExerciseType = (value: unknown): value is PracticeExerciseType =>
   value === "recall" || value === "fill_chunk" || value === "rewrite";
+
+const isObject = (value: unknown): value is Record<string, unknown> =>
+  Boolean(value) && typeof value === "object";
+
+const parseWithDiagnostics = (rawText: string) => {
+  try {
+    return {
+      jsonCandidate: rawText,
+      parsed: JSON.parse(rawText) as unknown,
+    };
+  } catch {
+    const jsonCandidate = extractJsonCandidate(rawText);
+    if (!jsonCandidate) {
+      throw new Error(
+        "Model output is not valid JSON and no JSON object could be extracted.",
+      );
+    }
+
+    try {
+      return {
+        jsonCandidate,
+        parsed: JSON.parse(jsonCandidate) as unknown,
+      };
+    } catch {
+      throw new Error("Extracted JSON candidate is still invalid JSON.");
+    }
+  }
+};
 
 const toValidPayload = (
   payload: Partial<PracticeGenerateRequest>,
@@ -62,19 +93,29 @@ const normalizePracticeResponse = (value: unknown): unknown => {
   }
 
   if (Array.isArray(exercises)) {
-    exercises = exercises.map((exercise) => {
+    exercises = exercises.map((exercise, index) => {
       if (!exercise || typeof exercise !== "object") return exercise;
       const item = exercise as Record<string, unknown>;
-      if (
-        (item.prompt === undefined || item.prompt === null) &&
+      const normalizedId =
+        typeof item.id === "string" && item.id.trim()
+          ? item.id
+          : `practice-${index + 1}`;
+      return {
+        ...item,
+        id: normalizedId,
+        ...((item.prompt === undefined || item.prompt === null) &&
         typeof item.question === "string"
-      ) {
-        return {
-          ...item,
-          prompt: item.question,
-        };
-      }
-      return item;
+          ? { prompt: item.question }
+          : {}),
+        ...(item.targetChunk === undefined &&
+        typeof item.target_chunk === "string"
+          ? { targetChunk: item.target_chunk }
+          : {}),
+        ...(item.referenceSentence === undefined &&
+        typeof item.reference_sentence === "string"
+          ? { referenceSentence: item.reference_sentence }
+          : {}),
+      };
     });
   }
 
@@ -85,29 +126,52 @@ const normalizePracticeResponse = (value: unknown): unknown => {
   };
 };
 
-const isValidPracticeGenerateResponse = (
+const validatePracticeGenerateResponse = (
   value: unknown,
-): value is PracticeGenerateResponse => {
-  if (!value || typeof value !== "object") return false;
-  const response = value as PracticeGenerateResponse;
+): { ok: true } | { ok: false; error: string } => {
+  if (!isObject(value)) {
+    return { ok: false, error: "Top-level JSON must be an object." };
+  }
+  const response = value as unknown as PracticeGenerateResponse;
 
-  if (response.version !== "v1") return false;
-  if (!Array.isArray(response.exercises) || response.exercises.length === 0) {
-    return false;
+  if (response.version !== "v1") {
+    return {
+      ok: false,
+      error: `Invalid version: expected "v1", got ${JSON.stringify(response.version)}.`,
+    };
   }
 
-  return response.exercises.every((exercise) => {
-    if (!exercise || typeof exercise !== "object") return false;
-    return (
-      typeof exercise.id === "string" &&
-      isValidExerciseType(exercise.type) &&
-      typeof exercise.prompt === "string" &&
-      typeof exercise.answer === "string" &&
-      (exercise.referenceSentence === undefined ||
-        typeof exercise.referenceSentence === "string") &&
-      (exercise.targetChunk === undefined || typeof exercise.targetChunk === "string")
-    );
-  });
+  if (!Array.isArray(response.exercises)) {
+    return { ok: false, error: "exercises must be an array." };
+  }
+
+  for (let i = 0; i < response.exercises.length; i += 1) {
+    const exercise = response.exercises[i];
+    if (!isObject(exercise)) {
+      return { ok: false, error: `exercises[${i}] must be an object.` };
+    }
+
+    if (typeof exercise.id !== "string" || !exercise.id.trim()) {
+      return { ok: false, error: `exercises[${i}] missing required id.` };
+    }
+
+    if (!isValidExerciseType(exercise.type)) {
+      return {
+        ok: false,
+        error: `exercises[${i}] invalid type: ${JSON.stringify(exercise.type)}.`,
+      };
+    }
+
+    if (typeof exercise.prompt !== "string" || !exercise.prompt.trim()) {
+      return { ok: false, error: `exercises[${i}] missing required prompt.` };
+    }
+
+    if (typeof exercise.answer !== "string" || !exercise.answer.trim()) {
+      return { ok: false, error: `exercises[${i}] missing required answer.` };
+    }
+  }
+
+  return { ok: true };
 };
 
 export async function POST(request: Request) {
@@ -130,13 +194,13 @@ export async function POST(request: Request) {
       temperature: 0.3,
     });
 
-    const parsed = normalizePracticeResponse(parseJsonWithFallback(rawModelText));
-
-    if (!isValidPracticeGenerateResponse(parsed)) {
+    const { jsonCandidate, parsed: parsedJson } = parseWithDiagnostics(rawModelText);
+    const parsed = normalizePracticeResponse(parsedJson);
+    const validation = validatePracticeGenerateResponse(parsed);
+    if (!validation.ok) {
       return NextResponse.json(
         {
-          error:
-            "Model output JSON does not match PracticeGenerateResponse basic structure.",
+          error: validation.error,
         },
         { status: 500 },
       );

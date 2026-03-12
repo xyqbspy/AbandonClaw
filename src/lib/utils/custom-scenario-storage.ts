@@ -26,7 +26,10 @@ const parseScenarios = (raw: string): Lesson[] => {
     if (!Array.isArray(parsed)) return EMPTY_SCENARIOS;
     return parsed.filter(isLessonShape).map((lesson) => ({
       ...lesson,
-      sourceType: "custom" as const,
+      sourceType:
+        lesson.sourceType === "custom"
+          ? ("imported" as const)
+          : (lesson.sourceType ?? "imported"),
     }));
   } catch {
     return EMPTY_SCENARIOS;
@@ -51,11 +54,18 @@ export function getCustomScenariosSnapshot() {
 export function saveCustomScenarioToStorage(lesson: Lesson) {
   if (!canUseStorage()) return;
   const scenarios = [...getCustomScenariosSnapshot()];
+  const nextLesson = {
+    ...lesson,
+    sourceType:
+      lesson.sourceType === "custom"
+        ? ("imported" as const)
+        : (lesson.sourceType ?? "imported"),
+  };
   const existingIndex = scenarios.findIndex((item) => item.id === lesson.id);
   if (existingIndex >= 0) {
-    scenarios[existingIndex] = { ...lesson, sourceType: "custom" as const };
+    scenarios[existingIndex] = nextLesson;
   } else {
-    scenarios.unshift({ ...lesson, sourceType: "custom" as const });
+    scenarios.unshift(nextLesson);
   }
   const nextRaw = JSON.stringify(scenarios);
   window.localStorage.setItem(CUSTOM_SCENARIOS_STORAGE_KEY, nextRaw);

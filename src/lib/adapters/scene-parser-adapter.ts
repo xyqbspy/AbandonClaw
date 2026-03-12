@@ -32,7 +32,7 @@ export function mapParsedSceneToLesson(response: SceneParserResponse): Lesson {
     estimatedMinutes: scene.estimatedMinutes,
     completionRate: scene.completionRate ?? 0,
     tags: scene.tags,
-    sourceType: "system",
+    sourceType: "builtin",
     sections: scene.sections.map((section) => ({
       id: section.id,
       title: section.title,

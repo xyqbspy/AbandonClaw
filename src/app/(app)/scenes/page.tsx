@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useRouter } from "next/navigation";
 import { Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/shared/page-header";
@@ -10,7 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { scenes } from "@/lib/data/mock-lessons";
 import { Lesson } from "@/lib/types";
-import { parseCustomScenario } from "@/lib/utils/custom-scenario-parser";
+import { parseSceneFromApi } from "@/lib/utils/scene-parser-api";
 import {
   getCustomScenariosSnapshot,
   removeCustomScenarioFromStorage,
@@ -32,9 +33,11 @@ A: Again?
 B: Yeah, I'm stuck at the office.`;
 
 export default function ScenesPage() {
+  const router = useRouter();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [input, setInput] = useState("");
   const [error, setError] = useState("");
+  const [importing, setImporting] = useState(false);
   const [refreshTick, setRefreshTick] = useState(0);
   const customScenes = useSyncExternalStore<Lesson[]>(
     subscribeNoop,
@@ -58,18 +61,39 @@ export default function ScenesPage() {
     setError("");
   };
 
-  const handleImport = () => {
-    const result = parseCustomScenario(input);
-    if (!result.ok) {
-      setError(result.error);
+  const handleImport = async () => {
+    const rawText = input.trim();
+    if (!rawText) {
+      setError("请先粘贴一段英语场景。");
       return;
     }
 
-    saveCustomScenarioToStorage(result.value);
-    setRefreshTick((prev) => prev + 1);
-    setInput("");
-    closeDialog();
-    toast.success("自定义场景已导入");
+    setImporting(true);
+    setError("");
+    try {
+      const parsedLesson = await parseSceneFromApi({
+        rawText,
+        sourceLanguage: "en",
+      });
+      const importedLesson: Lesson = {
+        ...parsedLesson,
+        sourceType: "imported",
+        tags: Array.from(new Set([...(parsedLesson.tags ?? []), "imported"])),
+      };
+
+      saveCustomScenarioToStorage(importedLesson);
+      setRefreshTick((prev) => prev + 1);
+      setInput("");
+      closeDialog();
+      toast.success("场景导入成功");
+      router.push(`/scene/${importedLesson.slug}`);
+    } catch (importError) {
+      setError(
+        importError instanceof Error ? importError.message : "导入失败，请稍后再试。",
+      );
+    } finally {
+      setImporting(false);
+    }
   };
 
   const handleDeleteCustomScene = (scene: Lesson) => {
@@ -117,7 +141,8 @@ export default function ScenesPage() {
             (total, section) => total + section.sentences.length,
             0,
           );
-          const isCustom = scene.sourceType === "custom";
+          const isCustom =
+            scene.sourceType === "custom" || scene.sourceType === "imported";
 
           return (
             <MotionCardLink
@@ -186,7 +211,7 @@ export default function ScenesPage() {
                 <div>
                   <CardTitle className="text-lg">导入自定义英语场景</CardTitle>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    支持粘贴一段英语对话，系统会自动拆分成适合学习的句子
+                    支持粘贴一段英语对话，系统会解析为可学习场景
                   </p>
                 </div>
                 <Button
@@ -216,8 +241,13 @@ export default function ScenesPage() {
                 <Button type="button" variant="outline" onClick={closeDialog} className="cursor-pointer">
                   取消
                 </Button>
-                <Button type="button" onClick={handleImport} className="cursor-pointer">
-                  导入
+                <Button
+                  type="button"
+                  onClick={handleImport}
+                  className="cursor-pointer"
+                  disabled={importing}
+                >
+                  {importing ? "导入中..." : "导入"}
                 </Button>
               </div>
             </CardContent>

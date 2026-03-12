@@ -71,7 +71,7 @@ export interface Lesson {
   tags: string[];
   sections: LessonSection[];
   explanations: AIExplanation[];
-  sourceType?: "system" | "custom";
+  sourceType?: "system" | "custom" | "builtin" | "imported" | "variant";
 }
 
 export interface Chunk {
