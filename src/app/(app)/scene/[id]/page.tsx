@@ -16,10 +16,12 @@ import {
   mapParsedSceneToLesson,
 } from "@/lib/adapters/scene-parser-adapter";
 import { mutateSceneFromApi } from "@/lib/utils/scene-mutate-api";
-import { parseSceneFromApi } from "@/lib/utils/scene-parser-api";
 import { practiceGenerateFromApi } from "@/lib/utils/practice-generate-api";
 import { getCustomScenarioBySlug } from "@/lib/utils/custom-scenario-storage";
 import {
+  deletePracticeSet,
+  deleteVariantItem,
+  deleteVariantSet,
   getSceneGeneratedState,
   markPracticeSetCompleted,
   markVariantItemStatus,
@@ -29,19 +31,17 @@ import {
 } from "@/lib/utils/scene-learning-flow-storage";
 import { SceneGeneratedState } from "@/lib/types/learning-flow";
 import { useSpeech } from "@/hooks/use-speech";
+import { ExpressionMapResponse } from "@/lib/types/expression-map";
+import { generateExpressionMapFromApi } from "@/lib/utils/expression-map-api";
 
 const subscribe = () => () => {};
-const API_SCENE_SLUG = "take-the-morning-off";
 
-type SceneViewMode = "scene" | "practice" | "variants" | "variant-study";
-
-const toRawTextForParser = (lesson: Lesson) =>
-  lesson.sections
-    .flatMap((section) => section.sentences)
-    .map((sentence) =>
-      sentence.speaker ? `${sentence.speaker}: ${sentence.text}` : sentence.text,
-    )
-    .join("\n");
+type SceneViewMode =
+  | "scene"
+  | "practice"
+  | "variants"
+  | "variant-study"
+  | "expression-map";
 
 const buildReusedChunks = (lesson: Lesson, limit = 12) => {
   const seen = new Set<string>();
@@ -72,7 +72,8 @@ const isSceneViewMode = (value: string): value is SceneViewMode =>
   value === "scene" ||
   value === "practice" ||
   value === "variants" ||
-  value === "variant-study";
+  value === "variant-study" ||
+  value === "expression-map";
 
 const findSentenceForChunk = (
   lesson: Lesson,
@@ -104,21 +105,38 @@ const toVariantTitle = (title: string, index: number) => {
   return `${title}（变体${index + 1}）`;
 };
 
+const findChunkContext = (
+  chunkText: string,
+  baseLesson: Lesson,
+  variantLessons: Lesson[],
+): { lesson: Lesson; sentence: LessonSentence } | null => {
+  const allLessons = [baseLesson, ...variantLessons];
+  for (const lesson of allLessons) {
+    const sentence = findSentenceForChunk(lesson, chunkText);
+    if (!sentence) continue;
+    const hasChunk =
+      sentence.chunks.some((item) => item.toLowerCase() === chunkText.toLowerCase()) ||
+      sentence.chunkDetails?.some(
+        (item) => item.text.toLowerCase() === chunkText.toLowerCase(),
+      );
+    if (hasChunk) return { lesson, sentence };
+  }
+  return null;
+};
+
 export default function SceneDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const searchParams = useSearchParams();
   const sceneId = params?.id ?? "";
   const presetScene = useMemo(() => getSceneBySlug(sceneId), [sceneId]);
-  const [apiLesson, setApiLesson] = useState<Lesson | null>(null);
-  const shouldFetchFromApi = sceneId === API_SCENE_SLUG && Boolean(presetScene);
   const customScene = useSyncExternalStore<Lesson | null>(
     subscribe,
     () => (presetScene ? null : getCustomScenarioBySlug(sceneId) ?? null),
     () => null,
   );
 
-  const baseLesson = apiLesson ?? presetScene ?? customScene;
+  const baseLesson = presetScene ?? customScene;
   const baseSceneId = baseLesson?.id ?? "";
 
   const [viewMode, setViewMode] = useState<SceneViewMode>("scene");
@@ -133,9 +151,17 @@ export default function SceneDetailPage() {
     useState<SelectionChunkLayer | null>(null);
   const [variantChunkSentence, setVariantChunkSentence] =
     useState<LessonSentence | null>(null);
+  const [variantChunkRelatedChunks, setVariantChunkRelatedChunks] = useState<string[]>(
+    [],
+  );
   const [variantChunkHoveredKey, setVariantChunkHoveredKey] = useState<string | null>(
     null,
   );
+  const [expressionMapLoading, setExpressionMapLoading] = useState(false);
+  const [expressionMapError, setExpressionMapError] = useState<string | null>(null);
+  const [expressionMap, setExpressionMap] = useState<ExpressionMapResponse | null>(null);
+  const [expressionMapVariantSetId, setExpressionMapVariantSetId] =
+    useState<string | null>(null);
   const [generatedState, setGeneratedState] = useState<SceneGeneratedState>({
     latestPracticeSet: null,
     latestVariantSet: null,
@@ -162,31 +188,6 @@ export default function SceneDetailPage() {
     router.push(href, { scroll: false });
   };
 
-  useEffect(() => {
-    if (!shouldFetchFromApi || !presetScene) {
-      setApiLesson(null);
-      return;
-    }
-
-    let disposed = false;
-    parseSceneFromApi({
-      rawText: toRawTextForParser(presetScene),
-      sourceLanguage: "en",
-    })
-      .then((lesson) => {
-        if (disposed) return;
-        setApiLesson(lesson);
-      })
-      .catch(() => {
-        if (disposed) return;
-        setApiLesson(null);
-      });
-
-    return () => {
-      disposed = true;
-    };
-  }, [presetScene, shouldFetchFromApi]);
-
   const refreshGeneratedState = (sceneKey: string) => {
     if (!sceneKey) return;
     setGeneratedState(getSceneGeneratedState(sceneKey));
@@ -204,7 +205,12 @@ export default function SceneDetailPage() {
     setVariantChunkModalOpen(false);
     setVariantChunkDetail(null);
     setVariantChunkSentence(null);
+    setVariantChunkRelatedChunks([]);
     setVariantChunkHoveredKey(null);
+    setExpressionMapLoading(false);
+    setExpressionMapError(null);
+    setExpressionMap(null);
+    setExpressionMapVariantSetId(null);
     refreshGeneratedState(baseSceneId);
   }, [sceneId, baseSceneId, searchParams]);
 
@@ -331,6 +337,42 @@ export default function SceneDetailPage() {
     setViewModeWithRoute("variant-study", variantId);
   };
 
+  const handleDeletePracticeSet = () => {
+    if (!baseLesson || !latestPracticeSet) return;
+    const confirmed = window.confirm("确认删除当前练习吗？删除后将无法查看，需重新生成。");
+    if (!confirmed) return;
+    deletePracticeSet(baseLesson.id, latestPracticeSet.id);
+    refreshGeneratedState(baseLesson.id);
+    setShowAnswerMap({});
+    setViewModeWithRoute("scene");
+  };
+
+  const handleDeleteVariantSet = () => {
+    if (!baseLesson || !latestVariantSet) return;
+    const confirmed = window.confirm("确认删除当前变体集吗？删除后将无法查看，需重新生成。");
+    if (!confirmed) return;
+    deleteVariantSet(baseLesson.id, latestVariantSet.id);
+    refreshGeneratedState(baseLesson.id);
+    setActiveVariantId(null);
+    setExpressionMap(null);
+    setExpressionMapVariantSetId(null);
+    setViewModeWithRoute("scene");
+  };
+
+  const handleDeleteVariantItem = (variantId: string) => {
+    if (!baseLesson || !latestVariantSet) return;
+    const confirmed = window.confirm("确认删除当前变体吗？删除后将无法恢复。");
+    if (!confirmed) return;
+    deleteVariantItem(baseLesson.id, latestVariantSet.id, variantId);
+    refreshGeneratedState(baseLesson.id);
+    setExpressionMap(null);
+    setExpressionMapVariantSetId(null);
+    if (activeVariantId === variantId) {
+      setActiveVariantId(null);
+      setViewModeWithRoute("variants");
+    }
+  };
+
   const handlePracticeToolClick = () => {
     if (!baseLesson || practiceLoading) return;
     if (generatedState.practiceStatus === "idle") {
@@ -374,11 +416,62 @@ export default function SceneDetailPage() {
 
   const handleOpenVariantChunk = (chunk: string) => {
     if (!baseLesson) return;
-    const sentence = findSentenceForChunk(baseLesson, chunk);
-    if (!sentence) return;
-    const detail = getChunkLayerFromLesson(baseLesson, sentence, chunk);
-    setVariantChunkSentence(sentence);
+    const variantLessons = latestVariantSet?.variants.map((item) => item.lesson) ?? [];
+    const context = findChunkContext(chunk, baseLesson, variantLessons);
+    if (!context) return;
+    const detail = getChunkLayerFromLesson(context.lesson, context.sentence, chunk);
+    setVariantChunkSentence(context.sentence);
     setVariantChunkDetail(detail);
+    setVariantChunkRelatedChunks(latestVariantSet?.reusedChunks ?? []);
+    setVariantChunkModalOpen(true);
+  };
+
+  const ensureExpressionMap = async () => {
+    if (!baseLesson || !latestVariantSet) return null;
+    if (expressionMap && expressionMapVariantSetId === latestVariantSet.id) {
+      return expressionMap;
+    }
+
+    setExpressionMapLoading(true);
+    setExpressionMapError(null);
+    try {
+      const response = await generateExpressionMapFromApi({
+        sourceSceneId: baseLesson.id,
+        sourceSceneTitle: baseLesson.title,
+        baseExpressions: buildReusedChunks(baseLesson, 50),
+        variantExpressionSources: latestVariantSet.variants.map((variant) => ({
+          sourceSceneId: variant.id,
+          expressions: buildReusedChunks(variant.lesson, 50),
+        })),
+      });
+      setExpressionMap(response);
+      setExpressionMapVariantSetId(latestVariantSet.id);
+      return response;
+    } catch (error) {
+      setExpressionMapError(
+        error instanceof Error ? error.message : "表达地图生成失败。",
+      );
+      return null;
+    } finally {
+      setExpressionMapLoading(false);
+    }
+  };
+
+  const handleOpenExpressionMap = async () => {
+    const result = await ensureExpressionMap();
+    if (!result) return;
+    setViewModeWithRoute("expression-map");
+  };
+
+  const handleOpenExpressionDetail = (expression: string, relatedChunks: string[]) => {
+    if (!baseLesson) return;
+    const variantLessons = latestVariantSet?.variants.map((item) => item.lesson) ?? [];
+    const context = findChunkContext(expression, baseLesson, variantLessons);
+    if (!context) return;
+    const detail = getChunkLayerFromLesson(context.lesson, context.sentence, expression);
+    setVariantChunkSentence(context.sentence);
+    setVariantChunkDetail(detail);
+    setVariantChunkRelatedChunks(relatedChunks);
     setVariantChunkModalOpen(true);
   };
 
@@ -397,6 +490,14 @@ export default function SceneDetailPage() {
               onClick={() => setViewModeWithRoute("scene")}
             >
               返回原场景
+            </button>
+            <button
+              type="button"
+              className="rounded-md border px-3 py-1.5 text-sm text-destructive hover:bg-muted disabled:opacity-60"
+              onClick={handleDeletePracticeSet}
+              disabled={!latestPracticeSet}
+            >
+              删除当前练习
             </button>
             <button
               type="button"
@@ -484,6 +585,22 @@ export default function SceneDetailPage() {
             >
               标记为已完成
             </button>
+            <button
+              type="button"
+              className="rounded-md border px-3 py-1.5 text-sm hover:bg-muted disabled:opacity-60"
+              onClick={handleOpenExpressionMap}
+              disabled={!latestVariantSet || expressionMapLoading}
+            >
+              {expressionMapLoading ? "生成中…" : "查看表达地图"}
+            </button>
+            <button
+              type="button"
+              className="rounded-md border px-3 py-1.5 text-sm text-destructive hover:bg-muted disabled:opacity-60"
+              onClick={handleDeleteVariantSet}
+              disabled={!latestVariantSet}
+            >
+              删除当前变体
+            </button>
           </div>
           <p className="text-sm text-muted-foreground">
             这些相似场景基于：{baseLesson.title}。这些相似场景会复用当前场景的核心 chunk，帮助你在新语境中继续练习。
@@ -523,18 +640,87 @@ export default function SceneDetailPage() {
                       状态：{toVariantStatusLabel(variant.status)}
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    className="rounded border px-2 py-1 text-xs hover:bg-muted"
-                    onClick={() => handleOpenVariant(variant.id)}
-                  >
-                    打开变体
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      className="rounded border px-2 py-1 text-xs hover:bg-muted"
+                      onClick={() => handleOpenVariant(variant.id)}
+                    >
+                      打开变体
+                    </button>
+                    <button
+                      type="button"
+                      className="rounded border px-2 py-1 text-xs text-destructive hover:bg-muted"
+                      onClick={() => handleDeleteVariantItem(variant.id)}
+                    >
+                      删除
+                    </button>
+                  </div>
                 </li>
               ))}
             </ul>
           </section>
         )}
+      </div>
+    );
+  }
+
+  if (viewMode === "expression-map") {
+    const families = expressionMap?.families ?? [];
+
+    return (
+      <div className="space-y-4">
+        <section className="space-y-3 rounded-lg border border-border/70 p-4">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              className="rounded-md border px-3 py-1.5 text-sm hover:bg-muted"
+              onClick={() => setViewModeWithRoute("variants")}
+            >
+              返回变体页
+            </button>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            表达家族会把当前场景与变体中的相关说法归在一起，帮助你快速看到同一意思的不同表达。
+          </p>
+          {expressionMapError ? (
+            <p className="text-sm text-destructive">{expressionMapError}</p>
+          ) : null}
+        </section>
+
+        <section className="space-y-2 rounded-lg border border-border/70 p-4">
+          {families.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              暂无表达家族。先生成变体后再查看表达地图。
+            </p>
+          ) : (
+            <ul className="space-y-2">
+              {families.map((family) => (
+                <li key={family.id} className="space-y-2 rounded-md border p-3 text-sm">
+                  <p className="font-medium">{family.anchor}</p>
+                  <p className="text-xs text-muted-foreground">{family.meaning}</p>
+                  <p className="text-xs text-muted-foreground">
+                    出现场景数：{family.sourceSceneIds.length}
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {family.expressions.map((expression) => (
+                      <button
+                        key={`${family.id}-${expression}`}
+                        type="button"
+                        className="rounded-md border border-border/70 bg-muted/30 px-2 py-1 text-xs hover:bg-muted"
+                        onClick={() =>
+                          handleOpenExpressionDetail(expression, family.expressions)
+                        }
+                      >
+                        {expression}
+                      </button>
+                    ))}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
       </div>
     );
   }
@@ -546,18 +732,18 @@ export default function SceneDetailPage() {
           <div className="flex items-center gap-2">
             <button
               type="button"
-              className="rounded-md border px-3 py-1.5 text-sm hover:bg-muted"
-              onClick={() => setViewModeWithRoute("variants")}
-            >
-              返回
-            </button>
-            <button
-              type="button"
               className="rounded-md border px-3 py-1.5 text-sm hover:bg-muted disabled:opacity-60"
               disabled={!canGeneratePractice}
               onClick={() => handleGeneratePractice(activeVariantLesson)}
             >
               {practiceLoading ? "练习中…" : "练习"}
+            </button>
+            <button
+              type="button"
+              className="rounded-md border px-3 py-1.5 text-sm text-destructive hover:bg-muted"
+              onClick={() => handleDeleteVariantItem(activeVariantLesson.id)}
+            >
+              删除当前变体
             </button>
           </div>
           <p className="text-sm text-muted-foreground">
@@ -583,16 +769,6 @@ export default function SceneDetailPage() {
             ? "练习"
             : "查看练习"}
       </button>
-      {generatedState.practiceStatus === "completed" ? (
-        <button
-          type="button"
-          className="rounded-md border px-2.5 py-1 text-xs hover:bg-muted disabled:opacity-60"
-          onClick={() => handleGeneratePractice(baseLesson)}
-          disabled={practiceLoading}
-        >
-          重新练习
-        </button>
-      ) : null}
       <button
         type="button"
         className="rounded-md border px-2.5 py-1 text-xs hover:bg-muted disabled:opacity-60"
@@ -605,16 +781,6 @@ export default function SceneDetailPage() {
             ? "变体"
             : "查看变体"}
       </button>
-      {generatedState.variantStatus === "completed" ? (
-        <button
-          type="button"
-          className="rounded-md border px-2.5 py-1 text-xs hover:bg-muted disabled:opacity-60"
-          onClick={handleGenerateVariants}
-          disabled={variantsLoading}
-        >
-          新变体
-        </button>
-      ) : null}
     </>
   );
 
@@ -628,7 +794,7 @@ export default function SceneDetailPage() {
       <SelectionDetailSheet
         currentSentence={variantChunkSentence}
         chunkDetail={variantChunkDetail}
-        relatedChunks={latestVariantSet?.reusedChunks ?? []}
+        relatedChunks={variantChunkRelatedChunks}
         open={variantChunkModalOpen}
         loading={false}
         speakingText={speakingText}

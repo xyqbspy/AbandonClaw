@@ -23,10 +23,68 @@ const sanitizeExerciseCount = (value: unknown) => {
 };
 
 const isValidExerciseType = (value: unknown): value is PracticeExerciseType =>
-  value === "recall" || value === "fill_chunk" || value === "rewrite";
+  value === "recall" ||
+  value === "fill_chunk" ||
+  value === "rewrite" ||
+  value === "expression_switch" ||
+  value === "expression_replace" ||
+  value === "expression_choice";
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
   Boolean(value) && typeof value === "object";
+
+const normalizeExpression = (value: string) =>
+  value
+    .trim()
+    .toLowerCase()
+    .replace(/[.,!?;:()[\]{}"']/g, "")
+    .replace(/\s+/g, " ");
+
+const EXPRESSION_FAMILY_HINTS = [
+  {
+    anchor: "running on empty",
+    meaning: "表示精力见底、非常疲惫",
+    expressions: ["running on empty", "exhausted", "worn out", "drained"],
+  },
+  {
+    anchor: "call it a day",
+    meaning: "表示今天先收工、到此为止",
+    expressions: ["call it a day", "wrap it up", "stop for today"],
+  },
+  {
+    anchor: "get through the day",
+    meaning: "表示先把这一天撑过去",
+    expressions: ["get through the day", "make it through the day", "survive the day"],
+  },
+] as const;
+
+const buildExpressionFamiliesForPrompt = (
+  scene: PracticeGenerateRequest["scene"],
+): string => {
+  const sceneExpressions = new Set<string>();
+  for (const section of scene.sections) {
+    for (const sentence of section.sentences) {
+      for (const chunk of sentence.chunks) {
+        if (!chunk?.text) continue;
+        sceneExpressions.add(normalizeExpression(chunk.text));
+      }
+    }
+  }
+
+  const families = EXPRESSION_FAMILY_HINTS.map((hint) => {
+    const presentInScene = hint.expressions.filter((item) =>
+      sceneExpressions.has(normalizeExpression(item)),
+    );
+    return {
+      anchor: hint.anchor,
+      meaning: hint.meaning,
+      expressions: hint.expressions,
+      presentInScene,
+    };
+  }).filter((family) => family.presentInScene.length > 0);
+
+  return JSON.stringify(families, null, 2);
+};
 
 const parseWithDiagnostics = (rawText: string) => {
   try {
@@ -189,12 +247,13 @@ export async function POST(request: Request) {
       systemPrompt: PRACTICE_GENERATE_SYSTEM_PROMPT,
       userPrompt: buildPracticeGenerateUserPrompt({
         sceneJson: JSON.stringify(scene),
+        expressionFamilies: buildExpressionFamiliesForPrompt(scene),
         exerciseCount,
       }),
       temperature: 0.3,
     });
 
-    const { jsonCandidate, parsed: parsedJson } = parseWithDiagnostics(rawModelText);
+    const { parsed: parsedJson } = parseWithDiagnostics(rawModelText);
     const parsed = normalizePracticeResponse(parsedJson);
     const validation = validatePracticeGenerateResponse(parsed);
     if (!validation.ok) {

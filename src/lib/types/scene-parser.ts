@@ -87,7 +87,13 @@ export interface PracticeGenerateRequest {
   exerciseCount?: number;
 }
 
-export type PracticeExerciseType = "recall" | "fill_chunk" | "rewrite";
+export type PracticeExerciseType =
+  | "recall"
+  | "fill_chunk"
+  | "rewrite"
+  | "expression_switch"
+  | "expression_replace"
+  | "expression_choice";
 
 export interface PracticeExercise {
   id: string;

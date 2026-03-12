@@ -120,6 +120,19 @@ export const markPracticeSetCompleted = (sceneId: string, practiceSetId: string)
   });
 };
 
+export const deletePracticeSet = (sceneId: string, practiceSetId: string) => {
+  const store = getStore();
+  const items = store.practiceByScene[sceneId] ?? [];
+  const nextItems = items.filter((item) => item.id !== practiceSetId);
+  setStore({
+    ...store,
+    practiceByScene: {
+      ...store.practiceByScene,
+      [sceneId]: nextItems,
+    },
+  });
+};
+
 export const markVariantSetCompleted = (sceneId: string, variantSetId: string) => {
   const store = getStore();
   const items = store.variantByScene[sceneId] ?? [];
@@ -133,6 +146,19 @@ export const markVariantSetCompleted = (sceneId: string, variantSetId: string) =
         }
       : item,
   );
+  setStore({
+    ...store,
+    variantByScene: {
+      ...store.variantByScene,
+      [sceneId]: nextItems,
+    },
+  });
+};
+
+export const deleteVariantSet = (sceneId: string, variantSetId: string) => {
+  const store = getStore();
+  const items = store.variantByScene[sceneId] ?? [];
+  const nextItems = items.filter((item) => item.id !== variantSetId);
   setStore({
     ...store,
     variantByScene: {
@@ -159,6 +185,32 @@ export const markVariantItemStatus = (
       ),
     };
   });
+
+  setStore({
+    ...store,
+    variantByScene: {
+      ...store.variantByScene,
+      [sceneId]: nextItems,
+    },
+  });
+};
+
+export const deleteVariantItem = (
+  sceneId: string,
+  variantSetId: string,
+  variantId: string,
+) => {
+  const store = getStore();
+  const items = store.variantByScene[sceneId] ?? [];
+  const nextItems = items
+    .map((variantSet) => {
+      if (variantSet.id !== variantSetId) return variantSet;
+      return {
+        ...variantSet,
+        variants: variantSet.variants.filter((variant) => variant.id !== variantId),
+      };
+    })
+    .filter((variantSet) => variantSet.variants.length > 0);
 
   setStore({
     ...store,
