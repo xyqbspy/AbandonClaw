@@ -1,10 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { toast } from "sonner";
 import { LessonReader } from "@/features/lesson/components/lesson-reader";
-import { getSceneBySlug } from "@/lib/data/mock-lessons";
-import { Lesson } from "@/lib/types";
+import { SelectionDetailSheet } from "@/features/lesson/components/selection-detail-sheet";
+import {
+  getChunkLayerFromLesson,
+  getFirstSentence,
+  getSceneBySlug,
+} from "@/lib/data/mock-lessons";
+import { Lesson, LessonSentence, SelectionChunkLayer } from "@/lib/types";
 import {
   mapLessonToParsedScene,
   mapParsedSceneToLesson,
@@ -22,6 +28,7 @@ import {
   saveVariantSet,
 } from "@/lib/utils/scene-learning-flow-storage";
 import { SceneGeneratedState } from "@/lib/types/learning-flow";
+import { useSpeech } from "@/hooks/use-speech";
 
 const subscribe = () => () => {};
 const API_SCENE_SLUG = "take-the-morning-off";
@@ -61,8 +68,46 @@ const buildReusedChunks = (lesson: Lesson, limit = 12) => {
 const makeGeneratedId = (prefix: string) =>
   `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
+const isSceneViewMode = (value: string): value is SceneViewMode =>
+  value === "scene" ||
+  value === "practice" ||
+  value === "variants" ||
+  value === "variant-study";
+
+const findSentenceForChunk = (
+  lesson: Lesson,
+  chunkText: string,
+): LessonSentence | null => {
+  const lower = chunkText.trim().toLowerCase();
+  if (!lower) return null;
+  for (const section of lesson.sections) {
+    for (const sentence of section.sentences) {
+      const inChunks = sentence.chunks.some((chunk) => chunk.toLowerCase() === lower);
+      const inChunkDetails = sentence.chunkDetails?.some(
+        (chunk) => chunk.text.toLowerCase() === lower,
+      );
+      if (inChunks || inChunkDetails) return sentence;
+    }
+  }
+  return getFirstSentence(lesson) ?? null;
+};
+
+const toVariantStatusLabel = (status: "unviewed" | "viewed" | "completed") => {
+  if (status === "viewed") return "已查看";
+  if (status === "completed") return "已完成";
+  return "未查看";
+};
+
+const toVariantTitle = (title: string, index: number) => {
+  const replaced = title.replace(/\(Variant\s*(\d+)\)/i, "（变体$1）");
+  if (replaced !== title) return replaced;
+  return `${title}（变体${index + 1}）`;
+};
+
 export default function SceneDetailPage() {
   const params = useParams<{ id: string }>();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const sceneId = params?.id ?? "";
   const presetScene = useMemo(() => getSceneBySlug(sceneId), [sceneId]);
   const [apiLesson, setApiLesson] = useState<Lesson | null>(null);
@@ -83,12 +128,39 @@ export default function SceneDetailPage() {
   const [practiceError, setPracticeError] = useState<string | null>(null);
   const [variantsError, setVariantsError] = useState<string | null>(null);
   const [showAnswerMap, setShowAnswerMap] = useState<Record<string, boolean>>({});
+  const [variantChunkModalOpen, setVariantChunkModalOpen] = useState(false);
+  const [variantChunkDetail, setVariantChunkDetail] =
+    useState<SelectionChunkLayer | null>(null);
+  const [variantChunkSentence, setVariantChunkSentence] =
+    useState<LessonSentence | null>(null);
+  const [variantChunkHoveredKey, setVariantChunkHoveredKey] = useState<string | null>(
+    null,
+  );
   const [generatedState, setGeneratedState] = useState<SceneGeneratedState>({
     latestPracticeSet: null,
     latestVariantSet: null,
     practiceStatus: "idle",
     variantStatus: "idle",
   });
+  const { supported, speak, stop, speakingText } = useSpeech();
+
+  const setViewModeWithRoute = (next: SceneViewMode, variantId?: string | null) => {
+    const nextParams = new URLSearchParams(searchParams.toString());
+    if (next === "scene") {
+      nextParams.delete("view");
+      nextParams.delete("variant");
+    } else {
+      nextParams.set("view", next);
+      if (next === "variant-study" && variantId) {
+        nextParams.set("variant", variantId);
+      } else {
+        nextParams.delete("variant");
+      }
+    }
+    const query = nextParams.toString();
+    const href = query ? `/scene/${sceneId}?${query}` : `/scene/${sceneId}`;
+    router.push(href, { scroll: false });
+  };
 
   useEffect(() => {
     if (!shouldFetchFromApi || !presetScene) {
@@ -121,13 +193,20 @@ export default function SceneDetailPage() {
   };
 
   useEffect(() => {
-    setViewMode("scene");
-    setActiveVariantId(null);
+    const modeParam = searchParams.get("view");
+    const variantParam = searchParams.get("variant");
+    const parsedMode = modeParam && isSceneViewMode(modeParam) ? modeParam : "scene";
+    setViewMode(parsedMode === "variant-study" ? "variant-study" : parsedMode);
+    setActiveVariantId(parsedMode === "variant-study" ? variantParam : null);
     setPracticeError(null);
     setVariantsError(null);
     setShowAnswerMap({});
+    setVariantChunkModalOpen(false);
+    setVariantChunkDetail(null);
+    setVariantChunkSentence(null);
+    setVariantChunkHoveredKey(null);
     refreshGeneratedState(baseSceneId);
-  }, [sceneId, baseSceneId]);
+  }, [sceneId, baseSceneId, searchParams]);
 
   const latestPracticeSet = generatedState.latestPracticeSet;
   const latestVariantSet = generatedState.latestVariantSet;
@@ -168,7 +247,7 @@ export default function SceneDetailPage() {
       savePracticeSet(practiceSet);
       refreshGeneratedState(baseLesson.id);
       setShowAnswerMap({});
-      setViewMode("practice");
+      setViewModeWithRoute("practice");
     } catch (error) {
       setPracticeError(
         error instanceof Error ? error.message : "Failed to generate practice.",
@@ -222,7 +301,7 @@ export default function SceneDetailPage() {
       saveVariantSet(variantSet);
       refreshGeneratedState(baseLesson.id);
       setActiveVariantId(null);
-      setViewMode("variants");
+      setViewModeWithRoute("variants");
     } catch (error) {
       setVariantsError(
         error instanceof Error ? error.message : "Failed to generate variants.",
@@ -249,7 +328,7 @@ export default function SceneDetailPage() {
     markVariantItemStatus(baseLesson.id, latestVariantSet.id, variantId, "viewed");
     refreshGeneratedState(baseLesson.id);
     setActiveVariantId(variantId);
-    setViewMode("variant-study");
+    setViewModeWithRoute("variant-study", variantId);
   };
 
   const handlePracticeToolClick = () => {
@@ -258,7 +337,7 @@ export default function SceneDetailPage() {
       void handleGeneratePractice(baseLesson);
       return;
     }
-    setViewMode("practice");
+    setViewModeWithRoute("practice");
   };
 
   const handleVariantToolClick = () => {
@@ -267,7 +346,40 @@ export default function SceneDetailPage() {
       void handleGenerateVariants();
       return;
     }
-    setViewMode("variants");
+    setViewModeWithRoute("variants");
+  };
+
+  const handlePronounce = (text: string) => {
+    if (!text.trim()) return;
+    if (!supported) {
+      toast.error("当前浏览器不支持发音功能");
+      return;
+    }
+    speak(text, { lang: "en-US" });
+  };
+
+  const handleLoopSentence = (text: string) => {
+    const clean = text.trim();
+    if (!clean) return;
+    if (!supported) {
+      toast.error("当前浏览器不支持发音功能");
+      return;
+    }
+    if (speakingText === clean) {
+      stop();
+      return;
+    }
+    speak(clean, { lang: "en-US" });
+  };
+
+  const handleOpenVariantChunk = (chunk: string) => {
+    if (!baseLesson) return;
+    const sentence = findSentenceForChunk(baseLesson, chunk);
+    if (!sentence) return;
+    const detail = getChunkLayerFromLesson(baseLesson, sentence, chunk);
+    setVariantChunkSentence(sentence);
+    setVariantChunkDetail(detail);
+    setVariantChunkModalOpen(true);
   };
 
   if (!baseLesson) {
@@ -282,9 +394,9 @@ export default function SceneDetailPage() {
             <button
               type="button"
               className="rounded-md border px-3 py-1.5 text-sm hover:bg-muted"
-              onClick={() => setViewMode("scene")}
+              onClick={() => setViewModeWithRoute("scene")}
             >
-              返回原场景 / Back to Original Scene
+              返回原场景
             </button>
             <button
               type="button"
@@ -292,7 +404,7 @@ export default function SceneDetailPage() {
               onClick={handleMarkPracticeComplete}
               disabled={!latestPracticeSet || latestPracticeSet.status === "completed"}
             >
-              标记为已完成 / Mark as Complete
+              标记为已完成
             </button>
           </div>
 
@@ -356,13 +468,13 @@ export default function SceneDetailPage() {
     return (
       <div className="space-y-4">
         <section className="space-y-3 rounded-lg border border-border/70 p-4">
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-2">
             <button
               type="button"
               className="rounded-md border px-3 py-1.5 text-sm hover:bg-muted"
-              onClick={() => setViewMode("scene")}
+              onClick={() => setViewModeWithRoute("scene")}
             >
-              返回原场景 / Back to Original Scene
+              返回原场景
             </button>
             <button
               type="button"
@@ -370,7 +482,7 @@ export default function SceneDetailPage() {
               onClick={handleMarkVariantSetComplete}
               disabled={!latestVariantSet || latestVariantSet.status === "completed"}
             >
-              标记为已完成 / Mark as Complete
+              标记为已完成
             </button>
           </div>
           <p className="text-sm text-muted-foreground">
@@ -379,12 +491,14 @@ export default function SceneDetailPage() {
           {latestVariantSet?.reusedChunks?.length ? (
             <div className="flex flex-wrap gap-2">
               {latestVariantSet.reusedChunks.map((chunk) => (
-                <span
+                <button
                   key={chunk}
-                  className="rounded-md border border-border/70 bg-muted/30 px-2 py-1 text-xs"
+                  type="button"
+                  className="rounded-md border border-border/70 bg-muted/30 px-2 py-1 text-xs hover:bg-muted"
+                  onClick={() => handleOpenVariantChunk(chunk)}
                 >
                   {chunk}
-                </span>
+                </button>
               ))}
             </div>
           ) : null}
@@ -395,24 +509,26 @@ export default function SceneDetailPage() {
         ) : (
           <section className="space-y-2 rounded-lg border border-border/70 p-4">
             <ul className="space-y-2">
-              {latestVariantSet.variants.map((variant) => (
+              {latestVariantSet.variants.map((variant, index) => (
                 <li
                   key={variant.id}
                   className="flex items-center justify-between rounded-md border p-3 text-sm"
                 >
                   <div>
-                    <p className="font-medium">{variant.lesson.title}</p>
+                    <p className="font-medium">{toVariantTitle(variant.lesson.title, index)}</p>
                     <p className="text-xs text-muted-foreground">
                       {variant.lesson.sections[0]?.summary ?? variant.lesson.subtitle}
                     </p>
-                    <p className="mt-1 text-xs text-muted-foreground">状态：{variant.status}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      状态：{toVariantStatusLabel(variant.status)}
+                    </p>
                   </div>
                   <button
                     type="button"
                     className="rounded border px-2 py-1 text-xs hover:bg-muted"
                     onClick={() => handleOpenVariant(variant.id)}
                   >
-                    Open Variant
+                    打开变体
                   </button>
                 </li>
               ))}
@@ -427,13 +543,13 @@ export default function SceneDetailPage() {
     return (
       <div className="space-y-4">
         <section className="space-y-3 rounded-lg border border-border/70 p-4">
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-2">
             <button
               type="button"
               className="rounded-md border px-3 py-1.5 text-sm hover:bg-muted"
-              onClick={() => setViewMode("variants")}
+              onClick={() => setViewModeWithRoute("variants")}
             >
-              Back to Similar Scenes
+              返回
             </button>
             <button
               type="button"
@@ -441,17 +557,8 @@ export default function SceneDetailPage() {
               disabled={!canGeneratePractice}
               onClick={() => handleGeneratePractice(activeVariantLesson)}
             >
-              {practiceLoading ? "正在生成练习…" : "练习这个场景 / Practice This Scene"}
+              {practiceLoading ? "练习中…" : "练习"}
             </button>
-            {latestPracticeSet ? (
-              <button
-                type="button"
-                className="rounded-md border px-3 py-1.5 text-sm hover:bg-muted"
-                onClick={() => setViewMode("practice")}
-              >
-                查看练习 / View Practice
-              </button>
-            ) : null}
           </div>
           <p className="text-sm text-muted-foreground">
             当前学习中：{activeVariantLesson.title}。你可以基于这个 variant 继续生成练习。
@@ -517,6 +624,23 @@ export default function SceneDetailPage() {
       {variantsError ? <p className="text-sm text-destructive">{variantsError}</p> : null}
 
       <LessonReader lesson={baseLesson} headerTools={headerTools} />
+
+      <SelectionDetailSheet
+        currentSentence={variantChunkSentence}
+        chunkDetail={variantChunkDetail}
+        relatedChunks={latestVariantSet?.reusedChunks ?? []}
+        open={variantChunkModalOpen}
+        loading={false}
+        speakingText={speakingText}
+        onOpenChange={setVariantChunkModalOpen}
+        onSave={() => toast.success("已收藏短语")}
+        onReview={() => toast.success("已加入复习")}
+        onPronounce={handlePronounce}
+        onLoopSentence={handleLoopSentence}
+        onSelectRelated={handleOpenVariantChunk}
+        hoveredChunkKey={variantChunkHoveredKey}
+        onHoverChunk={setVariantChunkHoveredKey}
+      />
     </div>
   );
 }

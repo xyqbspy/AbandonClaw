@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/shared/page-header";
-import { MotionCardLink } from "@/components/shared/motion-card-link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -17,6 +16,7 @@ import {
   removeCustomScenarioFromStorage,
   saveCustomScenarioToStorage,
 } from "@/lib/utils/custom-scenario-storage";
+import { getSceneGeneratedState } from "@/lib/utils/scene-learning-flow-storage";
 
 const difficultyLabel: Record<string, string> = {
   Beginner: "入门",
@@ -31,6 +31,16 @@ const placeholderExample = `A: Are we still on for dinner?
 B: I was just about to text you. Something came up at work.
 A: Again?
 B: Yeah, I'm stuck at the office.`;
+
+const toCompletedVariantLinks = (sceneId: string) => {
+  const state = getSceneGeneratedState(sceneId);
+  const variantSet = state.latestVariantSet;
+  if (!variantSet || variantSet.status !== "completed") return [];
+  return variantSet.variants.map((variant, index) => ({
+    id: variant.id,
+    label: `变体${index + 1}`,
+  }));
+};
 
 export default function ScenesPage() {
   const router = useRouter();
@@ -141,58 +151,75 @@ export default function ScenesPage() {
             (total, section) => total + section.sentences.length,
             0,
           );
+          const completedVariantLinks = toCompletedVariantLinks(scene.id);
           const isCustom =
             scene.sourceType === "custom" || scene.sourceType === "imported";
 
           return (
-            <MotionCardLink
+            <Card
               key={scene.id}
-              href={`/scene/${scene.slug}`}
-              motionId={scene.id}
-              ignoreSelector="[data-scene-delete='true']"
-              className="group block"
+              className="scene-card-motion h-full cursor-pointer border-border/70 transition-all duration-150 hover:border-primary/40 hover:shadow-sm"
+              onClick={() => router.push(`/scene/${scene.slug}`)}
             >
-              {(motionStateAttrs) => (
-                <Card
-                  data-pressed={motionStateAttrs["data-pressed"]}
-                  data-activated={motionStateAttrs["data-activated"]}
-                  className="scene-card-motion h-full cursor-pointer border-border/70 transition-all duration-150 hover:border-primary/40 hover:shadow-sm"
-                >
-                  <CardHeader className="space-y-0.5 p-2.5 pb-1.5 sm:p-3 sm:pb-2">
-                    <div className="flex items-start gap-2">
-                      <CardTitle className="min-w-0 flex-1 line-clamp-1 text-[15px] leading-5 sm:text-base">
-                        {scene.title}
-                      </CardTitle>
-                      {isCustom ? (
+              <CardHeader className="space-y-0.5 p-2.5 pb-1.5 sm:p-3 sm:pb-2">
+                <div className="flex items-start gap-2">
+                  <CardTitle className="min-w-0 flex-1 line-clamp-1 text-[15px] leading-5 sm:text-base">
+                    {scene.title}
+                  </CardTitle>
+                  {isCustom ? (
+                    <button
+                      type="button"
+                      data-scene-delete="true"
+                      aria-label="删除自定义场景"
+                      className="inline-flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                      onPointerDown={(event) => {
+                        event.stopPropagation();
+                      }}
+                      onClick={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        handleDeleteCustomScene(scene);
+                      }}
+                    >
+                      <Trash2 className="size-3.5" />
+                    </button>
+                  ) : null}
+                </div>
+                <p className="line-clamp-1 text-[11px] text-muted-foreground">{scene.subtitle}</p>
+              </CardHeader>
+              <CardContent className="p-2.5 pt-0 sm:p-3 sm:pt-0">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-[11px] text-muted-foreground">
+                    {difficultyLabel[scene.difficulty] ?? "中级"} · {sentenceCount}句 ·{" "}
+                    {scene.estimatedMinutes}分钟
+                  </p>
+                  {completedVariantLinks.length > 0 ? (
+                    <div className="flex flex-wrap items-center justify-end gap-1">
+                      {completedVariantLinks.map((variant) => (
                         <button
+                          key={variant.id}
                           type="button"
-                          data-scene-delete="true"
-                          aria-label="删除自定义场景"
-                          className="inline-flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                          data-scene-variant-view="true"
+                          className="rounded border px-1.5 py-0.5 text-[10px] text-muted-foreground hover:bg-muted hover:text-foreground"
                           onPointerDown={(event) => {
                             event.stopPropagation();
                           }}
                           onClick={(event) => {
                             event.preventDefault();
                             event.stopPropagation();
-                            handleDeleteCustomScene(scene);
+                            router.push(
+                              `/scene/${scene.slug}?view=variant-study&variant=${variant.id}`,
+                            );
                           }}
                         >
-                          <Trash2 className="size-3.5" />
+                          {variant.label}
                         </button>
-                      ) : null}
+                      ))}
                     </div>
-                    <p className="line-clamp-1 text-[11px] text-muted-foreground">{scene.subtitle}</p>
-                  </CardHeader>
-                  <CardContent className="p-2.5 pt-0 sm:p-3 sm:pt-0">
-                    <p className="text-[11px] text-muted-foreground">
-                      {difficultyLabel[scene.difficulty] ?? "中级"} · {sentenceCount}句 ·{" "}
-                      {scene.estimatedMinutes}分钟
-                    </p>
-                  </CardContent>
-                </Card>
-              )}
-            </MotionCardLink>
+                  ) : null}
+                </div>
+              </CardContent>
+            </Card>
           );
         })}
       </div>
