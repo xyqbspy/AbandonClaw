@@ -169,6 +169,8 @@ export function LessonReader({
   const suppressSelectionClearRef = useRef(false);
   const sentenceNodeMapRef = useRef<Record<string, HTMLDivElement | null>>({});
   const autoPlayActiveRef = useRef(false);
+  const autoPlayIndexRef = useRef(0);
+  const autoPlayWatchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const playFromIndexRef = useRef<(index: number) => void>(() => {});
   const sentenceLoopRef = useRef<string | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -470,18 +472,28 @@ export function LessonReader({
       );
       const target = sentenceOrder[nextIndex];
       autoPlayActiveRef.current = true;
+      autoPlayIndexRef.current = nextIndex;
       const success = speak(target.text, {
         lang: "en-US",
         onEnd: () => {
-          setAutoPlayIndex((prevIndex) => {
-            const next = (prevIndex + 1) % sentenceOrder.length;
-            if (!autoPlayActiveRef.current) return prevIndex;
-            window.setTimeout(() => playFromIndexRef.current(next), 80);
-            return next;
-          });
+          if (!autoPlayActiveRef.current) return;
+          const next = (autoPlayIndexRef.current + 1) % sentenceOrder.length;
+          autoPlayIndexRef.current = next;
+          setAutoPlayIndex(next);
+          window.setTimeout(() => playFromIndexRef.current(next), 80);
+        },
+        onError: () => {
+          if (!autoPlayActiveRef.current) return;
+          const next = (autoPlayIndexRef.current + 1) % sentenceOrder.length;
+          autoPlayIndexRef.current = next;
+          setAutoPlayIndex(next);
+          window.setTimeout(() => playFromIndexRef.current(next), 120);
         },
       });
       if (!success) {
+        autoPlayActiveRef.current = false;
+        setAutoPlayActive(false);
+        setAutoPlayIndex(0);
         toast.error("连播启动失败，请稍后重试");
         return;
       }
@@ -494,20 +506,50 @@ export function LessonReader({
     playFromIndexRef.current = startSequentialPlay;
   }, [startSequentialPlay]);
 
+  const stopSequentialPlay = useCallback(() => {
+    autoPlayActiveRef.current = false;
+    if (autoPlayWatchdogRef.current) {
+      clearTimeout(autoPlayWatchdogRef.current);
+      autoPlayWatchdogRef.current = null;
+    }
+    stop();
+    setAutoPlayActive(false);
+    setAutoPlayIndex(0);
+  }, [stop]);
+
+  useEffect(() => {
+    if (!autoPlayActive) {
+      if (autoPlayWatchdogRef.current) {
+        clearTimeout(autoPlayWatchdogRef.current);
+        autoPlayWatchdogRef.current = null;
+      }
+      return;
+    }
+    if (speakingText) return;
+    autoPlayWatchdogRef.current = setTimeout(() => {
+      if (!autoPlayActiveRef.current) return;
+      playFromIndexRef.current(autoPlayIndexRef.current);
+    }, 1800);
+
+    return () => {
+      if (autoPlayWatchdogRef.current) {
+        clearTimeout(autoPlayWatchdogRef.current);
+        autoPlayWatchdogRef.current = null;
+      }
+    };
+  }, [autoPlayActive, speakingText]);
+
   const toggleSequentialPlay = useCallback(() => {
     if (!supported) {
       toast.error("当前浏览器不支持发音功能");
       return;
     }
     if (autoPlayActive) {
-      autoPlayActiveRef.current = false;
-      stop();
-      setAutoPlayActive(false);
-      setAutoPlayIndex(0);
+      stopSequentialPlay();
       return;
     }
     startSequentialPlay(0);
-  }, [autoPlayActive, startSequentialPlay, stop, supported]);
+  }, [autoPlayActive, startSequentialPlay, stopSequentialPlay, supported]);
 
   const handleSave = useCallback(() => toast.success("已收藏短语"), []);
   const handleAddReview = useCallback(() => toast.success("已加入复习"), []);

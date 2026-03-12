@@ -168,6 +168,17 @@ export const deleteVariantSet = (sceneId: string, variantSetId: string) => {
   });
 };
 
+export const deleteAllVariantSets = (sceneId: string) => {
+  const store = getStore();
+  setStore({
+    ...store,
+    variantByScene: {
+      ...store.variantByScene,
+      [sceneId]: [],
+    },
+  });
+};
+
 export const markVariantItemStatus = (
   sceneId: string,
   variantSetId: string,

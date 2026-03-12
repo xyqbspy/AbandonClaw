@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useId, useRef, useState } from "react";
 
 type SpeakOptions = {
   lang?: string;
@@ -11,10 +11,15 @@ type SpeakOptions = {
   onError?: () => void;
 };
 
+let globalSpeechOwnerId: string | null = null;
+
 export function useSpeech() {
   const [speakingText, setSpeakingText] = useState<string | null>(null);
   const [paused, setPaused] = useState(false);
   const utterRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const instanceId = useId();
+  const instanceIdRef = useRef(`speech-${instanceId}`);
+  const speakSeqRef = useRef(0);
 
   const supported =
     typeof window !== "undefined" &&
@@ -23,6 +28,10 @@ export function useSpeech() {
 
   const stop = useCallback(() => {
     if (!supported) return;
+    speakSeqRef.current += 1;
+    if (globalSpeechOwnerId === instanceIdRef.current) {
+      globalSpeechOwnerId = null;
+    }
     window.speechSynthesis.cancel();
     utterRef.current = null;
     setSpeakingText(null);
@@ -49,25 +58,42 @@ export function useSpeech() {
     (text: string, options?: SpeakOptions) => {
       const clean = text.trim();
       if (!clean || !supported) return false;
-
-      stop();
+      const ownerId = instanceIdRef.current;
+      speakSeqRef.current += 1;
+      const currentSeq = speakSeqRef.current;
+      globalSpeechOwnerId = ownerId;
+      window.speechSynthesis.cancel();
+      utterRef.current = null;
+      setSpeakingText(null);
+      setPaused(false);
 
       const utter = new SpeechSynthesisUtterance(clean);
       utter.lang = options?.lang ?? "en-US";
       utter.rate = options?.rate ?? 1;
       utter.pitch = options?.pitch ?? 1;
       utter.onstart = () => {
+        if (globalSpeechOwnerId !== ownerId || speakSeqRef.current !== currentSeq) return;
         setSpeakingText(clean);
         setPaused(false);
         options?.onStart?.();
       };
       utter.onend = () => {
-        setSpeakingText((prev) => (prev === clean ? null : prev));
+        if (globalSpeechOwnerId !== ownerId || speakSeqRef.current !== currentSeq) {
+          setSpeakingText(null);
+          setPaused(false);
+          return;
+        }
+        setSpeakingText(null);
         setPaused(false);
         options?.onEnd?.();
       };
       utter.onerror = () => {
-        setSpeakingText((prev) => (prev === clean ? null : prev));
+        if (globalSpeechOwnerId !== ownerId || speakSeqRef.current !== currentSeq) {
+          setSpeakingText(null);
+          setPaused(false);
+          return;
+        }
+        setSpeakingText(null);
         setPaused(false);
         options?.onError?.();
       };
@@ -76,7 +102,7 @@ export function useSpeech() {
       window.speechSynthesis.speak(utter);
       return true;
     },
-    [stop, supported],
+    [supported],
   );
 
   return {

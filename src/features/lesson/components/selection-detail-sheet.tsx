@@ -26,6 +26,7 @@ export function SelectionDetailSheet({
   onSelectRelated,
   hoveredChunkKey,
   onHoverChunk,
+  showSentenceSection = true,
 }: {
   currentSentence: LessonSentence | null;
   chunkDetail: SelectionChunkLayer | null;
@@ -41,6 +42,7 @@ export function SelectionDetailSheet({
   onSelectRelated: (chunk: string) => void;
   hoveredChunkKey: string | null;
   onHoverChunk: (chunkKey: string | null) => void;
+  showSentenceSection?: boolean;
 }) {
   const panelRef = useRef<HTMLDivElement | null>(null);
   const [showSentenceTranslation, setShowSentenceTranslation] = useState(false);
@@ -107,8 +109,9 @@ export function SelectionDetailSheet({
               <Skeleton className="h-16 w-full" />
             </div>
           ) : (
-            <div className="space-y-4 animate-in fade-in-0 slide-in-from-bottom-1 duration-200">
-              <section className="rounded-xl border border-border/70 p-3">
+          <div className="space-y-4 animate-in fade-in-0 slide-in-from-bottom-1 duration-200">
+              {showSentenceSection ? (
+                <section className="rounded-xl border border-border/70 p-3">
                 <div className="flex items-center justify-between gap-3">
                   <h3 className="text-sm font-medium">当前句子</h3>
                   {currentSentence ? (
@@ -181,7 +184,8 @@ export function SelectionDetailSheet({
                 ) : (
                   <p className="text-sm text-muted-foreground">点按左侧句子开始学习。</p>
                 )}
-              </section>
+                </section>
+              ) : null}
 
               <section className="space-y-3 rounded-xl border border-border/70 p-3">
                 <div className="flex items-center justify-between gap-3">
