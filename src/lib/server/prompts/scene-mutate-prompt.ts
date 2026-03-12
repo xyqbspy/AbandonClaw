@@ -76,7 +76,7 @@ Create variants that keep the SAME situation but express several key ideas using
 Important mutation rules:
 
 1) Keep most of the scene unchanged so learners still recognize the original situation.
-2) In each variant, rewrite ONLY 3–4 key lines using different natural spoken chunks.
+2) In each variant, rewrite ONLY 4-5 key lines using different natural spoken chunks.
 3) Do NOT rely on shallow synonym replacement.
 4) Prefer replacing the whole expression with a different natural chunk that native speakers would use.
 5) Avoid changing every sentence.
