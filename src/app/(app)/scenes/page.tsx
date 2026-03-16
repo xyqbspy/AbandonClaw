@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
@@ -14,6 +14,7 @@ import {
   importSceneFromApi,
   SceneListItemResponse,
 } from "@/lib/utils/scenes-api";
+import { getSceneListCache, setSceneListCache } from "@/lib/cache/scene-list-cache";
 
 const difficultyLabel: Record<string, string> = {
   Beginner: "初级",
@@ -41,21 +42,64 @@ export default function ScenesPage() {
   const [importing, setImporting] = useState(false);
   const [loading, setLoading] = useState(true);
   const [allScenes, setAllScenes] = useState<SceneListItemResponse[]>([]);
+  const [listDataSource, setListDataSource] = useState<"none" | "cache" | "network">("none");
+  const activeLoadTokenRef = useRef(0);
 
-  const refreshScenes = async () => {
+  const refreshScenes = async (options?: { preferCache?: boolean }) => {
+    const token = activeLoadTokenRef.current + 1;
+    activeLoadTokenRef.current = token;
+    let networkApplied = false;
+    let hasCacheFallback = false;
+    const preferCache = options?.preferCache ?? false;
     setLoading(true);
-    try {
-      const nextScenes = await getScenesFromApi();
-      setAllScenes(nextScenes);
-    } catch (fetchError) {
-      toast.error(fetchError instanceof Error ? fetchError.message : "加载场景失败。");
-    } finally {
-      setLoading(false);
+    if (!preferCache) {
+      setListDataSource("none");
     }
+
+    const canApply = () => activeLoadTokenRef.current === token;
+    const networkPromise = getScenesFromApi();
+
+    const cacheTask = (async () => {
+      if (!preferCache) return;
+      try {
+        const cache = await getSceneListCache();
+        if (!canApply() || networkApplied) return;
+        if (cache.found && cache.record) {
+          hasCacheFallback = true;
+          setAllScenes(cache.record.data);
+          setListDataSource("cache");
+          setLoading(false);
+        }
+      } catch {
+        // Non-blocking.
+      }
+    })();
+
+    const networkTask = (async () => {
+      try {
+        const nextScenes = await networkPromise;
+        if (!canApply()) return;
+        networkApplied = true;
+        setAllScenes(nextScenes);
+        setListDataSource("network");
+        setLoading(false);
+        void setSceneListCache(nextScenes).catch(() => {
+          // Non-blocking.
+        });
+      } catch (fetchError) {
+        if (!canApply()) return;
+        if (!hasCacheFallback) {
+          toast.error(fetchError instanceof Error ? fetchError.message : "加载场景失败。");
+          setLoading(false);
+        }
+      }
+    })();
+
+    await Promise.allSettled([cacheTask, networkTask]);
   };
 
   useEffect(() => {
-    void refreshScenes();
+    void refreshScenes({ preferCache: true });
   }, []);
 
   useEffect(() => {
@@ -86,7 +130,7 @@ export default function ScenesPage() {
       const importedScene = await importSceneFromApi({ sourceText });
       setInput("");
       closeDialog();
-      await refreshScenes();
+      await refreshScenes({ preferCache: false });
       toast.success("场景导入成功。");
       router.push(`/scene/${importedScene.slug}`);
     } catch (importError) {
@@ -103,7 +147,7 @@ export default function ScenesPage() {
     if (!confirmed) return;
     try {
       await deleteSceneBySlugFromApi(scene.slug);
-      await refreshScenes();
+      await refreshScenes({ preferCache: false });
       toast.success("自定义场景已删除。");
     } catch (deleteError) {
       toast.error(deleteError instanceof Error ? deleteError.message : "删除失败。");
@@ -186,6 +230,15 @@ export default function ScenesPage() {
       </div>
     );
   };
+
+  useEffect(() => {
+    if (process.env.NODE_ENV !== "development") return;
+    // eslint-disable-next-line no-console
+    console.debug("[scene-list-cache][debug]", {
+      source: listDataSource,
+      count: allScenes.length,
+    });
+  }, [allScenes.length, listDataSource]);
 
   return (
     <div className="space-y-4">

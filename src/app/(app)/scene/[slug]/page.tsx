@@ -28,7 +28,16 @@ import { useSpeech } from "@/hooks/use-speech";
 import { ExpressionMapResponse } from "@/lib/types/expression-map";
 import { generateExpressionMapFromApi } from "@/lib/utils/expression-map-api";
 import {
+  clearExpiredSceneCaches,
+  getSceneCache,
+  listRecentSceneCacheKeys,
+  normalizeSceneSlug,
+  setSceneCache,
+} from "@/lib/cache/scene-cache";
+import { getPrefetchDebugState, scheduleScenePrefetch } from "@/lib/cache/scene-prefetch";
+import {
   generateSceneVariantsFromApi,
+  getScenesFromApi,
   getSceneDetailBySlugFromApi,
   getSceneVariantsFromApi,
 } from "@/lib/utils/scenes-api";
@@ -127,12 +136,18 @@ const findChunkContext = (
   return null;
 };
 
+const extractSlugFromSceneCacheKey = (key: string) =>
+  key.startsWith("scene:") ? key.slice("scene:".length) : "";
+
 export default function SceneDetailPage() {
   const params = useParams<{ slug: string }>();
   const router = useRouter();
   const searchParams = useSearchParams();
   const sceneSlug = params?.slug ?? "";
   const [baseLesson, setBaseLesson] = useState<Lesson | null>(null);
+  const [sceneDataSource, setSceneDataSource] = useState<"none" | "cache" | "network">(
+    "none",
+  );
   const [sceneLoading, setSceneLoading] = useState(true);
   const baseSceneId = baseLesson?.id ?? "";
 
@@ -166,6 +181,8 @@ export default function SceneDetailPage() {
     variantStatus: "idle",
   });
   const { supported, speak, stop, speakingText } = useSpeech();
+  const activeLoadTokenRef = useRef(0);
+  const latestSceneSlugRef = useRef(normalizeSceneSlug(sceneSlug));
   const learningStartedRef = useRef(false);
   const lastProgressSyncMsRef = useRef<number>(Date.now());
   const learningPingTimerRef = useRef<number | null>(null);
@@ -239,31 +256,140 @@ export default function SceneDetailPage() {
   };
 
   useEffect(() => {
+    latestSceneSlugRef.current = normalizeSceneSlug(sceneSlug);
+  }, [sceneSlug]);
+
+  useEffect(() => {
     if (!sceneSlug) return;
     learningStartedRef.current = false;
     lastProgressSyncMsRef.current = Date.now();
+    const requestToken = activeLoadTokenRef.current + 1;
+    activeLoadTokenRef.current = requestToken;
+    const requestSlug = normalizeSceneSlug(sceneSlug);
     let cancelled = false;
+    let networkApplied = false;
+    let hasCacheFallback = false;
+
+    const canApply = () =>
+      !cancelled &&
+      activeLoadTokenRef.current === requestToken &&
+      latestSceneSlugRef.current === requestSlug;
 
     const loadScene = async () => {
       setSceneLoading(true);
-      try {
-        const lesson = await getSceneDetailBySlugFromApi(sceneSlug);
-        if (cancelled) return;
+      setSceneDataSource("none");
+      setBaseLesson(null);
+      const networkPromise = getSceneDetailBySlugFromApi(sceneSlug);
+
+      const cacheTask = (async () => {
+        try {
+          const cacheResult = await getSceneCache(requestSlug);
+          if (!canApply() || networkApplied) return;
+          if (cacheResult.found && cacheResult.record) {
+            hasCacheFallback = true;
+            setBaseLesson(cacheResult.record.data);
+            setSceneDataSource("cache");
+            setSceneLoading(false);
+          }
+        } catch {
+          // Non-blocking: cache failures should not block network flow.
+        }
+      })();
+
+      const networkTask = (async () => {
+        try {
+          const lesson = await networkPromise;
+        if (!canApply()) return;
+        networkApplied = true;
         setBaseLesson(lesson);
-      } catch (error) {
-        if (cancelled) return;
-        setBaseLesson(null);
-        toast.error(error instanceof Error ? error.message : "Failed to load scene.");
-      } finally {
-        if (!cancelled) setSceneLoading(false);
-      }
+        setSceneDataSource("network");
+        setSceneLoading(false);
+          void setSceneCache(requestSlug, lesson).catch(() => {
+          // Non-blocking cache write.
+        });
+
+          // Low-disturb prefetch: only after current scene network result is visible.
+          void (async () => {
+            const candidates: string[] = [];
+            try {
+              const list = await getScenesFromApi();
+              if (!canApply()) return;
+              const currentIndex = list.findIndex(
+                (item) => normalizeSceneSlug(item.slug) === requestSlug,
+              );
+              if (currentIndex >= 0) {
+                for (let i = currentIndex + 1; i < list.length; i += 1) {
+                  const nextSlug = normalizeSceneSlug(list[i]?.slug ?? "");
+                  if (!nextSlug || nextSlug === requestSlug) continue;
+                  candidates.push(nextSlug);
+                  if (candidates.length >= 2) break;
+                }
+              }
+            } catch {
+              // Non-blocking: prefetch candidates can degrade gracefully.
+            }
+
+            if (candidates.length < 2) {
+              try {
+                const recentKeys = await listRecentSceneCacheKeys(8);
+                for (const key of recentKeys) {
+                  const recentSlug = normalizeSceneSlug(extractSlugFromSceneCacheKey(key));
+                  if (!recentSlug || recentSlug === requestSlug) continue;
+                  if (candidates.includes(recentSlug)) continue;
+                  candidates.push(recentSlug);
+                  if (candidates.length >= 2) break;
+                }
+              } catch {
+                // ignore
+              }
+            }
+
+            if (!canApply()) return;
+            scheduleScenePrefetch(candidates, { currentSlug: requestSlug });
+            if (process.env.NODE_ENV === "development") {
+              // eslint-disable-next-line no-console
+              console.debug("[scene-prefetch][debug]", getPrefetchDebugState());
+            }
+          })();
+        } catch (error) {
+          if (!canApply()) return;
+          if (!hasCacheFallback) {
+            setBaseLesson(null);
+            setSceneLoading(false);
+            toast.error(error instanceof Error ? error.message : "加载场景失败。");
+          }
+        }
+      })();
+
+      await Promise.allSettled([cacheTask, networkTask]);
     };
 
+    void clearExpiredSceneCaches().catch(() => {
+      // Non-blocking cleanup.
+    });
     void loadScene();
     return () => {
       cancelled = true;
     };
   }, [sceneSlug]);
+
+  useEffect(() => {
+    if (process.env.NODE_ENV !== "development") return;
+    if (!sceneSlug) return;
+    void listRecentSceneCacheKeys(5)
+      .then((keys) => {
+        // eslint-disable-next-line no-console
+        console.debug("[scene-cache][debug]", {
+          slug: sceneSlug,
+          source: sceneDataSource,
+          queueTop5: keys,
+          prefetch: getPrefetchDebugState(),
+        });
+      })
+      .catch(() => {
+        // ignore
+      });
+  }, [sceneDataSource, sceneSlug]);
 
   useEffect(() => {
     if (!baseLesson || learningStartedRef.current) return;
@@ -642,7 +768,7 @@ export default function SceneDetailPage() {
   }
 
   if (!baseLesson) {
-    return <div className="p-4 text-sm text-muted-foreground">Scene not found.</div>;
+    return <div className="p-4 text-sm text-muted-foreground">场景不存在。</div>;
   }
 
   const chunkDetailSheet = (

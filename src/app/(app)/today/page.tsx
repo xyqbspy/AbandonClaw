@@ -92,7 +92,7 @@ export default async function TodayPage() {
         description="保持短时、稳定的学习节奏，比一次性学习更容易沉淀表达。"
       />
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-3 gap-2 sm:gap-4">
         <StatCard title="连续学习" value={`${dashboard.overview.streakDays} 天`} icon={<Flame className="size-4 text-orange-500" />} />
         <StatCard title="已收藏短语" value={`${dashboard.overview.savedPhraseCount}`} />
         <StatCard title="复习正确率" value={dashboard.overview.reviewAccuracy == null ? "—" : `${dashboard.overview.reviewAccuracy}%`} />
