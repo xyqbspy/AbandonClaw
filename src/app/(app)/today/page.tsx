@@ -88,7 +88,7 @@ export default async function TodayPage() {
     <div className="space-y-6">
       <PageHeader
         eyebrow="今日学习"
-        title={`欢迎回来，${profile.username ?? user.email?.split("@")[0] ?? "Learner"}`}
+        title={`欢迎回来，${profile.username ?? user.email?.split("@")[0] ?? "学习者"}`}
         description="保持短时、稳定的学习节奏，比一次性学习更容易沉淀表达。"
       />
 

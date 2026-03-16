@@ -22,7 +22,7 @@ export async function mutateSceneFromApi(
   });
 
   if (!response.ok) {
-    let message = "Failed to mutate scene.";
+    let message = "场景改写失败。";
     try {
       const errorBody = (await response.json()) as { error?: string };
       if (errorBody?.error) message = errorBody.error;
@@ -34,7 +34,7 @@ export async function mutateSceneFromApi(
 
   const data = (await response.json()) as unknown;
   if (!isSceneMutateResponse(data)) {
-    throw new Error("Invalid mutate response format.");
+    throw new Error("场景改写响应格式无效。");
   }
 
   return data.variants;

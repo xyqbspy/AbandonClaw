@@ -15,12 +15,12 @@ export function AppTopbar() {
       const response = await fetch("/api/auth/logout", { method: "POST" });
       if (!response.ok) {
         const body = (await response.json()) as { error?: string };
-        throw new Error(body.error ?? "Logout failed.");
+        throw new Error(body.error ?? "退出登录失败。");
       }
       router.push("/login");
       router.refresh();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Logout failed.");
+      toast.error(error instanceof Error ? error.message : "退出登录失败。");
     }
   };
 
@@ -36,7 +36,7 @@ export function AppTopbar() {
             <Bell className="size-4" />
           </Button>
           <Button size="sm" variant="outline" onClick={() => void handleLogout()}>
-            Logout
+            退出登录
           </Button>
           <Avatar className="size-8">
             <AvatarFallback>YL</AvatarFallback>

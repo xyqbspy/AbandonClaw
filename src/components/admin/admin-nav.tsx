@@ -5,11 +5,11 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
 const adminNavItems = [
-  { label: "Overview", href: "/admin" },
-  { label: "Scenes", href: "/admin/scenes" },
-  { label: "Imported", href: "/admin/imported" },
-  { label: "Variants", href: "/admin/variants" },
-  { label: "AI Cache", href: "/admin/cache" },
+  { label: "总览", href: "/admin" },
+  { label: "场景", href: "/admin/scenes" },
+  { label: "导入场景", href: "/admin/imported" },
+  { label: "变体", href: "/admin/variants" },
+  { label: "AI 缓存", href: "/admin/cache" },
 ];
 
 export function AdminNav() {

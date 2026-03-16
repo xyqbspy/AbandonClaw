@@ -37,6 +37,9 @@ const normalizeSearch = (value: string | undefined) => {
   return text ? text : undefined;
 };
 
+const isMissingProgressStatusColumn = (error: { code?: string | null; message: string }) =>
+  error.code === "42703" || error.message.includes("column user_scene_progress.status does not exist");
+
 export async function listAdminScenes(filters: AdminSceneListFilters) {
   await runSeedScenesSync();
   const admin = createSupabaseAdminClient();
@@ -92,22 +95,49 @@ export async function getAdminSceneDetail(sceneId: string) {
   const variants = await getSceneVariantsBySceneId(sceneId);
 
   const {
-    data: progressRows,
-    error: progressError,
+    data: progressRowsWithStatus,
+    error: progressErrorWithStatus,
   } = await admin
     .from("user_scene_progress")
     .select("status,progress_percent,last_viewed_at")
     .eq("scene_id", sceneId);
 
-  if (progressError) {
-    throw new Error(`Failed to read scene progress rows: ${progressError.message}`);
-  }
-  const progressStatsRows = (progressRows ?? []) as Array<{
+  let progressStatsRows: Array<{
     status: string;
     progress_percent: number | null;
     last_viewed_at: string | null;
-  }>;
-  const startedRows = progressStatsRows.filter((row) => row.status !== "not_started");
+  }> = [];
+
+  if (progressErrorWithStatus) {
+    if (!isMissingProgressStatusColumn(progressErrorWithStatus)) {
+      throw new Error(`Failed to read scene progress rows: ${progressErrorWithStatus.message}`);
+    }
+    const { data: legacyProgressRows, error: legacyProgressError } = await admin
+      .from("user_scene_progress")
+      .select("progress_percent,last_viewed_at")
+      .eq("scene_id", sceneId);
+    if (legacyProgressError) {
+      throw new Error(`Failed to read legacy scene progress rows: ${legacyProgressError.message}`);
+    }
+    progressStatsRows = ((legacyProgressRows ?? []) as Array<{
+      progress_percent: number | null;
+      last_viewed_at: string | null;
+    }>).map((row) => ({
+      status: Number(row.progress_percent ?? 0) >= 100 ? "completed" : "in_progress",
+      progress_percent: row.progress_percent,
+      last_viewed_at: row.last_viewed_at,
+    }));
+  } else {
+    progressStatsRows = (progressRowsWithStatus ?? []) as Array<{
+      status: string;
+      progress_percent: number | null;
+      last_viewed_at: string | null;
+    }>;
+  }
+
+  const startedRows = progressStatsRows.filter(
+    (row) => row.status !== "not_started" && (row.last_viewed_at !== null || Number(row.progress_percent ?? 0) > 0),
+  );
 
   const progressStartedCount = startedRows.length;
   const progressCompletedCount = startedRows.filter(
@@ -326,7 +356,7 @@ export async function getAdminOverviewStats() {
   await runSeedScenesSync();
   const admin = createSupabaseAdminClient();
 
-  const [sceneRes, importedRes, variantRes, cacheStats, progressUsersRes, inProgressRes, completedRes, latestLearningRes] = await Promise.all([
+  const [sceneRes, importedRes, variantRes, cacheStats, latestLearningRes] = await Promise.all([
     admin.from("scenes").select("*", { count: "exact", head: true }),
     admin
       .from("scenes")
@@ -334,18 +364,6 @@ export async function getAdminOverviewStats() {
       .eq("origin", "imported"),
     admin.from("scene_variants").select("*", { count: "exact", head: true }),
     listRecentAiCacheStats(),
-    admin
-      .from("user_scene_progress")
-      .select("user_id")
-      .in("status", ["in_progress", "paused", "completed"]),
-    admin
-      .from("user_scene_progress")
-      .select("*", { count: "exact", head: true })
-      .in("status", ["in_progress", "paused"]),
-    admin
-      .from("user_scene_progress")
-      .select("*", { count: "exact", head: true })
-      .eq("status", "completed"),
     admin
       .from("user_scene_progress")
       .select("last_viewed_at")
@@ -361,22 +379,56 @@ export async function getAdminOverviewStats() {
   if (variantRes.error) {
     throw new Error(`Failed to count scene variants: ${variantRes.error.message}`);
   }
-  if (progressUsersRes.error) {
-    throw new Error(`Failed to count progress users: ${progressUsersRes.error.message}`);
-  }
-  if (inProgressRes.error) {
-    throw new Error(`Failed to count in-progress rows: ${inProgressRes.error.message}`);
-  }
-  if (completedRes.error) {
-    throw new Error(`Failed to count completed rows: ${completedRes.error.message}`);
-  }
   if (latestLearningRes.error) {
     throw new Error(`Failed to read latest learning activity: ${latestLearningRes.error.message}`);
   }
 
-  const uniqueProgressUsers = new Set(
-    ((progressUsersRes.data ?? []) as Array<{ user_id: string }>).map((row) => row.user_id),
-  ).size;
+  const {
+    data: progressUsersWithStatus,
+    error: progressUsersWithStatusError,
+  } = await admin
+    .from("user_scene_progress")
+    .select("user_id,status,progress_percent,last_viewed_at");
+
+  let uniqueProgressUsers = 0;
+  let scenesInProgressCount = 0;
+  let scenesCompletedCount = 0;
+
+  if (progressUsersWithStatusError) {
+    if (!isMissingProgressStatusColumn(progressUsersWithStatusError)) {
+      throw new Error(
+        `Failed to count progress users: ${progressUsersWithStatusError.message}`,
+      );
+    }
+    const { data: legacyProgressRows, error: legacyProgressError } = await admin
+      .from("user_scene_progress")
+      .select("user_id,progress_percent,last_viewed_at");
+    if (legacyProgressError) {
+      throw new Error(`Failed to count legacy progress users: ${legacyProgressError.message}`);
+    }
+    const rows = (legacyProgressRows ?? []) as Array<{
+      user_id: string;
+      progress_percent: number | null;
+      last_viewed_at: string | null;
+    }>;
+    const startedRows = rows.filter(
+      (row) => row.last_viewed_at !== null || Number(row.progress_percent ?? 0) > 0,
+    );
+    uniqueProgressUsers = new Set(startedRows.map((row) => row.user_id)).size;
+    scenesCompletedCount = startedRows.filter((row) => Number(row.progress_percent ?? 0) >= 100).length;
+    scenesInProgressCount = startedRows.length - scenesCompletedCount;
+  } else {
+    const rows = (progressUsersWithStatus ?? []) as Array<{
+      user_id: string;
+      status: string;
+    }>;
+    const startedRows = rows.filter((row) => row.status !== "not_started");
+    uniqueProgressUsers = new Set(startedRows.map((row) => row.user_id)).size;
+    scenesInProgressCount = startedRows.filter(
+      (row) => row.status === "in_progress" || row.status === "paused",
+    ).length;
+    scenesCompletedCount = startedRows.filter((row) => row.status === "completed").length;
+  }
 
   return {
     totalScenes: sceneRes.count ?? 0,
@@ -385,8 +437,8 @@ export async function getAdminOverviewStats() {
     totalCacheRows: cacheStats.total,
     latestCacheCreatedAt: cacheStats.latestCreatedAt,
     totalUsersWithProgress: uniqueProgressUsers,
-    scenesInProgressCount: inProgressRes.count ?? 0,
-    scenesCompletedCount: completedRes.count ?? 0,
+    scenesInProgressCount,
+    scenesCompletedCount,
     latestLearningActivityAt: latestLearningRes.data?.last_viewed_at ?? null,
   };
 }

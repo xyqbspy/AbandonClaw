@@ -638,7 +638,7 @@ export default function SceneDetailPage() {
   };
 
   if (sceneLoading) {
-    return <div className="p-4 text-sm text-muted-foreground">Loading scene...</div>;
+    return <div className="p-4 text-sm text-muted-foreground">场景加载中...</div>;
   }
 
   if (!baseLesson) {

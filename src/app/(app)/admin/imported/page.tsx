@@ -37,17 +37,17 @@ export default async function AdminImportedScenesPage({
   return (
     <div className="space-y-4">
       <PageHeader
-        eyebrow="Admin"
-        title="Imported Scenes"
-        description="Quick access to imported content for parse quality checks and cleanup."
+        eyebrow="管理后台"
+        title="导入场景"
+        description="快速查看 imported 内容，便于 parse 质量排查和清理。"
       />
 
       <Card className="border-border/70">
         <CardContent className="pt-4">
           <form className="grid gap-2 sm:grid-cols-[1fr_auto]">
-            <Input name="q" defaultValue={q} placeholder="Search title or slug" />
+            <Input name="q" defaultValue={q} placeholder="搜索标题或 slug" />
             <Button type="submit" variant="outline">
-              Search
+              搜索
             </Button>
           </form>
         </CardContent>
@@ -90,7 +90,7 @@ export default async function AdminImportedScenesPage({
             {result.rows.length === 0 ? (
               <tr>
                 <td colSpan={6} className="px-3 py-6 text-center text-muted-foreground">
-                  No imported scenes found.
+                  未找到导入场景。
                 </td>
               </tr>
             ) : null}
@@ -100,8 +100,8 @@ export default async function AdminImportedScenesPage({
 
       <div className="flex items-center justify-between text-xs text-muted-foreground">
         <p>
-          Showing {(result.page - 1) * result.pageSize + 1}-
-          {Math.min(result.page * result.pageSize, result.total)} of {result.total}
+          显示 {(result.page - 1) * result.pageSize + 1}-
+          {Math.min(result.page * result.pageSize, result.total)} / 共 {result.total}
         </p>
         <div className="flex items-center gap-2">
           {hasPrev ? (
@@ -109,20 +109,20 @@ export default async function AdminImportedScenesPage({
               href={`/admin/imported?q=${encodeURIComponent(q)}&page=${result.page - 1}`}
               className="rounded border px-2 py-1 hover:bg-muted"
             >
-              Prev
+              上一页
             </Link>
           ) : (
-            <span className="rounded border px-2 py-1 opacity-40">Prev</span>
+            <span className="rounded border px-2 py-1 opacity-40">上一页</span>
           )}
           {hasNext ? (
             <Link
               href={`/admin/imported?q=${encodeURIComponent(q)}&page=${result.page + 1}`}
               className="rounded border px-2 py-1 hover:bg-muted"
             >
-              Next
+              下一页
             </Link>
           ) : (
-            <span className="rounded border px-2 py-1 opacity-40">Next</span>
+            <span className="rounded border px-2 py-1 opacity-40">下一页</span>
           )}
         </div>
       </div>

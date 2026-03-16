@@ -45,21 +45,21 @@ export default async function AdminCachePage({
   return (
     <div className="space-y-4">
       <PageHeader
-        eyebrow="Admin"
-        title="AI Cache"
-        description="Read-only cache records for parse/variant diagnostics."
+        eyebrow="管理后台"
+        title="AI 缓存"
+        description="只读查看缓存记录，用于 parse/variant 问题排查。"
       />
 
       <Card className="border-border/70">
         <CardContent className="pt-4">
           <form className="grid gap-2 sm:grid-cols-[1fr_auto_auto_auto]">
-            <Input name="q" defaultValue={q} placeholder="Search cache_key" />
+            <Input name="q" defaultValue={q} placeholder="搜索 cache_key" />
             <select
               name="cacheType"
               defaultValue={cacheType}
               className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm"
             >
-              <option value="">All types</option>
+              <option value="">全部类型</option>
               <option value="scene_parse">scene_parse</option>
               <option value="scene_variants">scene_variants</option>
             </select>
@@ -68,12 +68,12 @@ export default async function AdminCachePage({
               defaultValue={status}
               className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm"
             >
-              <option value="">All status</option>
+              <option value="">全部状态</option>
               <option value="success">success</option>
               <option value="error">error</option>
             </select>
             <Button type="submit" variant="outline">
-              Filter
+              筛选
             </Button>
           </form>
         </CardContent>
@@ -116,7 +116,7 @@ export default async function AdminCachePage({
             {result.rows.length === 0 ? (
               <tr>
                 <td colSpan={8} className="px-3 py-6 text-center text-muted-foreground">
-                  No cache rows found.
+                  未找到缓存记录。
                 </td>
               </tr>
             ) : null}
@@ -132,16 +132,16 @@ export default async function AdminCachePage({
               <span className="font-mono text-xs">{selected.cache_key}</span>
             </p>
             <p>
-              <span className="text-muted-foreground">status:</span> {selected.status}
+              <span className="text-muted-foreground">状态：</span> {selected.status}
             </p>
             <p>
-              <span className="text-muted-foreground">meta_json:</span>{" "}
+              <span className="text-muted-foreground">meta_json：</span>{" "}
               <span className="font-mono text-xs">
                 {selected.meta_json ? JSON.stringify(selected.meta_json) : "-"}
               </span>
             </p>
             <p>
-              <span className="text-muted-foreground">input/output preview:</span>
+              <span className="text-muted-foreground">input/output 预览：</span>
             </p>
             <pre className="max-h-40 overflow-auto rounded border border-border/60 bg-muted/20 p-2 text-xs">
               {JSON.stringify(
@@ -163,8 +163,8 @@ export default async function AdminCachePage({
 
       <div className="flex items-center justify-between text-xs text-muted-foreground">
         <p>
-          Showing {(result.page - 1) * result.pageSize + 1}-
-          {Math.min(result.page * result.pageSize, result.total)} of {result.total}
+          显示 {(result.page - 1) * result.pageSize + 1}-
+          {Math.min(result.page * result.pageSize, result.total)} / 共 {result.total}
         </p>
         <div className="flex items-center gap-2">
           {hasPrev ? (
@@ -172,20 +172,20 @@ export default async function AdminCachePage({
               href={buildListUrl(result.page - 1)}
               className="rounded border px-2 py-1 hover:bg-muted"
             >
-              Prev
+              上一页
             </Link>
           ) : (
-            <span className="rounded border px-2 py-1 opacity-40">Prev</span>
+            <span className="rounded border px-2 py-1 opacity-40">上一页</span>
           )}
           {hasNext ? (
             <Link
               href={buildListUrl(result.page + 1)}
               className="rounded border px-2 py-1 hover:bg-muted"
             >
-              Next
+              下一页
             </Link>
           ) : (
-            <span className="rounded border px-2 py-1 opacity-40">Next</span>
+            <span className="rounded border px-2 py-1 opacity-40">下一页</span>
           )}
         </div>
       </div>

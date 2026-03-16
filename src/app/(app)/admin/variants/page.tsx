@@ -34,9 +34,9 @@ export default async function AdminVariantsPage({
   return (
     <div className="space-y-4">
       <PageHeader
-        eyebrow="Admin"
-        title="Variants"
-        description="Inspect generated variants and trace them back to scenes."
+        eyebrow="管理后台"
+        title="变体列表"
+        description="查看生成变体并追溯所属场景。"
       />
 
       <Card className="border-border/70">
@@ -45,18 +45,18 @@ export default async function AdminVariantsPage({
             <Input
               name="q"
               defaultValue={q}
-              placeholder="Search scene title / slug / scene_id / cache_key"
+              placeholder="搜索场景标题 / slug / scene_id / cache_key"
             />
             <select
               name="sort"
               defaultValue={sort}
               className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm"
             >
-              <option value="desc">created_at desc</option>
-              <option value="asc">created_at asc</option>
+              <option value="desc">按 created_at 倒序</option>
+              <option value="asc">按 created_at 正序</option>
             </select>
             <Button type="submit" variant="outline">
-              Filter
+              筛选
             </Button>
           </form>
         </CardContent>
@@ -100,7 +100,7 @@ export default async function AdminVariantsPage({
             {result.rows.length === 0 ? (
               <tr>
                 <td colSpan={7} className="px-3 py-6 text-center text-muted-foreground">
-                  No variants found.
+                  未找到变体。
                 </td>
               </tr>
             ) : null}
@@ -110,8 +110,8 @@ export default async function AdminVariantsPage({
 
       <div className="flex items-center justify-between text-xs text-muted-foreground">
         <p>
-          Showing {(result.page - 1) * result.pageSize + 1}-
-          {Math.min(result.page * result.pageSize, result.total)} of {result.total}
+          显示 {(result.page - 1) * result.pageSize + 1}-
+          {Math.min(result.page * result.pageSize, result.total)} / 共 {result.total}
         </p>
         <div className="flex items-center gap-2">
           {hasPrev ? (
@@ -119,20 +119,20 @@ export default async function AdminVariantsPage({
               href={buildListUrl(result.page - 1)}
               className="rounded border px-2 py-1 hover:bg-muted"
             >
-              Prev
+              上一页
             </Link>
           ) : (
-            <span className="rounded border px-2 py-1 opacity-40">Prev</span>
+            <span className="rounded border px-2 py-1 opacity-40">上一页</span>
           )}
           {hasNext ? (
             <Link
               href={buildListUrl(result.page + 1)}
               className="rounded border px-2 py-1 hover:bg-muted"
             >
-              Next
+              下一页
             </Link>
           ) : (
-            <span className="rounded border px-2 py-1 opacity-40">Next</span>
+            <span className="rounded border px-2 py-1 opacity-40">下一页</span>
           )}
         </div>
       </div>

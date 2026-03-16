@@ -25,7 +25,7 @@ export default async function AdminSceneDetailPage({
   return (
     <div className="space-y-4">
       <PageHeader
-        eyebrow="Admin Scene"
+        eyebrow="场景管理"
         title={scene.title}
         description={`ID: ${scene.id}`}
         actions={<SceneAdminActions sceneId={scene.id} isPublic={scene.is_public} />}
@@ -33,14 +33,13 @@ export default async function AdminSceneDetailPage({
 
       <Card className="border-destructive/30 bg-destructive/5">
         <CardContent className="pt-4 text-sm text-destructive">
-          This will permanently delete the scene and related variants. Seed scenes are also
-          deletable and will be re-seeded on next sync.
+          删除会永久移除该场景及关联变体。seed 场景也可删除，但下次同步会重新入库。
         </CardContent>
       </Card>
 
       <Card className="border-border/70">
         <CardHeader>
-          <CardTitle>Metadata</CardTitle>
+          <CardTitle>元信息</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-2 text-sm sm:grid-cols-2">
           <p>
@@ -141,11 +140,11 @@ export default async function AdminSceneDetailPage({
 
       <Card className="border-border/70">
         <CardHeader>
-          <CardTitle>Variants</CardTitle>
+          <CardTitle>变体</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
           {latestVariants.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No variants.</p>
+            <p className="text-sm text-muted-foreground">暂无变体。</p>
           ) : (
             <div className="overflow-x-auto rounded border border-border/60">
               <table className="min-w-full text-sm">
@@ -175,7 +174,7 @@ export default async function AdminSceneDetailPage({
             </div>
           )}
           <Link href="/admin/variants" className="text-xs text-muted-foreground underline">
-            Open full variants list
+            查看完整变体列表
           </Link>
         </CardContent>
       </Card>

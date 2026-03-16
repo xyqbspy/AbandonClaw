@@ -24,7 +24,7 @@ export async function parseSceneFromApi(payload: ParseSceneRequest): Promise<Les
   });
 
   if (!response.ok) {
-    let message = "Failed to parse scene.";
+    let message = "解析场景失败。";
     try {
       const errorBody = (await response.json()) as { error?: string };
       if (errorBody?.error) message = errorBody.error;
@@ -36,7 +36,7 @@ export async function parseSceneFromApi(payload: ParseSceneRequest): Promise<Les
 
   const data = (await response.json()) as unknown;
   if (!isSceneParserResponse(data)) {
-    throw new Error("Invalid scene parser response format.");
+    throw new Error("场景解析响应格式无效。");
   }
 
   return mapParsedSceneToLesson(data);

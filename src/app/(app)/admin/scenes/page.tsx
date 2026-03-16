@@ -47,21 +47,21 @@ export default async function AdminScenesPage({
   return (
     <div className="space-y-4">
       <PageHeader
-        eyebrow="Admin"
-        title="Scenes"
-        description="Search by title/slug, filter by origin, and inspect scene data."
+        eyebrow="管理后台"
+        title="场景列表"
+        description="按标题/slug 搜索，按来源和可见性筛选。"
       />
 
       <Card className="border-border/70">
         <CardContent className="pt-4">
           <form className="grid gap-2 sm:grid-cols-[1fr_auto_auto_auto]">
-            <Input name="q" defaultValue={q} placeholder="Search title or slug" />
+            <Input name="q" defaultValue={q} placeholder="搜索标题或 slug" />
             <select
               name="origin"
               defaultValue={originRaw}
               className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm"
             >
-              <option value="">All origins</option>
+              <option value="">全部来源</option>
               <option value="seed">seed</option>
               <option value="imported">imported</option>
             </select>
@@ -70,12 +70,12 @@ export default async function AdminScenesPage({
               defaultValue={isPublicRaw}
               className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm"
             >
-              <option value="">All visibility</option>
-              <option value="true">public</option>
-              <option value="false">private</option>
+              <option value="">全部可见性</option>
+              <option value="true">公开</option>
+              <option value="false">私有</option>
             </select>
             <Button type="submit" variant="outline">
-              Filter
+              筛选
             </Button>
           </form>
         </CardContent>
@@ -120,7 +120,7 @@ export default async function AdminScenesPage({
             {result.rows.length === 0 ? (
               <tr>
                 <td colSpan={7} className="px-3 py-6 text-center text-muted-foreground">
-                  No scenes found.
+                  未找到场景。
                 </td>
               </tr>
             ) : null}
@@ -130,8 +130,8 @@ export default async function AdminScenesPage({
 
       <div className="flex items-center justify-between text-xs text-muted-foreground">
         <p>
-          Showing {(result.page - 1) * result.pageSize + 1}-
-          {Math.min(result.page * result.pageSize, result.total)} of {result.total}
+          显示 {(result.page - 1) * result.pageSize + 1}-
+          {Math.min(result.page * result.pageSize, result.total)} / 共 {result.total}
         </p>
         <div className="flex items-center gap-2">
           {hasPrev ? (
@@ -139,20 +139,20 @@ export default async function AdminScenesPage({
               href={buildListUrl(result.page - 1)}
               className="rounded border px-2 py-1 hover:bg-muted"
             >
-              Prev
+              上一页
             </Link>
           ) : (
-            <span className="rounded border px-2 py-1 opacity-40">Prev</span>
+            <span className="rounded border px-2 py-1 opacity-40">上一页</span>
           )}
           {hasNext ? (
             <Link
               href={buildListUrl(result.page + 1)}
               className="rounded border px-2 py-1 hover:bg-muted"
             >
-              Next
+              下一页
             </Link>
           ) : (
-            <span className="rounded border px-2 py-1 opacity-40">Next</span>
+            <span className="rounded border px-2 py-1 opacity-40">下一页</span>
           )}
         </div>
       </div>

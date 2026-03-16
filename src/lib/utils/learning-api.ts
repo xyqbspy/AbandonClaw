@@ -18,7 +18,7 @@ export async function startSceneLearningFromApi(sceneSlug: string) {
   const response = await fetch(`/api/learning/scenes/${encodeURIComponent(sceneSlug)}/start`, {
     method: "POST",
   });
-  if (!response.ok) throw await toError(response, "Failed to start scene learning.");
+  if (!response.ok) throw await toError(response, "开始场景学习失败。");
   return (await response.json()) as unknown;
 }
 
@@ -37,7 +37,7 @@ export async function updateSceneLearningProgressFromApi(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
-  if (!response.ok) throw await toError(response, "Failed to update scene progress.");
+  if (!response.ok) throw await toError(response, "更新场景进度失败。");
   return (await response.json()) as unknown;
 }
 
@@ -45,7 +45,7 @@ export async function pauseSceneLearningFromApi(sceneSlug: string) {
   const response = await fetch(`/api/learning/scenes/${encodeURIComponent(sceneSlug)}/pause`, {
     method: "POST",
   });
-  if (!response.ok) throw await toError(response, "Failed to pause scene learning.");
+  if (!response.ok) throw await toError(response, "暂停场景学习失败。");
   return (await response.json()) as unknown;
 }
 
@@ -58,7 +58,6 @@ export async function completeSceneLearningFromApi(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload ?? {}),
   });
-  if (!response.ok) throw await toError(response, "Failed to complete scene learning.");
+  if (!response.ok) throw await toError(response, "完成场景学习失败。");
   return (await response.json()) as unknown;
 }
-

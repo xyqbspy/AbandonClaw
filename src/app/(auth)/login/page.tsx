@@ -24,7 +24,7 @@ export default function LoginPage() {
     const email = String(formData.get("email") ?? "").trim();
     const password = String(formData.get("password") ?? "");
     if (!email || !password) {
-      toast.error("Email and password are required.");
+      toast.error("邮箱和密码不能为空。");
       return;
     }
 
@@ -37,11 +37,11 @@ export default function LoginPage() {
       }
 
       await fetch("/api/me", { method: "GET" });
-      toast.success("Login successful.");
+      toast.success("登录成功。");
       router.push(loginTarget);
       router.refresh();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Login failed.");
+      toast.error(error instanceof Error ? error.message : "登录失败。");
     } finally {
       setSubmitting(false);
     }
@@ -50,26 +50,26 @@ export default function LoginPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-semibold">Login</h1>
+        <h1 className="text-3xl font-semibold">登录</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Sign in to continue your learning flow.
+          登录后继续你的学习流程。
         </p>
       </div>
       <form className="space-y-4" onSubmit={onSubmit}>
         <div className="space-y-2">
-          <Label htmlFor="email">Email</Label>
+          <Label htmlFor="email">邮箱</Label>
           <Input id="email" name="email" type="email" placeholder="name@example.com" required />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="password">Password</Label>
+          <Label htmlFor="password">密码</Label>
           <Input id="password" name="password" type="password" placeholder="********" required />
         </div>
         <Button className="w-full" type="submit" disabled={submitting}>
-          {submitting ? "Signing in..." : "Sign In"}
+          {submitting ? "登录中..." : "登录"}
         </Button>
       </form>
       <p className="text-sm text-muted-foreground">
-        No account yet?{" "}
+        还没有账号？{" "}
         <Link
           href={
             redirectTo && redirectTo.startsWith("/")
@@ -78,7 +78,7 @@ export default function LoginPage() {
           }
           className="text-foreground underline underline-offset-4"
         >
-          Create one
+          去注册
         </Link>
       </p>
     </div>

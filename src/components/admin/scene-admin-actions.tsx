@@ -30,10 +30,10 @@ export function SceneAdminActions({
         <input type="hidden" name="nextPublic" value={String(!isPublic)} />
         <Button type="submit" variant="outline" size="sm" disabled={loadingToggle}>
           {loadingToggle
-            ? "Updating..."
+            ? "更新中..."
             : isPublic
-              ? "Set Private"
-              : "Set Public"}
+              ? "设为私有"
+              : "设为公开"}
         </Button>
       </form>
 
@@ -45,7 +45,7 @@ export function SceneAdminActions({
         <input type="hidden" name="variantCount" value="3" />
         <input type="hidden" name="retainChunkRatio" value="0.6" />
         <Button type="submit" variant="secondary" size="sm" disabled={loadingGenerate}>
-          {loadingGenerate ? "Regenerating..." : "Regenerate Variants"}
+          {loadingGenerate ? "重新生成中..." : "重新生成变体"}
         </Button>
       </form>
 
@@ -53,7 +53,7 @@ export function SceneAdminActions({
         action={regenerateSceneVariantsAction}
         onSubmit={(event) => {
           const confirmed = window.confirm(
-            "Force regenerate bypasses cache and will call the model again (cost increase). Continue?",
+            "强制重新生成会跳过缓存并再次调用模型（会增加成本），是否继续？",
           );
           if (!confirmed) {
             event.preventDefault();
@@ -72,21 +72,21 @@ export function SceneAdminActions({
           size="sm"
           disabled={loadingForceGenerate}
         >
-          {loadingForceGenerate ? "Forcing..." : "Force Regenerate"}
+          {loadingForceGenerate ? "强制生成中..." : "强制重新生成"}
         </Button>
       </form>
 
       <form
         action={deleteSceneAction}
         onSubmit={(event) => {
-          const warning = `Delete scene ${sceneId}? This permanently removes scene, variants, and progress rows.`;
+          const warning = `确认删除场景 ${sceneId}？该操作会永久删除场景、变体和学习进度。`;
           const firstConfirmed = window.confirm(warning);
           if (!firstConfirmed) {
             event.preventDefault();
             return;
           }
           const finalConfirmed = window.confirm(
-            "Final confirmation: this action cannot be undone. Continue deleting?",
+            "最终确认：该操作不可撤销，是否继续删除？",
           );
           if (!finalConfirmed) {
             event.preventDefault();
@@ -97,7 +97,7 @@ export function SceneAdminActions({
       >
         <input type="hidden" name="sceneId" value={sceneId} />
         <Button type="submit" variant="destructive" size="sm" disabled={loadingDelete}>
-          {loadingDelete ? "Deleting..." : "Delete Scene"}
+          {loadingDelete ? "删除中..." : "删除场景"}
         </Button>
       </form>
     </div>

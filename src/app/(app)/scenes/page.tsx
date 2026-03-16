@@ -16,9 +16,9 @@ import {
 } from "@/lib/utils/scenes-api";
 
 const difficultyLabel: Record<string, string> = {
-  Beginner: "Beginner",
-  Intermediate: "Intermediate",
-  Advanced: "Advanced",
+  Beginner: "初级",
+  Intermediate: "中级",
+  Advanced: "高级",
 };
 
 const learningStatusLabel: Record<SceneListItemResponse["learningStatus"], string> = {
@@ -48,7 +48,7 @@ export default function ScenesPage() {
       const nextScenes = await getScenesFromApi();
       setAllScenes(nextScenes);
     } catch (fetchError) {
-      toast.error(fetchError instanceof Error ? fetchError.message : "Failed to load scenes.");
+      toast.error(fetchError instanceof Error ? fetchError.message : "加载场景失败。");
     } finally {
       setLoading(false);
     }
@@ -75,7 +75,7 @@ export default function ScenesPage() {
   const handleImport = async () => {
     const sourceText = input.trim();
     if (!sourceText) {
-      setError("Please paste some English scene text first.");
+      setError("请先粘贴英文场景文本。");
       return;
     }
 
@@ -87,11 +87,11 @@ export default function ScenesPage() {
       setInput("");
       closeDialog();
       await refreshScenes();
-      toast.success("Scene imported successfully.");
+      toast.success("场景导入成功。");
       router.push(`/scene/${importedScene.slug}`);
     } catch (importError) {
       setError(
-        importError instanceof Error ? importError.message : "Import failed. Please try again.",
+        importError instanceof Error ? importError.message : "导入失败，请重试。",
       );
     } finally {
       setImporting(false);
@@ -99,20 +99,20 @@ export default function ScenesPage() {
   };
 
   const handleDeleteCustomScene = async (scene: SceneListItemResponse) => {
-    const confirmed = window.confirm(`Delete "${scene.title}"?`);
+    const confirmed = window.confirm(`确认删除“${scene.title}”？`);
     if (!confirmed) return;
     try {
       await deleteSceneBySlugFromApi(scene.slug);
       await refreshScenes();
-      toast.success("Custom scene deleted.");
+      toast.success("自定义场景已删除。");
     } catch (deleteError) {
-      toast.error(deleteError instanceof Error ? deleteError.message : "Delete failed.");
+      toast.error(deleteError instanceof Error ? deleteError.message : "删除失败。");
     }
   };
 
   const renderSceneCards = () => {
-    if (loading) return <p className="text-sm text-muted-foreground">Loading scenes...</p>;
-    if (allScenes.length === 0) return <p className="text-sm text-muted-foreground">No scenes yet.</p>;
+    if (loading) return <p className="text-sm text-muted-foreground">场景加载中...</p>;
+    if (allScenes.length === 0) return <p className="text-sm text-muted-foreground">暂无场景。</p>;
 
     return (
       <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
@@ -133,7 +133,7 @@ export default function ScenesPage() {
                     <button
                       type="button"
                       data-scene-delete="true"
-                      aria-label="Delete scene"
+                      aria-label="删除场景"
                       className="inline-flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                       onPointerDown={(event) => event.stopPropagation()}
                       onClick={(event) => {
@@ -152,8 +152,8 @@ export default function ScenesPage() {
               <CardContent className="p-2.5 pt-0 sm:p-3 sm:pt-0">
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-[11px] text-muted-foreground">
-                    {difficultyLabel[scene.difficulty] ?? "Intermediate"} - {scene.sentenceCount} sentences -{" "}
-                    {scene.estimatedMinutes} min
+                    {difficultyLabel[scene.difficulty] ?? "中级"} - {scene.sentenceCount} 句 -{" "}
+                    {scene.estimatedMinutes} 分钟
                   </p>
                   <p className="text-[11px] text-muted-foreground">
                     {learningStatusLabel[scene.learningStatus]} - {Math.round(scene.progressPercent)}%
@@ -190,20 +190,20 @@ export default function ScenesPage() {
   return (
     <div className="space-y-4">
       <PageHeader
-        eyebrow="Scene Learning"
-        title="Pick A Real Conversation Scene"
-        description="Read in context, then continue with variants and practice."
+        eyebrow="场景学习"
+        title="选择真实对话场景"
+        description="先在语境中阅读，再进入变体与练习。"
       />
 
       <Card className="border-border/70 bg-card">
         <CardContent className="p-2.5 sm:p-3">
           <div className="flex items-center justify-between gap-2">
             <div className="min-w-0 space-y-0">
-              <p className="text-sm font-semibold leading-5">Import Custom Scene</p>
+              <p className="text-sm font-semibold leading-5">导入自定义场景</p>
               <p className="line-clamp-1 text-[11px] text-muted-foreground">
-                Paste English dialogue and parse it into learning format.
+                粘贴英文对话并解析为可学习格式。
               </p>
-              <p className="text-[11px] text-muted-foreground/90">Source: user imported text</p>
+              <p className="text-[11px] text-muted-foreground/90">来源：用户导入文本</p>
             </div>
             <Button
               type="button"
@@ -212,7 +212,7 @@ export default function ScenesPage() {
               onClick={() => setDialogOpen(true)}
             >
               <Plus className="size-3" />
-              Import
+              导入
             </Button>
           </div>
         </CardContent>
@@ -224,7 +224,7 @@ export default function ScenesPage() {
         <div className="fixed inset-0 z-50 flex items-end bg-black/25 p-3 animate-in fade-in-0 duration-200 sm:items-center sm:justify-center sm:p-6">
           <button
             type="button"
-            aria-label="Close import dialog"
+            aria-label="关闭导入弹窗"
             className="absolute inset-0"
             onClick={closeDialog}
           />
@@ -232,9 +232,9 @@ export default function ScenesPage() {
             <CardHeader className="space-y-2">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <CardTitle className="text-lg">Import Custom English Scene</CardTitle>
+                  <CardTitle className="text-lg">导入自定义英文场景</CardTitle>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    The system will parse this text into the existing scene schema.
+                    系统会将文本解析为当前场景数据结构。
                   </p>
                 </div>
                 <Button
@@ -242,7 +242,7 @@ export default function ScenesPage() {
                   variant="ghost"
                   size="icon-sm"
                   className="cursor-pointer"
-                  aria-label="Close"
+                  aria-label="关闭"
                   onClick={closeDialog}
                 >
                   <X className="size-4" />
@@ -267,7 +267,7 @@ export default function ScenesPage() {
                   onClick={closeDialog}
                   className="cursor-pointer"
                 >
-                  Cancel
+                  取消
                 </Button>
                 <Button
                   type="button"
@@ -275,7 +275,7 @@ export default function ScenesPage() {
                   className="cursor-pointer"
                   disabled={importing}
                 >
-                  {importing ? "Importing..." : "Import"}
+                  {importing ? "导入中..." : "导入"}
                 </Button>
               </div>
             </CardContent>

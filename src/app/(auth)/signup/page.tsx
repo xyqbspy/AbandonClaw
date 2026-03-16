@@ -25,7 +25,7 @@ export default function SignupPage() {
     const password = String(formData.get("password") ?? "");
 
     if (!email || !password) {
-      toast.error("Email and password are required.");
+      toast.error("邮箱和密码不能为空。");
       return;
     }
 
@@ -43,14 +43,14 @@ export default function SignupPage() {
       });
 
       if (error) throw new Error(error.message);
-      toast.success("Account created. Please check your email if confirmation is required.");
+      toast.success("账号已创建。如需验证，请检查邮箱。");
       router.push(
         redirectTo && redirectTo.startsWith("/")
           ? `/login?redirect=${encodeURIComponent(redirectTo)}`
           : "/login",
       );
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Signup failed.");
+      toast.error(error instanceof Error ? error.message : "注册失败。");
     } finally {
       setSubmitting(false);
     }
@@ -59,30 +59,30 @@ export default function SignupPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-semibold">Sign Up</h1>
+        <h1 className="text-3xl font-semibold">注册</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Create an account and start your scene-based learning.
+          创建账号并开始场景化学习。
         </p>
       </div>
       <form className="space-y-4" onSubmit={onSubmit}>
         <div className="space-y-2">
-          <Label htmlFor="username">Username</Label>
-          <Input id="username" name="username" placeholder="Your name" />
+          <Label htmlFor="username">用户名</Label>
+          <Input id="username" name="username" placeholder="你的昵称" />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="email">Email</Label>
+          <Label htmlFor="email">邮箱</Label>
           <Input id="email" name="email" type="email" placeholder="name@example.com" required />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="password">Password</Label>
-          <Input id="password" name="password" type="password" placeholder="Set password" required />
+          <Label htmlFor="password">密码</Label>
+          <Input id="password" name="password" type="password" placeholder="设置密码" required />
         </div>
         <Button className="w-full" type="submit" disabled={submitting}>
-          {submitting ? "Creating..." : "Create Account"}
+          {submitting ? "创建中..." : "创建账号"}
         </Button>
       </form>
       <p className="text-sm text-muted-foreground">
-        Already have an account?{" "}
+        已有账号？{" "}
         <Link
           href={
             redirectTo && redirectTo.startsWith("/")
@@ -91,7 +91,7 @@ export default function SignupPage() {
           }
           className="text-foreground underline underline-offset-4"
         >
-          Login
+          去登录
         </Link>
       </p>
     </div>
