@@ -1,10 +1,18 @@
 import { mapLessonToParsedScene, mapParsedSceneToLesson } from "@/lib/adapters/scene-parser-adapter";
 import { scenes as seedLessons } from "@/lib/data/mock-lessons";
-import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { Lesson } from "@/lib/types";
 import { ParsedScene, SceneParserResponse } from "@/lib/types/scene-parser";
-import { SceneRow, SceneVariantRow } from "@/lib/server/db/types";
+import { SceneRow, SceneVariantRow, UserSceneProgressRow } from "@/lib/server/db/types";
 import { getSceneVariantsBySceneId } from "@/lib/server/services/variant-service";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import {
+  deleteImportedSceneByOwner,
+  getVisibleSceneById,
+  getVisibleSceneBySlug,
+  insertScene,
+  listVisibleScenesByUserId,
+  upsertSceneBySlug,
+} from "@/lib/server/repositories/scene-repo";
 
 export interface SceneListItem {
   id: string;
@@ -17,6 +25,9 @@ export interface SceneListItem {
   sourceType: "builtin" | "imported";
   createdAt: string;
   variantLinks: Array<{ id: string; label: string }>;
+  learningStatus: "not_started" | "in_progress" | "completed" | "paused";
+  progressPercent: number;
+  lastViewedAt: string | null;
 }
 
 const SCENE_PARSE_PROMPT_VERSION = "scene-parse-v1";
@@ -59,6 +70,7 @@ const rowToLesson = (row: SceneRow): Lesson => {
 const toSceneSummary = (
   row: SceneRow,
   variants: SceneVariantRow[],
+  progress?: UserSceneProgressRow | null,
 ): SceneListItem => {
   const scene = normalizeSceneFromRow(row);
   const latestCacheKey = variants[0]?.cache_key ?? null;
@@ -86,15 +98,16 @@ const toSceneSummary = (
     sourceType: toSceneOriginSourceType(row.origin),
     createdAt: row.created_at,
     variantLinks,
+    learningStatus: progress?.status ?? "not_started",
+    progressPercent: Number(progress?.progress_percent ?? 0),
+    lastViewedAt: progress?.last_viewed_at ?? null,
   };
 };
 
 export async function upsertSeedScenesIfNeeded() {
-  const admin = createSupabaseAdminClient();
-
   for (const lesson of seedLessons) {
     const parsed = mapLessonToParsedScene(lesson);
-    const { error } = await admin.from("scenes").upsert(
+    await upsertSceneBySlug(
       {
         slug: lesson.slug,
         title: lesson.title,
@@ -109,68 +122,70 @@ export async function upsertSeedScenesIfNeeded() {
         model: process.env.GLM_MODEL ?? "glm-4.6",
         prompt_version: "seed-v1",
       } as never,
-      { onConflict: "slug" },
     );
-
-    if (error) {
-      throw new Error(`Failed to upsert seed scenes: ${error.message}`);
-    }
   }
+}
+
+export async function runSeedScenesSync() {
+  await upsertSeedScenesIfNeeded();
+  return {
+    total: seedLessons.length,
+  };
 }
 
 export async function listScenes(params: { userId: string }) {
-  await upsertSeedScenesIfNeeded();
+  await runSeedScenesSync();
+  const rows = await listVisibleScenesByUserId(params.userId);
   const admin = createSupabaseAdminClient();
-
-  const { data, error } = await admin
-    .from("scenes")
-    .select("*")
-    .or(`is_public.eq.true,created_by.eq.${params.userId}`)
-    .order("created_at", { ascending: false });
-
-  if (error) {
-    throw new Error(`Failed to list scenes: ${error.message}`);
-  }
-
-  const rows = (data ?? []) as SceneRow[];
   const variantRows = await Promise.all(
     rows.map((row) => getSceneVariantsBySceneId(row.id)),
   );
+  const sceneIds = rows.map((row) => row.id);
+  const { data: progressRows, error: progressError } = await admin
+    .from("user_scene_progress")
+    .select("*")
+    .eq("user_id", params.userId)
+    .in("scene_id", sceneIds);
 
-  return rows.map((row, index) => toSceneSummary(row, variantRows[index] ?? []));
+  if (progressError) {
+    throw new Error(`Failed to list scene progress: ${progressError.message}`);
+  }
+
+  const progressBySceneId = new Map<string, UserSceneProgressRow>();
+  for (const row of (progressRows ?? []) as UserSceneProgressRow[]) {
+    progressBySceneId.set(row.scene_id, row);
+  }
+
+  return rows.map((row, index) =>
+    toSceneSummary(
+      row,
+      variantRows[index] ?? [],
+      progressBySceneId.get(row.id) ?? null,
+    ),
+  );
 }
 
 export async function getSceneBySlug(params: { slug: string; userId: string }) {
-  await upsertSeedScenesIfNeeded();
-  const admin = createSupabaseAdminClient();
-
-  const { data, error } = await admin
-    .from("scenes")
-    .select("*")
-    .eq("slug", params.slug)
-    .or(`is_public.eq.true,created_by.eq.${params.userId}`)
-    .maybeSingle<SceneRow>();
-
-  if (error) {
-    throw new Error(`Failed to load scene by slug: ${error.message}`);
-  }
+  await runSeedScenesSync();
+  const data = await getVisibleSceneBySlug(params);
 
   if (!data) return null;
   return rowToLesson(data);
 }
 
-export async function getSceneById(params: { sceneId: string; userId: string }) {
-  const admin = createSupabaseAdminClient();
-  const { data, error } = await admin
-    .from("scenes")
-    .select("*")
-    .eq("id", params.sceneId)
-    .or(`is_public.eq.true,created_by.eq.${params.userId}`)
-    .maybeSingle<SceneRow>();
+export async function getSceneRecordBySlug(params: { slug: string; userId: string }) {
+  await runSeedScenesSync();
+  const data = await getVisibleSceneBySlug(params);
 
-  if (error) {
-    throw new Error(`Failed to load scene by id: ${error.message}`);
-  }
+  if (!data) return null;
+  return {
+    row: data,
+    lesson: rowToLesson(data),
+  };
+}
+
+export async function getSceneById(params: { sceneId: string; userId: string }) {
+  const data = await getVisibleSceneById(params);
 
   if (!data) return null;
   return {
@@ -189,7 +204,6 @@ export async function createImportedScene(params: {
   promptVersion?: string;
   cacheKey?: string;
 }) {
-  const admin = createSupabaseAdminClient();
   const parsedTitle = params.title?.trim() || params.parsedScene.title;
   const parsedSlugBase = params.parsedScene.slug || `imported-${Date.now()}`;
   const uniqueSlug = `${parsedSlugBase}-${Math.random().toString(36).slice(2, 8)}`;
@@ -202,9 +216,8 @@ export async function createImportedScene(params: {
     tags: mergedTags,
   };
 
-  const { data, error } = await admin
-    .from("scenes")
-    .insert({
+  const data = await insertScene(
+    {
       slug: uniqueSlug,
       title: parsedTitle,
       theme: params.theme?.trim() || null,
@@ -217,13 +230,8 @@ export async function createImportedScene(params: {
       created_by: params.userId,
       model: params.model ?? process.env.GLM_MODEL ?? "glm-4.6",
       prompt_version: params.promptVersion ?? SCENE_PARSE_PROMPT_VERSION,
-    } as never)
-    .select("*")
-    .single<SceneRow>();
-
-  if (error || !data) {
-    throw new Error(`Failed to create imported scene: ${error?.message ?? "unknown error"}`);
-  }
+    } as never,
+  );
 
   return rowToLesson(data);
 }
@@ -232,15 +240,5 @@ export async function deleteImportedScene(params: {
   sceneId: string;
   userId: string;
 }) {
-  const admin = createSupabaseAdminClient();
-  const { error } = await admin
-    .from("scenes")
-    .delete()
-    .eq("id", params.sceneId)
-    .eq("origin", "imported")
-    .eq("created_by", params.userId);
-
-  if (error) {
-    throw new Error(`Failed to delete scene: ${error.message}`);
-  }
+  await deleteImportedSceneByOwner(params);
 }

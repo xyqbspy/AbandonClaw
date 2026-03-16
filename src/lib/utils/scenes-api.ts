@@ -13,6 +13,9 @@ export interface SceneListItemResponse {
   sourceType: "builtin" | "imported";
   createdAt: string;
   variantLinks: Array<{ id: string; label: string }>;
+  learningStatus: "not_started" | "in_progress" | "completed" | "paused";
+  progressPercent: number;
+  lastViewedAt: string | null;
 }
 
 const extractError = async (response: Response, fallback: string) => {
@@ -93,8 +96,8 @@ const toVariantLesson = (variant: ParsedScene, index: number): Lesson => {
   };
 };
 
-export async function getSceneVariantsFromApi(sceneId: string) {
-  const response = await fetch(`/api/scenes/${encodeURIComponent(sceneId)}/variants`, {
+export async function getSceneVariantsFromApi(sceneSlug: string) {
+  const response = await fetch(`/api/scenes/${encodeURIComponent(sceneSlug)}/variants`, {
     method: "GET",
   });
   if (!response.ok) {
@@ -108,12 +111,12 @@ export async function getSceneVariantsFromApi(sceneId: string) {
 }
 
 export async function generateSceneVariantsFromApi(params: {
-  sceneId: string;
+  sceneSlug: string;
   variantCount?: number;
   retainChunkRatio?: number;
   theme?: string;
 }) {
-  const response = await fetch(`/api/scenes/${encodeURIComponent(params.sceneId)}/variants`, {
+  const response = await fetch(`/api/scenes/${encodeURIComponent(params.sceneSlug)}/variants`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

@@ -14,11 +14,13 @@ import {
   parseJsonWithFallback,
 } from "@/lib/server/scene-json";
 import {
-  buildStableCacheKey,
+  buildSceneVariantsCacheKey,
   getAiCacheByKey,
+  hashPayload,
   setAiCache,
 } from "@/lib/server/services/ai-cache-service";
 import { SceneVariantRow } from "@/lib/server/db/types";
+import { ValidationError } from "@/lib/server/errors";
 
 const SCENE_MUTATE_PROMPT_VERSION = "scene-mutate-v1";
 
@@ -26,7 +28,7 @@ const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value));
 
 const sanitizeVariantCount = (value: unknown) => {
-  if (typeof value !== "number" || Number.isNaN(value)) return 2;
+  if (typeof value !== "number" || Number.isNaN(value)) return 3;
   return clamp(Math.round(value), 1, 3);
 };
 
@@ -71,15 +73,14 @@ const buildVariantCacheKey = (params: {
   theme?: string;
   model: string;
 }) =>
-  buildStableCacheKey("scene-variants", {
-    cache_type: "scene_variants",
+  buildSceneVariantsCacheKey({
     sceneId: params.sceneId,
     sceneSlug: params.sceneSlug,
     model: params.model,
     promptVersion: SCENE_MUTATE_PROMPT_VERSION,
     variantCount: params.variantCount,
     retainChunkRatio: params.retainChunkRatio,
-    theme: params.theme ?? null,
+    theme: params.theme,
   });
 
 const normalizeMutateParams = (
@@ -102,7 +103,13 @@ async function insertSceneVariants(params: {
   createdBy?: string | null;
 }) {
   const admin = createSupabaseAdminClient();
-  await admin.from("scene_variants").delete().eq("cache_key", params.cacheKey);
+  const { error: deleteError } = await admin
+    .from("scene_variants")
+    .delete()
+    .eq("cache_key", params.cacheKey);
+  if (deleteError) {
+    throw new Error(`Failed to clear existing scene variants by cache key: ${deleteError.message}`);
+  }
 
   if (params.variants.length === 0) return;
 
@@ -120,6 +127,19 @@ async function insertSceneVariants(params: {
 
   const { error } = await admin.from("scene_variants").insert(rows as never);
   if (error) {
+    if (
+      error.code === "23505" ||
+      (typeof error.message === "string" &&
+        error.message.toLowerCase().includes("duplicate"))
+    ) {
+      const existingRows = await readSceneVariantsByCacheKey(params.cacheKey);
+      if (existingRows.length >= params.variants.length) {
+        return;
+      }
+      throw new Error(
+        "Variant insert conflict detected. Ensure phase-2 SQL migration is applied (cache_key must be non-unique in scene_variants).",
+      );
+    }
     throw new Error(`Failed to persist scene variants: ${error.message}`);
   }
 }
@@ -163,9 +183,15 @@ export async function generateSceneVariants(params: {
   theme?: string;
   model?: string;
   createdBy?: string | null;
+  force?: boolean;
 }) {
+  if (!isValidParsedScene(params.scene)) {
+    throw new ValidationError("scene payload is invalid.");
+  }
+
   const normalized = normalizeMutateParams(params);
   const model = params.model ?? process.env.GLM_MODEL ?? "glm-4.6";
+  const force = params.force === true;
 
   const cacheKey = buildVariantCacheKey({
     sceneId: params.sceneId,
@@ -176,46 +202,84 @@ export async function generateSceneVariants(params: {
     model,
   });
 
-  const cached = await getAiCacheByKey(cacheKey);
-  if (cached) {
-    const cachedOutput = cached.output_json as SceneMutateResponse;
-    if (isValidSceneMutateResponse(cachedOutput)) {
-      return {
-        source: "ai_cache" as const,
-        cacheKey,
-        response: cachedOutput,
-      };
+  if (!force) {
+    const cached = await getAiCacheByKey(cacheKey);
+    if (cached) {
+      const cachedOutput = cached.output_json as SceneMutateResponse;
+      if (isValidSceneMutateResponse(cachedOutput)) {
+        console.info("[scene-variants-cache]", {
+          cacheStatus: "hit",
+          cacheKey,
+          sceneId: params.sceneId,
+          model,
+        });
+        return {
+          source: "ai_cache" as const,
+          cacheKey,
+          cacheStatus: "hit" as const,
+          response: cachedOutput,
+        };
+      }
     }
   }
 
-  const cachedRows = await readSceneVariantsByCacheKey(cacheKey);
-  if (cachedRows.length > 0) {
-    const variants = cachedRows
-      .map((row) => row.variant_json as ParsedScene)
-      .filter(isValidParsedScene);
-    if (variants.length > 0) {
-      const response: SceneMutateResponse = { version: "v1", variants };
-      await setAiCache({
-        cacheKey,
-        cacheType: "scene_variants",
-        inputJson: {
+  if (!force) {
+    const cachedRows = await readSceneVariantsByCacheKey(cacheKey);
+    if (cachedRows.length > 0) {
+      const variants = cachedRows
+        .map((row) => row.variant_json as ParsedScene)
+        .filter(isValidParsedScene);
+      if (variants.length > 0) {
+        const response: SceneMutateResponse = { version: "v1", variants };
+        await setAiCache({
+          cacheKey,
+          cacheType: "scene_variants",
+          status: "success",
+          inputHash: hashPayload({
+            sceneId: params.sceneId,
+            variantCount: normalized.variantCount,
+            retainChunkRatio: normalized.retainChunkRatio,
+            theme: normalized.theme ?? null,
+          }),
+          sourceRef: `scene:${params.sceneId}`,
+          inputJson: {
+            sceneId: params.sceneId,
+            variantCount: normalized.variantCount,
+            retainChunkRatio: normalized.retainChunkRatio,
+            theme: normalized.theme ?? null,
+          },
+          outputJson: response,
+          metaJson: {
+            cacheStatus: "written",
+            source: "scene_variants",
+          },
+          model,
+          promptVersion: SCENE_MUTATE_PROMPT_VERSION,
+          createdBy: params.createdBy ?? null,
+        });
+        console.info("[scene-variants-cache]", {
+          cacheStatus: "hit",
+          cacheKey,
           sceneId: params.sceneId,
-          variantCount: normalized.variantCount,
-          retainChunkRatio: normalized.retainChunkRatio,
-          theme: normalized.theme ?? null,
-        },
-        outputJson: response,
-        model,
-        promptVersion: SCENE_MUTATE_PROMPT_VERSION,
-        createdBy: params.createdBy ?? null,
-      });
-      return {
-        source: "scene_variants" as const,
-        cacheKey,
-        response,
-      };
+          model,
+          source: "scene_variants",
+        });
+        return {
+          source: "scene_variants" as const,
+          cacheKey,
+          cacheStatus: "hit" as const,
+          response,
+        };
+      }
     }
   }
+
+  console.info("[scene-variants-cache]", {
+    cacheStatus: force ? "forced" : "miss",
+    cacheKey,
+    sceneId: params.sceneId,
+    model,
+  });
 
   const rawModelText = await callGlmChatCompletion({
     model,
@@ -247,6 +311,14 @@ export async function generateSceneVariants(params: {
   await setAiCache({
     cacheKey,
     cacheType: "scene_variants",
+    status: "success",
+    inputHash: hashPayload({
+      sceneId: params.sceneId,
+      variantCount: normalized.variantCount,
+      retainChunkRatio: normalized.retainChunkRatio,
+      theme: normalized.theme ?? null,
+    }),
+    sourceRef: `scene:${params.sceneId}`,
     inputJson: {
       sceneId: params.sceneId,
       variantCount: normalized.variantCount,
@@ -254,14 +326,26 @@ export async function generateSceneVariants(params: {
       theme: normalized.theme ?? null,
     },
     outputJson: parsed,
+    metaJson: {
+      cacheStatus: force ? "forced" : "written",
+      source: "glm",
+    },
     model,
     promptVersion: SCENE_MUTATE_PROMPT_VERSION,
     createdBy: params.createdBy ?? null,
   });
 
+  console.info("[scene-variants-cache]", {
+    cacheStatus: force ? "forced" : "written",
+    cacheKey,
+    sceneId: params.sceneId,
+    model,
+  });
+
   return {
     source: "glm" as const,
     cacheKey,
+    cacheStatus: force ? ("forced" as const) : ("written" as const),
     response: parsed,
   };
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { LessonReader } from "@/features/lesson/components/lesson-reader";
@@ -32,6 +32,12 @@ import {
   getSceneDetailBySlugFromApi,
   getSceneVariantsFromApi,
 } from "@/lib/utils/scenes-api";
+import {
+  completeSceneLearningFromApi,
+  pauseSceneLearningFromApi,
+  startSceneLearningFromApi,
+  updateSceneLearningProgressFromApi,
+} from "@/lib/utils/learning-api";
 
 type SceneViewMode =
   | "scene"
@@ -122,10 +128,10 @@ const findChunkContext = (
 };
 
 export default function SceneDetailPage() {
-  const params = useParams<{ id: string }>();
+  const params = useParams<{ slug: string }>();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const sceneId = params?.id ?? "";
+  const sceneSlug = params?.slug ?? "";
   const [baseLesson, setBaseLesson] = useState<Lesson | null>(null);
   const [sceneLoading, setSceneLoading] = useState(true);
   const baseSceneId = baseLesson?.id ?? "";
@@ -160,6 +166,54 @@ export default function SceneDetailPage() {
     variantStatus: "idle",
   });
   const { supported, speak, stop, speakingText } = useSpeech();
+  const learningStartedRef = useRef(false);
+  const lastProgressSyncMsRef = useRef<number>(Date.now());
+  const learningPingTimerRef = useRef<number | null>(null);
+  const currentViewModeRef = useRef<SceneViewMode>("scene");
+  const flushLearningDelta = useCallback(
+    (payload: {
+      progressPercent: number;
+      lastVariantIndex?: number;
+      withPause?: boolean;
+    }) => {
+      if (!baseLesson || !learningStartedRef.current) return Promise.resolve();
+      const studySecondsDelta = computeElapsedSecondsSinceLastSync();
+      if (studySecondsDelta <= 0 && !payload.withPause) {
+        return Promise.resolve();
+      }
+
+      return updateSceneLearningProgressFromApi(baseLesson.slug, {
+        progressPercent: payload.progressPercent,
+        lastVariantIndex: payload.lastVariantIndex,
+        studySecondsDelta,
+      })
+        .then(() => {
+          if (payload.withPause) {
+            return pauseSceneLearningFromApi(baseLesson.slug);
+          }
+          return undefined;
+        })
+        .catch(() => {
+          // Non-blocking.
+        });
+    },
+    [baseLesson],
+  );
+
+  const estimateProgressPercent = (mode: SceneViewMode) => {
+    if (mode === "practice") return 90;
+    if (mode === "variants" || mode === "variant-study" || mode === "expression-map") {
+      return 65;
+    }
+    return 20;
+  };
+
+  const computeElapsedSecondsSinceLastSync = () => {
+    const now = Date.now();
+    const elapsed = Math.max(0, Math.floor((now - lastProgressSyncMsRef.current) / 1000));
+    lastProgressSyncMsRef.current = now;
+    return elapsed;
+  };
 
   const setViewModeWithRoute = (next: SceneViewMode, variantId?: string | null) => {
     const nextParams = new URLSearchParams(searchParams.toString());
@@ -175,7 +229,7 @@ export default function SceneDetailPage() {
       }
     }
     const query = nextParams.toString();
-    const href = query ? `/scene/${sceneId}?${query}` : `/scene/${sceneId}`;
+    const href = query ? `/scene/${sceneSlug}?${query}` : `/scene/${sceneSlug}`;
     router.push(href, { scroll: false });
   };
 
@@ -185,13 +239,15 @@ export default function SceneDetailPage() {
   };
 
   useEffect(() => {
-    if (!sceneId) return;
+    if (!sceneSlug) return;
+    learningStartedRef.current = false;
+    lastProgressSyncMsRef.current = Date.now();
     let cancelled = false;
 
     const loadScene = async () => {
       setSceneLoading(true);
       try {
-        const lesson = await getSceneDetailBySlugFromApi(sceneId);
+        const lesson = await getSceneDetailBySlugFromApi(sceneSlug);
         if (cancelled) return;
         setBaseLesson(lesson);
       } catch (error) {
@@ -207,7 +263,16 @@ export default function SceneDetailPage() {
     return () => {
       cancelled = true;
     };
-  }, [sceneId]);
+  }, [sceneSlug]);
+
+  useEffect(() => {
+    if (!baseLesson || learningStartedRef.current) return;
+    learningStartedRef.current = true;
+    lastProgressSyncMsRef.current = Date.now();
+    void startSceneLearningFromApi(baseLesson.slug).catch(() => {
+      // Non-blocking: scene reading should still work if progress API fails temporarily.
+    });
+  }, [baseLesson]);
 
   useEffect(() => {
     if (!baseLesson) return;
@@ -215,7 +280,7 @@ export default function SceneDetailPage() {
 
     const syncVariantsFromDb = async () => {
       try {
-        const variants = await getSceneVariantsFromApi(baseLesson.id);
+        const variants = await getSceneVariantsFromApi(baseLesson.slug);
         if (cancelled || variants.length === 0) return;
 
         const current = getSceneGeneratedState(baseLesson.id).latestVariantSet;
@@ -266,7 +331,54 @@ export default function SceneDetailPage() {
     setExpressionMap(null);
     setExpressionMapVariantSetId(null);
     refreshGeneratedState(baseSceneId);
-  }, [sceneId, baseSceneId, searchParams]);
+  }, [sceneSlug, baseSceneId, searchParams]);
+
+  useEffect(() => {
+    currentViewModeRef.current = viewMode;
+  }, [viewMode]);
+
+  useEffect(() => {
+    if (!baseLesson) return;
+    const timer = window.setTimeout(() => {
+      void flushLearningDelta({
+        progressPercent: estimateProgressPercent(viewMode),
+        lastVariantIndex:
+          viewMode === "variant-study" && activeVariantId ? 1 : undefined,
+      });
+    }, 1200);
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [activeVariantId, baseLesson, flushLearningDelta, viewMode]);
+
+  useEffect(() => {
+    if (!baseLesson) return;
+    if (learningPingTimerRef.current) {
+      window.clearInterval(learningPingTimerRef.current);
+    }
+    learningPingTimerRef.current = window.setInterval(() => {
+      void flushLearningDelta({
+        progressPercent: estimateProgressPercent(viewMode),
+      });
+    }, 60000);
+
+    return () => {
+      if (learningPingTimerRef.current) {
+        window.clearInterval(learningPingTimerRef.current);
+        learningPingTimerRef.current = null;
+      }
+    };
+  }, [baseLesson, flushLearningDelta, viewMode]);
+
+  useEffect(() => {
+    if (!baseLesson) return;
+    return () => {
+      void flushLearningDelta({
+        progressPercent: estimateProgressPercent(currentViewModeRef.current),
+        withPause: true,
+      });
+    };
+  }, [baseLesson, flushLearningDelta]);
 
   const latestPracticeSet = generatedState.latestPracticeSet;
   const latestVariantSet = generatedState.latestVariantSet;
@@ -324,7 +436,7 @@ export default function SceneDetailPage() {
     setVariantsError(null);
     try {
       const variants = await generateSceneVariantsFromApi({
-        sceneId: baseLesson.id,
+        sceneSlug: baseLesson.slug,
         variantCount: 3,
         retainChunkRatio: 0.6,
       });
@@ -365,12 +477,18 @@ export default function SceneDetailPage() {
     if (!baseLesson || !latestPracticeSet) return;
     markPracticeSetCompleted(baseLesson.id, latestPracticeSet.id);
     refreshGeneratedState(baseLesson.id);
+    void completeSceneLearningFromApi(baseLesson.slug).catch(() => {
+      // Non-blocking.
+    });
   };
 
   const handleMarkVariantSetComplete = () => {
     if (!baseLesson || !latestVariantSet) return;
     markVariantSetCompleted(baseLesson.id, latestVariantSet.id);
     refreshGeneratedState(baseLesson.id);
+    void completeSceneLearningFromApi(baseLesson.slug).catch(() => {
+      // Non-blocking.
+    });
   };
 
   const handleOpenVariant = (variantId: string) => {

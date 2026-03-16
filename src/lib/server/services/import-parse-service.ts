@@ -11,10 +11,12 @@ import {
 import { callGlmChatCompletion } from "@/lib/server/glm-client";
 import { ParsedScene, SceneSourceLanguage } from "@/lib/types/scene-parser";
 import {
-  buildStableCacheKey,
+  buildSceneParseCacheKey,
   getAiCacheByKey,
+  hashPayload,
   setAiCache,
 } from "@/lib/server/services/ai-cache-service";
+import { ValidationError } from "@/lib/server/errors";
 
 const SCENE_PARSE_PROMPT_VERSION = "scene-parse-v1";
 
@@ -48,29 +50,44 @@ export async function parseImportedSceneWithCache(params: {
   sourceLanguage?: SceneSourceLanguage;
   userId?: string | null;
   model?: string;
+  force?: boolean;
 }) {
   const normalizedSource = params.sourceText.trim();
   if (!normalizedSource) {
-    throw new Error("sourceText is required.");
+    throw new ValidationError("sourceText is required.");
   }
 
   const model = params.model ?? process.env.GLM_MODEL ?? "glm-4.6";
-  const cacheKey = buildStableCacheKey("scene-parse", {
-    cache_type: "scene_parse",
+  const cacheKey = buildSceneParseCacheKey({
     model,
     promptVersion: SCENE_PARSE_PROMPT_VERSION,
     sourceLanguage: params.sourceLanguage ?? "en",
     sourceText: normalizedSource,
   });
+  const force = params.force === true;
 
-  const cached = await getAiCacheByKey(cacheKey);
-  if (cached && isObject(cached.output_json) && isValidParsedScene(cached.output_json)) {
-    return {
-      source: "ai_cache" as const,
-      cacheKey,
-      parsedScene: cached.output_json as ParsedScene,
-    };
+  if (!force) {
+    const cached = await getAiCacheByKey(cacheKey);
+    if (cached && isObject(cached.output_json) && isValidParsedScene(cached.output_json)) {
+      console.info("[scene-parse-cache]", {
+        cacheStatus: "hit",
+        cacheKey,
+        model,
+      });
+      return {
+        source: "ai_cache" as const,
+        cacheKey,
+        cacheStatus: "hit" as const,
+        parsedScene: cached.output_json as ParsedScene,
+      };
+    }
   }
+
+  console.info("[scene-parse-cache]", {
+    cacheStatus: force ? "forced" : "miss",
+    cacheKey,
+    model,
+  });
 
   const rawModelText = await callGlmChatCompletion({
     model,
@@ -87,19 +104,34 @@ export async function parseImportedSceneWithCache(params: {
   await setAiCache({
     cacheKey,
     cacheType: "scene_parse",
+    status: "success",
+    inputHash: hashPayload({
+      sourceText: normalizedSource,
+      sourceLanguage: params.sourceLanguage ?? "en",
+    }),
+    sourceRef: params.userId ? `user:${params.userId}` : null,
     inputJson: {
       sourceText: normalizedSource,
       sourceLanguage: params.sourceLanguage ?? "en",
     },
     outputJson: parsedScene,
+    metaJson: {
+      cacheStatus: force ? "forced" : "written",
+    },
     model,
     promptVersion: SCENE_PARSE_PROMPT_VERSION,
     createdBy: params.userId ?? null,
+  });
+  console.info("[scene-parse-cache]", {
+    cacheStatus: force ? "forced" : "written",
+    cacheKey,
+    model,
   });
 
   return {
     source: "glm" as const,
     cacheKey,
+    cacheStatus: force ? ("forced" as const) : ("written" as const),
     parsedScene,
   };
 }

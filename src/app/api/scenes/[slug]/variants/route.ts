@@ -1,11 +1,18 @@
 import { NextResponse } from "next/server";
-import { ensureProfile, requireCurrentUser } from "@/lib/server/auth";
-import { getSceneById } from "@/lib/server/services/scene-service";
+import { requireCurrentProfile } from "@/lib/server/auth";
+import { toApiErrorResponse } from "@/lib/server/api-error";
+import { NotFoundError } from "@/lib/server/errors";
+import { getSceneRecordBySlug } from "@/lib/server/services/scene-service";
 import {
   generateSceneVariants,
   getSceneVariantsBySceneId,
 } from "@/lib/server/services/variant-service";
 import { isValidParsedScene } from "@/lib/server/scene-json";
+import {
+  parseOptionalTrimmedString,
+  parseRetainChunkRatio,
+  parseVariantCount,
+} from "@/lib/server/validation";
 import { ParsedScene } from "@/lib/types/scene-parser";
 
 interface GenerateVariantsPayload {
@@ -24,15 +31,15 @@ export async function GET(
   context: { params: Promise<{ slug: string }> },
 ) {
   try {
-    const user = await requireCurrentUser();
-    await ensureProfile(user);
-    const { slug: sceneId } = await context.params;
+    const { user } = await requireCurrentProfile();
+    const { slug: sceneSlug } = await context.params;
 
-    const scene = await getSceneById({ sceneId, userId: user.id });
+    const scene = await getSceneRecordBySlug({ slug: sceneSlug, userId: user.id });
     if (!scene) {
-      return NextResponse.json({ error: "Scene not found." }, { status: 404 });
+      throw new NotFoundError("Scene not found.");
     }
 
+    const sceneId = scene.row.id;
     const rows = await getSceneVariantsBySceneId(sceneId);
     const latestCacheKey = rows[0]?.cache_key ?? null;
     const latestRows = latestCacheKey
@@ -44,15 +51,13 @@ export async function GET(
 
     return NextResponse.json(
       {
-        sceneId,
+        sceneSlug,
         ...toSceneVariantsResponse(variants),
       },
       { status: 200 },
     );
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to load scene variants.";
-    const status = message === "Unauthorized" ? 401 : 500;
-    return NextResponse.json({ error: message }, { status });
+    return toApiErrorResponse(error, "Failed to load scene variants.");
   }
 }
 
@@ -61,15 +66,15 @@ export async function POST(
   context: { params: Promise<{ slug: string }> },
 ) {
   try {
-    const user = await requireCurrentUser();
-    await ensureProfile(user);
-    const { slug: sceneId } = await context.params;
-    const scene = await getSceneById({ sceneId, userId: user.id });
+    const { user } = await requireCurrentProfile();
+    const { slug: sceneSlug } = await context.params;
+    const scene = await getSceneRecordBySlug({ slug: sceneSlug, userId: user.id });
     if (!scene) {
-      return NextResponse.json({ error: "Scene not found." }, { status: 404 });
+      throw new NotFoundError("Scene not found.");
     }
 
     const payload = (await request.json()) as GenerateVariantsPayload;
+    const sceneId = scene.row.id;
     const sourceScene = scene.row.scene_json as ParsedScene;
     const result = await generateSceneVariants({
       sceneId,
@@ -78,28 +83,26 @@ export async function POST(
         id: scene.row.id,
         slug: scene.row.slug,
       },
-      variantCount: typeof payload.variantCount === "number" ? payload.variantCount : undefined,
-      retainChunkRatio:
-        typeof payload.retainChunkRatio === "number" ? payload.retainChunkRatio : undefined,
-      theme: typeof payload.theme === "string" ? payload.theme : undefined,
+      variantCount: parseVariantCount(payload.variantCount, 3),
+      retainChunkRatio: parseRetainChunkRatio(payload.retainChunkRatio, 0.6),
+      theme: parseOptionalTrimmedString(payload.theme, "theme", 80),
       createdBy: user.id,
       model: process.env.GLM_MODEL ?? "glm-4.6",
     });
 
     return NextResponse.json(
       {
-        sceneId,
+        sceneSlug,
         cache: {
           key: result.cacheKey,
           source: result.source,
+          status: result.cacheStatus,
         },
         ...toSceneVariantsResponse(result.response.variants),
       },
       { status: 200 },
     );
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to generate variants.";
-    const status = message === "Unauthorized" ? 401 : 500;
-    return NextResponse.json({ error: message }, { status });
+    return toApiErrorResponse(error, "Failed to generate variants.");
   }
 }

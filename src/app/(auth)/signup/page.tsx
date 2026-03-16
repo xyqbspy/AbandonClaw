@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
@@ -11,7 +11,9 @@ import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 export default function SignupPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [submitting, setSubmitting] = useState(false);
+  const redirectTo = searchParams.get("redirect");
 
   const onSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -42,7 +44,11 @@ export default function SignupPage() {
 
       if (error) throw new Error(error.message);
       toast.success("Account created. Please check your email if confirmation is required.");
-      router.push("/login");
+      router.push(
+        redirectTo && redirectTo.startsWith("/")
+          ? `/login?redirect=${encodeURIComponent(redirectTo)}`
+          : "/login",
+      );
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Signup failed.");
     } finally {
@@ -77,7 +83,14 @@ export default function SignupPage() {
       </form>
       <p className="text-sm text-muted-foreground">
         Already have an account?{" "}
-        <Link href="/login" className="text-foreground underline underline-offset-4">
+        <Link
+          href={
+            redirectTo && redirectTo.startsWith("/")
+              ? `/login?redirect=${encodeURIComponent(redirectTo)}`
+              : "/login"
+          }
+          className="text-foreground underline underline-offset-4"
+        >
           Login
         </Link>
       </p>

@@ -21,6 +21,13 @@ const difficultyLabel: Record<string, string> = {
   Advanced: "Advanced",
 };
 
+const learningStatusLabel: Record<SceneListItemResponse["learningStatus"], string> = {
+  not_started: "未开始",
+  in_progress: "学习中",
+  completed: "已完成",
+  paused: "已暂停",
+};
+
 const placeholderExample = `A: Are we still on for dinner?
 B: I was just about to text you. Something came up at work.
 A: Again?
@@ -147,6 +154,9 @@ export default function ScenesPage() {
                   <p className="text-[11px] text-muted-foreground">
                     {difficultyLabel[scene.difficulty] ?? "Intermediate"} - {scene.sentenceCount} sentences -{" "}
                     {scene.estimatedMinutes} min
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {learningStatusLabel[scene.learningStatus]} - {Math.round(scene.progressPercent)}%
                   </p>
                   {scene.variantLinks.length > 0 ? (
                     <div className="flex flex-wrap items-center justify-end gap-1">

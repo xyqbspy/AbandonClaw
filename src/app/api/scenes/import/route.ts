@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
-import { ensureProfile, requireCurrentUser } from "@/lib/server/auth";
+import { requireCurrentProfile } from "@/lib/server/auth";
+import { toApiErrorResponse } from "@/lib/server/api-error";
+import { ValidationError } from "@/lib/server/errors";
+import {
+  parseOptionalTrimmedString,
+  parseRequiredTrimmedString,
+} from "@/lib/server/validation";
 import { SceneSourceLanguage } from "@/lib/types/scene-parser";
 import { parseImportedSceneWithCache } from "@/lib/server/services/import-parse-service";
 import { createImportedScene } from "@/lib/server/services/scene-service";
@@ -16,15 +22,12 @@ const isSourceLanguage = (value: unknown): value is SceneSourceLanguage =>
 
 export async function POST(request: Request) {
   try {
-    const user = await requireCurrentUser();
-    await ensureProfile(user);
+    const { user } = await requireCurrentProfile();
 
     const payload = (await request.json()) as ImportScenePayload;
-    const sourceText =
-      typeof payload.sourceText === "string" ? payload.sourceText.trim() : "";
-
-    if (!sourceText) {
-      return NextResponse.json({ error: "sourceText is required." }, { status: 400 });
+    const sourceText = parseRequiredTrimmedString(payload.sourceText, "sourceText", 8000);
+    if (sourceText.length < 10) {
+      throw new ValidationError("sourceText is too short.");
     }
 
     const sourceLanguage = isSourceLanguage(payload.sourceLanguage)
@@ -40,8 +43,8 @@ export async function POST(request: Request) {
     const lesson = await createImportedScene({
       userId: user.id,
       sourceText,
-      title: typeof payload.title === "string" ? payload.title : undefined,
-      theme: typeof payload.theme === "string" ? payload.theme : undefined,
+      title: parseOptionalTrimmedString(payload.title, "title", 120),
+      theme: parseOptionalTrimmedString(payload.theme, "theme", 80),
       parsedScene: parsed.parsedScene,
       model: process.env.GLM_MODEL ?? "glm-4.6",
     });
@@ -52,13 +55,12 @@ export async function POST(request: Request) {
         cache: {
           key: parsed.cacheKey,
           source: parsed.source,
+          status: parsed.cacheStatus,
         },
       },
       { status: 200 },
     );
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to import scene.";
-    const status = message === "Unauthorized" ? 401 : 500;
-    return NextResponse.json({ error: message }, { status });
+    return toApiErrorResponse(error, "Failed to import scene.");
   }
 }

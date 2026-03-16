@@ -1,0 +1,141 @@
+import Link from "next/link";
+import { PageHeader } from "@/components/shared/page-header";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { listAdminVariants } from "@/lib/server/admin/service";
+
+const parsePositiveInt = (value: string | undefined, fallback: number) => {
+  const num = Number(value);
+  if (!Number.isFinite(num) || num <= 0) return fallback;
+  return Math.floor(num);
+};
+
+export default async function AdminVariantsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const params = await searchParams;
+  const q = typeof params.q === "string" ? params.q : "";
+  const sort = params.sort === "asc" ? "asc" : "desc";
+  const page = parsePositiveInt(
+    typeof params.page === "string" ? params.page : undefined,
+    1,
+  );
+
+  const result = await listAdminVariants({ page, pageSize: 30, search: q, sort });
+  const hasPrev = result.page > 1;
+  const hasNext = result.page * result.pageSize < result.total;
+
+  const buildListUrl = (nextPage: number) =>
+    `/admin/variants?q=${encodeURIComponent(q)}&sort=${sort}&page=${nextPage}`;
+
+  return (
+    <div className="space-y-4">
+      <PageHeader
+        eyebrow="Admin"
+        title="Variants"
+        description="Inspect generated variants and trace them back to scenes."
+      />
+
+      <Card className="border-border/70">
+        <CardContent className="pt-4">
+          <form className="grid gap-2 sm:grid-cols-[1fr_auto_auto]">
+            <Input
+              name="q"
+              defaultValue={q}
+              placeholder="Search scene title / slug / scene_id / cache_key"
+            />
+            <select
+              name="sort"
+              defaultValue={sort}
+              className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm"
+            >
+              <option value="desc">created_at desc</option>
+              <option value="asc">created_at asc</option>
+            </select>
+            <Button type="submit" variant="outline">
+              Filter
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+
+      <div className="overflow-x-auto rounded-lg border border-border/70">
+        <table className="min-w-full text-sm">
+          <thead className="bg-muted/40 text-left text-xs text-muted-foreground">
+            <tr>
+              <th className="px-3 py-2">scene</th>
+              <th className="px-3 py-2">variant_index</th>
+              <th className="px-3 py-2">model</th>
+              <th className="px-3 py-2">prompt_version</th>
+              <th className="px-3 py-2">retain_ratio</th>
+              <th className="px-3 py-2">theme</th>
+              <th className="px-3 py-2">created_at</th>
+            </tr>
+          </thead>
+          <tbody>
+            {result.rows.map((row) => (
+              <tr key={row.id} className="border-t border-border/50 align-top">
+                <td className="px-3 py-2">
+                  <Link
+                    href={`/admin/scenes/${row.scene_id}`}
+                    className="text-foreground underline-offset-2 hover:underline"
+                  >
+                    {row.scene?.title ?? row.scene_id}
+                  </Link>
+                  <p className="font-mono text-xs text-muted-foreground">
+                    {row.scene?.slug ?? row.scene_id}
+                  </p>
+                </td>
+                <td className="px-3 py-2">{row.variant_index}</td>
+                <td className="px-3 py-2">{row.model ?? "-"}</td>
+                <td className="px-3 py-2">{row.prompt_version ?? "-"}</td>
+                <td className="px-3 py-2">{row.retain_chunk_ratio ?? "-"}</td>
+                <td className="px-3 py-2">{row.theme ?? "-"}</td>
+                <td className="px-3 py-2 whitespace-nowrap">{row.created_at}</td>
+              </tr>
+            ))}
+            {result.rows.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="px-3 py-6 text-center text-muted-foreground">
+                  No variants found.
+                </td>
+              </tr>
+            ) : null}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="flex items-center justify-between text-xs text-muted-foreground">
+        <p>
+          Showing {(result.page - 1) * result.pageSize + 1}-
+          {Math.min(result.page * result.pageSize, result.total)} of {result.total}
+        </p>
+        <div className="flex items-center gap-2">
+          {hasPrev ? (
+            <Link
+              href={buildListUrl(result.page - 1)}
+              className="rounded border px-2 py-1 hover:bg-muted"
+            >
+              Prev
+            </Link>
+          ) : (
+            <span className="rounded border px-2 py-1 opacity-40">Prev</span>
+          )}
+          {hasNext ? (
+            <Link
+              href={buildListUrl(result.page + 1)}
+              className="rounded border px-2 py-1 hover:bg-muted"
+            >
+              Next
+            </Link>
+          ) : (
+            <span className="rounded border px-2 py-1 opacity-40">Next</span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

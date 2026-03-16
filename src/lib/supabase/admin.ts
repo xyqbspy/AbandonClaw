@@ -1,18 +1,13 @@
 import { createClient } from "@supabase/supabase-js";
+import { getSupabaseServiceRoleKey, getSupabaseUrl } from "@/lib/supabase/env";
 
 let adminClient: ReturnType<typeof createClient> | null = null;
 
 export const createSupabaseAdminClient = () => {
   if (adminClient) return adminClient;
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!url || !serviceRoleKey) {
-    throw new Error(
-      "Missing Supabase admin env vars. NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required.",
-    );
-  }
+  const url = getSupabaseUrl();
+  const serviceRoleKey = getSupabaseServiceRoleKey();
 
   adminClient = createClient(url, serviceRoleKey, {
     auth: {

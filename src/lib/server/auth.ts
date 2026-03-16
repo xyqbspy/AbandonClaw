@@ -2,6 +2,11 @@ import type { Session, User } from "@supabase/supabase-js";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { ProfileRow } from "@/lib/server/db/types";
+import { AuthError, ForbiddenError } from "@/lib/server/errors";
+import { isAdminEmail } from "@/lib/shared/admin";
+
+const isMissingSessionError = (message: string) =>
+  message.toLowerCase().includes("auth session missing");
 
 const defaultUsernameFromUser = (user: User) =>
   user.user_metadata?.username ||
@@ -11,23 +16,56 @@ const defaultUsernameFromUser = (user: User) =>
 export async function getCurrentSession(): Promise<Session | null> {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase.auth.getSession();
-  if (error) throw new Error(error.message);
+  if (error) {
+    if (isMissingSessionError(error.message)) return null;
+    throw new Error(error.message);
+  }
   return data.session;
 }
 
 export async function getCurrentUser(): Promise<User | null> {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase.auth.getUser();
-  if (error) throw new Error(error.message);
+  if (error) {
+    if (isMissingSessionError(error.message)) return null;
+    throw new Error(error.message);
+  }
   return data.user;
 }
 
 export async function requireCurrentUser(): Promise<User> {
   const user = await getCurrentUser();
   if (!user) {
-    throw new Error("Unauthorized");
+    throw new AuthError();
   }
   return user;
+}
+
+export function isAdminUser(user: Pick<User, "email">): boolean {
+  return isAdminEmail(user.email);
+}
+
+export async function requireAdmin(): Promise<User> {
+  const user = await requireCurrentUser();
+  if (!isAdminUser(user)) {
+    throw new ForbiddenError();
+  }
+  return user;
+}
+
+export async function getCurrentProfile(): Promise<ProfileRow | null> {
+  const user = await getCurrentUser();
+  if (!user) return null;
+  return ensureProfile(user);
+}
+
+export async function requireCurrentProfile(): Promise<{
+  user: User;
+  profile: ProfileRow;
+}> {
+  const user = await requireCurrentUser();
+  const profile = await ensureProfile(user);
+  return { user, profile };
 }
 
 export async function ensureProfile(user: User): Promise<ProfileRow> {

@@ -1,13 +1,10 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { getSupabaseAnonKey, getSupabaseUrl } from "@/lib/supabase/env";
 
 export const createSupabaseServerClient = async () => {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!url || !key) {
-    throw new Error("Missing Supabase public env vars.");
-  }
+  const url = getSupabaseUrl();
+  const key = getSupabaseAnonKey();
 
   const cookieStore = await cookies();
 

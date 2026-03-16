@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { ensureProfile, getCurrentSession, getCurrentUser } from "@/lib/server/auth";
+import { getCurrentProfile, getCurrentSession, getCurrentUser } from "@/lib/server/auth";
+import { toApiErrorResponse } from "@/lib/server/api-error";
 
 export async function GET() {
   try {
@@ -8,10 +9,9 @@ export async function GET() {
       return NextResponse.json({ user: null, profile: null }, { status: 200 });
     }
 
-    const profile = await ensureProfile(user);
+    const profile = await getCurrentProfile();
     return NextResponse.json({ user, profile }, { status: 200 });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to load current user.";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return toApiErrorResponse(error, "Failed to load current user.");
   }
 }
