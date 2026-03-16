@@ -7,51 +7,80 @@ import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 export default function SignupPage() {
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
 
-  const onSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const onSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (submitting) return;
+
+    const formData = new FormData(event.currentTarget);
+    const username = String(formData.get("username") ?? "").trim();
+    const email = String(formData.get("email") ?? "").trim();
+    const password = String(formData.get("password") ?? "");
+
+    if (!email || !password) {
+      toast.error("Email and password are required.");
+      return;
+    }
+
     setSubmitting(true);
-    toast.success("注册完成，欢迎开始学习");
-    setTimeout(() => {
-      router.push("/scenes");
-    }, 220);
+    try {
+      const supabase = createSupabaseBrowserClient();
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            username,
+          },
+        },
+      });
+
+      if (error) throw new Error(error.message);
+      toast.success("Account created. Please check your email if confirmation is required.");
+      router.push("/login");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Signup failed.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-semibold">注册</h1>
-        <p className="mt-2 text-sm text-muted-foreground">创建账号后即可开始第一节课程。</p>
+        <h1 className="text-3xl font-semibold">Sign Up</h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Create an account and start your scene-based learning.
+        </p>
       </div>
       <form className="space-y-4" onSubmit={onSubmit}>
         <div className="space-y-2">
-          <Label htmlFor="name">昵称</Label>
-          <Input id="name" placeholder="请输入昵称" required />
+          <Label htmlFor="username">Username</Label>
+          <Input id="username" name="username" placeholder="Your name" />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="email">邮箱</Label>
-          <Input id="email" type="email" placeholder="name@example.com" required />
+          <Label htmlFor="email">Email</Label>
+          <Input id="email" name="email" type="email" placeholder="name@example.com" required />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="password">密码</Label>
-          <Input id="password" type="password" placeholder="请设置密码" required />
+          <Label htmlFor="password">Password</Label>
+          <Input id="password" name="password" type="password" placeholder="Set password" required />
         </div>
         <Button className="w-full" type="submit" disabled={submitting}>
-          {submitting ? "创建中..." : "注册并开始学习"}
+          {submitting ? "Creating..." : "Create Account"}
         </Button>
       </form>
       <p className="text-sm text-muted-foreground">
-        已有账号？{" "}
+        Already have an account?{" "}
         <Link href="/login" className="text-foreground underline underline-offset-4">
-          去登录
+          Login
         </Link>
       </p>
     </div>
   );
 }
-

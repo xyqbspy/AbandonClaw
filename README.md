@@ -1,36 +1,61 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AbandonClaw
 
-## Getting Started
+Next.js + Supabase English-learning app with server-side scene storage, auth, and AI cache.
 
-First, run the development server:
+## 1) Setup
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
+pnpm install
+cp .env.example .env.local
 pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 2) Required Env
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+GLM_API_KEY=
+GLM_BASE_URL=https://open.bigmodel.cn/api/paas/v4
+GLM_MODEL=glm-4.6
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+```
 
-## Learn More
+Notes:
+- `GLM_API_KEY` and `SUPABASE_SERVICE_ROLE_KEY` are server-only.
+- Do not expose `SUPABASE_SERVICE_ROLE_KEY` in client code.
 
-To learn more about Next.js, take a look at the following resources:
+## 3) Database Init (Supabase SQL Editor)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Run:
+- [supabase/sql/20260316_init_auth_scenes_cache.sql](/d:/WorkCode/AbandonClaw/supabase/sql/20260316_init_auth_scenes_cache.sql)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+This creates:
+- `profiles`
+- `scenes`
+- `scene_variants`
+- `ai_cache`
+- `user_scene_progress`
+- `updated_at` triggers
+- RLS + policies
 
-## Deploy on Vercel
+## 4) New Server APIs
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- `GET /api/me`
+- `GET /api/scenes`
+- `GET /api/scenes/[slug]`
+- `DELETE /api/scenes/[slug]` (imported scenes only)
+- `POST /api/scenes/import`
+- `GET /api/scenes/[sceneId]/variants`
+- `POST /api/scenes/[sceneId]/variants`
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 5) Architecture Notes
+
+- App routes under `(app)` now require auth (server-side guard).
+- First authenticated request ensures profile exists.
+- Seed scenes are upserted to DB by slug via server service.
+- Scene import parse and scene variants generation use DB-first cache:
+  - check `ai_cache` / persisted records first
+  - fallback to GLM call
+  - write back to DB

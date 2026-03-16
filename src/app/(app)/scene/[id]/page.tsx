@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { LessonReader } from "@/features/lesson/components/lesson-reader";
@@ -8,16 +8,10 @@ import { SelectionDetailSheet } from "@/features/lesson/components/selection-det
 import {
   getChunkLayerFromLesson,
   getFirstSentence,
-  getSceneBySlug,
 } from "@/lib/data/mock-lessons";
 import { Lesson, LessonSentence, SelectionChunkLayer } from "@/lib/types";
-import {
-  mapLessonToParsedScene,
-  mapParsedSceneToLesson,
-} from "@/lib/adapters/scene-parser-adapter";
-import { mutateSceneFromApi } from "@/lib/utils/scene-mutate-api";
+import { mapLessonToParsedScene } from "@/lib/adapters/scene-parser-adapter";
 import { practiceGenerateFromApi } from "@/lib/utils/practice-generate-api";
-import { getCustomScenarioBySlug } from "@/lib/utils/custom-scenario-storage";
 import {
   deleteAllVariantSets,
   deletePracticeSet,
@@ -33,8 +27,11 @@ import { SceneGeneratedState } from "@/lib/types/learning-flow";
 import { useSpeech } from "@/hooks/use-speech";
 import { ExpressionMapResponse } from "@/lib/types/expression-map";
 import { generateExpressionMapFromApi } from "@/lib/utils/expression-map-api";
-
-const subscribe = () => () => {};
+import {
+  generateSceneVariantsFromApi,
+  getSceneDetailBySlugFromApi,
+  getSceneVariantsFromApi,
+} from "@/lib/utils/scenes-api";
 
 type SceneViewMode =
   | "scene"
@@ -129,14 +126,8 @@ export default function SceneDetailPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const sceneId = params?.id ?? "";
-  const presetScene = useMemo(() => getSceneBySlug(sceneId), [sceneId]);
-  const customScene = useSyncExternalStore<Lesson | null>(
-    subscribe,
-    () => (presetScene ? null : getCustomScenarioBySlug(sceneId) ?? null),
-    () => null,
-  );
-
-  const baseLesson = presetScene ?? customScene;
+  const [baseLesson, setBaseLesson] = useState<Lesson | null>(null);
+  const [sceneLoading, setSceneLoading] = useState(true);
   const baseSceneId = baseLesson?.id ?? "";
 
   const [viewMode, setViewMode] = useState<SceneViewMode>("scene");
@@ -192,6 +183,69 @@ export default function SceneDetailPage() {
     if (!sceneKey) return;
     setGeneratedState(getSceneGeneratedState(sceneKey));
   };
+
+  useEffect(() => {
+    if (!sceneId) return;
+    let cancelled = false;
+
+    const loadScene = async () => {
+      setSceneLoading(true);
+      try {
+        const lesson = await getSceneDetailBySlugFromApi(sceneId);
+        if (cancelled) return;
+        setBaseLesson(lesson);
+      } catch (error) {
+        if (cancelled) return;
+        setBaseLesson(null);
+        toast.error(error instanceof Error ? error.message : "Failed to load scene.");
+      } finally {
+        if (!cancelled) setSceneLoading(false);
+      }
+    };
+
+    void loadScene();
+    return () => {
+      cancelled = true;
+    };
+  }, [sceneId]);
+
+  useEffect(() => {
+    if (!baseLesson) return;
+    let cancelled = false;
+
+    const syncVariantsFromDb = async () => {
+      try {
+        const variants = await getSceneVariantsFromApi(baseLesson.id);
+        if (cancelled || variants.length === 0) return;
+
+        const current = getSceneGeneratedState(baseLesson.id).latestVariantSet;
+        if (current) return;
+
+        const variantSet = {
+          id: `db-variant-${baseLesson.id}`,
+          sourceSceneId: baseLesson.id,
+          sourceSceneTitle: baseLesson.title,
+          reusedChunks: buildReusedChunks(baseLesson),
+          variants: variants.map((lesson, index) => ({
+            id: `${lesson.id}-${index + 1}`,
+            lesson,
+            status: "unviewed" as const,
+          })),
+          status: "generated" as const,
+          createdAt: new Date().toISOString(),
+        };
+        saveVariantSet(variantSet);
+        refreshGeneratedState(baseLesson.id);
+      } catch {
+        // Keep local-only variants if db sync fails.
+      }
+    };
+
+    void syncVariantsFromDb();
+    return () => {
+      cancelled = true;
+    };
+  }, [baseLesson]);
 
   useEffect(() => {
     const modeParam = searchParams.get("view");
@@ -269,27 +323,17 @@ export default function SceneDetailPage() {
     setVariantsLoading(true);
     setVariantsError(null);
     try {
-      const parsedScene = mapLessonToParsedScene(baseLesson);
-      const variants = await mutateSceneFromApi({
-        scene: parsedScene,
+      const variants = await generateSceneVariantsFromApi({
+        sceneId: baseLesson.id,
         variantCount: 3,
         retainChunkRatio: 0.6,
       });
 
-      const variantItems = variants.map((variant, index) => {
-        const lesson = mapParsedSceneToLesson({ version: "v1", scene: variant });
-        const variantId = `${lesson.id}-variant-${index + 1}`;
-        const normalizedLesson: Lesson = {
-          ...lesson,
-          id: variantId,
-          slug: `${lesson.slug}-variant-${index + 1}`,
-          title: `${lesson.title} (Variant ${index + 1})`,
-          sourceType: "variant",
-        };
-
+      const variantItems = variants.map((lesson, index) => {
+        const variantId = `${lesson.id}-${index + 1}`;
         return {
           id: variantId,
-          lesson: normalizedLesson,
+          lesson,
           status: "unviewed" as const,
         };
       });
@@ -474,6 +518,10 @@ export default function SceneDetailPage() {
     setVariantChunkRelatedChunks(relatedChunks);
     setVariantChunkModalOpen(true);
   };
+
+  if (sceneLoading) {
+    return <div className="p-4 text-sm text-muted-foreground">Loading scene...</div>;
+  }
 
   if (!baseLesson) {
     return <div className="p-4 text-sm text-muted-foreground">Scene not found.</div>;

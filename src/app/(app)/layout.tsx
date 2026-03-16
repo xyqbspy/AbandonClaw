@@ -1,8 +1,15 @@
 import { ReactNode } from "react";
+import { redirect } from "next/navigation";
 import { AppTopbar } from "@/components/layout/app-topbar";
 import { PageShell } from "@/components/layout/page-shell";
+import { getCurrentUser } from "@/lib/server/auth";
 
-export default function AppLayout({ children }: { children: ReactNode }) {
+export default async function AppLayout({ children }: { children: ReactNode }) {
+  const user = await getCurrentUser();
+  if (!user) {
+    redirect("/login");
+  }
+
   return (
     <PageShell>
       <AppTopbar />
