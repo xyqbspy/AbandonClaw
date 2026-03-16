@@ -301,13 +301,6 @@ export function LessonReader({
     };
   }, [chunkDetail, currentSentence, lesson.slug, sentenceOrder]);
 
-  const speakingSentenceId = useMemo(
-    () =>
-      sentenceOrder.find((sentence) => sentence.text === speakingText)?.id ??
-      null,
-    [sentenceOrder, speakingText],
-  );
-
   useEffect(() => {
     autoPlayActiveRef.current = autoPlayActive;
   }, [autoPlayActive]);
@@ -380,7 +373,7 @@ export function LessonReader({
         suppressSelectionClearRef.current = false;
       }, 80);
     },
-    [dispatchAction, findSentenceById, isMobile],
+    [dispatchAction, findSentenceById, isMobile, setSheetOpen],
   );
 
   const handleSentenceTap = useCallback(
@@ -392,7 +385,7 @@ export function LessonReader({
       dispatchAction({ type: "SELECTION_CLEARED" });
       if (isMobile) setSheetOpen(true);
     },
-    [dispatchAction, isMobile],
+    [dispatchAction, isMobile, setSheetOpen],
   );
 
   const handleMobileGroupTap = useCallback(
@@ -413,7 +406,7 @@ export function LessonReader({
       const firstChunk = anchorSentence?.chunks[0];
       if (firstChunk) activateChunk(anchorSentenceId, firstChunk);
     },
-    [activateChunk, dispatchAction, findSentenceById],
+    [activateChunk, dispatchAction, findSentenceById, setSheetOpen],
   );
 
   const extractSelectionInReader = useCallback(() => {
@@ -643,13 +636,6 @@ export function LessonReader({
       toast.error(error instanceof Error ? error.message : "加入复习失败");
     }
   }, [buildPhrasePayload, onReviewPhrase, onSavePhrase]);
-
-  useEffect(() => {
-    if (!isMobile) return;
-    if (!speakingSentenceId) return;
-    const node = sentenceNodeMapRef.current[speakingSentenceId];
-    node?.scrollIntoView({ block: "nearest", behavior: "smooth" });
-  }, [isMobile, speakingSentenceId]);
 
   useEffect(() => {
     if (isMobile) return;

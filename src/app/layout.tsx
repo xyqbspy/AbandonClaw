@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ScrollToTopOnRouteChange } from "@/components/layout/scroll-to-top-on-route-change";
 import { ThemeProvider } from "@/components/shared/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
@@ -26,6 +27,7 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
+          <ScrollToTopOnRouteChange />
           {children}
           <Toaster position="top-right" richColors />
         </ThemeProvider>
