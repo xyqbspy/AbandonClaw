@@ -21,6 +21,7 @@ export function SelectionDetailSheet({
   onOpenChange,
   onSave,
   onReview,
+  saved = false,
   onPronounce,
   onLoopSentence,
   onSelectRelated,
@@ -37,6 +38,7 @@ export function SelectionDetailSheet({
   onOpenChange: (open: boolean) => void;
   onSave: () => void;
   onReview: () => void;
+  saved?: boolean;
   onPronounce: (text: string) => void;
   onLoopSentence: (text: string) => void;
   onSelectRelated: (chunk: string) => void;
@@ -279,7 +281,7 @@ export function SelectionDetailSheet({
         <footer className="border-t border-border/70 bg-background/95 p-3">
           <div className="grid grid-cols-2 gap-2">
             <Button className="cursor-pointer" onClick={onSave} disabled={!chunkDetail}>
-              收藏短语
+              {saved ? "已收藏" : "收藏短语"}
             </Button>
             <Button variant="secondary" className="cursor-pointer" onClick={onReview} disabled={!chunkDetail}>
               加入复习

@@ -6,6 +6,7 @@ import {
   UserSceneProgressRow,
 } from "@/lib/server/db/types";
 import { getSceneRecordBySlug } from "@/lib/server/services/scene-service";
+import { getUserPhraseSummary } from "@/lib/server/phrases/service";
 import { NotFoundError } from "@/lib/server/errors";
 
 const nowIso = () => new Date().toISOString();
@@ -450,7 +451,7 @@ const calculateStreakDays = (dates: string[]) => {
 export async function getLearningOverview(userId: string): Promise<LearningOverview> {
   const admin = createSupabaseAdminClient();
 
-  const [completedRes, inProgressRes, phraseRes, recentStatsRes, streakRes] =
+  const [completedRes, inProgressRes, phraseSummary, recentStatsRes, streakRes] =
     await Promise.all([
       admin
         .from("user_scene_progress")
@@ -462,10 +463,7 @@ export async function getLearningOverview(userId: string): Promise<LearningOverv
         .select("*", { count: "exact", head: true })
         .eq("user_id", userId)
         .in("status", ["in_progress", "paused"]),
-      admin
-        .from("user_scene_progress")
-        .select("saved_phrase_count")
-        .eq("user_id", userId),
+      getUserPhraseSummary(userId),
       admin
         .from("user_daily_learning_stats")
         .select("study_seconds,date")
@@ -487,9 +485,6 @@ export async function getLearningOverview(userId: string): Promise<LearningOverv
   if (inProgressRes.error) {
     throwLearningQueryError("count in-progress scenes", inProgressRes.error);
   }
-  if (phraseRes.error) {
-    throwLearningQueryError("read saved phrase count", phraseRes.error);
-  }
   if (recentStatsRes.error) {
     throwLearningQueryError("read recent study stats", recentStatsRes.error);
   }
@@ -497,13 +492,7 @@ export async function getLearningOverview(userId: string): Promise<LearningOverv
     throwLearningQueryError("read streak stats", streakRes.error);
   }
 
-  // Phase3 placeholder: saved phrases come from progress aggregation for now.
-  // This will be switched to phrase-system authoritative tables in later phases.
-  const totalSavedPhrases = (phraseRes.data ?? []).reduce(
-    (sum, row) =>
-      sum + Number((row as { saved_phrase_count?: number }).saved_phrase_count ?? 0),
-    0,
-  );
+  const totalSavedPhrases = phraseSummary.totalSavedPhrases;
   const recentStudySeconds = (recentStatsRes.data ?? []).reduce(
     (sum, row) => sum + Number((row as { study_seconds?: number }).study_seconds ?? 0),
     0,

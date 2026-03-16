@@ -88,3 +88,33 @@ export interface UserDailyLearningStatsRow {
   created_at: string;
   updated_at: string;
 }
+
+export interface PhraseRow {
+  id: string;
+  normalized_text: string;
+  display_text: string;
+  translation: string | null;
+  usage_note: string | null;
+  difficulty: string | null;
+  tags: unknown;
+  created_at: string;
+  updated_at: string;
+}
+
+export type UserPhraseStatus = "saved" | "archived";
+
+export interface UserPhraseRow {
+  id: string;
+  user_id: string;
+  phrase_id: string;
+  status: UserPhraseStatus;
+  source_scene_id: string | null;
+  source_scene_slug: string | null;
+  source_sentence_index: number | null;
+  source_sentence_text: string | null;
+  source_chunk_text: string | null;
+  saved_at: string;
+  last_seen_at: string;
+  created_at: string;
+  updated_at: string;
+}

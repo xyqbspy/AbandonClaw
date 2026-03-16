@@ -47,6 +47,11 @@ import {
   startSceneLearningFromApi,
   updateSceneLearningProgressFromApi,
 } from "@/lib/utils/learning-api";
+import {
+  getSavedNormalizedPhraseTextsFromApi,
+  savePhraseFromApi,
+} from "@/lib/utils/phrases-api";
+import { normalizePhraseText } from "@/lib/shared/phrases";
 
 type SceneViewMode =
   | "scene"
@@ -136,6 +141,25 @@ const findChunkContext = (
   return null;
 };
 
+const collectLessonChunkTexts = (lesson: Lesson) => {
+  const texts = new Set<string>();
+  for (const section of lesson.sections) {
+    for (const sentence of section.sentences) {
+      for (const chunk of sentence.chunks) {
+        const normalized = normalizePhraseText(chunk);
+        if (!normalized) continue;
+        texts.add(normalized);
+      }
+      for (const detail of sentence.chunkDetails ?? []) {
+        const normalized = normalizePhraseText(detail.text);
+        if (!normalized) continue;
+        texts.add(normalized);
+      }
+    }
+  }
+  return Array.from(texts);
+};
+
 const extractSlugFromSceneCacheKey = (key: string) =>
   key.startsWith("scene:") ? key.slice("scene:".length) : "";
 
@@ -174,6 +198,7 @@ export default function SceneDetailPage() {
   const [expressionMap, setExpressionMap] = useState<ExpressionMapResponse | null>(null);
   const [expressionMapVariantSetId, setExpressionMapVariantSetId] =
     useState<string | null>(null);
+  const [savedPhraseTextSet, setSavedPhraseTextSet] = useState<Set<string>>(new Set());
   const [generatedState, setGeneratedState] = useState<SceneGeneratedState>({
     latestPracticeSet: null,
     latestVariantSet: null,
@@ -187,6 +212,61 @@ export default function SceneDetailPage() {
   const lastProgressSyncMsRef = useRef<number>(Date.now());
   const learningPingTimerRef = useRef<number | null>(null);
   const currentViewModeRef = useRef<SceneViewMode>("scene");
+  const savePhraseForScene = useCallback(
+    async (payload: {
+      text: string;
+      translation?: string;
+      usageNote?: string;
+      sourceSentenceIndex?: number;
+      sourceSentenceText?: string;
+      sourceChunkText?: string;
+    }) => {
+      if (!baseLesson) return { created: false };
+      const result = await savePhraseFromApi({
+        text: payload.text,
+        translation: payload.translation,
+        usageNote: payload.usageNote,
+        sourceSceneSlug: baseLesson.slug,
+        sourceSentenceIndex: payload.sourceSentenceIndex,
+        sourceSentenceText: payload.sourceSentenceText,
+        sourceChunkText: payload.sourceChunkText ?? payload.text,
+      });
+      setSavedPhraseTextSet((prev) => {
+        const next = new Set(prev);
+        next.add(normalizePhraseText(payload.text));
+        return next;
+      });
+      return { created: result.created };
+    },
+    [baseLesson],
+  );
+
+  const handleSaveFromVariantSheet = useCallback(() => {
+    if (!variantChunkDetail?.text) return;
+    const sentenceIndex = variantChunkSentence
+      ? (baseLesson?.sections
+          .flatMap((section) => section.sentences)
+          .findIndex((sentence) => sentence.id === variantChunkSentence.id) ?? -1)
+      : -1;
+    void savePhraseForScene({
+      text: variantChunkDetail.text,
+      translation: variantChunkDetail.translation,
+      usageNote: variantChunkDetail.usageNote,
+      sourceSentenceIndex: sentenceIndex >= 0 ? sentenceIndex : undefined,
+      sourceSentenceText: variantChunkSentence?.text,
+      sourceChunkText: variantChunkDetail.text,
+    })
+      .then((result) => {
+        if (!result.created) {
+          toast.message("该短语已在收藏中");
+          return;
+        }
+        toast.success("已收藏短语");
+      })
+      .catch((error) => {
+        toast.error(error instanceof Error ? error.message : "收藏短语失败");
+      });
+  }, [baseLesson, savePhraseForScene, variantChunkDetail, variantChunkSentence]);
   const flushLearningDelta = useCallback(
     (payload: {
       progressPercent: number;
@@ -347,7 +427,6 @@ export default function SceneDetailPage() {
             if (!canApply()) return;
             scheduleScenePrefetch(candidates, { currentSlug: requestSlug });
             if (process.env.NODE_ENV === "development") {
-              // eslint-disable-next-line no-console
               console.debug("[scene-prefetch][debug]", getPrefetchDebugState());
             }
           })();
@@ -378,7 +457,6 @@ export default function SceneDetailPage() {
     if (!sceneSlug) return;
     void listRecentSceneCacheKeys(5)
       .then((keys) => {
-        // eslint-disable-next-line no-console
         console.debug("[scene-cache][debug]", {
           slug: sceneSlug,
           source: sceneDataSource,
@@ -398,6 +476,31 @@ export default function SceneDetailPage() {
     void startSceneLearningFromApi(baseLesson.slug).catch(() => {
       // Non-blocking: scene reading should still work if progress API fails temporarily.
     });
+  }, [baseLesson]);
+
+  useEffect(() => {
+    if (!baseLesson) {
+      setSavedPhraseTextSet(new Set());
+      return;
+    }
+    const candidates = collectLessonChunkTexts(baseLesson);
+    if (candidates.length === 0) {
+      setSavedPhraseTextSet(new Set());
+      return;
+    }
+    let cancelled = false;
+    void getSavedNormalizedPhraseTextsFromApi(candidates)
+      .then((texts) => {
+        if (cancelled) return;
+        setSavedPhraseTextSet(new Set(texts.map((text) => normalizePhraseText(text))));
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setSavedPhraseTextSet(new Set());
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [baseLesson]);
 
   useEffect(() => {
@@ -780,8 +883,13 @@ export default function SceneDetailPage() {
       loading={false}
       speakingText={speakingText}
       onOpenChange={setVariantChunkModalOpen}
-      onSave={() => toast.success("已收藏短语")}
-      onReview={() => toast.success("已加入复习")}
+      onSave={handleSaveFromVariantSheet}
+      onReview={handleSaveFromVariantSheet}
+      saved={
+        variantChunkDetail?.text
+          ? savedPhraseTextSet.has(normalizePhraseText(variantChunkDetail.text))
+          : false
+      }
       onPronounce={handlePronounce}
       onLoopSentence={handleLoopSentence}
       onSelectRelated={handleOpenVariantChunk}
@@ -1072,7 +1180,12 @@ export default function SceneDetailPage() {
             当前学习中：{activeVariantLesson.title}。你可以基于这个 variant 继续生成练习。
           </p>
         </section>
-        <LessonReader lesson={activeVariantLesson} />
+        <LessonReader
+          lesson={activeVariantLesson}
+          savedPhraseTexts={Array.from(savedPhraseTextSet)}
+          onSavePhrase={savePhraseForScene}
+          onReviewPhrase={savePhraseForScene}
+        />
       </div>
     );
   }
@@ -1111,7 +1224,13 @@ export default function SceneDetailPage() {
       {practiceError ? <p className="text-sm text-destructive">{practiceError}</p> : null}
       {variantsError ? <p className="text-sm text-destructive">{variantsError}</p> : null}
 
-      <LessonReader lesson={baseLesson} headerTools={headerTools} />
+      <LessonReader
+        lesson={baseLesson}
+        headerTools={headerTools}
+        savedPhraseTexts={Array.from(savedPhraseTextSet)}
+        onSavePhrase={savePhraseForScene}
+        onReviewPhrase={savePhraseForScene}
+      />
       {chunkDetailSheet}
     </div>
   );

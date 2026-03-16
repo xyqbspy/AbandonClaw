@@ -36,6 +36,7 @@ import { SelectionDetailPanel } from "@/features/lesson/components/selection-det
 import { SelectionDetailSheet } from "@/features/lesson/components/selection-detail-sheet";
 import { SelectionToolbar } from "@/features/lesson/components/selection-toolbar";
 import { SentenceBlock } from "@/features/lesson/components/sentence-block";
+import { normalizePhraseText } from "@/lib/shared/phrases";
 
 type SelectionState = {
   text: string;
@@ -150,9 +151,31 @@ function interactionReducer(
 export function LessonReader({
   lesson,
   headerTools,
+  savedPhraseTexts,
+  onSavePhrase,
+  onReviewPhrase,
 }: {
   lesson: Lesson;
   headerTools?: ReactNode;
+  savedPhraseTexts?: string[];
+  onSavePhrase?: (payload: {
+    text: string;
+    translation?: string;
+    usageNote?: string;
+    sourceSceneSlug?: string;
+    sourceSentenceIndex?: number;
+    sourceSentenceText?: string;
+    sourceChunkText?: string;
+  }) => Promise<{ created?: boolean } | void> | { created?: boolean } | void;
+  onReviewPhrase?: (payload: {
+    text: string;
+    translation?: string;
+    usageNote?: string;
+    sourceSceneSlug?: string;
+    sourceSentenceIndex?: number;
+    sourceSentenceText?: string;
+    sourceChunkText?: string;
+  }) => Promise<{ created?: boolean } | void> | { created?: boolean } | void;
 }) {
   const difficultyLabel =
     lesson.difficulty === "Beginner"
@@ -180,6 +203,7 @@ export function LessonReader({
     useState<MobileSentenceGroup | null>(null);
   const [autoPlayActive, setAutoPlayActive] = useState(false);
   const [, setAutoPlayIndex] = useState(0);
+  const [localSavedPhraseTexts, setLocalSavedPhraseTexts] = useState<Set<string>>(new Set());
   const [state, dispatch] = useReducer(interactionReducer, {
     activeSentenceId: firstSentence?.id ?? null,
     activeChunkKey: null,
@@ -248,6 +272,35 @@ export function LessonReader({
       state.activeChunkKey,
     );
   }, [currentSentence, lesson, state.activeChunkKey]);
+  const combinedSavedPhraseTexts = useMemo(() => {
+    const fromProps = (savedPhraseTexts ?? [])
+      .map((text) => normalizePhraseText(text))
+      .filter(Boolean);
+    return new Set([...fromProps, ...localSavedPhraseTexts]);
+  }, [localSavedPhraseTexts, savedPhraseTexts]);
+
+  const chunkSaved = useMemo(() => {
+    if (!chunkDetail?.text) return false;
+    return combinedSavedPhraseTexts.has(normalizePhraseText(chunkDetail.text));
+  }, [chunkDetail, combinedSavedPhraseTexts]);
+
+  const buildPhrasePayload = useCallback(() => {
+    if (!chunkDetail?.text) return null;
+    const sentence = currentSentence;
+    const sentenceIndex = sentence
+      ? sentenceOrder.findIndex((item) => item.id === sentence.id)
+      : -1;
+    return {
+      text: chunkDetail.text,
+      translation: chunkDetail.translation,
+      usageNote: chunkDetail.usageNote,
+      sourceSceneSlug: lesson.slug,
+      sourceSentenceIndex: sentenceIndex >= 0 ? sentenceIndex : undefined,
+      sourceSentenceText: sentence?.text,
+      sourceChunkText: chunkDetail.text,
+    };
+  }, [chunkDetail, currentSentence, lesson.slug, sentenceOrder]);
+
   const speakingSentenceId = useMemo(
     () =>
       sentenceOrder.find((sentence) => sentence.text === speakingText)?.id ??
@@ -551,8 +604,45 @@ export function LessonReader({
     startSequentialPlay(0);
   }, [autoPlayActive, startSequentialPlay, stopSequentialPlay, supported]);
 
-  const handleSave = useCallback(() => toast.success("已收藏短语"), []);
-  const handleAddReview = useCallback(() => toast.success("已加入复习"), []);
+  const handleSave = useCallback(async () => {
+    const payload = buildPhrasePayload();
+    if (!payload) return;
+    try {
+      const result = await onSavePhrase?.(payload);
+      setLocalSavedPhraseTexts((prev) => {
+        const next = new Set(prev);
+        next.add(normalizePhraseText(payload.text));
+        return next;
+      });
+      if (result && typeof result === "object" && result.created === false) {
+        toast.message("该短语已在收藏中");
+        return;
+      }
+      toast.success("已收藏短语");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "收藏短语失败");
+    }
+  }, [buildPhrasePayload, onSavePhrase]);
+
+  const handleAddReview = useCallback(async () => {
+    const payload = buildPhrasePayload();
+    if (!payload) return;
+    try {
+      if (onReviewPhrase) {
+        await onReviewPhrase(payload);
+      } else if (onSavePhrase) {
+        await onSavePhrase(payload);
+      }
+      setLocalSavedPhraseTexts((prev) => {
+        const next = new Set(prev);
+        next.add(normalizePhraseText(payload.text));
+        return next;
+      });
+      toast.success("已加入复习");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "加入复习失败");
+    }
+  }, [buildPhrasePayload, onReviewPhrase, onSavePhrase]);
 
   useEffect(() => {
     if (!isMobile) return;
@@ -939,6 +1029,7 @@ export function LessonReader({
           speakingText={speakingText}
           onSave={handleSave}
           onReview={handleAddReview}
+          saved={chunkSaved}
           onPronounce={handlePronounce}
           onSelectRelated={(chunk) => {
             if (isMobile && mobileActiveGroup) {
@@ -973,6 +1064,7 @@ export function LessonReader({
         onOpenChange={setSheetOpen}
         onSave={handleSave}
         onReview={handleAddReview}
+        saved={chunkSaved}
         onPronounce={handlePronounce}
         onLoopSentence={handleLoopSentence}
         onSelectRelated={(chunk) => {

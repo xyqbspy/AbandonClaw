@@ -32,6 +32,7 @@ export function SelectionDetailPanel({
   speakingText,
   onSave,
   onReview,
+  saved = false,
   onPronounce,
   onSelectRelated,
   hoveredChunkKey,
@@ -44,6 +45,7 @@ export function SelectionDetailPanel({
   speakingText: string | null;
   onSave: () => void;
   onReview: () => void;
+  saved?: boolean;
   onPronounce: (text: string) => void;
   onSelectRelated: (chunk: string) => void;
   hoveredChunkKey: string | null;
@@ -217,7 +219,7 @@ export function SelectionDetailPanel({
 
                 <div className="grid grid-cols-2 gap-2 pt-1">
                   <Button size="sm" onClick={onSave}>
-                    收藏短语
+                    {saved ? "已收藏" : "收藏短语"}
                   </Button>
                   <Button size="sm" variant="secondary" onClick={onReview}>
                     加入复习
