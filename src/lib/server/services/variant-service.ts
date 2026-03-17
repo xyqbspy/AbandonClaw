@@ -21,6 +21,7 @@ import {
 } from "@/lib/server/services/ai-cache-service";
 import { SceneVariantRow } from "@/lib/server/db/types";
 import { ValidationError } from "@/lib/server/errors";
+import { getUserChunkCandidatesForSceneMutation } from "@/lib/server/chunks/service";
 
 const SCENE_MUTATE_PROMPT_VERSION = "scene-mutate-v1";
 
@@ -72,6 +73,7 @@ const buildVariantCacheKey = (params: {
   retainChunkRatio: number;
   theme?: string;
   model: string;
+  knownChunksHash?: string | null;
 }) =>
   buildSceneVariantsCacheKey({
     sceneId: params.sceneId,
@@ -81,6 +83,7 @@ const buildVariantCacheKey = (params: {
     variantCount: params.variantCount,
     retainChunkRatio: params.retainChunkRatio,
     theme: params.theme,
+    knownChunksHash: params.knownChunksHash ?? null,
   });
 
 const normalizeMutateParams = (
@@ -192,6 +195,20 @@ export async function generateSceneVariants(params: {
   const normalized = normalizeMutateParams(params);
   const model = params.model ?? process.env.GLM_MODEL ?? "glm-4.6";
   const force = params.force === true;
+  const preferredKnownChunkCandidates = params.createdBy
+    ? await getUserChunkCandidatesForSceneMutation(params.createdBy, {
+        sceneSlug: params.scene.slug,
+        themeHint: normalized.theme,
+        limit: 16,
+      })
+    : [];
+  const preferredKnownChunks = preferredKnownChunkCandidates
+    .map((item) => item.text)
+    .filter(Boolean)
+    .slice(0, 12);
+  const effectiveKnownChunks = preferredKnownChunks.length >= 2 ? preferredKnownChunks : [];
+  const knownChunksHash =
+    effectiveKnownChunks.length > 0 ? hashPayload(effectiveKnownChunks) : null;
 
   const cacheKey = buildVariantCacheKey({
     sceneId: params.sceneId,
@@ -200,6 +217,7 @@ export async function generateSceneVariants(params: {
     retainChunkRatio: normalized.retainChunkRatio,
     theme: normalized.theme,
     model,
+    knownChunksHash,
   });
 
   if (!force) {
@@ -240,6 +258,7 @@ export async function generateSceneVariants(params: {
             variantCount: normalized.variantCount,
             retainChunkRatio: normalized.retainChunkRatio,
             theme: normalized.theme ?? null,
+            knownChunksHash,
           }),
           sourceRef: `scene:${params.sceneId}`,
           inputJson: {
@@ -247,6 +266,7 @@ export async function generateSceneVariants(params: {
             variantCount: normalized.variantCount,
             retainChunkRatio: normalized.retainChunkRatio,
             theme: normalized.theme ?? null,
+            preferredKnownChunks: effectiveKnownChunks,
           },
           outputJson: response,
           metaJson: {
@@ -284,13 +304,14 @@ export async function generateSceneVariants(params: {
   const rawModelText = await callGlmChatCompletion({
     model,
     systemPrompt: SCENE_MUTATE_SYSTEM_PROMPT,
-    userPrompt: buildSceneMutateUserPrompt({
-      sceneJson: JSON.stringify(params.scene),
-      variantCount: normalized.variantCount,
-      retainChunkRatio: normalized.retainChunkRatio,
-      theme: normalized.theme,
-    }),
-    temperature: 0.3,
+      userPrompt: buildSceneMutateUserPrompt({
+        sceneJson: JSON.stringify(params.scene),
+        variantCount: normalized.variantCount,
+        retainChunkRatio: normalized.retainChunkRatio,
+        theme: normalized.theme,
+        preferredKnownChunks: effectiveKnownChunks,
+      }),
+      temperature: 0.3,
   });
 
   const parsed = normalizeMutateResponseVersion(parseJsonWithFallback(rawModelText));
@@ -317,6 +338,7 @@ export async function generateSceneVariants(params: {
       variantCount: normalized.variantCount,
       retainChunkRatio: normalized.retainChunkRatio,
       theme: normalized.theme ?? null,
+      knownChunksHash,
     }),
     sourceRef: `scene:${params.sceneId}`,
     inputJson: {
@@ -324,6 +346,7 @@ export async function generateSceneVariants(params: {
       variantCount: normalized.variantCount,
       retainChunkRatio: normalized.retainChunkRatio,
       theme: normalized.theme ?? null,
+      preferredKnownChunks: effectiveKnownChunks,
     },
     outputJson: parsed,
     metaJson: {

@@ -21,6 +21,8 @@ export interface PhraseSummaryResponse {
   todaySavedPhrases: number;
 }
 
+export type PhraseReviewStatus = "saved" | "reviewing" | "mastered" | "archived";
+
 export interface UserPhraseItemResponse {
   userPhraseId: string;
   phraseId: string;
@@ -36,6 +38,13 @@ export interface UserPhraseItemResponse {
   sourceChunkText: string | null;
   savedAt: string;
   lastSeenAt: string;
+  reviewStatus: PhraseReviewStatus;
+  reviewCount: number;
+  correctCount: number;
+  incorrectCount: number;
+  lastReviewedAt: string | null;
+  nextReviewAt: string | null;
+  masteredAt: string | null;
 }
 
 export async function savePhraseFromApi(payload: {
@@ -69,12 +78,14 @@ export async function getMyPhrasesFromApi(params?: {
   page?: number;
   limit?: number;
   status?: "saved" | "archived";
+  reviewStatus?: PhraseReviewStatus | "all";
 }) {
   const search = new URLSearchParams();
   if (params?.query) search.set("query", params.query);
   if (params?.page) search.set("page", String(params.page));
   if (params?.limit) search.set("limit", String(params.limit));
   if (params?.status) search.set("status", params.status);
+  if (params?.reviewStatus) search.set("reviewStatus", params.reviewStatus);
   const suffix = search.toString();
   const response = await fetch(`/api/phrases/mine${suffix ? `?${suffix}` : ""}`, {
     method: "GET",

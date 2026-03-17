@@ -53,6 +53,7 @@ export const buildSceneVariantsCacheKey = (params: {
   variantCount: number;
   retainChunkRatio: number;
   theme?: string;
+  knownChunksHash?: string | null;
 }) =>
   buildStableCacheKey("scene-variants", {
     cache_type: "scene_variants",
@@ -63,6 +64,7 @@ export const buildSceneVariantsCacheKey = (params: {
     variantCount: params.variantCount,
     retainChunkRatio: params.retainChunkRatio,
     theme: params.theme ?? null,
+    knownChunksHash: params.knownChunksHash ?? null,
   });
 
 export async function getAiCacheByKey(cacheKey: string) {

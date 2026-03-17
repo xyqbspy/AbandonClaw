@@ -52,6 +52,10 @@ import {
   savePhraseFromApi,
 } from "@/lib/utils/phrases-api";
 import { normalizePhraseText } from "@/lib/shared/phrases";
+import {
+  getScenePhraseRecommendationsFromApi,
+  ScenePhraseRecommendationItem,
+} from "@/lib/utils/recommendations-api";
 
 type SceneViewMode =
   | "scene"
@@ -199,6 +203,12 @@ export default function SceneDetailPage() {
   const [expressionMapVariantSetId, setExpressionMapVariantSetId] =
     useState<string | null>(null);
   const [savedPhraseTextSet, setSavedPhraseTextSet] = useState<Set<string>>(new Set());
+  const [recommendedPhrases, setRecommendedPhrases] = useState<
+    ScenePhraseRecommendationItem[]
+  >([]);
+  const [savingRecommendedKeys, setSavingRecommendedKeys] = useState<Set<string>>(
+    new Set(),
+  );
   const [generatedState, setGeneratedState] = useState<SceneGeneratedState>({
     latestPracticeSet: null,
     latestVariantSet: null,
@@ -498,6 +508,29 @@ export default function SceneDetailPage() {
         if (cancelled) return;
         setSavedPhraseTextSet(new Set());
       });
+    return () => {
+      cancelled = true;
+    };
+  }, [baseLesson]);
+
+  useEffect(() => {
+    if (!baseLesson) {
+      setRecommendedPhrases([]);
+      return;
+    }
+
+    let cancelled = false;
+    void getScenePhraseRecommendationsFromApi(baseLesson.slug, 3)
+      .then((items) => {
+        if (cancelled) return;
+        setRecommendedPhrases(items);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        // Silent fallback: recommendations should not block core scene flow.
+        setRecommendedPhrases([]);
+      });
+
     return () => {
       cancelled = true;
     };
@@ -866,6 +899,45 @@ export default function SceneDetailPage() {
     setVariantChunkModalOpen(true);
   };
 
+  const handleSaveRecommendedPhrase = useCallback(
+    (item: ScenePhraseRecommendationItem) => {
+      const key = item.normalizedText;
+      if (!key) return;
+      if (savingRecommendedKeys.has(key)) return;
+
+      setSavingRecommendedKeys((prev) => {
+        const next = new Set(prev);
+        next.add(key);
+        return next;
+      });
+
+      void savePhraseForScene({
+        text: item.text,
+        translation: item.translation ?? undefined,
+        sourceSentenceIndex: item.sourceSentenceIndex ?? undefined,
+        sourceSentenceText: item.sourceSentenceText ?? undefined,
+        sourceChunkText: item.sourceChunkText,
+      })
+        .then((result) => {
+          setRecommendedPhrases((prev) =>
+            prev.filter((candidate) => candidate.normalizedText !== key),
+          );
+          toast.success(result.created ? "已收藏推荐表达" : "该表达已在收藏中");
+        })
+        .catch((error) => {
+          toast.error(error instanceof Error ? error.message : "收藏失败");
+        })
+        .finally(() => {
+          setSavingRecommendedKeys((prev) => {
+            const next = new Set(prev);
+            next.delete(key);
+            return next;
+          });
+        });
+    },
+    [savePhraseForScene, savingRecommendedKeys],
+  );
+
   if (sceneLoading) {
     return <div className="p-4 text-sm text-muted-foreground">场景加载中...</div>;
   }
@@ -1219,10 +1291,52 @@ export default function SceneDetailPage() {
     </>
   );
 
+  const recommendedItems = recommendedPhrases.filter(
+    (item) => !savedPhraseTextSet.has(item.normalizedText),
+  );
+  const recommendedBlock =
+    recommendedItems.length > 0 ? (
+      <section className="space-y-2 rounded-lg border border-border/70 p-3">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-sm font-medium">值得收藏的表达</p>
+          <span className="text-xs text-muted-foreground">本场景推荐</span>
+        </div>
+        <ul className="space-y-2">
+          {recommendedItems.map((item) => (
+            <li
+              key={item.normalizedText}
+              className="flex items-start justify-between gap-3 rounded-md border p-2.5"
+            >
+              <div className="min-w-0 space-y-0.5">
+                <p className="text-sm font-medium">{item.text}</p>
+                {item.translation ? (
+                  <p className="text-xs text-muted-foreground">{item.translation}</p>
+                ) : null}
+                {item.sourceSentenceText ? (
+                  <p className="line-clamp-2 text-xs text-muted-foreground">
+                    {item.sourceSentenceText}
+                  </p>
+                ) : null}
+              </div>
+              <button
+                type="button"
+                className="h-7 shrink-0 rounded-md border px-2.5 text-xs hover:bg-muted disabled:opacity-60"
+                disabled={savingRecommendedKeys.has(item.normalizedText)}
+                onClick={() => handleSaveRecommendedPhrase(item)}
+              >
+                {savingRecommendedKeys.has(item.normalizedText) ? "收藏中..." : "收藏"}
+              </button>
+            </li>
+          ))}
+        </ul>
+      </section>
+    ) : null;
+
   return (
     <div className="space-y-5">
       {practiceError ? <p className="text-sm text-destructive">{practiceError}</p> : null}
       {variantsError ? <p className="text-sm text-destructive">{variantsError}</p> : null}
+      {recommendedBlock}
 
       <LessonReader
         lesson={baseLesson}

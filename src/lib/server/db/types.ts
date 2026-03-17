@@ -102,12 +102,20 @@ export interface PhraseRow {
 }
 
 export type UserPhraseStatus = "saved" | "archived";
+export type UserPhraseReviewStatus = "saved" | "reviewing" | "mastered" | "archived";
 
 export interface UserPhraseRow {
   id: string;
   user_id: string;
   phrase_id: string;
   status: UserPhraseStatus;
+  review_status: UserPhraseReviewStatus;
+  review_count: number;
+  correct_count: number;
+  incorrect_count: number;
+  last_reviewed_at: string | null;
+  next_review_at: string | null;
+  mastered_at: string | null;
   source_scene_id: string | null;
   source_scene_slug: string | null;
   source_sentence_index: number | null;
@@ -115,6 +123,65 @@ export interface UserPhraseRow {
   source_chunk_text: string | null;
   saved_at: string;
   last_seen_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export type PhraseReviewResult = "again" | "hard" | "good";
+
+export interface PhraseReviewLogRow {
+  id: string;
+  user_id: string;
+  phrase_id: string;
+  user_phrase_id: string;
+  review_result: PhraseReviewResult;
+  was_correct: boolean;
+  reviewed_at: string;
+  scheduled_next_review_at: string | null;
+  source: string | null;
+  created_at: string;
+}
+
+export interface ScenePhraseRecommendationStateRow {
+  id: string;
+  user_id: string;
+  scene_slug: string;
+  normalized_text: string;
+  source_chunk_text: string | null;
+  last_recommended_at: string;
+  recommended_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ChunkRow {
+  id: string;
+  normalized_text: string;
+  display_text: string;
+  translation: string | null;
+  chunk_type: "chunk";
+  difficulty: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type UserChunkStatus = "encountered" | "practiced" | "familiar";
+
+export interface UserChunkRow {
+  id: string;
+  user_id: string;
+  chunk_id: string;
+  status: UserChunkStatus;
+  encounter_count: number;
+  practice_count: number;
+  mastery_score: number;
+  first_seen_at: string;
+  last_seen_at: string;
+  last_practiced_at: string | null;
+  source_scene_id: string | null;
+  source_scene_slug: string | null;
+  source_sentence_index: number | null;
+  source_sentence_text: string | null;
   created_at: string;
   updated_at: string;
 }

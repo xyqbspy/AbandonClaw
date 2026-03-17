@@ -29,8 +29,8 @@ export default async function TodayPage() {
       continueLearning: null,
       todayTasks: {
         sceneTask: { done: false, continueSceneSlug: null },
-        reviewTask: { done: false, reviewItemsCompleted: 0, placeholder: true as const },
-        outputTask: { done: false, phrasesSavedToday: 0, placeholder: true as const },
+        reviewTask: { done: false, reviewItemsCompleted: 0, dueReviewCount: 0 },
+        outputTask: { done: false, phrasesSavedToday: 0 },
       },
     };
   });
@@ -59,15 +59,15 @@ export default async function TodayPage() {
         : "选择一个场景并开始学习。",
       durationMinutes: continueLearning?.estimatedMinutes ?? 12,
       done: dashboard.todayTasks.sceneTask.done,
-      actionHref: continueLearning
-        ? `/scene/${continueLearning.sceneSlug}`
-        : "/scenes",
+      actionHref: continueLearning ? `/scene/${continueLearning.sceneSlug}` : "/scenes",
     },
     {
       id: "task-review",
       title: "进行一次短时复习",
       description:
-        "复习系统仍在接入中，当前仅展示真实完成计数的占位任务。",
+        dashboard.todayTasks.reviewTask.dueReviewCount > 0
+          ? `当前待复习 ${dashboard.todayTasks.reviewTask.dueReviewCount} 条，今天已完成 ${dashboard.todayTasks.reviewTask.reviewItemsCompleted} 条。`
+          : `今天已完成 ${dashboard.todayTasks.reviewTask.reviewItemsCompleted} 条复习。`,
       durationMinutes: 8,
       done: dashboard.todayTasks.reviewTask.done,
       actionHref: "/review",
@@ -75,7 +75,7 @@ export default async function TodayPage() {
     {
       id: "task-output",
       title: "输出练习",
-      description: `今日已累计保存 ${dashboard.todayTasks.outputTask.phrasesSavedToday} 条短语。`,
+      description: `今日已累计收藏 ${dashboard.todayTasks.outputTask.phrasesSavedToday} 条短语。`,
       durationMinutes: 4,
       done: dashboard.todayTasks.outputTask.done,
       actionHref: "/chunks",
@@ -93,9 +93,20 @@ export default async function TodayPage() {
       />
 
       <div className="grid grid-cols-3 gap-2 sm:gap-4">
-        <StatCard title="连续学习" value={`${dashboard.overview.streakDays} 天`} icon={<Flame className="size-4 text-orange-500" />} />
+        <StatCard
+          title="连续学习"
+          value={`${dashboard.overview.streakDays} 天`}
+          icon={<Flame className="size-4 text-orange-500" />}
+        />
         <StatCard title="已收藏短语" value={`${dashboard.overview.savedPhraseCount}`} />
-        <StatCard title="复习正确率" value={dashboard.overview.reviewAccuracy == null ? "—" : `${dashboard.overview.reviewAccuracy}%`} />
+        <StatCard
+          title="复习正确率"
+          value={
+            dashboard.overview.reviewAccuracy == null
+              ? "—"
+              : `${dashboard.overview.reviewAccuracy}%`
+          }
+        />
       </div>
 
       <TodayTaskList tasks={dailyTasks} />
@@ -110,7 +121,9 @@ export default async function TodayPage() {
           </CardHeader>
           <CardContent className="space-y-3">
             <p className="text-lg font-medium">{continueLearning?.title ?? "选择一个场景开始学习"}</p>
-            <p className="text-sm text-muted-foreground">{continueLearning?.subtitle ?? "你还没有学习记录，先进入一个场景吧。"}</p>
+            <p className="text-sm text-muted-foreground">
+              {continueLearning?.subtitle ?? "你还没有学习记录，先进入一个场景吧。"}
+            </p>
             {continueLearning ? (
               <p className="text-xs text-muted-foreground">
                 当前进度：{Math.round(continueLearning.progressPercent)}%

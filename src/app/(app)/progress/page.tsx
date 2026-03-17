@@ -26,7 +26,7 @@ export default async function ProgressPage() {
       <PageHeader
         eyebrow="学习进度"
         title="你的学习节奏"
-        description="查看连续性、复习表现与能力维度变化，及时调整每日学习重心。"
+        description="查看连续性、复习表现与能力变化，及时调整每日学习重心。"
       />
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard title="连续学习" value={`${overview.streakDays} 天`} />
@@ -36,12 +36,12 @@ export default async function ProgressPage() {
       </div>
       <Card>
         <CardHeader>
-          <CardTitle>最近学习时长</CardTitle>
+          <CardTitle>最近学习数据</CardTitle>
         </CardHeader>
         <CardContent className="text-sm text-muted-foreground">
           最近 7 天累计学习约 {overview.recentStudyMinutes} 分钟。
           <br />
-          复习正确率将在复习系统接入真实评分后展示。
+          复习正确率：{overview.reviewAccuracy == null ? "—" : `${overview.reviewAccuracy}%`}
         </CardContent>
       </Card>
     </div>

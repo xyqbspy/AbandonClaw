@@ -134,3 +134,25 @@ export async function generateSceneVariantsFromApi(params: {
   const variants = data.variants ?? [];
   return variants.map((variant, index) => toVariantLesson(variant, index));
 }
+
+export async function generatePersonalizedSceneFromApi(payload: {
+  promptText: string;
+  tone?: "natural" | "polite" | "casual" | "simple";
+  difficulty?: "easy" | "medium";
+  sentenceCount?: number;
+  reuseKnownChunks?: boolean;
+}) {
+  const response = await fetch("/api/scenes/generate", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    throw new Error(await extractError(response, "生成场景失败。"));
+  }
+  const data = (await response.json()) as { scene?: Lesson };
+  if (!data.scene) throw new Error("生成场景响应无效。");
+  return data.scene;
+}

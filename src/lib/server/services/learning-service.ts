@@ -7,6 +7,7 @@ import {
 } from "@/lib/server/db/types";
 import { getSceneRecordBySlug } from "@/lib/server/services/scene-service";
 import { getUserPhraseSummary } from "@/lib/server/phrases/service";
+import { getReviewSummary } from "@/lib/server/review/service";
 import { NotFoundError } from "@/lib/server/errors";
 
 const nowIso = () => new Date().toISOString();
@@ -68,12 +69,11 @@ export interface TodayLearningTasks {
   reviewTask: {
     done: boolean;
     reviewItemsCompleted: number;
-    placeholder: true;
+    dueReviewCount: number;
   };
   outputTask: {
     done: boolean;
     phrasesSavedToday: number;
-    placeholder: true;
   };
 }
 
@@ -398,15 +398,18 @@ export async function getContinueLearningScene(userId: string) {
 
 export async function getTodayLearningTasks(userId: string): Promise<TodayLearningTasks> {
   const admin = createSupabaseAdminClient();
-  const today = todayDate();
   const continueScene = await getContinueLearningScene(userId);
+  const [reviewSummary, statsQuery] = await Promise.all([
+    getReviewSummary(userId),
+    admin
+      .from("user_daily_learning_stats")
+      .select("*")
+      .eq("user_id", userId)
+      .eq("date", todayDate())
+      .maybeSingle<UserDailyLearningStatsRow>(),
+  ]);
 
-  const { data: statsRow, error: statsError } = await admin
-    .from("user_daily_learning_stats")
-    .select("*")
-    .eq("user_id", userId)
-    .eq("date", today)
-    .maybeSingle<UserDailyLearningStatsRow>();
+  const { data: statsRow, error: statsError } = statsQuery;
   if (statsError) {
     throwLearningQueryError("query today learning stats", statsError);
   }
@@ -421,14 +424,13 @@ export async function getTodayLearningTasks(userId: string): Promise<TodayLearni
       continueSceneSlug: continueScene?.sceneSlug ?? null,
     },
     reviewTask: {
-      done: reviewItemsCompleted > 0,
+      done: reviewSummary.dueReviewCount === 0 || reviewItemsCompleted > 0,
       reviewItemsCompleted,
-      placeholder: true,
+      dueReviewCount: reviewSummary.dueReviewCount,
     },
     outputTask: {
       done: phrasesSaved >= 1,
       phrasesSavedToday: phrasesSaved,
-      placeholder: true,
     },
   };
 }
@@ -451,7 +453,7 @@ const calculateStreakDays = (dates: string[]) => {
 export async function getLearningOverview(userId: string): Promise<LearningOverview> {
   const admin = createSupabaseAdminClient();
 
-  const [completedRes, inProgressRes, phraseSummary, recentStatsRes, streakRes] =
+  const [completedRes, inProgressRes, phraseSummary, recentStatsRes, streakRes, reviewSummary] =
     await Promise.all([
       admin
         .from("user_scene_progress")
@@ -477,6 +479,7 @@ export async function getLearningOverview(userId: string): Promise<LearningOverv
         .gt("study_seconds", 0)
         .order("date", { ascending: false })
         .limit(60),
+      getReviewSummary(userId),
     ]);
 
   if (completedRes.error) {
@@ -507,7 +510,7 @@ export async function getLearningOverview(userId: string): Promise<LearningOverv
     inProgressScenesCount: inProgressRes.count ?? 0,
     savedPhraseCount: totalSavedPhrases,
     recentStudyMinutes: Math.round(recentStudySeconds / 60),
-    reviewAccuracy: null,
+    reviewAccuracy: reviewSummary.reviewAccuracy,
   };
 }
 

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireCurrentProfile } from "@/lib/server/auth";
 import { toApiErrorResponse } from "@/lib/server/api-error";
 import { savePhraseForUser } from "@/lib/server/phrases/service";
+import { trackChunksForUser } from "@/lib/server/chunks/service";
 import {
   parseOptionalNonNegativeInt,
   parseOptionalTrimmedString,
@@ -53,6 +54,34 @@ export async function POST(request: Request) {
         500,
       ),
     });
+
+    const favoriteChunkText =
+      parseOptionalTrimmedString(payload.sourceChunkText, "sourceChunkText", 500) ??
+      parseOptionalTrimmedString(payload.text, "text", 200);
+    if (favoriteChunkText) {
+      try {
+        await trackChunksForUser(user.id, {
+          sceneSlug: parseOptionalTrimmedString(
+            payload.sourceSceneSlug,
+            "sourceSceneSlug",
+            200,
+          ),
+          sentenceIndex: parseOptionalNonNegativeInt(
+            payload.sourceSentenceIndex,
+            "sourceSentenceIndex",
+          ),
+          sentenceText: parseOptionalTrimmedString(
+            payload.sourceSentenceText,
+            "sourceSentenceText",
+            3000,
+          ),
+          chunks: [favoriteChunkText],
+          interactionType: "favorite",
+        });
+      } catch (trackError) {
+        console.warn("[user-chunks] favorite tracking failed", trackError);
+      }
+    }
 
     return NextResponse.json(result, { status: 200 });
   } catch (error) {

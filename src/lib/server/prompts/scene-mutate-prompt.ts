@@ -67,7 +67,15 @@ export function buildSceneMutateUserPrompt(input: {
   variantCount: number;
   retainChunkRatio: number;
   theme?: string;
+  preferredKnownChunks?: string[];
 }) {
+  const preferredKnownChunks =
+    input.preferredKnownChunks && input.preferredKnownChunks.length > 0
+      ? input.preferredKnownChunks.join(", ")
+      : "none";
+  const minKnownChunkReuse =
+    (input.preferredKnownChunks?.length ?? 0) >= 2 ? "at least 2" : "if suitable";
+
   return `Generate ${input.variantCount} scene variants from the following scene.
 
 Goal:
@@ -83,6 +91,11 @@ Important mutation rules:
 6) Avoid making the variant longer or more complex.
 7) Maintain the same conversational tone and meaning.
 8) The learner should feel: "This is the same scene, but I learned another natural way to say it."
+9) Keep sentence count close to original scene.
+10) Keep total length close to original scene.
+11) Each variant should replace at least 2 chunks in natural spoken English.
+12) Prefer reusing known user chunks when they naturally fit.
+13) If a known chunk does not fit the context, skip it instead of forcing.
 
 Good chunk-based re-expression examples:
 
@@ -114,6 +127,8 @@ Bad variants:
 "You're really running on empty."
 
 Theme hint (optional): ${input.theme ?? "none"}
+retainChunkRatio target: ${input.retainChunkRatio}
+Known user chunk candidates (prefer reuse, ${minKnownChunkReuse} if possible): ${preferredKnownChunks}
 
 Original scene JSON:
 ${input.sceneJson}

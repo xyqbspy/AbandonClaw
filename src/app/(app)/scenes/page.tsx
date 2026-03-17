@@ -1,9 +1,10 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
+import { GenerateSceneSheet } from "@/components/scenes/generate-scene-sheet";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -37,6 +38,7 @@ B: Yeah, I'm stuck at the office.`;
 export default function ScenesPage() {
   const router = useRouter();
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [generateSheetOpen, setGenerateSheetOpen] = useState(false);
   const [input, setInput] = useState("");
   const [error, setError] = useState("");
   const [importing, setImporting] = useState(false);
@@ -142,6 +144,12 @@ export default function ScenesPage() {
     }
   };
 
+  const handleGenerateSuccess = async (scene: { slug: string; title: string }) => {
+    await refreshScenes({ preferCache: false });
+    toast.success("新场景已生成");
+    router.push(`/scene/${scene.slug}`);
+  };
+
   const handleDeleteCustomScene = async (scene: SceneListItemResponse) => {
     const confirmed = window.confirm(`确认删除“${scene.title}”？`);
     if (!confirmed) return;
@@ -177,7 +185,7 @@ export default function ScenesPage() {
                     <button
                       type="button"
                       data-scene-delete="true"
-                      aria-label="删除场景"
+                      aria-label="鍒犻櫎鍦烘櫙"
                       className="inline-flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                       onPointerDown={(event) => event.stopPropagation()}
                       onClick={(event) => {
@@ -233,7 +241,6 @@ export default function ScenesPage() {
 
   useEffect(() => {
     if (process.env.NODE_ENV !== "development") return;
-    // eslint-disable-next-line no-console
     console.debug("[scene-list-cache][debug]", {
       source: listDataSource,
       count: allScenes.length,
@@ -262,6 +269,15 @@ export default function ScenesPage() {
               type="button"
               size="sm"
               className="h-7 cursor-pointer shrink-0 px-2 text-[11px]"
+              variant="outline"
+              onClick={() => setGenerateSheetOpen(true)}
+            >
+              生成我的场景
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              className="h-7 cursor-pointer shrink-0 px-2 text-[11px]"
               onClick={() => setDialogOpen(true)}
             >
               <Plus className="size-3" />
@@ -272,6 +288,12 @@ export default function ScenesPage() {
       </Card>
 
       {renderSceneCards()}
+
+      <GenerateSceneSheet
+        open={generateSheetOpen}
+        onOpenChange={setGenerateSheetOpen}
+        onGenerated={handleGenerateSuccess}
+      />
 
       {dialogOpen ? (
         <div className="fixed inset-0 z-50 flex items-end bg-black/25 p-3 animate-in fade-in-0 duration-200 sm:items-center sm:justify-center sm:p-6">
@@ -338,3 +360,5 @@ export default function ScenesPage() {
     </div>
   );
 }
+
+

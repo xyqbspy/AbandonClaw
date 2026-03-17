@@ -14,6 +14,10 @@ import {
   parseVariantCount,
 } from "@/lib/server/validation";
 import { ParsedScene } from "@/lib/types/scene-parser";
+import {
+  extractChunkTextsFromParsedScene,
+  trackChunksForUser,
+} from "@/lib/server/chunks/service";
 
 interface GenerateVariantsPayload {
   variantCount?: unknown;
@@ -89,6 +93,20 @@ export async function POST(
       createdBy: user.id,
       model: process.env.GLM_MODEL ?? "glm-4.6",
     });
+
+    const sourceChunks = extractChunkTextsFromParsedScene(sourceScene);
+    if (sourceChunks.length > 0) {
+      try {
+        await trackChunksForUser(user.id, {
+          sceneId,
+          sceneSlug: scene.row.slug,
+          chunks: sourceChunks,
+          interactionType: "practice",
+        });
+      } catch (trackError) {
+        console.warn("[user-chunks] variant tracking failed", trackError);
+      }
+    }
 
     return NextResponse.json(
       {

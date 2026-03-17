@@ -7,6 +7,7 @@ import {
   listUserSavedPhrases,
 } from "@/lib/server/phrases/service";
 import { normalizePhraseText } from "@/lib/shared/phrases";
+import { UserPhraseReviewStatus } from "@/lib/server/db/types";
 
 const parsePositiveInt = (
   value: string | null,
@@ -50,6 +51,20 @@ export async function GET(request: Request) {
           : (() => {
               throw new ValidationError("status must be saved or archived.");
             })();
+    const reviewStatusRaw = searchParams.get("reviewStatus");
+    const reviewStatus: UserPhraseReviewStatus | "all" =
+      reviewStatusRaw === "saved" ||
+      reviewStatusRaw === "reviewing" ||
+      reviewStatusRaw === "mastered" ||
+      reviewStatusRaw === "archived"
+        ? reviewStatusRaw
+        : reviewStatusRaw === "all" || !reviewStatusRaw
+          ? "all"
+          : (() => {
+              throw new ValidationError(
+                "reviewStatus must be all/saved/reviewing/mastered/archived.",
+              );
+            })();
 
     const result = await listUserSavedPhrases({
       userId: user.id,
@@ -57,6 +72,7 @@ export async function GET(request: Request) {
       page,
       limit,
       status,
+      reviewStatus,
     });
 
     return NextResponse.json(result, { status: 200 });

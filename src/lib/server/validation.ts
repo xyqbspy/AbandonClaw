@@ -125,3 +125,12 @@ export const parseOptionalStatusFilter = (
   }
   return normalized;
 };
+
+export type ReviewResult = "again" | "hard" | "good";
+
+export const parseReviewResult = (value: unknown): ReviewResult => {
+  if (value === "again" || value === "hard" || value === "good") {
+    return value;
+  }
+  throw new ValidationError("reviewResult must be one of again/hard/good.");
+};

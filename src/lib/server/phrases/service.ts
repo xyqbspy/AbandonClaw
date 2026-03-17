@@ -3,6 +3,7 @@ import {
   PhraseRow,
   UserDailyLearningStatsRow,
   UserPhraseRow,
+  UserPhraseReviewStatus,
   UserSceneProgressRow,
 } from "@/lib/server/db/types";
 import { normalizePhraseText } from "@/lib/shared/phrases";
@@ -39,6 +40,13 @@ export interface UserSavedPhraseItem {
   sourceChunkText: string | null;
   savedAt: string;
   lastSeenAt: string;
+  reviewStatus: UserPhraseReviewStatus;
+  reviewCount: number;
+  correctCount: number;
+  incorrectCount: number;
+  lastReviewedAt: string | null;
+  nextReviewAt: string | null;
+  masteredAt: string | null;
 }
 
 const parseOptionalTrimmed = (value: unknown, maxLength = 500) => {
@@ -74,6 +82,13 @@ const mapSavedPhraseRow = (row: UserPhraseRow & { phrase: PhraseRow | null }): U
   sourceChunkText: row.source_chunk_text,
   savedAt: row.saved_at,
   lastSeenAt: row.last_seen_at,
+  reviewStatus: row.review_status,
+  reviewCount: row.review_count,
+  correctCount: row.correct_count,
+  incorrectCount: row.incorrect_count,
+  lastReviewedAt: row.last_reviewed_at,
+  nextReviewAt: row.next_review_at,
+  masteredAt: row.mastered_at,
 });
 
 async function ensurePhraseEntity(input: {
@@ -247,6 +262,20 @@ export async function savePhraseForUser(userId: string, input: SavePhraseInput) 
     user_id: userId,
     phrase_id: phrase.id,
     status: "saved" as const,
+    // MVP review loop: new saved phrases should be immediately due once,
+    // so users can see "today due" and complete their first review quickly.
+    review_status:
+      existing?.review_status === "archived"
+        ? ("saved" as const)
+        : (existing?.review_status ?? ("saved" as const)),
+    review_count: existing?.review_count ?? 0,
+    correct_count: existing?.correct_count ?? 0,
+    incorrect_count: existing?.incorrect_count ?? 0,
+    last_reviewed_at: existing?.last_reviewed_at ?? null,
+    next_review_at:
+      existing?.next_review_at ??
+      (existing?.review_status === "mastered" ? null : now),
+    mastered_at: existing?.mastered_at ?? null,
     source_scene_id: sourceSceneId ?? existing?.source_scene_id ?? null,
     source_scene_slug: sourceSceneSlug ?? existing?.source_scene_slug ?? null,
     source_sentence_index:
@@ -295,6 +324,7 @@ export async function listUserSavedPhrases(params: {
   userId: string;
   query?: string;
   status?: "saved" | "archived";
+  reviewStatus?: UserPhraseReviewStatus | "all";
   page?: number;
   limit?: number;
 }) {
@@ -312,6 +342,9 @@ export async function listUserSavedPhrases(params: {
     .range(from, to);
 
   query = query.eq("status", params.status ?? "saved");
+  if (params.reviewStatus && params.reviewStatus !== "all") {
+    query = query.eq("review_status", params.reviewStatus);
+  }
 
   const textQuery = params.query?.trim();
   if (textQuery) {
