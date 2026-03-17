@@ -8,6 +8,46 @@ import { isAdminEmail } from "@/lib/shared/admin";
 const isMissingSessionError = (message: string) =>
   message.toLowerCase().includes("auth session missing");
 
+const isTransientAuthNetworkError = (message: string) => {
+  const lower = message.toLowerCase();
+  return (
+    lower.includes("fetch failed") ||
+    lower.includes("connect timeout") ||
+    lower.includes("und_err_connect_timeout")
+  );
+};
+
+const waitMs = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function withAuthRetry<T>(
+  label: "getSession" | "getUser",
+  fn: () => Promise<{ data: T; error: { message: string } | null }>,
+) {
+  let lastError: { message: string } | null = null;
+
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    const result = await fn();
+    if (!result.error) return result;
+    lastError = result.error;
+
+    if (!isTransientAuthNetworkError(result.error.message) || attempt >= 2) {
+      break;
+    }
+
+    console.warn("[auth] transient network error, retrying", {
+      label,
+      attempt,
+      message: result.error.message,
+    });
+    await waitMs(250);
+  }
+
+  return {
+    data: {} as T,
+    error: lastError,
+  };
+}
+
 const defaultUsernameFromUser = (user: User) =>
   user.user_metadata?.username ||
   user.email?.split("@")[0] ||
@@ -15,9 +55,16 @@ const defaultUsernameFromUser = (user: User) =>
 
 export async function getCurrentSession(): Promise<Session | null> {
   const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase.auth.getSession();
+  const { data, error } = await withAuthRetry("getSession", () =>
+    supabase.auth.getSession(),
+  );
   if (error) {
     if (isMissingSessionError(error.message)) return null;
+    if (isTransientAuthNetworkError(error.message)) {
+      throw new Error(
+        "Supabase auth network timeout while reading session. Please retry.",
+      );
+    }
     throw new Error(error.message);
   }
   return data.session;
@@ -25,9 +72,16 @@ export async function getCurrentSession(): Promise<Session | null> {
 
 export async function getCurrentUser(): Promise<User | null> {
   const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase.auth.getUser();
+  const { data, error } = await withAuthRetry("getUser", () =>
+    supabase.auth.getUser(),
+  );
   if (error) {
     if (isMissingSessionError(error.message)) return null;
+    if (isTransientAuthNetworkError(error.message)) {
+      throw new Error(
+        "Supabase auth network timeout while reading current user. Please retry.",
+      );
+    }
     throw new Error(error.message);
   }
   return data.user;

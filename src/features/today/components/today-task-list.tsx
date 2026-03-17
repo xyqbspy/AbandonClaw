@@ -7,7 +7,7 @@ export function TodayTaskList({ tasks }: { tasks: DailyTask[] }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>今日任务</CardTitle>
+        <CardTitle>{"\u4eca\u65e5\u4efb\u52a1"}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
         {tasks.map((task) => (
@@ -34,7 +34,9 @@ export function TodayTaskList({ tasks }: { tasks: DailyTask[] }) {
                   : "bg-primary text-primary-foreground hover:bg-primary/90"
               }`}
             >
-              {task.done ? "已完成" : `开始（${task.durationMinutes} 分钟）`}
+              {task.done
+                ? "\u5df2\u5b8c\u6210"
+                : `\u5f00\u59cb\uff08${task.durationMinutes} \u5206\u949f\uff09`}
             </Link>
           </div>
         ))}

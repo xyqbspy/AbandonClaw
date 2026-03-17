@@ -6,11 +6,12 @@ import {
 import { UserPhraseItemResponse } from "@/lib/utils/phrases-api";
 
 export type PhraseListCacheRecord = {
-  schemaVersion: "phrase-list-cache-v1";
+  schemaVersion: "phrase-list-cache-v2";
   key: string;
   type: "phrase_list";
   query: string;
   status: "saved" | "archived";
+  reviewStatus: "saved" | "reviewing" | "mastered" | "archived" | "all";
   page: number;
   limit: number;
   data: {
@@ -24,7 +25,7 @@ export type PhraseListCacheRecord = {
   expiresAt: number;
 };
 
-const CACHE_SCHEMA_VERSION: PhraseListCacheRecord["schemaVersion"] = "phrase-list-cache-v1";
+const CACHE_SCHEMA_VERSION: PhraseListCacheRecord["schemaVersion"] = "phrase-list-cache-v2";
 const PHRASE_LIST_TTL_MS = 24 * 60 * 60 * 1000;
 
 const memoryPhraseListRecords = new Map<string, PhraseListCacheRecord>();
@@ -36,10 +37,11 @@ const normalizeQuery = (query: string) => query.trim().toLowerCase();
 const cacheKey = (params: {
   query: string;
   status: "saved" | "archived";
+  reviewStatus: "saved" | "reviewing" | "mastered" | "archived" | "all";
   page: number;
   limit: number;
 }) =>
-  `phrase-list:v1:${params.status}:q=${encodeURIComponent(normalizeQuery(params.query))}:p=${params.page}:l=${params.limit}`;
+  `phrase-list:v2:${params.status}:r=${params.reviewStatus}:q=${encodeURIComponent(normalizeQuery(params.query))}:p=${params.page}:l=${params.limit}`;
 
 const isPhraseListItemValid = (item: UserPhraseItemResponse) =>
   typeof item?.userPhraseId === "string" &&
@@ -55,6 +57,7 @@ const isPhraseListCacheValid = (record: PhraseListCacheRecord, expectedKey: stri
   record.schemaVersion === CACHE_SCHEMA_VERSION &&
   record.key === expectedKey &&
   record.type === "phrase_list" &&
+  ["saved", "reviewing", "mastered", "archived", "all"].includes(record.reviewStatus) &&
   Array.isArray(record.data?.rows) &&
   record.data.rows.every(isPhraseListItemValid) &&
   Number.isFinite(record.data.total) &&
@@ -69,6 +72,7 @@ const debugLog = (...args: unknown[]) => {
 export async function getPhraseListCache(params: {
   query: string;
   status?: "saved" | "archived";
+  reviewStatus?: "saved" | "reviewing" | "mastered" | "archived" | "all";
   page?: number;
   limit?: number;
 }): Promise<{
@@ -79,6 +83,7 @@ export async function getPhraseListCache(params: {
   const normalizedParams = {
     query: params.query ?? "",
     status: params.status ?? "saved",
+    reviewStatus: params.reviewStatus ?? "all",
     page: params.page ?? 1,
     limit: params.limit ?? 100,
   };
@@ -116,6 +121,7 @@ export async function setPhraseListCache(
   params: {
     query: string;
     status?: "saved" | "archived";
+    reviewStatus?: "saved" | "reviewing" | "mastered" | "archived" | "all";
     page?: number;
     limit?: number;
   },
@@ -133,6 +139,7 @@ export async function setPhraseListCache(
   const normalizedParams = {
     query: params.query ?? "",
     status: params.status ?? "saved",
+    reviewStatus: params.reviewStatus ?? "all",
     page: params.page ?? 1,
     limit: params.limit ?? 100,
   };
@@ -144,6 +151,7 @@ export async function setPhraseListCache(
     type: "phrase_list",
     query: normalizeQuery(normalizedParams.query),
     status: normalizedParams.status,
+    reviewStatus: normalizedParams.reviewStatus,
     page: normalizedParams.page,
     limit: normalizedParams.limit,
     data: payload,

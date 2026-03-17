@@ -1,3 +1,4 @@
+import { clearLearningDashboardCache } from "@/lib/cache/learning-dashboard-cache";
 import { normalizePhraseText } from "@/lib/shared/phrases";
 
 interface ApiErrorBody {
@@ -11,7 +12,7 @@ const toApiError = async (response: Response, fallback: string) => {
       return new Error(body.error);
     }
   } catch {
-    // ignore parse error
+    // Ignore parse error.
   }
   return new Error(fallback);
 };
@@ -64,13 +65,17 @@ export async function savePhraseFromApi(payload: {
     body: JSON.stringify(payload),
   });
   if (!response.ok) {
-    throw await toApiError(response, "收藏短语失败。");
+    throw await toApiError(response, "\u6536\u85cf\u77ed\u8bed\u5931\u8d25\u3002");
   }
-  return (await response.json()) as {
+  const data = (await response.json()) as {
     created: boolean;
     phrase: { id: string; normalized_text: string; display_text: string };
     userPhrase: { id: string };
   };
+  void clearLearningDashboardCache().catch(() => {
+    // Non-blocking.
+  });
+  return data;
 }
 
 export async function getMyPhrasesFromApi(params?: {
@@ -91,7 +96,7 @@ export async function getMyPhrasesFromApi(params?: {
     method: "GET",
   });
   if (!response.ok) {
-    throw await toApiError(response, "加载收藏短语失败。");
+    throw await toApiError(response, "\u52a0\u8f7d\u6536\u85cf\u77ed\u8bed\u5931\u8d25\u3002");
   }
   return (await response.json()) as {
     rows: UserPhraseItemResponse[];
@@ -104,7 +109,7 @@ export async function getMyPhrasesFromApi(params?: {
 export async function getPhraseSummaryFromApi() {
   const response = await fetch("/api/phrases/summary", { method: "GET" });
   if (!response.ok) {
-    throw await toApiError(response, "加载短语统计失败。");
+    throw await toApiError(response, "\u52a0\u8f7d\u77ed\u8bed\u7edf\u8ba1\u5931\u8d25\u3002");
   }
   return (await response.json()) as PhraseSummaryResponse;
 }
@@ -119,7 +124,7 @@ export async function getSavedNormalizedPhraseTextsFromApi(texts: string[]) {
     { method: "GET" },
   );
   if (!response.ok) {
-    throw await toApiError(response, "读取已收藏短语状态失败。");
+    throw await toApiError(response, "\u8bfb\u53d6\u5df2\u6536\u85cf\u77ed\u8bed\u72b6\u6001\u5931\u8d25\u3002");
   }
   const data = (await response.json()) as { texts?: string[] };
   return data.texts ?? [];

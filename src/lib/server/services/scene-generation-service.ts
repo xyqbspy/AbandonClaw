@@ -133,6 +133,7 @@ export async function generatePersonalizedSceneForUser(
   userId: string,
   rawInput: GeneratePersonalizedSceneInput,
 ) {
+  const runId = `sg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const promptText = toOptionalTrimmed(rawInput.promptText, 800);
   if (!promptText) {
     throw new ValidationError("promptText is required.");
@@ -143,6 +144,15 @@ export async function generatePersonalizedSceneForUser(
   const difficulty = normalizeDifficulty(rawInput.difficulty);
   const reuseKnownChunks = rawInput.reuseKnownChunks !== false;
   const model = process.env.GLM_MODEL ?? "glm-4.6";
+  console.log("[scene.generate] start", {
+    runId,
+    userId,
+    model,
+    tone: tone ?? null,
+    difficulty,
+    sentenceCount,
+    reuseKnownChunks,
+  });
 
   const knownChunkCandidates = reuseKnownChunks
     ? await getUserChunkCandidatesForSceneGeneration(userId, {
@@ -166,12 +176,14 @@ export async function generatePersonalizedSceneForUser(
     knownChunksHash,
   });
 
+  console.log("[scene.generate] cache lookup", { runId, cacheKey });
   const cached = await getAiCacheByKey(cacheKey);
   let generatedSourceText: string;
   let generatedTitle: string | undefined;
   let generatedTheme: string | undefined;
 
   if (cached) {
+    console.log("[scene.generate] cache hit", { runId, cacheKey });
     const cachedValue = getPromptFromCache(cached.output_json);
     if (cachedValue) {
       generatedSourceText = cachedValue.generatedSourceText;
@@ -181,10 +193,13 @@ export async function generatePersonalizedSceneForUser(
       generatedSourceText = "";
     }
   } else {
+    console.log("[scene.generate] cache miss", { runId, cacheKey });
     generatedSourceText = "";
   }
 
   if (!generatedSourceText) {
+    console.log("[scene.generate] calling glm", { runId, model, cacheKey });
+    const glmStartMs = Date.now();
     const rawModelText = await callGlmChatCompletion({
       model,
       systemPrompt: SCENE_GENERATE_SYSTEM_PROMPT,
@@ -198,11 +213,28 @@ export async function generatePersonalizedSceneForUser(
       }),
       temperature: 0.35,
     });
+    console.log("[scene.generate] glm returned", {
+      runId,
+      elapsedMs: Date.now() - glmStartMs,
+      contentLength: rawModelText.length,
+      contentPreview: rawModelText.slice(0, 200),
+    });
 
+    console.log("[scene.generate] parsing content", { runId });
     const parsed = parseJsonWithFallback(rawModelText);
     if (!isGeneratedSceneDraft(parsed)) {
+      console.error("[scene.generate] parsed invalid", {
+        runId,
+        parsedType: typeof parsed,
+        parsedPreview: JSON.stringify(parsed).slice(0, 400),
+      });
       throw new Error("Generated scene draft JSON is invalid.");
     }
+    console.log("[scene.generate] parsed ok", {
+      runId,
+      title: parsed.title,
+      lineCount: parsed.lines.length,
+    });
 
     generatedSourceText = toDraftSourceText(parsed);
     generatedTitle = parsed.title.trim();
@@ -241,15 +273,24 @@ export async function generatePersonalizedSceneForUser(
       promptVersion: SCENE_GENERATE_PROMPT_VERSION,
       createdBy: userId,
     });
+    console.log("[scene.generate] cache write ok", { runId, cacheKey });
   }
 
+  console.log("[scene.generate] parse scene before", { runId, model });
   const parsed = await parseImportedSceneWithCache({
     sourceText: generatedSourceText,
     sourceLanguage: "en",
     userId,
     model,
   });
+  console.log("[scene.generate] parse scene after", {
+    runId,
+    parseCacheKey: parsed.cacheKey,
+    parseSource: parsed.source,
+    parseCacheStatus: parsed.cacheStatus,
+  });
 
+  console.log("[scene.generate] inserting scene", { runId });
   const scene = await createImportedScene({
     userId,
     sourceText: generatedSourceText,
@@ -259,6 +300,12 @@ export async function generatePersonalizedSceneForUser(
     model,
     promptVersion: SCENE_GENERATE_PROMPT_VERSION,
     cacheKey,
+  });
+  console.log("[scene.generate] insert ok", {
+    runId,
+    sceneId: scene.id,
+    sceneSlug: scene.slug,
+    title: scene.title,
   });
 
   return {
