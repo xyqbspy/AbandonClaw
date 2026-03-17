@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { requireCurrentProfile } from "@/lib/server/auth";
-import { toApiErrorResponse } from "@/lib/server/api-error";
 import { parseRequiredTrimmedString } from "@/lib/server/validation";
 import { generatePersonalizedSceneForUser } from "@/lib/server/services/scene-generation-service";
 
