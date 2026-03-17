@@ -45,6 +45,8 @@ export default function ScenesPage() {
   const [loading, setLoading] = useState(true);
   const [allScenes, setAllScenes] = useState<SceneListItemResponse[]>([]);
   const [listDataSource, setListDataSource] = useState<"none" | "cache" | "network">("none");
+  const [confirmDeleteSceneId, setConfirmDeleteSceneId] = useState<string | null>(null);
+  const [deletingSceneId, setDeletingSceneId] = useState<string | null>(null);
   const activeLoadTokenRef = useRef(0);
 
   const refreshScenes = async (options?: { preferCache?: boolean }) => {
@@ -145,14 +147,17 @@ export default function ScenesPage() {
   };
 
   const handleDeleteCustomScene = async (scene: SceneListItemResponse) => {
-    const confirmed = window.confirm(`确认删除“${scene.title}”？`);
-    if (!confirmed) return;
+    if (deletingSceneId) return;
+    setDeletingSceneId(scene.id);
     try {
       await deleteSceneBySlugFromApi(scene.slug);
       await refreshScenes({ preferCache: false });
       toast.success("自定义场景已删除。");
+      setConfirmDeleteSceneId(null);
     } catch (deleteError) {
       toast.error(deleteError instanceof Error ? deleteError.message : "删除失败。");
+    } finally {
+      setDeletingSceneId(null);
     }
   };
 
@@ -176,20 +181,56 @@ export default function ScenesPage() {
                     {scene.title}
                   </CardTitle>
                   {isImported ? (
-                    <button
-                      type="button"
-                      data-scene-delete="true"
-                      aria-label="鍒犻櫎鍦烘櫙"
-                      className="inline-flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                      onPointerDown={(event) => event.stopPropagation()}
-                      onClick={(event) => {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        void handleDeleteCustomScene(scene);
-                      }}
-                    >
-                      <Trash2 className="size-3.5" />
-                    </button>
+                    <div className="relative shrink-0">
+                      <button
+                        type="button"
+                        data-scene-delete="true"
+                        aria-label="删除场景"
+                        className="inline-flex h-6 w-6 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                        onPointerDown={(event) => event.stopPropagation()}
+                        onClick={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          setConfirmDeleteSceneId((prev) => (prev === scene.id ? null : scene.id));
+                        }}
+                      >
+                        <Trash2 className="size-3.5" />
+                      </button>
+                      {confirmDeleteSceneId === scene.id ? (
+                        <div
+                          className="absolute right-0 top-7 z-20 w-40 rounded-md border border-border/70 bg-background p-2 shadow-sm"
+                          onPointerDown={(event) => event.stopPropagation()}
+                          onClick={(event) => event.stopPropagation()}
+                        >
+                          <p className="text-xs text-muted-foreground">删除这个场景？</p>
+                          <div className="mt-1.5 flex justify-end gap-1.5">
+                            <button
+                              type="button"
+                              className="rounded border px-2 py-0.5 text-[11px] text-muted-foreground hover:bg-muted"
+                              onClick={(event) => {
+                                event.preventDefault();
+                                event.stopPropagation();
+                                setConfirmDeleteSceneId(null);
+                              }}
+                            >
+                              取消
+                            </button>
+                            <button
+                              type="button"
+                              className="rounded border border-destructive/30 px-2 py-0.5 text-[11px] text-destructive hover:bg-destructive/5 disabled:opacity-60"
+                              disabled={deletingSceneId === scene.id}
+                              onClick={(event) => {
+                                event.preventDefault();
+                                event.stopPropagation();
+                                void handleDeleteCustomScene(scene);
+                              }}
+                            >
+                              {deletingSceneId === scene.id ? "删除中..." : "删除"}
+                            </button>
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
                   ) : null}
                 </div>
                 <p className="line-clamp-1 text-[11px] text-muted-foreground">{scene.subtitle}</p>
