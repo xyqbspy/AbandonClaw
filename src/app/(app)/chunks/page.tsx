@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Search } from "lucide-react";
+import { ChevronDown, Search } from "lucide-react";
 import { toast } from "sonner";
 import { getPhraseListCache, setPhraseListCache } from "@/lib/cache/phrase-list-cache";
 import { normalizePhraseText } from "@/lib/shared/phrases";
@@ -238,6 +238,7 @@ export default function ChunksPage() {
   const [addingFamily, setAddingFamily] = useState(false);
   const [mapOpeningForId, setMapOpeningForId] = useState<string | null>(null);
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
+  const [expandedCardIds, setExpandedCardIds] = useState<Record<string, boolean>>({});
 
   const activeLoadTokenRef = useRef(0);
 
@@ -493,17 +494,15 @@ export default function ChunksPage() {
     setExpandedIds((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
+  const toggleCardExpanded = (id: string) => {
+    setExpandedCardIds((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
   const getUsageHint = (item: UserPhraseItemResponse) => {
     const raw = (item.usageNote ?? "").trim();
     if (raw.length === 0) return zh.usageHintFallback;
     if (raw.length <= 70) return raw;
     return `${raw.slice(0, 70)}...`;
-  };
-
-  const getReviewStageHint = (status: PhraseReviewStatus) => {
-    if (status === "reviewing") return zh.reviewStageReviewingHint;
-    if (status === "mastered") return zh.reviewStageMasteredHint;
-    return zh.reviewStageSavedHint;
   };
 
   const getReviewActionHint = (status: PhraseReviewStatus) => {
@@ -608,99 +607,115 @@ export default function ChunksPage() {
       ) : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {phrases.map((item) => (
-            <Card key={item.userPhraseId} className="h-full">
-              <CardHeader className="space-y-2">
-                <div className="rounded-xl border border-border/70 bg-muted/40 p-3">
-                  <p className="text-xs text-muted-foreground">{zh.expressionUnit}</p>
-                  <p className="mt-1 text-lg font-semibold leading-snug">{item.text}</p>
-                </div>
-                <p className="line-clamp-2 text-sm text-muted-foreground">
-                  {item.translation ?? zh.noTranslation}
-                </p>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">{zh.usageHint}</p>
-                  <p className="line-clamp-2 text-sm text-foreground/90">{getUsageHint(item)}</p>
-                </div>
-                <div className="space-y-1 text-sm text-muted-foreground">
-                  <p className="font-medium text-foreground/80">{zh.sourceSentence}</p>
-                  <p className="line-clamp-2">
-                    {item.sourceSentenceText
-                      ? renderSentenceWithExpressionHighlight(item.sourceSentenceText, item.text)
-                      : zh.noSourceSentence}
-                  </p>
-                </div>
-                <div className="rounded-lg border border-border/60 p-2.5">
-                  <div className="flex items-center gap-2">
-                    <Badge variant="secondary">{reviewStatusLabel[item.reviewStatus]}</Badge>
-                    <p className="text-xs text-muted-foreground">{zh.reviewStage}</p>
+            <Card key={item.userPhraseId} className="h-full overflow-hidden">
+              <CardHeader className="px-3 py-2.5">
+                <button
+                  type="button"
+                  className="w-full text-left"
+                  onClick={() => toggleCardExpanded(item.userPhraseId)}
+                  aria-expanded={Boolean(expandedCardIds[item.userPhraseId])}
+                  aria-label={item.text}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-[11px] text-muted-foreground">{zh.expressionUnit}</p>
+                      <p className="mt-0.5 text-[15px] font-semibold leading-snug">{item.text}</p>
+                      <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
+                        {item.translation ?? zh.noTranslation}
+                      </p>
+                    </div>
+                    <div className="mt-0.5 flex shrink-0 items-center gap-1.5">
+                      <Badge variant="secondary">{reviewStatusLabel[item.reviewStatus]}</Badge>
+                      <ChevronDown
+                        className={`size-4 text-muted-foreground transition-transform duration-200 ${
+                          expandedCardIds[item.userPhraseId] ? "rotate-180" : "rotate-0"
+                        }`}
+                      />
+                    </div>
                   </div>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {getReviewStageHint(item.reviewStatus)}
-                  </p>
-                  <p className="mt-1 text-xs text-foreground/80">{getReviewActionHint(item.reviewStatus)}</p>
-                </div>
-                {item.usageNote && item.usageNote.trim().length > 70 ? (
-                  <div className="space-y-1">
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      className="h-auto px-0 text-xs text-muted-foreground"
-                      onClick={() => toggleExpanded(item.userPhraseId)}
-                    >
-                      {expandedIds[item.userPhraseId] ? zh.collapseDetail : zh.expandDetail}
-                    </Button>
-                    {expandedIds[item.userPhraseId] ? (
-                      <div className="space-y-2 rounded-lg border border-border/60 p-2.5">
-                        <div className="space-y-1">
+                </button>
+              </CardHeader>
+              <div
+                className={`overflow-hidden border-t border-border/50 transition-all duration-200 ${
+                  expandedCardIds[item.userPhraseId]
+                    ? "max-h-[560px] opacity-100"
+                    : "max-h-0 opacity-0"
+                }`}
+              >
+                <CardContent className="space-y-3.5 p-3 pt-2.5 pb-2">
+                  <div className="space-y-0.5">
+                    <p className="text-xs text-muted-foreground">{zh.usageHint}</p>
+                    <p className="line-clamp-2 text-sm text-foreground/90">{getUsageHint(item)}</p>
+                  </div>
+                  <div className="space-y-0.5">
+                    <p className="text-xs text-muted-foreground">{zh.sourceSentence}</p>
+                    <p className="line-clamp-2 text-sm text-muted-foreground">
+                      {item.sourceSentenceText
+                        ? renderSentenceWithExpressionHighlight(item.sourceSentenceText, item.text)
+                        : zh.noSourceSentence}
+                    </p>
+                  </div>
+                  <div className="space-y-0.5">
+                    <p className="text-xs text-muted-foreground">{zh.reviewStage}</p>
+                    <p className="text-xs text-foreground/80">{getReviewActionHint(item.reviewStatus)}</p>
+                  </div>
+                  {item.usageNote && item.usageNote.trim().length > 70 ? (
+                    <div className="space-y-1.5">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="h-auto px-0 text-xs text-muted-foreground"
+                        onClick={() => toggleExpanded(item.userPhraseId)}
+                      >
+                        {expandedIds[item.userPhraseId] ? zh.collapseDetail : zh.expandDetail}
+                      </Button>
+                      {expandedIds[item.userPhraseId] ? (
+                        <div className="space-y-1.5 pt-0.5">
                           <p className="text-xs text-muted-foreground">{zh.inThisSentence}</p>
                           <p className="text-sm text-foreground/90">
                             {item.translation ?? zh.noTranslation}
                           </p>
-                        </div>
-                        <div className="space-y-1">
                           <p className="text-xs text-muted-foreground">{zh.commonUsage}</p>
                           <p className="text-sm text-muted-foreground">{item.usageNote}</p>
                         </div>
-                      </div>
-                    ) : null}
-                  </div>
-                ) : null}
-              </CardContent>
-              <CardFooter className="flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={() => startReviewFromCard(item)}
-                >
-                  {getPrimaryActionLabel(item)}
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  disabled={!item.expressionFamilyId}
-                  onClick={() => void openExpressionMap(item)}
-                >
-                  {!item.expressionFamilyId
-                    ? zh.mapUnavailable
-                    : mapOpeningForId === item.userPhraseId
-                      ? zh.mapPending
-                      : zh.openMap}
-                </Button>
-                {item.sourceSceneSlug ? (
+                      ) : null}
+                    </div>
+                  ) : null}
+                </CardContent>
+                <CardFooter className="flex flex-wrap gap-2 border-t border-border/40 px-3 py-2.5">
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => startReviewFromCard(item)}
+                  >
+                    {getPrimaryActionLabel(item)}
+                  </Button>
                   <Button
                     type="button"
                     size="sm"
                     variant="outline"
-                    onClick={() => router.push(`/scene/${item.sourceSceneSlug}`)}
+                    disabled={!item.expressionFamilyId}
+                    onClick={() => void openExpressionMap(item)}
                   >
-                    {zh.sourceScene}
+                    {!item.expressionFamilyId
+                      ? zh.mapUnavailable
+                      : mapOpeningForId === item.userPhraseId
+                        ? zh.mapPending
+                        : zh.openMap}
                   </Button>
-                ) : null}
-              </CardFooter>
+                  {item.sourceSceneSlug ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => router.push(`/scene/${item.sourceSceneSlug}`)}
+                    >
+                      {zh.sourceScene}
+                    </Button>
+                  ) : null}
+                </CardFooter>
+              </div>
             </Card>
           ))}
         </div>
