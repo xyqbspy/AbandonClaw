@@ -21,23 +21,41 @@ const waitMs = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
 async function withAuthRetry<T>(
   label: "getSession" | "getUser",
-  fn: () => Promise<{ data: T; error: { message: string } | null }>,
+  fn: () => Promise<{ data: T; error: unknown }>,
 ) {
   let lastError: { message: string } | null = null;
 
+  const toErrorLike = (value: unknown): { message: string } | null => {
+    if (!value) return null;
+    if (
+      typeof value === "object" &&
+      "message" in value &&
+      typeof (value as { message?: unknown }).message === "string"
+    ) {
+      return { message: (value as { message: string }).message };
+    }
+    return { message: String(value) };
+  };
+
   for (let attempt = 1; attempt <= 2; attempt += 1) {
     const result = await fn();
-    if (!result.error) return result;
-    lastError = result.error;
+    const error = toErrorLike(result.error);
+    if (!error) {
+      return {
+        data: result.data,
+        error: null,
+      };
+    }
+    lastError = error;
 
-    if (!isTransientAuthNetworkError(result.error.message) || attempt >= 2) {
+    if (!isTransientAuthNetworkError(error.message) || attempt >= 2) {
       break;
     }
 
     console.warn("[auth] transient network error, retrying", {
       label,
       attempt,
-      message: result.error.message,
+      message: error.message,
     });
     await waitMs(250);
   }
@@ -55,8 +73,9 @@ const defaultUsernameFromUser = (user: User) =>
 
 export async function getCurrentSession(): Promise<Session | null> {
   const supabase = await createSupabaseServerClient();
-  const { data, error } = await withAuthRetry("getSession", () =>
-    supabase.auth.getSession(),
+  const { data, error } = await withAuthRetry<{ session: Session | null }>(
+    "getSession",
+    () => supabase.auth.getSession() as Promise<{ data: { session: Session | null }; error: unknown }>,
   );
   if (error) {
     if (isMissingSessionError(error.message)) return null;
@@ -72,8 +91,9 @@ export async function getCurrentSession(): Promise<Session | null> {
 
 export async function getCurrentUser(): Promise<User | null> {
   const supabase = await createSupabaseServerClient();
-  const { data, error } = await withAuthRetry("getUser", () =>
-    supabase.auth.getUser(),
+  const { data, error } = await withAuthRetry<{ user: User | null }>(
+    "getUser",
+    () => supabase.auth.getUser() as Promise<{ data: { user: User | null }; error: unknown }>,
   );
   if (error) {
     if (isMissingSessionError(error.message)) return null;
