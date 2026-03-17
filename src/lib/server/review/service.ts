@@ -25,6 +25,7 @@ export interface DueReviewItem {
   usageNote: string | null;
   sourceSceneSlug: string | null;
   sourceSentenceText: string | null;
+  expressionFamilyId: string | null;
   reviewStatus: UserPhraseReviewStatus;
   reviewCount: number;
   correctCount: number;
@@ -46,6 +47,7 @@ const mapDueItem = (row: UserPhraseRow & { phrase: PhraseRow | null }): DueRevie
   usageNote: row.phrase?.usage_note ?? null,
   sourceSceneSlug: row.source_scene_slug,
   sourceSentenceText: row.source_sentence_text,
+  expressionFamilyId: row.expression_family_id,
   reviewStatus: row.review_status,
   reviewCount: row.review_count,
   correctCount: row.correct_count,

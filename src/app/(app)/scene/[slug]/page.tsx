@@ -357,8 +357,8 @@ export default function SceneDetailPage() {
     activeLoadTokenRef.current = requestToken;
     const requestSlug = normalizeSceneSlug(sceneSlug);
     let cancelled = false;
-    let networkApplied = false;
     let hasCacheFallback = false;
+    let cacheFresh = false;
 
     const canApply = () =>
       !cancelled &&
@@ -369,14 +369,13 @@ export default function SceneDetailPage() {
       setSceneLoading(true);
       setSceneDataSource("none");
       setBaseLesson(null);
-      const networkPromise = getSceneDetailBySlugFromApi(sceneSlug);
-
       const cacheTask = (async () => {
         try {
           const cacheResult = await getSceneCache(requestSlug);
-          if (!canApply() || networkApplied) return;
+          if (!canApply()) return;
           if (cacheResult.found && cacheResult.record) {
             hasCacheFallback = true;
+            cacheFresh = !cacheResult.isExpired;
             setBaseLesson(cacheResult.record.data);
             setSceneDataSource("cache");
             setSceneLoading(false);
@@ -386,11 +385,12 @@ export default function SceneDetailPage() {
         }
       })();
 
-      const networkTask = (async () => {
-        try {
-          const lesson = await networkPromise;
+      await cacheTask;
+      if (cacheFresh) return;
+
+      try {
+          const lesson = await getSceneDetailBySlugFromApi(sceneSlug);
         if (!canApply()) return;
-        networkApplied = true;
         setBaseLesson(lesson);
         setSceneDataSource("network");
         setSceneLoading(false);
@@ -448,9 +448,7 @@ export default function SceneDetailPage() {
             toast.error(error instanceof Error ? error.message : "加载场景失败。");
           }
         }
-      })();
-
-      await Promise.allSettled([cacheTask, networkTask]);
+      
     };
 
     void clearExpiredSceneCaches().catch(() => {

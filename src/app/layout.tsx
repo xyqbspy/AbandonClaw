@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import { ScrollToTopOnRouteChange } from "@/components/layout/scroll-to-top-on-route-change";
 import { ThemeProvider } from "@/components/shared/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
@@ -10,7 +10,7 @@ export const metadata: Metadata = {
     template: "%s | Abridge English",
   },
   description:
-    "以短语和语境为核心的英语学习产品，帮助你在阅读中理解、在复习中沉淀。",
+    "\u4ee5\u8868\u8fbe\u548c\u8bed\u5883\u4e3a\u6838\u5fc3\u7684\u82f1\u8bed\u5b66\u4e60\u4ea7\u54c1\uff0c\u5e2e\u52a9\u4f60\u5728\u9605\u8bfb\u4e2d\u7406\u89e3\u3001\u5728\u590d\u4e60\u4e2d\u6c89\u6dc0\u3002",
 };
 
 export default function RootLayout({

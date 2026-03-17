@@ -17,7 +17,7 @@ export type SceneListCacheRecord = {
 
 const CACHE_KEY: SceneListCacheRecord["key"] = "scene-list:default";
 const CACHE_SCHEMA_VERSION: SceneListCacheRecord["schemaVersion"] = "scene-list-cache-v1";
-const SCENE_LIST_TTL_MS = 24 * 60 * 60 * 1000;
+const SCENE_LIST_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 let memorySceneListRecord: SceneListCacheRecord | null = null;
 
@@ -25,7 +25,6 @@ const nowMs = () => Date.now();
 
 const debugLog = (...args: unknown[]) => {
   if (process.env.NODE_ENV !== "development") return;
-  // eslint-disable-next-line no-console
   console.debug("[scene-list-cache]", ...args);
 };
 

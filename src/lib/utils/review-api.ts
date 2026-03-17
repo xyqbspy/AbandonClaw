@@ -8,6 +8,7 @@ export interface DueReviewItemResponse {
   usageNote: string | null;
   sourceSceneSlug: string | null;
   sourceSentenceText: string | null;
+  expressionFamilyId: string | null;
   reviewStatus: "saved" | "reviewing" | "mastered" | "archived";
   reviewCount: number;
   correctCount: number;
@@ -29,7 +30,7 @@ const toApiError = async (response: Response, fallback: string) => {
       return new Error(body.error);
     }
   } catch {
-    // ignore
+    // Ignore parse failure.
   }
   return new Error(fallback);
 };

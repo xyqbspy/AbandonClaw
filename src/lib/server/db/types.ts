@@ -121,6 +121,7 @@ export interface UserPhraseRow {
   source_sentence_index: number | null;
   source_sentence_text: string | null;
   source_chunk_text: string | null;
+  expression_family_id: string | null;
   saved_at: string;
   last_seen_at: string;
   created_at: string;

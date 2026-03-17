@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowRight, BookOpenCheck, Flame } from "lucide-react";
 import { toast } from "sonner";
@@ -16,6 +17,7 @@ import {
   getLearningDashboardFromApi,
 } from "@/lib/utils/learning-api";
 import { getScenesFromApi, SceneListItemResponse } from "@/lib/utils/scenes-api";
+import { startReviewSession } from "@/lib/utils/review-session";
 import { PageHeader } from "@/components/shared/page-header";
 import { StatCard } from "@/components/shared/stat-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -42,7 +44,7 @@ const zh = {
   eyebrow: "\u4eca\u65e5\u5b66\u4e60",
   desc: "\u4fdd\u6301\u77ed\u65f6\u3001\u7a33\u5b9a\u7684\u5b66\u4e60\u8282\u594f\uff0c\u6bd4\u4e00\u6b21\u6027\u5b66\u4e60\u66f4\u5bb9\u6613\u6c89\u6dc0\u8868\u8fbe\u3002",
   statStreak: "\u8fde\u7eed\u5b66\u4e60",
-  statSaved: "\u5df2\u6536\u85cf\u77ed\u8bed",
+  statSaved: "\u5df2\u4fdd\u5b58\u8868\u8fbe",
   statAcc: "\u590d\u4e60\u6b63\u786e\u7387",
   continueTitle: "\u7ee7\u7eed\u5b66\u4e60",
   continueEmptyTitle: "\u9009\u62e9\u4e00\u4e2a\u573a\u666f\u5f00\u59cb\u5b66\u4e60",
@@ -63,6 +65,7 @@ const zh = {
 };
 
 export function TodayPageClient({ displayName }: { displayName: string }) {
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [dashboard, setDashboard] = useState<LearningDashboardResponse>(EMPTY_DASHBOARD);
   const [sceneList, setSceneList] = useState<SceneListItemResponse[]>([]);
@@ -86,75 +89,66 @@ export function TodayPageClient({ displayName }: { displayName: string }) {
 
     let hasCacheFallback = false;
     const canApply = () => activeLoadTokenRef.current === token;
-
-    const dashboardPromise = getLearningDashboardFromApi();
-    const scenesPromise = getScenesFromApi();
-
-    const cacheTask = (async () => {
-      if (!preferCache) return;
+    if (preferCache) {
       try {
         const [dashboardCache, sceneCache] = await Promise.all([
           getLearningDashboardCache(),
           getSceneListCache(),
         ]);
-        if (!canApply()) return;
-
-        if (dashboardCache.found && dashboardCache.record) {
-          hasCacheFallback = true;
-          setDashboard(dashboardCache.record.data);
-          setDashboardDataSource("cache");
-          setLoading(false);
-        }
-        if (sceneCache.found && sceneCache.record) {
-          hasCacheFallback = true;
-          setSceneList(sceneCache.record.data);
-          setSceneDataSource("cache");
-          setLoading(false);
+        if (canApply()) {
+          if (dashboardCache.found && dashboardCache.record) {
+            hasCacheFallback = true;
+            setDashboard(dashboardCache.record.data);
+            setDashboardDataSource("cache");
+            setLoading(false);
+          }
+          if (sceneCache.found && sceneCache.record) {
+            hasCacheFallback = true;
+            setSceneList(sceneCache.record.data);
+            setSceneDataSource("cache");
+            setLoading(false);
+          }
         }
       } catch {
         // Ignore cache failures.
       }
-    })();
+    }
 
-    const networkTask = (async () => {
-      const [dashboardResult, scenesResult] = await Promise.allSettled([
-        dashboardPromise,
-        scenesPromise,
-      ]);
-      if (!canApply()) return;
+    const [dashboardResult, scenesResult] = await Promise.allSettled([
+      getLearningDashboardFromApi(),
+      getScenesFromApi(),
+    ]);
+    if (!canApply()) return;
 
-      let hasNetworkSuccess = false;
-      if (dashboardResult.status === "fulfilled") {
-        hasNetworkSuccess = true;
-        setDashboard(dashboardResult.value);
-        setDashboardDataSource("network");
-        void setLearningDashboardCache(dashboardResult.value).catch(() => {
-          // Non-blocking.
-        });
-      }
+    let hasNetworkSuccess = false;
+    if (dashboardResult.status === "fulfilled") {
+      hasNetworkSuccess = true;
+      setDashboard(dashboardResult.value);
+      setDashboardDataSource("network");
+      void setLearningDashboardCache(dashboardResult.value).catch(() => {
+        // Non-blocking.
+      });
+    }
 
-      if (scenesResult.status === "fulfilled") {
-        hasNetworkSuccess = true;
-        setSceneList(scenesResult.value);
-        setSceneDataSource("network");
-        void setSceneListCache(scenesResult.value).catch(() => {
-          // Non-blocking.
-        });
-      }
+    if (scenesResult.status === "fulfilled") {
+      hasNetworkSuccess = true;
+      setSceneList(scenesResult.value);
+      setSceneDataSource("network");
+      void setSceneListCache(scenesResult.value).catch(() => {
+        // Non-blocking.
+      });
+    }
 
-      if (!hasNetworkSuccess && !hasCacheFallback) {
-        const reason =
-          dashboardResult.status === "rejected"
-            ? dashboardResult.reason
-            : scenesResult.status === "rejected"
-              ? scenesResult.reason
-              : new Error("unknown");
-        toast.error(reason instanceof Error ? reason.message : zh.loadFail);
-      }
-      setLoading(false);
-    })();
-
-    await Promise.allSettled([cacheTask, networkTask]);
+    if (!hasNetworkSuccess && !hasCacheFallback) {
+      const reason =
+        dashboardResult.status === "rejected"
+          ? dashboardResult.reason
+          : scenesResult.status === "rejected"
+            ? scenesResult.reason
+            : new Error("unknown");
+      toast.error(reason instanceof Error ? reason.message : zh.loadFail);
+    }
+    setLoading(false);
   };
 
   useEffect(() => {
@@ -213,7 +207,7 @@ export function TodayPageClient({ displayName }: { displayName: string }) {
     {
       id: "task-output",
       title: zh.taskOutputTitle,
-      description: `\u4eca\u65e5\u5df2\u7d2f\u8ba1\u6536\u85cf ${dashboard.todayTasks.outputTask.phrasesSavedToday} \u6761\u77ed\u8bed\u3002`,
+      description: `\u4eca\u65e5\u5df2\u7d2f\u8ba1\u4fdd\u5b58 ${dashboard.todayTasks.outputTask.phrasesSavedToday} \u6761\u8868\u8fbe\u3002`,
       durationMinutes: 4,
       done: dashboard.todayTasks.outputTask.done,
       actionHref: "/chunks",
@@ -248,7 +242,16 @@ export function TodayPageClient({ displayName }: { displayName: string }) {
         />
       </div>
 
-      <TodayTaskList tasks={dailyTasks} />
+      <TodayTaskList
+        tasks={dailyTasks}
+        onStartTask={(task) => {
+          if (task.id === "task-review") {
+            startReviewSession({ router, source: "today-task" });
+            return;
+          }
+          router.push(task.actionHref);
+        }}
+      />
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>

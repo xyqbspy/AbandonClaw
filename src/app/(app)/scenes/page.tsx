@@ -50,8 +50,8 @@ export default function ScenesPage() {
   const refreshScenes = async (options?: { preferCache?: boolean }) => {
     const token = activeLoadTokenRef.current + 1;
     activeLoadTokenRef.current = token;
-    let networkApplied = false;
     let hasCacheFallback = false;
+    let cacheFresh = false;
     const preferCache = options?.preferCache ?? false;
     setLoading(true);
     if (!preferCache) {
@@ -59,15 +59,13 @@ export default function ScenesPage() {
     }
 
     const canApply = () => activeLoadTokenRef.current === token;
-    const networkPromise = getScenesFromApi();
 
-    const cacheTask = (async () => {
-      if (!preferCache) return;
+    if (preferCache) {
       try {
         const cache = await getSceneListCache();
-        if (!canApply() || networkApplied) return;
-        if (cache.found && cache.record) {
+        if (canApply() && cache.found && cache.record) {
           hasCacheFallback = true;
+          cacheFresh = !cache.isExpired;
           setAllScenes(cache.record.data);
           setListDataSource("cache");
           setLoading(false);
@@ -75,29 +73,25 @@ export default function ScenesPage() {
       } catch {
         // Non-blocking.
       }
-    })();
+      if (cacheFresh) return;
+    }
 
-    const networkTask = (async () => {
-      try {
-        const nextScenes = await networkPromise;
-        if (!canApply()) return;
-        networkApplied = true;
-        setAllScenes(nextScenes);
-        setListDataSource("network");
+    try {
+      const nextScenes = await getScenesFromApi();
+      if (!canApply()) return;
+      setAllScenes(nextScenes);
+      setListDataSource("network");
+      setLoading(false);
+      void setSceneListCache(nextScenes).catch(() => {
+        // Non-blocking.
+      });
+    } catch (fetchError) {
+      if (!canApply()) return;
+      if (!hasCacheFallback) {
+        toast.error(fetchError instanceof Error ? fetchError.message : "加载场景失败。");
         setLoading(false);
-        void setSceneListCache(nextScenes).catch(() => {
-          // Non-blocking.
-        });
-      } catch (fetchError) {
-        if (!canApply()) return;
-        if (!hasCacheFallback) {
-          toast.error(fetchError instanceof Error ? fetchError.message : "加载场景失败。");
-          setLoading(false);
-        }
       }
-    })();
-
-    await Promise.allSettled([cacheTask, networkTask]);
+    }
   };
 
   useEffect(() => {

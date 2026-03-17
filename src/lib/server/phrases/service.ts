@@ -12,6 +12,50 @@ import { getSceneRecordBySlug } from "@/lib/server/services/scene-service";
 
 const nowIso = () => new Date().toISOString();
 const todayDate = () => new Date().toISOString().slice(0, 10);
+const FAMILY_STOP_WORDS = new Set([
+  "a",
+  "an",
+  "the",
+  "to",
+  "of",
+  "and",
+  "or",
+  "for",
+  "in",
+  "on",
+  "at",
+  "is",
+  "are",
+  "was",
+  "were",
+  "be",
+  "been",
+  "being",
+  "it",
+  "this",
+  "that",
+  "i",
+  "you",
+  "he",
+  "she",
+  "we",
+  "they",
+  "do",
+  "does",
+  "did",
+  "have",
+  "has",
+  "had",
+  "with",
+  "from",
+  "as",
+  "my",
+  "your",
+  "his",
+  "her",
+  "our",
+  "their",
+]);
 
 export interface SavePhraseInput {
   text: string;
@@ -23,6 +67,7 @@ export interface SavePhraseInput {
   sourceSentenceIndex?: number;
   sourceSentenceText?: string;
   sourceChunkText?: string;
+  expressionFamilyId?: string;
 }
 
 export interface UserSavedPhraseItem {
@@ -38,6 +83,7 @@ export interface UserSavedPhraseItem {
   sourceSentenceIndex: number | null;
   sourceSentenceText: string | null;
   sourceChunkText: string | null;
+  expressionFamilyId: string | null;
   savedAt: string;
   lastSeenAt: string;
   reviewStatus: UserPhraseReviewStatus;
@@ -67,6 +113,110 @@ const parseTags = (value: unknown) => {
   return Array.from(new Set(tags));
 };
 
+const normalizeSceneLineage = (sceneSlug: string | null) => {
+  if (!sceneSlug) return "global";
+  return sceneSlug
+    .trim()
+    .toLowerCase()
+    .replace(/-variant-\d+$/i, "")
+    .replace(/[^a-z0-9-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "") || "global";
+};
+
+const extractCoreTokens = (normalizedText: string) =>
+  normalizedText
+    .split(" ")
+    .map((token) => token.trim())
+    .filter((token) => token.length >= 3 && !FAMILY_STOP_WORDS.has(token))
+    .slice(0, 6);
+
+const computeTokenJaccard = (a: string[], b: string[]) => {
+  if (a.length === 0 || b.length === 0) return 0;
+  const setA = new Set(a);
+  const setB = new Set(b);
+  let intersection = 0;
+  for (const token of setA) {
+    if (setB.has(token)) intersection += 1;
+  }
+  const union = new Set([...setA, ...setB]).size;
+  return union === 0 ? 0 : intersection / union;
+};
+
+const buildFamilyIdByRule = (params: {
+  sourceSceneSlug: string | null;
+  normalizedText: string;
+}) => {
+  const lineage = normalizeSceneLineage(params.sourceSceneSlug);
+  const tokens = extractCoreTokens(params.normalizedText);
+  const key = tokens.slice(0, 2).join("-") || params.normalizedText.split(" ").slice(0, 2).join("-");
+  const safeKey = key.replace(/[^a-z0-9-]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
+  return `fam:${lineage}:${safeKey || "expression"}`.slice(0, 120);
+};
+
+async function inferExpressionFamilyId(params: {
+  userId: string;
+  sourceSceneSlug: string | null;
+  normalizedText: string;
+  providedFamilyId: string | null;
+  existingFamilyId: string | null;
+}) {
+  if (params.providedFamilyId) return params.providedFamilyId;
+  if (params.existingFamilyId) return params.existingFamilyId;
+
+  const candidateByRule = buildFamilyIdByRule({
+    sourceSceneSlug: params.sourceSceneSlug,
+    normalizedText: params.normalizedText,
+  });
+
+  const admin = createSupabaseAdminClient();
+  const lineage = normalizeSceneLineage(params.sourceSceneSlug);
+  const sceneSlugPrefix = lineage === "global" ? null : lineage;
+
+  let query = admin
+    .from("user_phrases")
+    .select("expression_family_id,source_scene_slug,source_chunk_text")
+    .eq("user_id", params.userId)
+    .eq("status", "saved")
+    .limit(80);
+
+  if (sceneSlugPrefix) {
+    query = query.or(
+      `source_scene_slug.eq.${sceneSlugPrefix},source_scene_slug.like.${sceneSlugPrefix}-variant-%`,
+    );
+  }
+
+  const { data, error } = await query;
+  if (error) {
+    return candidateByRule;
+  }
+
+  const currentTokens = extractCoreTokens(params.normalizedText);
+  let bestMatch: { score: number; familyId: string | null } | null = null;
+  for (const row of (data ?? []) as Array<{
+    expression_family_id: string | null;
+    source_scene_slug: string | null;
+    source_chunk_text: string | null;
+  }>) {
+    const candidateText = normalizePhraseText(row.source_chunk_text ?? "");
+    if (!candidateText) continue;
+    const candidateTokens = extractCoreTokens(candidateText);
+    const jaccard = computeTokenJaccard(currentTokens, candidateTokens);
+    const includeScore =
+      params.normalizedText.includes(candidateText) || candidateText.includes(params.normalizedText)
+        ? 0.4
+        : 0;
+    const score = jaccard + includeScore;
+    if (score < 0.55) continue;
+    if (!bestMatch || score > bestMatch.score) {
+      bestMatch = { score, familyId: row.expression_family_id };
+    }
+  }
+
+  if (bestMatch?.familyId) return bestMatch.familyId;
+  return candidateByRule;
+}
+
 const mapSavedPhraseRow = (row: UserPhraseRow & { phrase: PhraseRow | null }): UserSavedPhraseItem => ({
   userPhraseId: row.id,
   phraseId: row.phrase_id,
@@ -80,6 +230,7 @@ const mapSavedPhraseRow = (row: UserPhraseRow & { phrase: PhraseRow | null }): U
   sourceSentenceIndex: row.source_sentence_index,
   sourceSentenceText: row.source_sentence_text,
   sourceChunkText: row.source_chunk_text,
+  expressionFamilyId: row.expression_family_id,
   savedAt: row.saved_at,
   lastSeenAt: row.last_seen_at,
   reviewStatus: row.review_status,
@@ -258,6 +409,14 @@ export async function savePhraseForUser(userId: string, input: SavePhraseInput) 
   }
 
   const now = nowIso();
+  const providedFamilyId = parseOptionalTrimmed(input.expressionFamilyId, 120);
+  const inferredFamilyId = await inferExpressionFamilyId({
+    userId,
+    sourceSceneSlug,
+    normalizedText,
+    providedFamilyId,
+    existingFamilyId: existing?.expression_family_id ?? null,
+  });
   const nextPayload = {
     user_id: userId,
     phrase_id: phrase.id,
@@ -291,6 +450,8 @@ export async function savePhraseForUser(userId: string, input: SavePhraseInput) 
       parseOptionalTrimmed(input.sourceChunkText, 500) ??
       existing?.source_chunk_text ??
       text,
+    expression_family_id:
+      inferredFamilyId ?? null,
     saved_at: existing?.saved_at ?? now,
     last_seen_at: now,
   };
@@ -301,8 +462,33 @@ export async function savePhraseForUser(userId: string, input: SavePhraseInput) 
     .select("*")
     .single<UserPhraseRow>();
 
-  if (upsertError || !savedRow) {
-    throw new Error(`Failed to save user phrase: ${upsertError?.message ?? "unknown error"}`);
+  let finalSavedRow = savedRow;
+  if (upsertError) {
+    const shouldFallbackWithoutFamilyColumn =
+      upsertError.code === "42703" ||
+      upsertError.message.toLowerCase().includes("expression_family_id");
+
+    if (shouldFallbackWithoutFamilyColumn) {
+      const fallbackPayload = { ...nextPayload };
+      delete (fallbackPayload as Record<string, unknown>).expression_family_id;
+      const { data: fallbackRow, error: fallbackError } = await admin
+        .from("user_phrases")
+        .upsert(fallbackPayload as never, { onConflict: "user_id,phrase_id" })
+        .select("*")
+        .single<UserPhraseRow>();
+      if (fallbackError || !fallbackRow) {
+        throw new Error(
+          `Failed to save user phrase (fallback): ${fallbackError?.message ?? "unknown error"}`,
+        );
+      }
+      finalSavedRow = fallbackRow;
+    } else {
+      throw new Error(`Failed to save user phrase: ${upsertError.message}`);
+    }
+  }
+
+  if (!finalSavedRow) {
+    throw new Error("Failed to save user phrase: unknown error");
   }
 
   const created = !existing;
@@ -315,7 +501,7 @@ export async function savePhraseForUser(userId: string, input: SavePhraseInput) 
 
   return {
     phrase,
-    userPhrase: savedRow,
+    userPhrase: finalSavedRow,
     created,
   };
 }

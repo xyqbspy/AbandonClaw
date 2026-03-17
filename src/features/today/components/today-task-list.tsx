@@ -3,7 +3,13 @@ import { CheckCircle2, Circle } from "lucide-react";
 import { DailyTask } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-export function TodayTaskList({ tasks }: { tasks: DailyTask[] }) {
+export function TodayTaskList({
+  tasks,
+  onStartTask,
+}: {
+  tasks: DailyTask[];
+  onStartTask?: (task: DailyTask) => void;
+}) {
   return (
     <Card>
       <CardHeader>
@@ -26,18 +32,34 @@ export function TodayTaskList({ tasks }: { tasks: DailyTask[] }) {
               </p>
               <p className="text-xs text-muted-foreground">{task.description}</p>
             </div>
-            <Link
-              href={task.actionHref}
-              className={`inline-flex h-7 cursor-pointer items-center justify-center rounded-lg px-2.5 text-[0.8rem] font-medium transition active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 ${
-                task.done
-                  ? "bg-secondary text-secondary-foreground hover:bg-secondary/90"
-                  : "bg-primary text-primary-foreground hover:bg-primary/90"
-              }`}
-            >
-              {task.done
-                ? "\u5df2\u5b8c\u6210"
-                : `\u5f00\u59cb\uff08${task.durationMinutes} \u5206\u949f\uff09`}
-            </Link>
+            {onStartTask ? (
+              <button
+                type="button"
+                onClick={() => onStartTask(task)}
+                className={`inline-flex h-7 cursor-pointer items-center justify-center rounded-lg px-2.5 text-[0.8rem] font-medium transition active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 ${
+                  task.done
+                    ? "bg-secondary text-secondary-foreground hover:bg-secondary/90"
+                    : "bg-primary text-primary-foreground hover:bg-primary/90"
+                }`}
+              >
+                {task.done
+                  ? "\u5df2\u5b8c\u6210"
+                  : `\u5f00\u59cb\uff08${task.durationMinutes} \u5206\u949f\uff09`}
+              </button>
+            ) : (
+              <Link
+                href={task.actionHref}
+                className={`inline-flex h-7 cursor-pointer items-center justify-center rounded-lg px-2.5 text-[0.8rem] font-medium transition active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 ${
+                  task.done
+                    ? "bg-secondary text-secondary-foreground hover:bg-secondary/90"
+                    : "bg-primary text-primary-foreground hover:bg-primary/90"
+                }`}
+              >
+                {task.done
+                  ? "\u5df2\u5b8c\u6210"
+                  : `\u5f00\u59cb\uff08${task.durationMinutes} \u5206\u949f\uff09`}
+              </Link>
+            )}
           </div>
         ))}
       </CardContent>

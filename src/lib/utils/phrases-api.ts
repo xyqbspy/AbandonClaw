@@ -37,6 +37,7 @@ export interface UserPhraseItemResponse {
   sourceSentenceIndex: number | null;
   sourceSentenceText: string | null;
   sourceChunkText: string | null;
+  expressionFamilyId: string | null;
   savedAt: string;
   lastSeenAt: string;
   reviewStatus: PhraseReviewStatus;
@@ -58,6 +59,7 @@ export async function savePhraseFromApi(payload: {
   sourceSentenceIndex?: number;
   sourceSentenceText?: string;
   sourceChunkText?: string;
+  expressionFamilyId?: string;
 }) {
   const response = await fetch("/api/phrases/save", {
     method: "POST",

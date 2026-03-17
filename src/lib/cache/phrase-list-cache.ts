@@ -26,7 +26,7 @@ export type PhraseListCacheRecord = {
 };
 
 const CACHE_SCHEMA_VERSION: PhraseListCacheRecord["schemaVersion"] = "phrase-list-cache-v2";
-const PHRASE_LIST_TTL_MS = 24 * 60 * 60 * 1000;
+const PHRASE_LIST_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 const memoryPhraseListRecords = new Map<string, PhraseListCacheRecord>();
 

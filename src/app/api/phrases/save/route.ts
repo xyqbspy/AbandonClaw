@@ -19,6 +19,7 @@ interface SavePhrasePayload {
   sourceSentenceIndex?: unknown;
   sourceSentenceText?: unknown;
   sourceChunkText?: unknown;
+  expressionFamilyId?: unknown;
 }
 
 export async function POST(request: Request) {
@@ -52,6 +53,11 @@ export async function POST(request: Request) {
         payload.sourceChunkText,
         "sourceChunkText",
         500,
+      ),
+      expressionFamilyId: parseOptionalTrimmedString(
+        payload.expressionFamilyId,
+        "expressionFamilyId",
+        120,
       ),
     });
 

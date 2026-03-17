@@ -30,7 +30,7 @@ type CacheQueueItem = {
 
 type SceneCacheMap = Map<string, SceneCacheRecord<Lesson>>;
 
-const SCENE_TTL_MS = 24 * 60 * 60 * 1000;
+const SCENE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const SCENE_MAX_ITEMS = 20;
 const QUEUE_META_KEY = "scene_queue_v1";
 const EXPIRED_HARD_DELETE_AFTER_MS = 7 * 24 * 60 * 60 * 1000;
@@ -49,7 +49,6 @@ const sceneKey = (slug: string) => `scene:${normalizeSceneSlug(slug)}`;
 
 const debugLog = (...args: unknown[]) => {
   if (process.env.NODE_ENV !== "development") return;
-  // eslint-disable-next-line no-console
   console.debug("[scene-cache]", ...args);
 };
 
