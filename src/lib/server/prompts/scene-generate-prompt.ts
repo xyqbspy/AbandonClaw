@@ -60,16 +60,18 @@ Return JSON with this exact shape:
   "version": "v1",
   "title": "short scene title",
   "theme": "optional short theme",
-  "lines": [
-    {"speaker": "A", "text": "..."},
-    {"speaker": "B", "text": "..."}
+  "dialogue": [
+    {"speaker": "A", "text": "...", "translation": "...", "tts": "..."},
+    {"speaker": "B", "text": "...", "translation": "...", "tts": "..."}
   ]
 }
 
-Rules for lines:
-- lines length must be between 6 and 14.
+Rules for dialogue:
+- dialogue length must be between 6 and 14.
 - each line text should be concise.
-- speaker should be short labels like A/B or Clerk/Customer.
+- speaker must be either "A" or "B".
+- translation must be concise natural Chinese.
+- tts should be clean, no emoji/symbol noise, usually same as text.
 
 Return pure JSON only.`;
 }

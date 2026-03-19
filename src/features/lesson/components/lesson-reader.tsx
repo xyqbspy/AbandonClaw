@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import {
   ReactNode,
@@ -10,7 +10,6 @@ import {
   useState,
 } from "react";
 import {
-  Clock3,
   Headphones,
   Languages,
   Play,
@@ -27,7 +26,6 @@ import {
 import { useMobile } from "@/hooks/use-mobile";
 import { useSpeech } from "@/hooks/use-speech";
 import { Lesson, LessonSentence, SelectionChunkLayer } from "@/lib/types";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -68,7 +66,19 @@ type MobileSentenceGroup = {
   text: string;
   translation: string;
   relatedChunks: string[];
-  speaker?: string;
+  speaker?: "A" | "B";
+};
+
+const speakerTextClassName = (speaker?: "A" | "B") => {
+  if (speaker === "A") return "text-sky-700";
+  if (speaker === "B") return "text-emerald-700";
+  return "text-muted-foreground/80";
+};
+
+const speakerLabel = (speaker?: "A" | "B") => {
+  if (speaker === "A") return "A";
+  if (speaker === "B") return "B";
+  return "";
 };
 
 function groupSentencesForMobile(
@@ -89,7 +99,7 @@ function groupSentencesForMobile(
       continue;
     }
 
-    const looksLikeQuestion = /[?？]\s*$/.test(current.text.trim());
+    const looksLikeQuestion = /[?？！]\s*$/.test(current.text.trim());
     const areBothShort = current.text.length <= 80 && next.text.length <= 80;
 
     if (looksLikeQuestion || areBothShort) {
@@ -179,10 +189,11 @@ export function LessonReader({
 }) {
   const difficultyLabel =
     lesson.difficulty === "Beginner"
-      ? "难度 入门"
+      ? "入门"
       : lesson.difficulty === "Advanced"
-        ? "难度 进阶"
-        : "难度 中级";
+        ? "进阶"
+        : "中级";
+  const isDialogueScene = lesson.sceneType === "dialogue";
 
   const firstSentence = getFirstSentence(lesson) ?? null;
   const isMobile = useMobile();
@@ -224,6 +235,11 @@ export function LessonReader({
       ),
     [lesson.sections],
   );
+  const sceneTypeMetaLabel = isDialogueScene
+    ? `双人对话 · ${sentenceCount}轮`
+    : `自述练习 · ${sentenceCount}句`;
+  const sceneMetaLabel = `${difficultyLabel} · ${lesson.estimatedMinutes}分钟 · ${sceneTypeMetaLabel}`;
+  const sentenceSectionLabel = isDialogueScene ? "当前对话" : "当前表达";
   const sentenceOrder = useMemo(
     () => lesson.sections.flatMap((section) => section.sentences),
     [lesson.sections],
@@ -738,12 +754,7 @@ export function LessonReader({
                   </Button>
                 </div>
                 <p className="text-[10px] leading-4 whitespace-nowrap text-muted-foreground/80">
-                  {lesson.difficulty === "Beginner"
-                    ? "入门"
-                    : lesson.difficulty === "Advanced"
-                      ? "进阶"
-                      : "中级"}{" "}
-                  · {lesson.estimatedMinutes}分钟 · {sentenceCount}句
+                  {sceneMetaLabel}
                 </p>
                 {headerTools ? (
                   <div className="flex flex-wrap items-center gap-1.5">
@@ -770,14 +781,7 @@ export function LessonReader({
             ) : null}
             {!isMobile ? (
               <>
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge>{difficultyLabel}</Badge>
-                  <Badge variant="outline">
-                    <Clock3 className="mr-1 size-3.5" />
-                    预计时间 {lesson.estimatedMinutes} 分钟
-                  </Badge>
-                  <Badge variant="outline">{sentenceCount} 句</Badge>
-                </div>
+                <p className="text-sm text-muted-foreground">{sceneMetaLabel}</p>
                 <div className="flex flex-wrap gap-2">
                   <Button
                     size="sm"
@@ -857,6 +861,8 @@ export function LessonReader({
                             : active
                               ? "bg-muted/10"
                               : "hover:bg-muted/8",
+                          isDialogueScene && groupContext.speaker === "A" && "mr-8",
+                          isDialogueScene && groupContext.speaker === "B" && "ml-8",
                         )}
                       >
                         <div className="px-3 py-1">
@@ -869,51 +875,65 @@ export function LessonReader({
                           >
                             <div
                               className={cn(
-                                "mb-1 flex items-center justify-end gap-2",
+                                "mb-1 flex items-center justify-between gap-2",
                                 groupSelected && "text-primary",
                               )}
                             >
-                              <button
-                                type="button"
-                                className={cn(
-                                  "inline-flex cursor-pointer items-center gap-1 text-[11px] leading-none transition-colors active:opacity-70",
-                                  groupSelected
-                                    ? "text-primary/80 hover:text-primary/95"
-                                    : "text-muted-foreground/70 hover:text-muted-foreground",
-                                )}
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  setMobileGroupTranslationOpenMap((prev) => ({
-                                    ...prev,
-                                    [groupKey]: !prev[groupKey],
-                                  }));
-                                }}
-                              >
-                                <Languages className="size-3" />
-                                {translationOpen ? "收起" : "翻译"}
-                              </button>
-                              <button
-                                type="button"
-                                className={cn(
-                                  "inline-flex cursor-pointer items-center gap-1 text-[11px] leading-none transition-colors active:opacity-70",
-                                  groupSelected
-                                    ? "text-primary/80 hover:text-primary/95"
-                                    : "text-muted-foreground/70 hover:text-muted-foreground",
-                                )}
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  handleLoopSentence(groupText);
-                                }}
-                              >
-                                <Volume2
+                              {isDialogueScene && groupContext.speaker ? (
+                                <p
                                   className={cn(
-                                    "size-3",
-                                    groupPlaying &&
-                                      "animate-pulse text-primary",
+                                    "text-[10px] tracking-[0.08em] uppercase",
+                                    speakerTextClassName(groupContext.speaker),
                                   )}
-                                />
-                                {groupPlaying ? "停止" : "播放"}
-                              </button>
+                                >
+                                  {speakerLabel(groupContext.speaker)}
+                                </p>
+                              ) : (
+                                <span />
+                              )}
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  className={cn(
+                                    "inline-flex cursor-pointer items-center gap-1 text-[11px] leading-none transition-colors active:opacity-70",
+                                    groupSelected
+                                      ? "text-primary/80 hover:text-primary/95"
+                                      : "text-muted-foreground/70 hover:text-muted-foreground",
+                                  )}
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    setMobileGroupTranslationOpenMap((prev) => ({
+                                      ...prev,
+                                      [groupKey]: !prev[groupKey],
+                                    }));
+                                  }}
+                                >
+                                  <Languages className="size-3" />
+                                  {translationOpen ? "收起" : "翻译"}
+                                </button>
+                                <button
+                                  type="button"
+                                  className={cn(
+                                    "inline-flex cursor-pointer items-center gap-1 text-[11px] leading-none transition-colors active:opacity-70",
+                                    groupSelected
+                                      ? "text-primary/80 hover:text-primary/95"
+                                      : "text-muted-foreground/70 hover:text-muted-foreground",
+                                  )}
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    handleLoopSentence(groupText);
+                                  }}
+                                >
+                                  <Volume2
+                                    className={cn(
+                                      "size-3",
+                                      groupPlaying &&
+                                        "animate-pulse text-primary",
+                                    )}
+                                  />
+                                  {groupPlaying ? "停止" : "播放"}
+                                </button>
+                              </div>
                             </div>
 
                             <div
@@ -939,11 +959,6 @@ export function LessonReader({
                             className="cursor-pointer transition-colors"
                             onClick={() => handleMobileGroupTap(groupContext)}
                           >
-                            {groupContext.speaker ? (
-                              <p className="mb-1 text-[10px] tracking-[0.08em] text-muted-foreground/80 uppercase">
-                                {groupContext.speaker}
-                              </p>
-                            ) : null}
                             <p
                               className={cn(
                                 "text-[16px] leading-[1.72] font-normal tracking-[0.01em] text-foreground/95",
@@ -975,6 +990,7 @@ export function LessonReader({
                   <SentenceBlock
                     key={sentence.id}
                     sentence={sentence}
+                    showSpeaker={isDialogueScene}
                     speaking={speakingText === (sentence.audioText ?? sentence.text)}
                     activeChunkKey={state.activeChunkKey}
                     hoveredChunkKey={state.hoveredChunkKey}
@@ -1011,6 +1027,8 @@ export function LessonReader({
           currentSentence={mobileDisplaySentence}
           chunkDetail={chunkDetail}
           relatedChunks={relatedChunks}
+          showSpeaker={isDialogueScene}
+          sentenceSectionLabel={sentenceSectionLabel}
           loading={false}
           speakingText={speakingText}
           onSave={handleSave}
@@ -1045,6 +1063,8 @@ export function LessonReader({
         chunkDetail={chunkDetail}
         relatedChunks={relatedChunks}
         open={sheetOpen}
+        showSpeaker={isDialogueScene}
+        sentenceSectionLabel={sentenceSectionLabel}
         loading={false}
         speakingText={speakingText}
         onOpenChange={setSheetOpen}
@@ -1077,3 +1097,6 @@ export function LessonReader({
     </div>
   );
 }
+
+
+

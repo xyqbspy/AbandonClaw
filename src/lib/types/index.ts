@@ -19,7 +19,7 @@ export interface LessonSentence {
   text: string;
   translation: string;
   chunks: string[];
-  speaker?: string;
+  speaker?: "A" | "B";
   audioText?: string;
   chunkDetails?: SentenceChunkDetail[];
 }
@@ -69,6 +69,7 @@ export interface Lesson {
   estimatedMinutes: number;
   completionRate: number;
   tags: string[];
+  sceneType?: "dialogue" | "monologue";
   sections: LessonSection[];
   explanations: AIExplanation[];
   sourceType?: "system" | "custom" | "builtin" | "imported" | "variant";

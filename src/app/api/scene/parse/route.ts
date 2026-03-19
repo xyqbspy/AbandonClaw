@@ -9,6 +9,7 @@ import {
   normalizeSceneParserResponseVersion,
 } from "@/lib/server/scene-json";
 import { ParseSceneRequest } from "@/lib/types/scene-parser";
+import { normalizeParsedSceneDialogue } from "@/lib/shared/scene-dialogue";
 
 const isValidPayload = (
   payload: Partial<ParseSceneRequest>,
@@ -49,6 +50,48 @@ const parseWithDiagnostics = (rawText: string) => {
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
   Boolean(value) && typeof value === "object";
+
+const normalizeParseApiResponse = (value: unknown) => {
+  if (!isObject(value) || !isObject(value.scene)) return value;
+  const scene = value.scene as Record<string, unknown>;
+  const parsedScene = normalizeParsedSceneDialogue({
+    id: typeof scene.id === "string" ? scene.id : `scene-${Date.now()}`,
+    slug: typeof scene.slug === "string" ? scene.slug : `scene-${Date.now()}`,
+    title: typeof scene.title === "string" ? scene.title : "Generated Scene",
+    subtitle:
+      typeof scene.subtitle === "string"
+        ? scene.subtitle
+        : typeof scene.description === "string"
+          ? scene.description
+          : "",
+    description: typeof scene.description === "string" ? scene.description : "",
+    difficulty:
+      scene.difficulty === "Beginner" ||
+      scene.difficulty === "Intermediate" ||
+      scene.difficulty === "Advanced"
+        ? scene.difficulty
+        : "Intermediate",
+    estimatedMinutes:
+      typeof scene.estimatedMinutes === "number" && Number.isFinite(scene.estimatedMinutes)
+        ? Math.max(3, Math.min(20, Math.round(scene.estimatedMinutes)))
+        : 8,
+    tags: Array.isArray(scene.tags)
+      ? scene.tags.filter((item): item is string => typeof item === "string")
+      : [],
+    type:
+      scene.type === "dialogue" || scene.type === "monologue"
+        ? scene.type
+        : undefined,
+    dialogue: Array.isArray(scene.dialogue) ? (scene.dialogue as never) : [],
+    sections: Array.isArray(scene.sections) ? (scene.sections as never) : [],
+    glossary: Array.isArray(scene.glossary) ? (scene.glossary as never) : undefined,
+  });
+
+  return {
+    ...value,
+    scene: parsedScene,
+  };
+};
 
 const normalizeSceneResponse = (value: unknown): unknown => {
   const withVersion = normalizeSceneParserResponseVersion(value);
@@ -179,6 +222,46 @@ const normalizeSceneResponse = (value: unknown): unknown => {
         sentences: nextSentences,
       };
     });
+  }
+
+  if ((!Array.isArray(scene.sections) || scene.sections.length === 0) && Array.isArray(scene.dialogue)) {
+    const sentences = scene.dialogue
+      .filter((line) => isObject(line) && typeof line.text === "string" && line.text.trim())
+      .map((line, index) => {
+        const lineObject = line as Record<string, unknown>;
+        const text = typeof lineObject.text === "string" ? lineObject.text.trim() : "";
+        const translation =
+          typeof lineObject.translation === "string" && lineObject.translation.trim()
+            ? lineObject.translation.trim()
+            : text;
+        const chunks = Array.isArray(lineObject.chunks) ? lineObject.chunks : [];
+        return {
+          id:
+            typeof lineObject.id === "string" && lineObject.id.trim()
+              ? lineObject.id.trim()
+              : `s${index + 1}`,
+          ...(lineObject.speaker === "A" || lineObject.speaker === "B"
+            ? { speaker: lineObject.speaker }
+            : {}),
+          text,
+          translation,
+          audioText:
+            typeof lineObject.tts === "string" && lineObject.tts.trim()
+              ? lineObject.tts.trim()
+              : text,
+          chunks,
+        };
+      });
+    if (sentences.length > 0) {
+      scene.sections = [
+        {
+          id: "dialogue-main",
+          title: "Dialogue",
+          summary: sentences[0]?.text?.slice(0, 80) ?? "",
+          sentences,
+        },
+      ];
+    }
   }
 
   return {
@@ -430,7 +513,7 @@ export async function POST(request: Request) {
       temperature: 0.2,
     });
 
-    const { jsonCandidate, parsed: parsedJson } = parseWithDiagnostics(rawModelText);
+    const { parsed: parsedJson } = parseWithDiagnostics(rawModelText);
     const normalized = normalizeSceneResponse(parsedJson);
     const { nextValue: parsed, fallbacks } =
       applySentenceTranslationFallback(normalized);
@@ -451,7 +534,8 @@ export async function POST(request: Request) {
       );
     }
 
-    return NextResponse.json(parsed, { status: 200 });
+    const normalizedParsed = normalizeParseApiResponse(parsed);
+    return NextResponse.json(normalizedParsed, { status: 200 });
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Failed to parse scene.";

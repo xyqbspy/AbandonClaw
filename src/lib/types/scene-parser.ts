@@ -23,9 +23,20 @@ export interface ParsedSceneChunk {
   synonyms?: string[];
 }
 
+export type ParsedSceneSpeaker = "A" | "B";
+
+export interface ParsedSceneDialogueLine {
+  id: string;
+  speaker: ParsedSceneSpeaker;
+  text: string;
+  translation: string;
+  tts?: string;
+  chunks: ParsedSceneChunk[];
+}
+
 export interface ParsedSceneSentence {
   id: string;
-  speaker?: string;
+  speaker?: ParsedSceneSpeaker;
   text: string;
   translation: string;
   audioText?: string;
@@ -61,6 +72,8 @@ export interface ParsedScene {
   estimatedMinutes: number;
   completionRate?: number;
   tags: string[];
+  type?: "dialogue" | "monologue";
+  dialogue: ParsedSceneDialogueLine[];
   sections: ParsedSceneSection[];
   glossary?: ParsedSceneGlossaryItem[];
 }

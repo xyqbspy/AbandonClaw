@@ -10,7 +10,7 @@ const isSceneParserResponse = (value: unknown): value is SceneParserResponse => 
     Boolean(response.scene) &&
     typeof response.scene?.id === "string" &&
     typeof response.scene?.slug === "string" &&
-    Array.isArray(response.scene?.sections)
+    (Array.isArray(response.scene?.dialogue) || Array.isArray(response.scene?.sections))
   );
 };
 

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import { Languages, Volume2 } from "lucide-react";
@@ -7,8 +7,25 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
+const speakerBadgeClassName = (speaker?: "A" | "B") => {
+  if (speaker === "A") {
+    return "border-sky-300/70 bg-sky-50 text-sky-700";
+  }
+  if (speaker === "B") {
+    return "border-emerald-300/70 bg-emerald-50 text-emerald-700";
+  }
+  return "";
+};
+
+const speakerLabel = (speaker?: "A" | "B") => {
+  if (speaker === "A") return "A";
+  if (speaker === "B") return "B";
+  return "";
+};
+
 export function SentenceBlock({
   sentence,
+  showSpeaker = true,
   speaking,
   activeChunkKey,
   hoveredChunkKey,
@@ -19,6 +36,7 @@ export function SentenceBlock({
   mobileTapEnabled,
 }: {
   sentence: LessonSentence;
+  showSpeaker?: boolean;
   speaking?: boolean;
   activeChunkKey?: string | null;
   hoveredChunkKey?: string | null;
@@ -46,15 +64,23 @@ export function SentenceBlock({
         "space-y-3 border-border/70 p-4 transition-all duration-150 hover:border-primary/30 sm:p-5",
         mobileTapEnabled &&
           "cursor-pointer active:scale-[0.998] active:border-primary/40",
+        showSpeaker && sentence.speaker === "A" && "sm:mr-12",
+        showSpeaker && sentence.speaker === "B" && "sm:ml-12",
       )}
       onClick={() => {
         if (mobileTapEnabled) onSentenceTap?.(sentence.id);
       }}
     >
       <div className="flex items-center justify-between gap-2">
-        {sentence.speaker ? (
-          <Badge variant="outline" className="text-[10px] tracking-[0.08em] uppercase">
-            {sentence.speaker}
+        {showSpeaker && sentence.speaker ? (
+          <Badge
+            variant="outline"
+            className={cn(
+              "text-[10px] tracking-[0.08em] uppercase",
+              speakerBadgeClassName(sentence.speaker),
+            )}
+          >
+            {speakerLabel(sentence.speaker)}
           </Badge>
         ) : (
           <span />
@@ -161,4 +187,5 @@ export function SentenceBlock({
     </Card>
   );
 }
+
 

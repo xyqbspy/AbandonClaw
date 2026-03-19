@@ -1,4 +1,4 @@
-import { CirclePlay, Volume2 } from "lucide-react";
+﻿import { CirclePlay, Volume2 } from "lucide-react";
 import { LessonSentence, SelectionChunkLayer } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,16 @@ const highlightSelected = (sentence: string, selected?: string) => {
 };
 
 const isLongChunk = (text: string) => text.length > 22;
+const speakerTextClassName = (speaker?: "A" | "B") => {
+  if (speaker === "A") return "text-sky-700";
+  if (speaker === "B") return "text-emerald-700";
+  return "text-muted-foreground";
+};
+const speakerLabel = (speaker?: "A" | "B") => {
+  if (speaker === "A") return "A";
+  if (speaker === "B") return "B";
+  return "";
+};
 
 export function SelectionDetailPanel({
   currentSentence,
@@ -37,6 +47,8 @@ export function SelectionDetailPanel({
   onSelectRelated,
   hoveredChunkKey,
   onHoverChunk,
+  showSpeaker = true,
+  sentenceSectionLabel = "当前句子",
 }: {
   currentSentence: LessonSentence | null;
   chunkDetail: SelectionChunkLayer | null;
@@ -50,12 +62,19 @@ export function SelectionDetailPanel({
   onSelectRelated: (chunk: string) => void;
   hoveredChunkKey: string | null;
   onHoverChunk: (chunkKey: string | null) => void;
+  showSpeaker?: boolean;
+  sentenceSectionLabel?: string;
 }) {
   return (
     <div className="sticky top-20 hidden space-y-4 lg:block">
       <Card className="overflow-hidden border-border/70 shadow-sm">
         <CardHeader className="space-y-2 border-b border-border/60 bg-muted/30 pb-3">
-          <CardTitle className="text-lg">当前句子</CardTitle>
+          <CardTitle className="text-lg">
+            {sentenceSectionLabel}
+            {showSpeaker && currentSentence?.speaker
+              ? `（${speakerLabel(currentSentence.speaker)}）`
+              : ""}
+          </CardTitle>
         </CardHeader>
         {loading ? (
           <CardContent className="space-y-3 pt-4">
@@ -68,9 +87,14 @@ export function SelectionDetailPanel({
             className="space-y-3 pt-4 animate-in fade-in-0 slide-in-from-right-1 duration-200"
           >
             <div className="rounded-lg border border-border/70 bg-background px-3 py-2 text-sm leading-7 break-words">
-              {currentSentence.speaker ? (
-                <p className="mb-1 text-[10px] tracking-[0.08em] text-muted-foreground uppercase">
-                  {currentSentence.speaker}
+              {showSpeaker && currentSentence.speaker ? (
+                <p
+                  className={cn(
+                    "mb-1 text-[10px] tracking-[0.08em] uppercase",
+                    speakerTextClassName(currentSentence.speaker),
+                  )}
+                >
+                  {speakerLabel(currentSentence.speaker)}
                 </p>
               ) : null}
               {highlightSelected(currentSentence.text, chunkDetail?.text)}
@@ -188,7 +212,7 @@ export function SelectionDetailPanel({
                 <div>
                   <p className="text-xs tracking-[0.08em] text-muted-foreground">常见用法</p>
                   <p className="mt-1 text-sm leading-7">
-                    {chunkDetail.grammarLabel ? `${chunkDetail.grammarLabel}｜` : ""}
+                    {chunkDetail.grammarLabel ? `${chunkDetail.grammarLabel} · ` : ""}
                     {chunkDetail.usageNote}
                   </p>
                 </div>
@@ -227,7 +251,7 @@ export function SelectionDetailPanel({
                 </div>
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">点击下方短语查看解析与例句</p>
+              <p className="text-sm text-muted-foreground">点击下方短语查看解析与例句。</p>
             )}
           </CardContent>
         )}
@@ -235,3 +259,7 @@ export function SelectionDetailPanel({
     </div>
   );
 }
+
+
+
+

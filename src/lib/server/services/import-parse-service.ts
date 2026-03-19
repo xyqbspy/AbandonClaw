@@ -10,6 +10,7 @@ import {
 } from "@/lib/server/scene-json";
 import { callGlmChatCompletion } from "@/lib/server/glm-client";
 import { ParsedScene, SceneSourceLanguage } from "@/lib/types/scene-parser";
+import { normalizeParsedSceneDialogue } from "@/lib/shared/scene-dialogue";
 import {
   buildSceneParseCacheKey,
   getAiCacheByKey,
@@ -51,7 +52,16 @@ const toStringOr = (value: unknown, fallback: string) =>
 const toDifficulty = (value: unknown): ParsedScene["difficulty"] =>
   value === "Beginner" || value === "Intermediate" || value === "Advanced"
     ? value
-    : "Intermediate";
+      : "Intermediate";
+
+const toSpeaker = (value: unknown): "A" | "B" | undefined => {
+  if (value === "A" || value === "B") return value;
+  if (typeof value === "string") {
+    const normalized = value.trim().toUpperCase();
+    if (normalized === "A" || normalized === "B") return normalized;
+  }
+  return undefined;
+};
 
 const toExamples = (value: unknown, text: string, translation: string) => {
   if (Array.isArray(value) && value.length > 0) {
@@ -80,11 +90,66 @@ const coerceParsedSceneFromLooseResponse = (value: unknown): ParsedScene | null 
       ? (source as Record<string, unknown>).sections
       : null) ??
     (Array.isArray(value.sections) ? value.sections : null);
-  if (!Array.isArray(rawSections) || rawSections.length === 0) return null;
+  const rawDialogue =
+    (Array.isArray((source as Record<string, unknown>).dialogue)
+      ? (source as Record<string, unknown>).dialogue
+      : null) ??
+    (Array.isArray(value.dialogue) ? value.dialogue : null);
 
   const normalizedSections: ParsedScene["sections"] = [];
-  for (let sectionIndex = 0; sectionIndex < rawSections.length; sectionIndex += 1) {
-    const section = rawSections[sectionIndex];
+  const normalizedDialogue: ParsedScene["dialogue"] = [];
+
+  if (Array.isArray(rawDialogue) && rawDialogue.length > 0) {
+    for (let lineIndex = 0; lineIndex < rawDialogue.length; lineIndex += 1) {
+      const line = rawDialogue[lineIndex];
+      if (!isObject(line)) continue;
+      const text = toStringOr(line.text, "");
+      if (!text) continue;
+      const translation = toStringOr(line.translation, text);
+      const rawChunks = Array.isArray(line.chunks) ? line.chunks : [];
+      const normalizedChunks: ParsedScene["dialogue"][number]["chunks"] = [];
+
+      for (let chunkIndex = 0; chunkIndex < rawChunks.length; chunkIndex += 1) {
+        const chunk = rawChunks[chunkIndex];
+        if (!isObject(chunk)) continue;
+        const chunkText = toStringOr(chunk.text, "");
+        if (!chunkText) continue;
+        const chunkTranslation = toStringOr(chunk.translation, chunkText);
+        normalizedChunks.push({
+          key: toStringOr(chunk.key, `c${lineIndex + 1}-${chunkIndex + 1}`),
+          text: chunkText,
+          translation: chunkTranslation,
+          grammarLabel: toStringOr(chunk.grammarLabel, "Chunk"),
+          meaningInSentence: toStringOr(chunk.meaningInSentence, chunkText),
+          usageNote: toStringOr(chunk.usageNote, "Useful expression in this context."),
+          examples: toExamples(chunk.examples, chunkText, chunkTranslation),
+        });
+      }
+
+      if (normalizedChunks.length === 0) continue;
+      const speaker = toSpeaker(line.speaker);
+      if (!speaker) continue;
+      normalizedDialogue.push({
+        id: toStringOr(line.id, `s${lineIndex + 1}`),
+        speaker,
+        text,
+        translation,
+        tts: toStringOr(line.tts, text),
+        chunks: normalizedChunks,
+      });
+    }
+  }
+
+  if (
+    normalizedDialogue.length === 0 &&
+    (!Array.isArray(rawSections) || rawSections.length === 0)
+  ) {
+    return null;
+  }
+
+  const sectionRows = Array.isArray(rawSections) ? rawSections : [];
+  for (let sectionIndex = 0; sectionIndex < sectionRows.length; sectionIndex += 1) {
+    const section = sectionRows[sectionIndex];
     if (!isObject(section)) continue;
 
     const rawSentences = Array.isArray(section.sentences) ? section.sentences : [];
@@ -118,15 +183,14 @@ const coerceParsedSceneFromLooseResponse = (value: unknown): ParsedScene | null 
       }
 
       if (normalizedChunks.length === 0) continue;
-      const speaker =
-        typeof sentence.speaker === "string" && sentence.speaker.trim()
-          ? sentence.speaker.trim()
-          : undefined;
+      const sentenceId = toStringOr(sentence.id, `s${sectionIndex + 1}-${sentenceIndex + 1}`);
+      const speaker = toSpeaker(sentence.speaker);
       normalizedSentences.push({
-        id: toStringOr(sentence.id, `s${sectionIndex + 1}-${sentenceIndex + 1}`),
+        id: sentenceId,
         ...(speaker ? { speaker } : {}),
         text,
         translation,
+        audioText: toStringOr(sentence.audioText, text),
         chunks: normalizedChunks,
       });
     }
@@ -139,7 +203,7 @@ const coerceParsedSceneFromLooseResponse = (value: unknown): ParsedScene | null 
       sentences: normalizedSentences,
     });
   }
-  if (normalizedSections.length === 0) return null;
+  if (normalizedSections.length === 0 && normalizedDialogue.length === 0) return null;
 
   const title = toStringOr(source.title, "Generated Scene");
   const slug = toSlug(toStringOr(source.slug, title)) || `generated-${Date.now()}`;
@@ -161,11 +225,12 @@ const coerceParsedSceneFromLooseResponse = (value: unknown): ParsedScene | null 
         ? Math.max(3, Math.min(20, Math.round(source.estimatedMinutes)))
         : 8,
     tags,
+    dialogue: normalizedDialogue,
     sections: normalizedSections,
     glossary: Array.isArray(source.glossary) ? source.glossary : undefined,
   };
-
-  return isValidParsedScene(parsed) ? parsed : null;
+  const normalizedParsed = normalizeParsedSceneDialogue(parsed);
+  return isValidParsedScene(normalizedParsed) ? normalizedParsed : null;
 };
 
 const summarizeParsedShape = (value: unknown) => {
@@ -225,7 +290,7 @@ IMPORTANT:
 - Return ONE pure JSON object only.
 - Top-level must be: {"version":"v1","scene":{...}}
 - Do not add explanation before or after JSON.
-- Ensure scene has non-empty sections/sentences/chunks.`;
+- Ensure scene has non-empty dialogue/chunks.`;
 
 export async function parseImportedSceneWithCache(params: {
   sourceText: string;
@@ -258,6 +323,9 @@ export async function parseImportedSceneWithCache(params: {
   if (!force) {
     const cached = await getAiCacheByKey(cacheKey);
     if (cached && isObject(cached.output_json) && isValidParsedScene(cached.output_json)) {
+      const normalizedCachedScene = normalizeParsedSceneDialogue(
+        cached.output_json as ParsedScene,
+      );
       console.info("[scene-parse-cache]", {
         cacheStatus: "hit",
         cacheKey,
@@ -268,7 +336,7 @@ export async function parseImportedSceneWithCache(params: {
         source: "ai_cache" as const,
         cacheKey,
         cacheStatus: "hit" as const,
-        parsedScene: cached.output_json as ParsedScene,
+        parsedScene: normalizedCachedScene,
       };
     }
   }
@@ -340,10 +408,11 @@ export async function parseImportedSceneWithCache(params: {
     }
   }
   const parsedScene = parseResult.parsedScene;
+  const normalizedParsedScene = normalizeParsedSceneDialogue(parsedScene);
   console.log("[scene.parse] parsed ok", {
     runId,
-    title: parsedScene.title,
-    sections: parsedScene.sections.length,
+    title: normalizedParsedScene.title,
+    dialogue: normalizedParsedScene.dialogue.length,
   });
 
   await setAiCache({
@@ -359,7 +428,7 @@ export async function parseImportedSceneWithCache(params: {
       sourceText: normalizedSource,
       sourceLanguage: params.sourceLanguage ?? "en",
     },
-    outputJson: parsedScene,
+    outputJson: normalizedParsedScene,
     metaJson: {
       cacheStatus: force ? "forced" : "written",
     },
@@ -378,6 +447,6 @@ export async function parseImportedSceneWithCache(params: {
     source: "glm" as const,
     cacheKey,
     cacheStatus: force ? ("forced" as const) : ("written" as const),
-    parsedScene,
+    parsedScene: normalizedParsedScene,
   };
 }

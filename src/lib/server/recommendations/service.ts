@@ -3,6 +3,7 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getSceneRecordBySlug } from "@/lib/server/services/scene-service";
 import { normalizePhraseText } from "@/lib/shared/phrases";
 import { ChunkRow, UserChunkRow, UserPhraseRow } from "@/lib/server/db/types";
+import { normalizeParsedSceneDialogue } from "@/lib/shared/scene-dialogue";
 
 export type RecommendationReasonCode =
   | "useful_chunk"
@@ -73,30 +74,29 @@ const looksLikeUsefulChunk = (text: string) => {
 };
 
 const extractScenePhraseCandidates = (scene: ParsedScene): ScenePhraseCandidate[] => {
+  const normalizedScene = normalizeParsedSceneDialogue(scene);
   const uniqueByNormalized = new Map<string, ScenePhraseCandidate>();
   let sentenceIndex = 0;
 
-  for (const section of scene.sections ?? []) {
-    for (const sentence of section.sentences ?? []) {
-      for (const chunk of sentence.chunks ?? []) {
-        const text = chunk?.text?.trim();
-        if (!text) continue;
-        const normalizedText = normalizePhraseText(text);
-        if (!normalizedText) continue;
-        if (!looksLikeUsefulChunk(text)) continue;
-        if (uniqueByNormalized.has(normalizedText)) continue;
+  for (const line of normalizedScene.dialogue ?? []) {
+    for (const chunk of line.chunks ?? []) {
+      const text = chunk?.text?.trim();
+      if (!text) continue;
+      const normalizedText = normalizePhraseText(text);
+      if (!normalizedText) continue;
+      if (!looksLikeUsefulChunk(text)) continue;
+      if (uniqueByNormalized.has(normalizedText)) continue;
 
-        uniqueByNormalized.set(normalizedText, {
-          text,
-          normalizedText,
-          translation: chunk.translation?.trim() || null,
-          sourceSentenceIndex: sentenceIndex,
-          sourceSentenceText: sentence.text?.trim() || null,
-          sourceChunkText: text,
-        });
-      }
-      sentenceIndex += 1;
+      uniqueByNormalized.set(normalizedText, {
+        text,
+        normalizedText,
+        translation: chunk.translation?.trim() || null,
+        sourceSentenceIndex: sentenceIndex,
+        sourceSentenceText: line.text?.trim() || null,
+        sourceChunkText: text,
+      });
     }
+    sentenceIndex += 1;
   }
 
   return Array.from(uniqueByNormalized.values());

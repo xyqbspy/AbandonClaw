@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
@@ -944,6 +944,10 @@ export default function SceneDetailPage() {
     return <div className="p-4 text-sm text-muted-foreground">场景不存在。</div>;
   }
 
+  const isDialogueScene = baseLesson.sceneType === "dialogue";
+  const practiceButtonLabel = isDialogueScene ? "练对话" : "练表达";
+  const viewPracticeButtonLabel = isDialogueScene ? "查看对话练习" : "查看表达练习";
+
   const chunkDetailSheet = (
     <SelectionDetailSheet
       currentSentence={variantChunkSentence}
@@ -1236,7 +1240,7 @@ export default function SceneDetailPage() {
               disabled={!canGeneratePractice}
               onClick={() => handleGeneratePractice(activeVariantLesson)}
             >
-              {practiceLoading ? "练习中…" : "练习"}
+              {practiceLoading ? "练习中…" : practiceButtonLabel}
             </button>
             <button
               type="button"
@@ -1271,8 +1275,8 @@ export default function SceneDetailPage() {
         {practiceLoading
           ? "练习中…"
           : generatedState.practiceStatus === "idle"
-            ? "练习"
-            : "查看练习"}
+            ? practiceButtonLabel
+            : viewPracticeButtonLabel}
       </button>
       <button
         type="button"
@@ -1347,3 +1351,4 @@ export default function SceneDetailPage() {
     </div>
   );
 }
+

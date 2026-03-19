@@ -16,6 +16,8 @@ import { parseImportedSceneWithCache } from "@/lib/server/services/import-parse-
 import { createImportedScene } from "@/lib/server/services/scene-service";
 import { getUserChunkCandidatesForSceneMutation } from "@/lib/server/chunks/service";
 import { normalizePhraseText } from "@/lib/shared/phrases";
+import { ParsedScene } from "@/lib/types/scene-parser";
+import { normalizeParsedSceneDialogue } from "@/lib/shared/scene-dialogue";
 
 const SCENE_GENERATE_PROMPT_VERSION = "scene-generate-v1";
 const DEFAULT_SENTENCE_COUNT = 10;
@@ -28,15 +30,17 @@ interface RelatedChunkVariant {
 }
 
 interface GeneratedSceneDraftLine {
-  speaker?: string;
+  speaker: "A" | "B";
   text: string;
+  translation: string;
+  tts?: string;
 }
 
 interface GeneratedSceneDraft {
   version: "v1";
   title: string;
   theme?: string;
-  lines: GeneratedSceneDraftLine[];
+  dialogue: GeneratedSceneDraftLine[];
 }
 
 export interface GeneratePersonalizedSceneInput {
@@ -95,7 +99,13 @@ const sceneTextContainsExpression = (sceneText: string, expressionText: string) 
 const isDraftLine = (value: unknown): value is GeneratedSceneDraftLine => {
   if (!value || typeof value !== "object") return false;
   const row = value as Record<string, unknown>;
-  return typeof row.text === "string" && row.text.trim().length > 0;
+  return (
+    (row.speaker === "A" || row.speaker === "B") &&
+    typeof row.text === "string" &&
+    row.text.trim().length > 0 &&
+    typeof row.translation === "string" &&
+    row.translation.trim().length > 0
+  );
 };
 
 const isGeneratedSceneDraft = (value: unknown): value is GeneratedSceneDraft => {
@@ -103,19 +113,46 @@ const isGeneratedSceneDraft = (value: unknown): value is GeneratedSceneDraft => 
   const row = value as Record<string, unknown>;
   if (row.version !== "v1") return false;
   if (typeof row.title !== "string" || !row.title.trim()) return false;
-  if (!Array.isArray(row.lines)) return false;
-  if (row.lines.length < 6 || row.lines.length > 14) return false;
-  return row.lines.every(isDraftLine);
+  if (!Array.isArray(row.dialogue)) return false;
+  if (row.dialogue.length < 6 || row.dialogue.length > 14) return false;
+  return row.dialogue.every(isDraftLine);
 };
 
 const toDraftSourceText = (draft: GeneratedSceneDraft) =>
-  draft.lines
+  draft.dialogue
     .map((line) => {
-      const speaker = typeof line.speaker === "string" ? line.speaker.trim() : "";
       const text = line.text.trim();
-      return speaker ? `${speaker}: ${text}` : text;
+      return `${line.speaker}: ${text}`;
     })
     .join("\n");
+
+const mergeDraftDialogueIntoParsedScene = (
+  parsedScene: ParsedScene,
+  draft: GeneratedSceneDraft | null,
+) => {
+  const normalized = normalizeParsedSceneDialogue(parsedScene);
+  if (!draft) return normalized;
+
+  const dialogue = normalized.dialogue.map((line, index) => {
+    const draftLine = draft.dialogue[index];
+    if (!draftLine) return line;
+    return {
+      ...line,
+      speaker: draftLine.speaker,
+      text: draftLine.text.trim() || line.text,
+      translation: draftLine.translation.trim() || line.translation,
+      tts: (draftLine.tts?.trim() || draftLine.text || line.text).trim(),
+      chunks: line.chunks,
+    };
+  });
+
+  return normalizeParsedSceneDialogue({
+    ...normalized,
+    title: draft.title.trim() || normalized.title,
+    dialogue,
+    sections: [],
+  });
+};
 
 const getPromptFromCache = (cacheOutput: unknown) => {
   if (!cacheOutput || typeof cacheOutput !== "object") return null;
@@ -297,6 +334,7 @@ export async function generatePersonalizedSceneForUser(
   let generatedSourceText: string;
   let generatedTitle: string | undefined;
   let generatedTheme: string | undefined;
+  let generatedDialogueDraft: GeneratedSceneDraft | null = null;
 
   if (cached) {
     console.log("[scene.generate] cache hit", { runId, cacheKey });
@@ -305,6 +343,9 @@ export async function generatePersonalizedSceneForUser(
       generatedSourceText = cachedValue.generatedSourceText;
       generatedTitle = cachedValue.generatedTitle;
       generatedTheme = cachedValue.generatedTheme;
+      const row = cached.output_json as Record<string, unknown>;
+      const cachedDraft = row.generatedDialogueDraft;
+      generatedDialogueDraft = isGeneratedSceneDraft(cachedDraft) ? cachedDraft : null;
     } else {
       generatedSourceText = "";
     }
@@ -347,10 +388,11 @@ export async function generatePersonalizedSceneForUser(
       });
       throw new Error("Generated scene draft JSON is invalid.");
     }
+    generatedDialogueDraft = parsed;
     console.log("[scene.generate] parsed ok", {
       runId,
       title: parsed.title,
-      lineCount: parsed.lines.length,
+      lineCount: parsed.dialogue.length,
     });
 
     generatedSourceText = toDraftSourceText(parsed);
@@ -383,6 +425,7 @@ export async function generatePersonalizedSceneForUser(
         generatedSourceText,
         generatedTitle: generatedTitle ?? null,
         generatedTheme: generatedTheme ?? null,
+        generatedDialogueDraft,
         knownChunksUsed: knownChunks,
         relatedChunkVariantsUsed: relatedChunkVariants,
       },
@@ -411,12 +454,16 @@ export async function generatePersonalizedSceneForUser(
   });
 
   console.log("[scene.generate] inserting scene", { runId });
+  const scenePayload = mergeDraftDialogueIntoParsedScene(
+    parsed.parsedScene,
+    generatedDialogueDraft,
+  );
   const scene = await createImportedScene({
     userId,
     sourceText: generatedSourceText,
     title: generatedTitle,
     theme: generatedTheme,
-    parsedScene: parsed.parsedScene,
+    parsedScene: scenePayload,
     model,
     promptVersion: SCENE_GENERATE_PROMPT_VERSION,
     cacheKey,
@@ -427,8 +474,9 @@ export async function generatePersonalizedSceneForUser(
     sceneSlug: scene.slug,
     title: scene.title,
   });
+  const sceneTextForMatch = scenePayload.dialogue.map((line) => line.text).join(" ");
   const relatedChunkVariantsMatched = relatedChunkVariants.filter((item) =>
-    sceneTextContainsExpression(generatedSourceText, item.text),
+    sceneTextContainsExpression(sceneTextForMatch, item.text),
   );
 
   return {

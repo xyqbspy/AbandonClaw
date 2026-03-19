@@ -10,6 +10,7 @@ export interface SceneListItemResponse {
   difficulty: string;
   estimatedMinutes: number;
   sentenceCount: number;
+  sceneType: "dialogue" | "monologue";
   sourceType: "builtin" | "imported";
   createdAt: string;
   variantLinks: Array<{ id: string; label: string }>;

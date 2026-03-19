@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireCurrentProfile } from "@/lib/server/auth";
 import { toApiErrorResponse } from "@/lib/server/api-error";
-import { savePhraseForUser } from "@/lib/server/phrases/service";
+import { SavePhraseInput, savePhraseForUser } from "@/lib/server/phrases/service";
 import { trackChunksForUser } from "@/lib/server/chunks/service";
 import {
   parseOptionalNonNegativeInt,
@@ -30,7 +30,7 @@ interface SaveAllPayload {
   items?: unknown;
 }
 
-const normalizeSavePayload = (payload: SavePhrasePayload) => {
+const normalizeSavePayload = (payload: SavePhrasePayload): SavePhraseInput => {
   const sourceSceneSlug = parseOptionalTrimmedString(
     payload.sourceSceneSlug,
     "sourceSceneSlug",

@@ -29,6 +29,10 @@ const learningStatusLabel: Record<SceneListItemResponse["learningStatus"], strin
   completed: "已完成",
   paused: "已暂停",
 };
+const sceneTypeSummary = (scene: SceneListItemResponse) =>
+  scene.sceneType === "dialogue"
+    ? `双人对话 · ${scene.sentenceCount}轮`
+    : `自述练习 · ${scene.sentenceCount}句`;
 
 const placeholderExample = `A: Are we still on for dinner?
 B: I was just about to text you. Something came up at work.
@@ -264,11 +268,11 @@ export default function ScenesPage() {
               <CardContent className="p-2.5 pt-0 sm:p-3 sm:pt-0">
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-[11px] text-muted-foreground">
-                    {difficultyLabel[scene.difficulty] ?? "中级"} - {scene.sentenceCount} 句 -{" "}
-                    {scene.estimatedMinutes} 分钟
+                    {difficultyLabel[scene.difficulty] ?? "中级"} · {scene.estimatedMinutes}分钟 ·{" "}
+                    {sceneTypeSummary(scene)}
                   </p>
                   <p className="text-[11px] text-muted-foreground">
-                    {learningStatusLabel[scene.learningStatus]} - {Math.round(scene.progressPercent)}%
+                    {learningStatusLabel[scene.learningStatus]} · {Math.round(scene.progressPercent)}%
                   </p>
                   {scene.variantLinks.length > 0 ? (
                     <div className="flex flex-wrap items-center justify-end gap-1">

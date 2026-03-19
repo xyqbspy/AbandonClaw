@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -10,6 +10,16 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
 const isLongChunk = (text: string) => text.length > 22;
+const speakerTextClassName = (speaker?: "A" | "B") => {
+  if (speaker === "A") return "text-sky-700";
+  if (speaker === "B") return "text-emerald-700";
+  return "text-muted-foreground";
+};
+const speakerLabel = (speaker?: "A" | "B") => {
+  if (speaker === "A") return "A";
+  if (speaker === "B") return "B";
+  return "";
+};
 
 export function SelectionDetailSheet({
   currentSentence,
@@ -28,6 +38,8 @@ export function SelectionDetailSheet({
   hoveredChunkKey,
   onHoverChunk,
   showSentenceSection = true,
+  showSpeaker = true,
+  sentenceSectionLabel = "当前句子",
 }: {
   currentSentence: LessonSentence | null;
   chunkDetail: SelectionChunkLayer | null;
@@ -45,12 +57,17 @@ export function SelectionDetailSheet({
   hoveredChunkKey: string | null;
   onHoverChunk: (chunkKey: string | null) => void;
   showSentenceSection?: boolean;
+  showSpeaker?: boolean;
+  sentenceSectionLabel?: string;
 }) {
   const panelRef = useRef<HTMLDivElement | null>(null);
   const [showSentenceTranslation, setShowSentenceTranslation] = useState(false);
   const [exampleTranslationOpenMap, setExampleTranslationOpenMap] = useState<Record<string, boolean>>({});
   const hasChunk = Boolean(chunkDetail);
-  const topHint = useMemo(() => (hasChunk ? "短语解析" : "点击下方短语查看解析与例句"), [hasChunk]);
+  const topHint = useMemo(
+    () => (hasChunk ? "短语解析" : "点击下方短语查看解析与例句"),
+    [hasChunk],
+  );
 
   const toggleExampleTranslation = useCallback((example: string) => {
     setExampleTranslationOpenMap((prev) => ({
@@ -90,7 +107,9 @@ export function SelectionDetailSheet({
         <header className="flex items-start justify-between border-b border-border/70 px-4 pb-3 pt-3">
           <div>
             <h2 className="text-sm font-semibold">学习详情</h2>
-            <p className="text-xs text-muted-foreground">点句子看翻译，再点短语看解析。</p>
+            <p className="text-xs text-muted-foreground">
+              {showSpeaker ? "点对话看翻译，再点短语看解析。" : "点表达看翻译，再点短语看解析。"}
+            </p>
           </div>
           <Button
             size="icon-sm"
@@ -115,7 +134,12 @@ export function SelectionDetailSheet({
               {showSentenceSection ? (
                 <section className="rounded-xl border border-border/70 p-3">
                 <div className="flex items-center justify-between gap-3">
-                  <h3 className="text-sm font-medium">当前句子</h3>
+                  <h3 className="text-sm font-medium">
+                    {sentenceSectionLabel}
+                    {showSpeaker && currentSentence?.speaker
+                      ? `（${speakerLabel(currentSentence.speaker)}）`
+                      : ""}
+                  </h3>
                   {currentSentence ? (
                     <div className="flex items-center gap-3">
                       <button
@@ -139,9 +163,14 @@ export function SelectionDetailSheet({
                 </div>
                 {currentSentence ? (
                   <>
-                    {currentSentence.speaker ? (
-                      <p className="text-[10px] tracking-[0.08em] text-muted-foreground uppercase">
-                        {currentSentence.speaker}
+                    {showSpeaker && currentSentence.speaker ? (
+                      <p
+                        className={cn(
+                          "text-[10px] tracking-[0.08em] uppercase",
+                          speakerTextClassName(currentSentence.speaker),
+                        )}
+                      >
+                        {speakerLabel(currentSentence.speaker)}
                       </p>
                     ) : null}
                     <p className="mt-1 text-sm leading-7 break-words">{currentSentence.text}</p>
@@ -157,7 +186,9 @@ export function SelectionDetailSheet({
                     </div>
 
                     <div className="mt-3 space-y-2">
-                      <p className="text-xs tracking-[0.08em] text-muted-foreground">本句相关短语</p>
+                      <p className="text-xs tracking-[0.08em] text-muted-foreground">
+                        {showSpeaker ? "本轮相关短语" : "本句相关短语"}
+                      </p>
                       <div className="flex flex-wrap gap-2">
                         {relatedChunks.map((chunk) => (
                           <button
@@ -184,7 +215,7 @@ export function SelectionDetailSheet({
                     </div>
                   </>
                 ) : (
-                  <p className="text-sm text-muted-foreground">点按左侧句子开始学习。</p>
+                  <p className="text-sm text-muted-foreground">点击左侧句子开始学习。</p>
                 )}
                 </section>
               ) : null}
@@ -223,7 +254,7 @@ export function SelectionDetailSheet({
                     <div>
                       <p className="text-xs tracking-[0.08em] text-muted-foreground">常见用法</p>
                       <p className="mt-1 text-sm leading-7">
-                        {chunkDetail.grammarLabel ? `${chunkDetail.grammarLabel}｜` : ""}
+                        {chunkDetail.grammarLabel ? `${chunkDetail.grammarLabel} · ` : ""}
                         {chunkDetail.usageNote}
                       </p>
                     </div>
@@ -271,7 +302,7 @@ export function SelectionDetailSheet({
                     </div>
                   </div>
                 ) : (
-                  <p className="text-sm text-muted-foreground">点击下方短语查看解析与例句</p>
+                  <p className="text-sm text-muted-foreground">点击下方短语查看解析与例句。</p>
                 )}
               </section>
             </div>
@@ -293,3 +324,6 @@ export function SelectionDetailSheet({
     document.body,
   );
 }
+
+
+

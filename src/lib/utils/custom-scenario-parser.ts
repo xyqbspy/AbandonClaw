@@ -104,7 +104,12 @@ const toSentenceData = (turns: ParsedTurn[], sceneId: string): LessonSentence[] 
     text: turn.text,
     translation: "",
     chunks: [],
-    speaker: turn.speaker,
+    speaker:
+      typeof turn.speaker === "string" && turn.speaker.trim().toUpperCase() === "B"
+        ? "B"
+        : typeof turn.speaker === "string" && turn.speaker.trim().toUpperCase() === "A"
+          ? "A"
+          : undefined,
     audioText: turn.text,
   }));
 

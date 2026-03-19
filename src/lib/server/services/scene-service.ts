@@ -2,6 +2,7 @@ import { mapLessonToParsedScene, mapParsedSceneToLesson } from "@/lib/adapters/s
 import { scenes as seedLessons } from "@/lib/data/mock-lessons";
 import { Lesson } from "@/lib/types";
 import { ParsedScene, SceneParserResponse } from "@/lib/types/scene-parser";
+import { normalizeParsedSceneDialogue } from "@/lib/shared/scene-dialogue";
 import { SceneRow, SceneVariantRow, UserSceneProgressRow } from "@/lib/server/db/types";
 import { getSceneVariantsBySceneId } from "@/lib/server/services/variant-service";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -22,6 +23,7 @@ export interface SceneListItem {
   difficulty: string;
   estimatedMinutes: number;
   sentenceCount: number;
+  sceneType: "dialogue" | "monologue";
   sourceType: "builtin" | "imported";
   createdAt: string;
   variantLinks: Array<{ id: string; label: string }>;
@@ -36,7 +38,7 @@ const toSceneOriginSourceType = (origin: string): "builtin" | "imported" =>
 
 const normalizeSceneFromRow = (row: SceneRow): ParsedScene => {
   const raw = row.scene_json as ParsedScene;
-  return {
+  const normalized = normalizeParsedSceneDialogue({
     ...raw,
     id: row.id,
     slug: row.slug,
@@ -51,7 +53,9 @@ const normalizeSceneFromRow = (row: SceneRow): ParsedScene => {
       typeof raw.estimatedMinutes === "number" ? raw.estimatedMinutes : 10,
     tags: Array.isArray(raw.tags) ? raw.tags : [],
     sections: Array.isArray(raw.sections) ? raw.sections : [],
-  };
+    dialogue: Array.isArray(raw.dialogue) ? raw.dialogue : [],
+  });
+  return normalized;
 };
 
 const rowToLesson = (row: SceneRow): Lesson => {
@@ -91,10 +95,8 @@ const toSceneSummary = (
     subtitle: scene.subtitle,
     difficulty: scene.difficulty,
     estimatedMinutes: scene.estimatedMinutes,
-    sentenceCount: scene.sections.reduce(
-      (total, section) => total + section.sentences.length,
-      0,
-    ),
+    sentenceCount: scene.dialogue.length,
+    sceneType: scene.type ?? "monologue",
     sourceType: toSceneOriginSourceType(row.origin),
     createdAt: row.created_at,
     variantLinks,
@@ -210,7 +212,7 @@ export async function createImportedScene(params: {
   const mergedTags = Array.from(new Set([...(params.parsedScene.tags ?? []), "imported"]));
 
   const sceneJson: ParsedScene = {
-    ...params.parsedScene,
+    ...normalizeParsedSceneDialogue(params.parsedScene),
     slug: uniqueSlug,
     title: parsedTitle,
     tags: mergedTags,

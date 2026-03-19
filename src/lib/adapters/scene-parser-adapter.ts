@@ -2,8 +2,10 @@
 import {
   ParsedScene,
   ParsedSceneChunk,
+  ParsedSceneDialogueLine,
   SceneParserResponse,
 } from "@/lib/types/scene-parser";
+import { normalizeParsedSceneDialogue } from "@/lib/shared/scene-dialogue";
 
 const toUniqueChunkTexts = (chunks: ParsedSceneChunk[]) => {
   const seen = new Set<string>();
@@ -20,7 +22,7 @@ const toUniqueChunkTexts = (chunks: ParsedSceneChunk[]) => {
 };
 
 export function mapParsedSceneToLesson(response: SceneParserResponse): Lesson {
-  const { scene } = response;
+  const scene = normalizeParsedSceneDialogue(response.scene);
 
   return {
     id: scene.id,
@@ -32,6 +34,7 @@ export function mapParsedSceneToLesson(response: SceneParserResponse): Lesson {
     estimatedMinutes: scene.estimatedMinutes,
     completionRate: scene.completionRate ?? 0,
     tags: scene.tags,
+    sceneType: scene.type ?? (scene.dialogue.length > 0 ? "dialogue" : "monologue"),
     sourceType: "builtin",
     sections: scene.sections.map((section) => ({
       id: section.id,
@@ -72,6 +75,46 @@ export function mapParsedSceneToLesson(response: SceneParserResponse): Lesson {
 }
 
 export function mapLessonToParsedScene(lesson: Lesson): ParsedScene {
+  const sentenceRows = lesson.sections.flatMap((section) => section.sentences);
+  const inferredType =
+    lesson.sceneType ??
+    (sentenceRows.some((sentence) => sentence.speaker === "A" || sentence.speaker === "B")
+      ? "dialogue"
+      : "monologue");
+  const dialogue: ParsedSceneDialogueLine[] =
+    inferredType === "dialogue"
+      ? sentenceRows
+          .filter((sentence) => sentence.speaker === "A" || sentence.speaker === "B")
+          .map((sentence) => ({
+            id: sentence.id,
+            speaker: sentence.speaker === "B" ? "B" : "A",
+            text: sentence.text,
+            translation: sentence.translation,
+            tts: sentence.audioText ?? sentence.text,
+            chunks:
+              sentence.chunkDetails?.map((chunk) => ({
+                key: chunk.text,
+                text: chunk.text,
+                translation: chunk.translation,
+                grammarLabel: chunk.grammarLabel,
+                meaningInSentence: chunk.meaningInSentence,
+                usageNote: chunk.usageNote,
+                examples: chunk.examples,
+                pronunciation: chunk.pronunciation,
+                synonyms: chunk.synonyms,
+              })) ??
+              sentence.chunks.map((chunkText) => ({
+                key: chunkText,
+                text: chunkText,
+                translation: "",
+                grammarLabel: "",
+                meaningInSentence: "",
+                usageNote: "",
+                examples: [],
+              })),
+          }))
+      : [];
+
   return {
     id: lesson.id,
     slug: lesson.slug,
@@ -82,6 +125,8 @@ export function mapLessonToParsedScene(lesson: Lesson): ParsedScene {
     estimatedMinutes: lesson.estimatedMinutes,
     completionRate: lesson.completionRate,
     tags: lesson.tags,
+    type: inferredType,
+    dialogue,
     sections: lesson.sections.map((section) => ({
       id: section.id,
       title: section.title,

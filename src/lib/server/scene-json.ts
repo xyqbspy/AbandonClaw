@@ -67,6 +67,18 @@ const isValidChunk = (value: unknown) => {
   );
 };
 
+const isValidSpeaker = (value: unknown) => value === "A" || value === "B";
+
+const isValidDialogueLine = (value: unknown) => {
+  if (!isObject(value)) return false;
+  if (!isValidSpeaker(value.speaker)) return false;
+  if (typeof value.id !== "string" || typeof value.text !== "string") return false;
+  if (typeof value.translation !== "string") return false;
+  if (value.tts !== undefined && typeof value.tts !== "string") return false;
+  if (!Array.isArray(value.chunks)) return false;
+  return value.chunks.every(isValidChunk);
+};
+
 const isValidSentence = (value: unknown) => {
   if (!isObject(value)) return false;
   if (typeof value.id !== "string" || typeof value.text !== "string") {
@@ -88,10 +100,18 @@ export const isValidParsedScene = (value: unknown): value is ParsedScene => {
   if (!isObject(value)) return false;
   if (typeof value.id !== "string" || !value.id.trim()) return false;
   if (typeof value.slug !== "string" || !value.slug.trim()) return false;
-  if (!Array.isArray(value.sections) || value.sections.length === 0) {
+  const hasValidDialogue =
+    Array.isArray(value.dialogue) &&
+    value.dialogue.length > 0 &&
+    value.dialogue.every(isValidDialogueLine);
+  const hasValidSections =
+    Array.isArray(value.sections) &&
+    value.sections.length > 0 &&
+    value.sections.every(isValidSection);
+  if (!hasValidDialogue && !hasValidSections) {
     return false;
   }
-  return value.sections.every(isValidSection);
+  return true;
 };
 
 export const normalizeSceneParserResponseVersion = (value: unknown): unknown => {
