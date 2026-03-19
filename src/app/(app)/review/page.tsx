@@ -46,6 +46,9 @@ const zh = {
   incorrect: "\u9519\u8bef",
   dash: "\u2014",
   sessionHint: "\u6b63\u5728\u590d\u4e60\u4f60\u521a\u9009\u4e2d\u7684\u8868\u8fbe\u3002",
+  manualSessionHint: "\u521a\u8bb0\u4e0b\u8fd9\u4e2a\u8868\u8fbe\uff0c\u73b0\u5728\u8bd5\u7740\u81ea\u5df1\u7528\u4e00\u4e0b\u3002",
+  manualTrainingHintSubtle:
+    "\u8fd9\u662f\u4f60\u521a\u6536\u85cf\u7684\u8868\u8fbe\uff0c\u5148\u522b\u770b\u53c2\u8003\u53e5\uff0c\u8bd5\u7740\u8bf4\u4e00\u53e5",
   fromExpressionLibrary: "\u6765\u81ea\u8868\u8fbe\u5e93",
   fromExpressionMap: "\u6765\u81ea\u8868\u8fbe\u5730\u56fe",
   fromTodayTask: "\u6765\u81ea\u4eca\u65e5\u4efb\u52a1",
@@ -226,6 +229,7 @@ export default function ReviewPage() {
     : "";
   const sourceLabel = (() => {
     if (!isSessionReview) return null;
+    if (sessionSource === "expression-library-manual-add") return zh.fromExpressionLibrary;
     if (sessionSource === "expression-library-card") return zh.fromExpressionLibrary;
     if (sessionSource === "expression-map-family" || sessionSource === "expression-map-single") {
       return zh.fromExpressionMap;
@@ -233,7 +237,15 @@ export default function ReviewPage() {
     if (sessionSource === "today-task") return zh.fromTodayTask;
     return zh.fromSelected;
   })();
-  const primaryHint = isSessionReview ? zh.sessionHint : zh.defaultHint;
+  const primaryHint = (() => {
+    if (!isSessionReview) return zh.defaultHint;
+    if (sessionSource === "expression-library-manual-add") return zh.manualSessionHint;
+    return zh.sessionHint;
+  })();
+  const trainingHintSubtle =
+    sessionSource === "expression-library-manual-add"
+      ? zh.manualTrainingHintSubtle
+      : zh.trainingHintSubtle;
 
   const submit = async (result: "again" | "hard" | "good") => {
     if (!current || submitting) return;
@@ -293,7 +305,7 @@ export default function ReviewPage() {
             <p className="text-sm text-muted-foreground">
               {zh.trainingGuidePrefix} <ExpressionWordMark>{zh.expressionLabel}</ExpressionWordMark> {zh.trainingGuideSuffix}
             </p>
-            <p className="text-xs text-muted-foreground">{zh.trainingHintSubtle}</p>
+            <p className="text-xs text-muted-foreground">{trainingHintSubtle}</p>
             <CardTitle className="text-xl">
               <ExpressionWordMark>{zh.expressionLabel}</ExpressionWordMark>：{current.text}
             </CardTitle>

@@ -58,12 +58,16 @@ const FAMILY_STOP_WORDS = new Set([
 ]);
 
 export interface SavePhraseInput {
-  text: string;
+  text?: string;
+  learningItemType?: "expression" | "sentence";
+  sentenceText?: string;
   translation?: string;
   usageNote?: string;
   difficulty?: string;
   tags?: string[];
   sourceSceneSlug?: string;
+  sourceType?: "scene" | "manual";
+  sourceNote?: string;
   sourceSentenceIndex?: number;
   sourceSentenceText?: string;
   sourceChunkText?: string;
@@ -80,10 +84,13 @@ export interface UserSavedPhraseItem {
   difficulty: string | null;
   tags: string[];
   sourceSceneSlug: string | null;
+  sourceType: "scene" | "manual";
+  sourceNote: string | null;
   sourceSentenceIndex: number | null;
   sourceSentenceText: string | null;
   sourceChunkText: string | null;
   expressionFamilyId: string | null;
+  learningItemType: "expression" | "sentence";
   savedAt: string;
   lastSeenAt: string;
   reviewStatus: UserPhraseReviewStatus;
@@ -111,6 +118,26 @@ const parseTags = (value: unknown) => {
     .filter(Boolean)
     .slice(0, 8);
   return Array.from(new Set(tags));
+};
+
+const inferLearningItemType = (row: Pick<
+  UserPhraseRow,
+  "learning_item_type" | "source_sentence_text" | "source_chunk_text"
+>): "expression" | "sentence" => {
+  if (row.learning_item_type === "sentence") return "sentence";
+  const hasSentenceText = Boolean(row.source_sentence_text?.trim());
+  const chunkText = row.source_chunk_text?.trim() ?? "";
+  const looksLikeSentenceSynthetic = /^sentence-[0-9a-f]{8}$/i.test(chunkText);
+  if (hasSentenceText && looksLikeSentenceSynthetic) return "sentence";
+  return "expression";
+};
+
+const toStableSentenceSyntheticText = (sentence: string) => {
+  let hash = 0;
+  for (let index = 0; index < sentence.length; index += 1) {
+    hash = (hash * 31 + sentence.charCodeAt(index)) >>> 0;
+  }
+  return `sentence-${hash.toString(16).padStart(8, "0")}`;
 };
 
 const normalizeSceneLineage = (sceneSlug: string | null) => {
@@ -217,16 +244,40 @@ async function inferExpressionFamilyId(params: {
   return candidateByRule;
 }
 
-const mapSavedPhraseRow = (row: UserPhraseRow & { phrase: PhraseRow | null }): UserSavedPhraseItem => ({
+const mapSavedPhraseRow = (row: UserPhraseRow & { phrase: PhraseRow | null }): UserSavedPhraseItem => {
+  const learningItemType = inferLearningItemType(row);
+  return {
+  learningItemType,
   userPhraseId: row.id,
   phraseId: row.phrase_id,
-  text: row.phrase?.display_text ?? row.source_chunk_text ?? "",
-  normalizedText: row.phrase?.normalized_text ?? "",
+  text:
+    learningItemType === "sentence"
+      ? row.source_sentence_text ??
+        row.phrase?.display_text ??
+        row.source_chunk_text ??
+        ""
+      : row.phrase?.display_text ?? row.source_chunk_text ?? "",
+  normalizedText:
+    learningItemType === "sentence"
+      ? normalizePhraseText(
+          row.source_sentence_text ??
+            row.phrase?.display_text ??
+            row.source_chunk_text ??
+            "",
+        )
+      : row.phrase?.normalized_text ?? "",
   translation: row.phrase?.translation ?? null,
   usageNote: row.phrase?.usage_note ?? null,
   difficulty: row.phrase?.difficulty ?? null,
   tags: Array.isArray(row.phrase?.tags) ? (row.phrase?.tags as string[]) : [],
   sourceSceneSlug: row.source_scene_slug,
+  sourceType:
+    row.source_type === "manual"
+      ? "manual"
+      : row.source_scene_slug
+        ? "scene"
+        : "manual",
+  sourceNote: row.source_note ?? null,
   sourceSentenceIndex: row.source_sentence_index,
   sourceSentenceText: row.source_sentence_text,
   sourceChunkText: row.source_chunk_text,
@@ -240,7 +291,8 @@ const mapSavedPhraseRow = (row: UserPhraseRow & { phrase: PhraseRow | null }): U
   lastReviewedAt: row.last_reviewed_at,
   nextReviewAt: row.next_review_at,
   masteredAt: row.mastered_at,
-});
+  };
+};
 
 async function ensurePhraseEntity(input: {
   normalizedText: string;
@@ -368,21 +420,34 @@ async function incrementSceneSavedPhraseCount(userId: string, sceneId: string) {
 }
 
 export async function savePhraseForUser(userId: string, input: SavePhraseInput) {
-  const text = typeof input.text === "string" ? input.text.trim() : "";
-  if (!text) {
-    throw new ValidationError("text is required.");
-  }
-  if (text.length < 2) {
-    throw new ValidationError("text is too short.");
-  }
-  if (text.length > 200) {
-    throw new ValidationError("text must be <= 200 characters.");
+  const learningItemType = input.learningItemType === "sentence" ? "sentence" : "expression";
+  const expressionText = typeof input.text === "string" ? input.text.trim() : "";
+  const sentenceText = parseOptionalTrimmed(input.sentenceText, 3000);
+
+  if (learningItemType === "expression") {
+    if (!expressionText) {
+      throw new ValidationError("text is required.");
+    }
+    if (expressionText.length < 2) {
+      throw new ValidationError("text is too short.");
+    }
+    if (expressionText.length > 200) {
+      throw new ValidationError("text must be <= 200 characters.");
+    }
+  } else {
+    if (!sentenceText) {
+      throw new ValidationError("sentenceText is required when learningItemType=sentence.");
+    }
   }
 
-  const normalizedText = normalizePhraseText(text);
+  const phraseDisplayText =
+    learningItemType === "sentence"
+      ? expressionText || toStableSentenceSyntheticText(sentenceText ?? "")
+      : expressionText;
+  const normalizedText = normalizePhraseText(phraseDisplayText);
   const phrase = await ensurePhraseEntity({
     normalizedText,
-    displayText: text,
+    displayText: phraseDisplayText,
     translation: parseOptionalTrimmed(input.translation, 500),
     usageNote: parseOptionalTrimmed(input.usageNote, 1000),
     difficulty: parseOptionalTrimmed(input.difficulty, 64),
@@ -410,13 +475,16 @@ export async function savePhraseForUser(userId: string, input: SavePhraseInput) 
 
   const now = nowIso();
   const providedFamilyId = parseOptionalTrimmed(input.expressionFamilyId, 120);
-  const inferredFamilyId = await inferExpressionFamilyId({
-    userId,
-    sourceSceneSlug,
-    normalizedText,
-    providedFamilyId,
-    existingFamilyId: existing?.expression_family_id ?? null,
-  });
+  const inferredFamilyId =
+    learningItemType === "sentence" && !expressionText
+      ? existing?.expression_family_id ?? providedFamilyId ?? null
+      : await inferExpressionFamilyId({
+          userId,
+          sourceSceneSlug,
+          normalizedText,
+          providedFamilyId,
+          existingFamilyId: existing?.expression_family_id ?? null,
+        });
   const nextPayload = {
     user_id: userId,
     phrase_id: phrase.id,
@@ -424,34 +492,54 @@ export async function savePhraseForUser(userId: string, input: SavePhraseInput) 
     // MVP review loop: new saved phrases should be immediately due once,
     // so users can see "today due" and complete their first review quickly.
     review_status:
-      existing?.review_status === "archived"
-        ? ("saved" as const)
-        : (existing?.review_status ?? ("saved" as const)),
+      learningItemType === "sentence"
+        ? ("archived" as const)
+        : existing?.review_status === "archived"
+          ? ("saved" as const)
+          : (existing?.review_status ?? ("saved" as const)),
     review_count: existing?.review_count ?? 0,
     correct_count: existing?.correct_count ?? 0,
     incorrect_count: existing?.incorrect_count ?? 0,
     last_reviewed_at: existing?.last_reviewed_at ?? null,
     next_review_at:
-      existing?.next_review_at ??
-      (existing?.review_status === "mastered" ? null : now),
+      learningItemType === "sentence"
+        ? null
+        : existing?.next_review_at ??
+          (existing?.review_status === "mastered" ? null : now),
     mastered_at: existing?.mastered_at ?? null,
     source_scene_id: sourceSceneId ?? existing?.source_scene_id ?? null,
     source_scene_slug: sourceSceneSlug ?? existing?.source_scene_slug ?? null,
+    source_type:
+      input.sourceType ??
+      existing?.source_type ??
+      (sourceSceneSlug ? ("scene" as const) : ("manual" as const)),
+    source_note:
+      parseOptionalTrimmed(input.sourceNote, 300) ??
+      existing?.source_note ??
+      null,
     source_sentence_index:
       typeof input.sourceSentenceIndex === "number" &&
       Number.isFinite(input.sourceSentenceIndex)
         ? Math.max(0, Math.floor(input.sourceSentenceIndex))
         : existing?.source_sentence_index ?? null,
     source_sentence_text:
-      parseOptionalTrimmed(input.sourceSentenceText, 3000) ??
+      (learningItemType === "sentence"
+        ? sentenceText
+        : parseOptionalTrimmed(input.sourceSentenceText, 3000)) ??
       existing?.source_sentence_text ??
       null,
     source_chunk_text:
-      parseOptionalTrimmed(input.sourceChunkText, 500) ??
+      (learningItemType === "sentence"
+        ? parseOptionalTrimmed(input.sourceChunkText, 500) ?? parseOptionalTrimmed(input.text, 500)
+        : parseOptionalTrimmed(input.sourceChunkText, 500) ?? parseOptionalTrimmed(input.text, 500)) ??
       existing?.source_chunk_text ??
-      text,
+      phraseDisplayText,
     expression_family_id:
       inferredFamilyId ?? null,
+    learning_item_type:
+      learningItemType ??
+      existing?.learning_item_type ??
+      "expression",
     saved_at: existing?.saved_at ?? now,
     last_seen_at: now,
   };
@@ -466,11 +554,17 @@ export async function savePhraseForUser(userId: string, input: SavePhraseInput) 
   if (upsertError) {
     const shouldFallbackWithoutFamilyColumn =
       upsertError.code === "42703" ||
-      upsertError.message.toLowerCase().includes("expression_family_id");
+      upsertError.message.toLowerCase().includes("expression_family_id") ||
+      upsertError.message.toLowerCase().includes("source_type") ||
+      upsertError.message.toLowerCase().includes("source_note") ||
+      upsertError.message.toLowerCase().includes("learning_item_type");
 
     if (shouldFallbackWithoutFamilyColumn) {
       const fallbackPayload = { ...nextPayload };
       delete (fallbackPayload as Record<string, unknown>).expression_family_id;
+      delete (fallbackPayload as Record<string, unknown>).source_type;
+      delete (fallbackPayload as Record<string, unknown>).source_note;
+      delete (fallbackPayload as Record<string, unknown>).learning_item_type;
       const { data: fallbackRow, error: fallbackError } = await admin
         .from("user_phrases")
         .upsert(fallbackPayload as never, { onConflict: "user_id,phrase_id" })
@@ -511,6 +605,7 @@ export async function listUserSavedPhrases(params: {
   query?: string;
   status?: "saved" | "archived";
   reviewStatus?: UserPhraseReviewStatus | "all";
+  learningItemType?: "expression" | "sentence" | "all";
   page?: number;
   limit?: number;
 }) {
@@ -531,7 +626,6 @@ export async function listUserSavedPhrases(params: {
   if (params.reviewStatus && params.reviewStatus !== "all") {
     query = query.eq("review_status", params.reviewStatus);
   }
-
   const textQuery = params.query?.trim();
   if (textQuery) {
     query = query.or(
@@ -545,9 +639,17 @@ export async function listUserSavedPhrases(params: {
   }
 
   const rows = (data ?? []) as Array<UserPhraseRow & { phrase: PhraseRow | null }>;
+  const mappedRows = rows.map(mapSavedPhraseRow);
+  const filteredRows =
+    params.learningItemType && params.learningItemType !== "all"
+      ? mappedRows.filter((row) => row.learningItemType === params.learningItemType)
+      : mappedRows;
   return {
-    rows: rows.map(mapSavedPhraseRow),
-    total: count ?? 0,
+    rows: filteredRows,
+    total:
+      params.learningItemType && params.learningItemType !== "all"
+        ? filteredRows.length
+        : (count ?? 0),
     page,
     limit,
   };

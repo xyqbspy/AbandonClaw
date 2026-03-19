@@ -118,10 +118,13 @@ export interface UserPhraseRow {
   mastered_at: string | null;
   source_scene_id: string | null;
   source_scene_slug: string | null;
+  source_type: "scene" | "manual" | null;
+  source_note: string | null;
   source_sentence_index: number | null;
   source_sentence_text: string | null;
   source_chunk_text: string | null;
   expression_family_id: string | null;
+  learning_item_type: "expression" | "sentence" | null;
   saved_at: string;
   last_seen_at: string;
   created_at: string;

@@ -34,10 +34,13 @@ export interface UserPhraseItemResponse {
   difficulty: string | null;
   tags: string[];
   sourceSceneSlug: string | null;
+  sourceType: "scene" | "manual";
+  sourceNote: string | null;
   sourceSentenceIndex: number | null;
   sourceSentenceText: string | null;
   sourceChunkText: string | null;
   expressionFamilyId: string | null;
+  learningItemType: "expression" | "sentence";
   savedAt: string;
   lastSeenAt: string;
   reviewStatus: PhraseReviewStatus;
@@ -50,12 +53,16 @@ export interface UserPhraseItemResponse {
 }
 
 export async function savePhraseFromApi(payload: {
-  text: string;
+  text?: string;
+  learningItemType?: "expression" | "sentence";
+  sentenceText?: string;
   translation?: string;
   usageNote?: string;
   difficulty?: string;
   tags?: string[];
   sourceSceneSlug?: string;
+  sourceType?: "scene" | "manual";
+  sourceNote?: string;
   sourceSentenceIndex?: number;
   sourceSentenceText?: string;
   sourceChunkText?: string;
@@ -86,6 +93,7 @@ export async function getMyPhrasesFromApi(params?: {
   limit?: number;
   status?: "saved" | "archived";
   reviewStatus?: PhraseReviewStatus | "all";
+  learningItemType?: "expression" | "sentence" | "all";
 }) {
   const search = new URLSearchParams();
   if (params?.query) search.set("query", params.query);
@@ -93,6 +101,7 @@ export async function getMyPhrasesFromApi(params?: {
   if (params?.limit) search.set("limit", String(params.limit));
   if (params?.status) search.set("status", params.status);
   if (params?.reviewStatus) search.set("reviewStatus", params.reviewStatus);
+  if (params?.learningItemType) search.set("learningItemType", params.learningItemType);
   const suffix = search.toString();
   const response = await fetch(`/api/phrases/mine${suffix ? `?${suffix}` : ""}`, {
     method: "GET",

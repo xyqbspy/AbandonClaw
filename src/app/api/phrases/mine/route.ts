@@ -65,6 +65,15 @@ export async function GET(request: Request) {
                 "reviewStatus must be all/saved/reviewing/mastered/archived.",
               );
             })();
+    const learningItemTypeRaw = searchParams.get("learningItemType");
+    const learningItemType: "expression" | "sentence" | "all" =
+      learningItemTypeRaw === "expression" || learningItemTypeRaw === "sentence"
+        ? learningItemTypeRaw
+        : learningItemTypeRaw === "all" || !learningItemTypeRaw
+          ? "all"
+          : (() => {
+              throw new ValidationError("learningItemType must be all/expression/sentence.");
+            })();
 
     const result = await listUserSavedPhrases({
       userId: user.id,
@@ -73,6 +82,7 @@ export async function GET(request: Request) {
       limit,
       status,
       reviewStatus,
+      learningItemType,
     });
 
     return NextResponse.json(result, { status: 200 });

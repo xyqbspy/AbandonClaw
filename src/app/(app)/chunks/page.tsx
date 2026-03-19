@@ -17,10 +17,12 @@ import {
 import { startReviewSession } from "@/lib/utils/review-session";
 import { PageHeader } from "@/components/shared/page-header";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Sheet,
   SheetContent,
@@ -39,6 +41,58 @@ const zh = {
   title: "Expression Library",
   desc: "\u5728\u8fd9\u91cc\u7ba1\u7406\u4f60\u7684\u5df2\u4fdd\u5b58\u8868\u8fbe\uff0c\u5e76\u4ece\u8868\u8fbe\u7ec4\u76f4\u63a5\u8fdb\u5165\u590d\u4e60\u3002",
   searchPlaceholder: "\u641c\u7d22\u5df2\u4fdd\u5b58\u8868\u8fbe",
+  addExpression: "\u6dfb\u52a0\u5b66\u4e60\u5185\u5bb9",
+  manualAddTitle: "\u6dfb\u52a0\u5b66\u4e60\u5185\u5bb9",
+  manualAddDesc: "\u5148\u9009\u62e9\u8bb0\u5f55\u8868\u8fbe\u6216\u53e5\u5b50\uff0c\u518d\u5feb\u901f\u5b58\u5165\u5b66\u4e60\u5e93\u3002",
+  itemTypeLabel: "\u8bb0\u5f55\u7c7b\u578b",
+  itemTypeExpression: "\u8bb0\u5f55\u8868\u8fbe",
+  itemTypeSentence: "\u8bb0\u5f55\u53e5\u5b50",
+  contentTabExpression: "\u8868\u8fbe",
+  contentTabSentence: "\u53e5\u5b50",
+  expressionTextLabel: "\u8868\u8fbe",
+  expressionTextPlaceholder: "call it a day",
+  sentenceLabel: "\u53e5\u5b50",
+  sentencePlaceholder: "I think I should call it a day.",
+  translationLabel: "\u4e2d\u6587\u91ca\u4e49",
+  translationPlaceholder: "\u4eca\u5929\u5148\u5230\u8fd9\u91cc / \u6536\u5de5",
+  sourceSentenceLabel: "\u4f8b\u53e5 / \u8bed\u5883",
+  sentenceMainLabel: "\u53e5\u5b50",
+  sentenceMainPlaceholder: "I was exhausted, so I decided to call it a day.",
+  usageNoteLabel: "\u4f7f\u7528\u63d0\u793a",
+  usageNotePlaceholder:
+    "\u4f8b\u5982\uff1a\u9002\u5408\u4ec0\u4e48\u65f6\u5019\u7528\uff1f\u8bed\u6c14\u4e0a\u6709\u4ec0\u4e48\u611f\u89c9\uff1f",
+  sourceNoteLabel: "\u8bb0\u5f55\u6765\u6e90",
+  sourceNotePlaceholder:
+    "\u4f8b\u5982\uff1a\u4f60\u662f\u5728\u54ea\u91cc\u770b\u5230\u5b83\u7684\uff1f\u64ad\u5ba2 / \u89c6\u9891 / \u670b\u53cb\u804a\u5929",
+  saveToLibrary: "\u4fdd\u5b58\u5230\u8868\u8fbe\u5e93",
+  saveAndReview: "\u4fdd\u5b58\u5e76\u52a0\u5165\u590d\u4e60",
+  saveSentence: "\u4fdd\u5b58\u53e5\u5b50",
+  saveSentenceReview: "\u4fdd\u5b58\u53e5\u5b50",
+  saveSuccess: "\u5df2\u52a0\u5165\u8868\u8fbe\u5e93\uff0c\u53ef\u7a0d\u540e\u8fdb\u5165\u590d\u4e60",
+  saveSentenceSuccess: "\u5df2\u4fdd\u5b58\u53e5\u5b50\u5230\u5b66\u4e60\u5e93",
+  saveReviewSuccess: "\u5df2\u52a0\u5165\u8868\u8fbe\u5e93\uff0c\u6b63\u5728\u5f00\u59cb\u590d\u4e60",
+  saveDuplicateSuccess: "\u8fd9\u4e2a\u8868\u8fbe\u5df2\u7ecf\u5728\u8868\u8fbe\u5e93\u91cc\u4e86\uff0c\u5df2\u66f4\u65b0\u8bb0\u5f55",
+  saveSentenceDuplicateSuccess: "\u8fd9\u53e5\u5185\u5bb9\u5df2\u5728\u5b66\u4e60\u5e93\u91cc\uff0c\u5df2\u66f4\u65b0\u8bb0\u5f55",
+  saveDuplicateReviewSuccess:
+    "\u8fd9\u4e2a\u8868\u8fbe\u5df2\u7ecf\u5728\u8868\u8fbe\u5e93\u91cc\u4e86\uff0c\u6b63\u5728\u5f00\u59cb\u590d\u4e60",
+  sourceNoteDisplay: "\u8bb0\u5f55\u6765\u6e90",
+  manualRecorded: "\u624b\u52a8\u8bb0\u5f55",
+  sentenceUnit: "\u53e5\u5b50\u5355\u5143",
+  sentenceUnitHint: "\u8fd9\u662f\u4e00\u6761\u8bed\u5883\u53e5\u5b50\uff0c\u53ef\u4ece\u4e2d\u63d0\u70bc\u8868\u8fbe\u3002",
+  sentenceSource: "\u53e5\u5b50\u6765\u6e90",
+  sentenceSourceFallback: "\u624b\u52a8\u8bb0\u5f55\u7684\u53e5\u5b50",
+  sentenceExpressions: "\u8fd9\u53e5\u91cc\u503c\u5f97\u8bb0\u7684\u8868\u8fbe",
+  sentenceNoExpressions: "\u6682\u65e0\u6807\u8bb0\u8868\u8fbe\uff0c\u53ef\u4ece\u8fd9\u53e5\u7ee7\u7eed\u8bb0\u5f55\u3002",
+  sentenceExpressionsHint: "\u70b9\u51fb\u300c\u4fdd\u5b58\u8fd9\u4e2a\u8868\u8fbe\u300d\uff0c\u76f4\u63a5\u52a0\u5165\u8868\u8fbe\u5e93\u3002",
+  sentenceRecordExpression: "\u81ea\u5df1\u9009\u4e00\u6bb5\u6765\u8bb0\u5f55",
+  sentenceSaveExpression: "\u4fdd\u5b58\u8fd9\u4e2a\u8868\u8fbe",
+  sentenceSavedExpression: "\u5df2\u4fdd\u5b58",
+  sentenceRecordHint: "\u4ece\u8fd9\u53e5\u91cc\u62c6\u51fa\u4e00\u6bb5\u503c\u5f97\u8bb0\u7684\u8868\u8fbe",
+  sentenceRecordFormHint: "\u53ef\u9009\uff1a\u4ece\u8fd9\u53e5\u91cc\u63d0\u53d6\u4e00\u6bb5\u503c\u5f97\u8bb0\u7684\u8868\u8fbe\u3002",
+  sentenceOpenExpressionComposer: "\u5df2\u6253\u5f00\u300c\u8bb0\u5f55\u8868\u8fbe\u300d",
+  sentenceExpressionSaved: "\u5df2\u4fdd\u5b58\u5230\u8868\u8fbe\u5e93",
+  missingExpression: "\u8bf7\u8f93\u5165\u8868\u8fbe\u6587\u672c",
+  missingSentence: "\u8bf7\u8f93\u5165\u53e5\u5b50\u5185\u5bb9",
   tabs: {
     all: "\u5168\u90e8",
     saved: "\u5f85\u590d\u4e60",
@@ -65,6 +119,7 @@ const zh = {
   continueReview: "\u7ee7\u7eed\u590d\u4e60",
   revisitOne: "\u518d\u770b\u4e00\u904d",
   reviewFamily: "\u590d\u4e60\u8fd9\u7ec4",
+  sentenceReviewPending: "\u53e5\u5b50\u590d\u4e60\u5f85\u5f00\u653e",
   openMap: "\u76f8\u5173\u8868\u8fbe",
   mapPending: "\u76f8\u5173\u8868\u8fbe\u751f\u6210\u4e2d",
   mapUnavailable: "\u6682\u65e0\u76f8\u5173\u8868\u8fbe",
@@ -218,6 +273,22 @@ const renderSentenceWithExpressionHighlight = (sentence: string, expression: str
   );
 };
 
+const extractExpressionsFromSentenceItem = (item: UserPhraseItemResponse) => {
+  const raw = (item.sourceChunkText ?? "").trim();
+  if (!raw) return [] as string[];
+  const parts = raw
+    .split(/[|,/，；;]+/)
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length >= 2 && entry.length <= 80);
+  const unique = new Map<string, string>();
+  for (const entry of parts) {
+    const normalized = normalizePhraseText(entry);
+    if (!normalized || unique.has(normalized)) continue;
+    unique.set(normalized, entry);
+  }
+  return Array.from(unique.values()).slice(0, 6);
+};
+
 export default function ChunksPage() {
   const router = useRouter();
   const [query, setQuery] = useState("");
@@ -225,6 +296,7 @@ export default function ChunksPage() {
   const [phrases, setPhrases] = useState<UserPhraseItemResponse[]>([]);
   const [total, setTotal] = useState(0);
   const [reviewFilter, setReviewFilter] = useState<PhraseReviewStatus | "all">("all");
+  const [contentFilter, setContentFilter] = useState<"expression" | "sentence">("expression");
   const [listDataSource, setListDataSource] = useState<"none" | "cache" | "network">("none");
 
   const [mapOpen, setMapOpen] = useState(false);
@@ -239,12 +311,28 @@ export default function ChunksPage() {
   const [mapOpeningForId, setMapOpeningForId] = useState<string | null>(null);
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
   const [expandedCardIds, setExpandedCardIds] = useState<Record<string, boolean>>({});
+  const [addSheetOpen, setAddSheetOpen] = useState(false);
+  const [manualItemType, setManualItemType] = useState<"expression" | "sentence">("expression");
+  const [manualText, setManualText] = useState("");
+  const [manualSentence, setManualSentence] = useState("");
+  const [manualTranslation, setManualTranslation] = useState("");
+  const [manualSourceSentence, setManualSourceSentence] = useState("");
+  const [manualUsageNote, setManualUsageNote] = useState("");
+  const [manualSourceNote, setManualSourceNote] = useState("");
+  const [savingManual, setSavingManual] = useState(false);
+  const [savingSentenceExpressionKey, setSavingSentenceExpressionKey] = useState<string | null>(
+    null,
+  );
+  const [savedSentenceExpressionKeys, setSavedSentenceExpressionKeys] = useState<
+    Record<string, boolean>
+  >({});
 
   const activeLoadTokenRef = useRef(0);
 
   const loadPhrases = async (
     nextQuery: string,
     nextFilter: PhraseReviewStatus | "all",
+    nextContentFilter: "expression" | "sentence",
     options?: { preferCache?: boolean },
   ) => {
     const token = activeLoadTokenRef.current + 1;
@@ -263,6 +351,7 @@ export default function ChunksPage() {
       page: 1,
       status: "saved" as const,
       reviewStatus: nextFilter,
+      learningItemType: nextContentFilter,
     };
 
     if (preferCache) {
@@ -271,6 +360,7 @@ export default function ChunksPage() {
           query: requestParams.query,
           status: requestParams.status,
           reviewStatus: requestParams.reviewStatus,
+          learningItemType: requestParams.learningItemType,
           page: requestParams.page,
           limit: requestParams.limit,
         });
@@ -303,6 +393,7 @@ export default function ChunksPage() {
           query: requestParams.query,
           status: requestParams.status,
           reviewStatus: requestParams.reviewStatus,
+          learningItemType: requestParams.learningItemType,
           page: requestParams.page,
           limit: requestParams.limit,
         },
@@ -323,10 +414,10 @@ export default function ChunksPage() {
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      void loadPhrases(query, reviewFilter, { preferCache: true });
+      void loadPhrases(query, reviewFilter, contentFilter, { preferCache: true });
     }, 180);
     return () => window.clearTimeout(timer);
-  }, [query, reviewFilter]);
+  }, [query, reviewFilter, contentFilter]);
 
   useEffect(() => {
     if (process.env.NODE_ENV !== "development") return;
@@ -334,8 +425,9 @@ export default function ChunksPage() {
       source: listDataSource,
       count: phrases.length,
       filter: reviewFilter,
+      contentFilter,
     });
-  }, [listDataSource, phrases.length, reviewFilter]);
+  }, [listDataSource, phrases.length, reviewFilter, contentFilter]);
 
   const summary = useMemo(() => {
     if (loading) return zh.loading;
@@ -429,6 +521,7 @@ export default function ChunksPage() {
   }, [activeFamily, centerExpressionText, mapData?.sourceSceneId, phraseByNormalized]);
 
   const getPrimaryActionLabel = (item: UserPhraseItemResponse) => {
+    if (item.learningItemType === "sentence") return zh.sentenceReviewPending;
     if (item.reviewStatus === "reviewing") return zh.continueReview;
     if (item.reviewStatus === "mastered") {
       return item.expressionFamilyId ? zh.reviewFamily : zh.revisitOne;
@@ -437,6 +530,10 @@ export default function ChunksPage() {
   };
 
   const startReviewFromCard = (item: UserPhraseItemResponse) => {
+    if (item.learningItemType === "sentence") {
+      toast.message(zh.sentenceReviewPending);
+      return;
+    }
     if (item.reviewStatus === "mastered" && item.expressionFamilyId) {
       const familyRows = phrases.filter((row) => row.expressionFamilyId === item.expressionFamilyId);
       if (familyRows.length > 0) {
@@ -457,7 +554,43 @@ export default function ChunksPage() {
     });
   };
 
+  const openExpressionComposerFromSentence = (item: UserPhraseItemResponse) => {
+    setManualItemType("expression");
+    setManualText("");
+    setManualSourceSentence(item.text);
+    setManualTranslation(item.translation ?? "");
+    setManualUsageNote("");
+    setManualSourceNote(item.sourceNote ?? "");
+    setAddSheetOpen(true);
+    toast.message(zh.sentenceOpenExpressionComposer);
+  };
+
+  const saveExpressionFromSentence = async (item: UserPhraseItemResponse, expression: string) => {
+    const normalized = normalizePhraseText(expression);
+    if (!normalized) return;
+    const key = `${item.userPhraseId}:${normalized}`;
+    if (savingSentenceExpressionKey === key) return;
+    setSavingSentenceExpressionKey(key);
+    try {
+      await savePhraseFromApi({
+        text: expression,
+        learningItemType: "expression",
+        sourceType: "manual",
+        sourceSentenceText: item.text,
+        sourceChunkText: expression,
+        translation: item.translation ?? undefined,
+      });
+      setSavedSentenceExpressionKeys((prev) => ({ ...prev, [key]: true }));
+      toast.success(zh.sentenceExpressionSaved);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : zh.loadFailed);
+    } finally {
+      setSavingSentenceExpressionKey(null);
+    }
+  };
+
   const openExpressionMap = async (expression: UserPhraseItemResponse) => {
+    if (expression.learningItemType === "sentence") return;
     setMapOpeningForId(expression.userPhraseId);
     setMapOpen(true);
     setMapLoading(true);
@@ -554,13 +687,90 @@ export default function ChunksPage() {
 
       if (tasks.length > 0) {
         await Promise.all(tasks);
-        await loadPhrases(query, reviewFilter, { preferCache: false });
+        await loadPhrases(query, reviewFilter, contentFilter, { preferCache: false });
       }
       toast.success(zh.addFamilySuccess);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : zh.loadFailed);
     } finally {
       setAddingFamily(false);
+    }
+  };
+
+  const resetManualForm = () => {
+    setManualItemType("expression");
+    setManualText("");
+    setManualSentence("");
+    setManualTranslation("");
+    setManualSourceSentence("");
+    setManualUsageNote("");
+    setManualSourceNote("");
+  };
+
+  const handleSaveManualExpression = async (mode: "save" | "save_and_review") => {
+    const text = manualText.trim();
+    const sentenceText =
+      manualItemType === "sentence"
+        ? manualSentence.trim()
+        : manualSourceSentence.trim();
+    if (manualItemType === "expression" && !text) {
+      toast.error(zh.missingExpression);
+      return;
+    }
+    if (manualItemType === "sentence" && !sentenceText) {
+      toast.error(zh.missingSentence);
+      return;
+    }
+    if (savingManual) return;
+
+    setSavingManual(true);
+    try {
+      const response = await savePhraseFromApi({
+        text: text || undefined,
+        learningItemType: manualItemType,
+        sentenceText: sentenceText || undefined,
+        translation: manualTranslation.trim() || undefined,
+        usageNote: manualUsageNote.trim() || undefined,
+        sourceType: "manual",
+        sourceNote: manualSourceNote.trim() || undefined,
+        sourceSentenceText: sentenceText || undefined,
+        sourceChunkText: text || undefined,
+      });
+
+      const nextContentFilter =
+        manualItemType === "sentence" ? "sentence" : contentFilter;
+      if (nextContentFilter !== contentFilter) {
+        setContentFilter(nextContentFilter);
+      }
+      await loadPhrases(query, reviewFilter, nextContentFilter, { preferCache: false });
+      if (mode === "save_and_review" && manualItemType === "expression") {
+        toast.success(response.created ? zh.saveReviewSuccess : zh.saveDuplicateReviewSuccess);
+        startReviewSession({
+          router,
+          source: "expression-library-manual-add",
+          expressions: [
+            {
+              userPhraseId: response.userPhrase.id,
+              text,
+            },
+          ],
+        });
+      } else {
+        if (manualItemType === "sentence") {
+          toast.success(
+            response.created ? zh.saveSentenceSuccess : zh.saveSentenceDuplicateSuccess,
+          );
+        } else {
+          toast.success(response.created ? zh.saveSuccess : zh.saveDuplicateSuccess);
+        }
+      }
+
+      setAddSheetOpen(false);
+      resetManualForm();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : zh.loadFailed);
+    } finally {
+      setSavingManual(false);
     }
   };
 
@@ -578,7 +788,37 @@ export default function ChunksPage() {
             onChange={(event) => setQuery(event.target.value)}
           />
         </div>
-        <p className="text-xs text-muted-foreground">{summary}</p>
+        <div className="flex items-center gap-2">
+          <p className="text-xs text-muted-foreground">{summary}</p>
+          <Button type="button" size="sm" variant="outline" onClick={() => setAddSheetOpen(true)}>
+            {zh.addExpression}
+          </Button>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        <Button
+          type="button"
+          size="sm"
+          variant={contentFilter === "expression" ? "default" : "outline"}
+          onClick={() => {
+            setContentFilter("expression");
+            setReviewFilter("all");
+          }}
+        >
+          {zh.contentTabExpression}
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant={contentFilter === "sentence" ? "default" : "outline"}
+          onClick={() => {
+            setContentFilter("sentence");
+            setReviewFilter("all");
+          }}
+        >
+          {zh.contentTabSentence}
+        </Button>
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -606,7 +846,10 @@ export default function ChunksPage() {
         <EmptyState title={zh.emptyTitle} description={zh.emptyDesc} />
       ) : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {phrases.map((item) => (
+          {phrases.map((item) => {
+            const sentenceExpressions =
+              item.learningItemType === "sentence" ? extractExpressionsFromSentenceItem(item) : [];
+            return (
             <Card key={item.userPhraseId} className="h-full overflow-hidden">
               <CardHeader className="px-3 py-2.5">
                 <button
@@ -618,8 +861,12 @@ export default function ChunksPage() {
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <p className="text-[11px] text-muted-foreground">{zh.expressionUnit}</p>
-                      <p className="mt-0.5 text-[15px] font-semibold leading-snug">{item.text}</p>
+                      <p className="text-[11px] text-muted-foreground">
+                        {item.learningItemType === "sentence" ? zh.sentenceUnit : zh.expressionUnit}
+                      </p>
+                      <p className="mt-0.5 text-[15px] font-semibold leading-snug">
+                        {item.text}
+                      </p>
                       <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
                         {item.translation ?? zh.noTranslation}
                       </p>
@@ -643,18 +890,84 @@ export default function ChunksPage() {
                 }`}
               >
                 <CardContent className="space-y-3.5 p-3 pt-2.5 pb-2">
-                  <div className="space-y-0.5">
-                    <p className="text-xs text-muted-foreground">{zh.usageHint}</p>
-                    <p className="line-clamp-2 text-sm text-foreground/90">{getUsageHint(item)}</p>
-                  </div>
-                  <div className="space-y-0.5">
-                    <p className="text-xs text-muted-foreground">{zh.sourceSentence}</p>
-                    <p className="line-clamp-2 text-sm text-muted-foreground">
-                      {item.sourceSentenceText
-                        ? renderSentenceWithExpressionHighlight(item.sourceSentenceText, item.text)
-                        : zh.noSourceSentence}
-                    </p>
-                  </div>
+                  {item.learningItemType === "sentence" ? (
+                    <>
+                      <div className="space-y-0.5">
+                        <p className="text-xs text-muted-foreground">{zh.usageHint}</p>
+                        <p className="line-clamp-2 text-sm text-foreground/90">{getUsageHint(item)}</p>
+                      </div>
+                      <div className="space-y-0.5">
+                        <p className="text-xs text-muted-foreground">{zh.sentenceSource}</p>
+                        <p className="line-clamp-2 text-sm text-muted-foreground">
+                          {item.sourceSceneSlug ? item.sourceSceneSlug : zh.sentenceSourceFallback}
+                        </p>
+                        <p className="text-xs text-muted-foreground">{zh.sentenceUnitHint}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-xs text-muted-foreground">{zh.sentenceExpressions}</p>
+                        <p className="text-[11px] text-muted-foreground">{zh.sentenceExpressionsHint}</p>
+                        {sentenceExpressions.length > 0 ? (
+                          <div className="flex flex-wrap gap-1.5">
+                            {sentenceExpressions.map((expression) => {
+                              const normalized = normalizePhraseText(expression);
+                              const key = `${item.userPhraseId}:${normalized}`;
+                              const isSaved = Boolean(savedSentenceExpressionKeys[key]);
+                              const isSaving = savingSentenceExpressionKey === key;
+                              return (
+                                <div
+                                  key={key}
+                                  className="flex items-center gap-1 rounded-full border border-border/60 px-2 py-1"
+                                >
+                                  <span className="text-xs text-foreground">{expression}</span>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-5 px-1.5 text-[11px]"
+                                    disabled={isSaved || isSaving}
+                                    onClick={() => void saveExpressionFromSentence(item, expression)}
+                                  >
+                                    {isSaved
+                                      ? zh.sentenceSavedExpression
+                                      : isSaving
+                                        ? `${zh.sentenceSaveExpression}...`
+                                        : zh.sentenceSaveExpression}
+                                  </Button>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-muted-foreground">{zh.sentenceNoExpressions}</p>
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="space-y-0.5">
+                        <p className="text-xs text-muted-foreground">{zh.usageHint}</p>
+                        <p className="line-clamp-2 text-sm text-foreground/90">{getUsageHint(item)}</p>
+                      </div>
+                      <div className="space-y-0.5">
+                        <p className="text-xs text-muted-foreground">{zh.sourceSentence}</p>
+                        <p className="line-clamp-2 text-sm text-muted-foreground">
+                          {item.sourceSentenceText
+                            ? renderSentenceWithExpressionHighlight(item.sourceSentenceText, item.text)
+                            : zh.noSourceSentence}
+                        </p>
+                      </div>
+                    </>
+                  )}
+                  {item.sourceType === "manual" ? (
+                    <div className="space-y-0.5">
+                      <p className="text-xs text-muted-foreground">{zh.manualRecorded}</p>
+                      {item.sourceNote ? (
+                        <p className="line-clamp-1 text-xs text-muted-foreground">
+                          {zh.sourceNoteDisplay}：{item.sourceNote}
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : null}
                   <div className="space-y-0.5">
                     <p className="text-xs text-muted-foreground">{zh.reviewStage}</p>
                     <p className="text-xs text-foreground/80">{getReviewActionHint(item.reviewStatus)}</p>
@@ -684,42 +997,210 @@ export default function ChunksPage() {
                   ) : null}
                 </CardContent>
                 <CardFooter className="flex flex-wrap gap-2 border-t border-border/40 px-3 py-2.5">
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={() => startReviewFromCard(item)}
-                  >
-                    {getPrimaryActionLabel(item)}
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    disabled={!item.expressionFamilyId}
-                    onClick={() => void openExpressionMap(item)}
-                  >
-                    {!item.expressionFamilyId
-                      ? zh.mapUnavailable
-                      : mapOpeningForId === item.userPhraseId
-                        ? zh.mapPending
-                        : zh.openMap}
-                  </Button>
-                  {item.sourceSceneSlug ? (
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={() => router.push(`/scene/${item.sourceSceneSlug}`)}
-                    >
-                      {zh.sourceScene}
-                    </Button>
-                  ) : null}
+                  {item.learningItemType === "sentence" ? (
+                    <>
+                      {/* TODO: Re-enable one-click extraction after stable server-side chunk detection is available. */}
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-8 rounded-md px-3 text-xs"
+                        onClick={() => openExpressionComposerFromSentence(item)}
+                      >
+                        {zh.sentenceRecordExpression}
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() => startReviewFromCard(item)}
+                      >
+                        {getPrimaryActionLabel(item)}
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={!item.expressionFamilyId}
+                        onClick={() => void openExpressionMap(item)}
+                      >
+                        {!item.expressionFamilyId
+                          ? zh.mapUnavailable
+                          : mapOpeningForId === item.userPhraseId
+                            ? zh.mapPending
+                            : zh.openMap}
+                      </Button>
+                      {item.sourceSceneSlug ? (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => router.push(`/scene/${item.sourceSceneSlug}`)}
+                        >
+                          {zh.sourceScene}
+                        </Button>
+                      ) : null}
+                    </>
+                  )}
                 </CardFooter>
               </div>
             </Card>
-          ))}
+          );
+          })}
         </div>
       )}
+
+      <Sheet
+        open={addSheetOpen}
+        onOpenChange={(open) => {
+          setAddSheetOpen(open);
+          if (!open && !savingManual) resetManualForm();
+        }}
+      >
+        <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto rounded-t-2xl">
+          <SheetHeader>
+            <SheetTitle>{zh.manualAddTitle}</SheetTitle>
+            <SheetDescription>{zh.manualAddDesc}</SheetDescription>
+          </SheetHeader>
+          <div className="space-y-4 px-4 pb-2">
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground">{zh.itemTypeLabel}</p>
+              <Tabs
+                value={manualItemType}
+                onValueChange={(value) =>
+                  setManualItemType(value === "sentence" ? "sentence" : "expression")
+                }
+              >
+                <TabsList className="w-full">
+                  <TabsTrigger value="expression" className="flex-1">
+                    {zh.itemTypeExpression}
+                  </TabsTrigger>
+                  <TabsTrigger value="sentence" className="flex-1">
+                    {zh.itemTypeSentence}
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
+
+            {manualItemType === "expression" ? (
+              <div className="space-y-3 pt-1">
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">{zh.expressionTextLabel}</p>
+                  <Input
+                    value={manualText}
+                    onChange={(event) => setManualText(event.target.value)}
+                    placeholder={zh.expressionTextPlaceholder}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">{zh.translationLabel}</p>
+                  <Input
+                    value={manualTranslation}
+                    onChange={(event) => setManualTranslation(event.target.value)}
+                    placeholder={zh.translationPlaceholder}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">{zh.sourceSentenceLabel}</p>
+                  <Textarea
+                    value={manualSourceSentence}
+                    onChange={(event) => setManualSourceSentence(event.target.value)}
+                    rows={3}
+                    placeholder={zh.sentencePlaceholder}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">{zh.usageNoteLabel}</p>
+                  <Textarea
+                    value={manualUsageNote}
+                    onChange={(event) => setManualUsageNote(event.target.value)}
+                    rows={3}
+                    placeholder={zh.usageNotePlaceholder}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">{zh.sourceNoteLabel}</p>
+                  <Input
+                    value={manualSourceNote}
+                    onChange={(event) => setManualSourceNote(event.target.value)}
+                    placeholder={zh.sourceNotePlaceholder}
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3 pt-1">
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">{zh.sentenceMainLabel}</p>
+                  <Textarea
+                    value={manualSentence}
+                    onChange={(event) => setManualSentence(event.target.value)}
+                    rows={4}
+                    placeholder={zh.sentenceMainPlaceholder}
+                  />
+                  <p className="text-[11px] text-muted-foreground">{zh.sentenceRecordFormHint}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">{zh.translationLabel}</p>
+                  <Input
+                    value={manualTranslation}
+                    onChange={(event) => setManualTranslation(event.target.value)}
+                    placeholder={zh.translationPlaceholder}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">{zh.usageNoteLabel}</p>
+                  <Textarea
+                    value={manualUsageNote}
+                    onChange={(event) => setManualUsageNote(event.target.value)}
+                    rows={3}
+                    placeholder={zh.usageNotePlaceholder}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">{zh.sourceNoteLabel}</p>
+                  <Input
+                    value={manualSourceNote}
+                    onChange={(event) => setManualSourceNote(event.target.value)}
+                    placeholder={zh.sourceNotePlaceholder}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          <SheetFooter>
+            <div
+              className={`grid gap-2 pb-safe ${
+                manualItemType === "sentence" ? "grid-cols-1" : "grid-cols-2"
+              }`}
+            >
+              <Button
+                type="button"
+                variant="outline"
+                disabled={savingManual}
+                onClick={() => void handleSaveManualExpression("save")}
+              >
+                {savingManual
+                  ? `${manualItemType === "sentence" ? zh.saveSentence : zh.saveToLibrary}...`
+                  : manualItemType === "sentence"
+                    ? zh.saveSentence
+                    : zh.saveToLibrary}
+              </Button>
+              {manualItemType === "expression" ? (
+                <Button
+                  type="button"
+                  disabled={savingManual}
+                  onClick={() => void handleSaveManualExpression("save_and_review")}
+                >
+                  {savingManual ? `${zh.saveAndReview}...` : zh.saveAndReview}
+                </Button>
+              ) : null}
+            </div>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
 
       <Sheet open={mapOpen} onOpenChange={setMapOpen}>
         <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto rounded-t-2xl">
