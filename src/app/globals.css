@@ -33,7 +33,7 @@
 }
 
 :root {
-  --background: oklch(0.985 0.007 95);
+  --background: rgb(255 255 255);
   --foreground: oklch(0.24 0.02 245);
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", "PingFang SC",
     "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", Arial, sans-serif;
@@ -90,9 +90,7 @@
 
   body {
     @apply bg-background text-foreground;
-    background-image:
-      radial-gradient(circle at 20% 0%, oklch(0.94 0.02 220 / 40%), transparent 35%),
-      radial-gradient(circle at 100% 0%, oklch(0.96 0.012 90 / 60%), transparent 30%);
+    background-image: none;
     min-height: 100vh;
     line-height: 1.6;
   }

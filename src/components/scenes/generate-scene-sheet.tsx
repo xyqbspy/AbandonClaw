@@ -14,6 +14,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { generatePersonalizedSceneFromApi } from "@/lib/utils/scenes-api";
+import { APPLE_BUTTON_BASE, APPLE_BUTTON_TEXT_MD } from "@/lib/ui/apple-style";
 
 type Tone = "natural" | "polite" | "casual" | "simple";
 type Difficulty = "easy" | "medium";
@@ -50,6 +51,9 @@ const difficultyOptions: Array<{ value: Difficulty; label: string }> = [
 ];
 
 const sentenceCountOptions: SentenceCount[] = [6, 10, 14];
+const appleButtonClassName = `${APPLE_BUTTON_BASE} ${APPLE_BUTTON_TEXT_MD}`;
+const appleSegmentBaseClassName =
+  `${APPLE_BUTTON_BASE} h-9 px-3 text-sm font-medium`;
 
 const defaultForm = {
   promptText: "",
@@ -136,10 +140,10 @@ export function GenerateSceneSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="bottom"
-        className="max-h-[92vh] rounded-t-2xl p-0 sm:mx-auto sm:max-w-2xl sm:rounded-2xl sm:border"
+        className="max-h-[92vh] rounded-t-2xl border-0 bg-[rgb(246,246,246)] p-0 sm:mx-auto sm:max-w-2xl sm:rounded-2xl"
         showCloseButton
       >
-        <SheetHeader className="space-y-1 border-b px-4 pb-3 pt-4">
+        <SheetHeader className="space-y-1 px-4 pb-3 pt-4">
           <SheetTitle>生成我的场景</SheetTitle>
           <SheetDescription>
             可以用中文或英文描述你最近想练的情境。
@@ -147,7 +151,7 @@ export function GenerateSceneSheet({
         </SheetHeader>
 
         <div className="space-y-4 overflow-y-auto px-4 py-4">
-          <div className="space-y-2">
+          <div className="space-y-2 rounded-xl bg-[rgb(246,246,246)] p-3">
             <Label htmlFor="scene-generate-prompt">场景方向</Label>
             <Textarea
               id="scene-generate-prompt"
@@ -168,7 +172,7 @@ I want a short scene about canceling plans politely
             </p>
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-2 rounded-xl bg-[rgb(246,246,246)] p-3">
             <Label>语气风格</Label>
             <div className="grid grid-cols-4 gap-2">
               {toneOptions.map((option) => (
@@ -176,8 +180,13 @@ I want a short scene about canceling plans politely
                   key={option.value}
                   type="button"
                   size="sm"
-                  variant={tone === option.value ? "default" : "outline"}
-                  className="h-8"
+                  variant="ghost"
+                  className={cn(
+                    appleSegmentBaseClassName,
+                    tone === option.value
+                      ? "bg-[rgb(32,44,60)] text-white hover:bg-[rgb(25,36,50)]"
+                      : "text-foreground/80 hover:bg-[rgb(238,238,238)]",
+                  )}
                   onClick={() => setTone(option.value)}
                   disabled={submitting}
                 >
@@ -188,7 +197,7 @@ I want a short scene about canceling plans politely
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
+            <div className="space-y-2 rounded-xl bg-[rgb(246,246,246)] p-3">
               <Label>难度</Label>
               <div className="flex gap-2">
                 {difficultyOptions.map((option) => (
@@ -196,8 +205,13 @@ I want a short scene about canceling plans politely
                     key={option.value}
                     type="button"
                     size="sm"
-                    variant={difficulty === option.value ? "default" : "outline"}
-                    className="h-8 flex-1"
+                    variant="ghost"
+                    className={cn(
+                      `${appleSegmentBaseClassName} flex-1`,
+                      difficulty === option.value
+                        ? "bg-[rgb(32,44,60)] text-white hover:bg-[rgb(25,36,50)]"
+                        : "text-foreground/80 hover:bg-[rgb(238,238,238)]",
+                    )}
                     onClick={() => setDifficulty(option.value)}
                     disabled={submitting}
                   >
@@ -207,7 +221,7 @@ I want a short scene about canceling plans politely
               </div>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-2 rounded-xl bg-[rgb(246,246,246)] p-3">
               <Label>句数</Label>
               <div className="flex gap-2">
                 {sentenceCountOptions.map((value) => (
@@ -215,8 +229,13 @@ I want a short scene about canceling plans politely
                     key={value}
                     type="button"
                     size="sm"
-                    variant={sentenceCount === value ? "default" : "outline"}
-                    className="h-8 flex-1"
+                    variant="ghost"
+                    className={cn(
+                      `${appleSegmentBaseClassName} flex-1`,
+                      sentenceCount === value
+                        ? "bg-[rgb(32,44,60)] text-white hover:bg-[rgb(25,36,50)]"
+                        : "text-foreground/80 hover:bg-[rgb(238,238,238)]",
+                    )}
                     onClick={() => setSentenceCount(value)}
                     disabled={submitting}
                   >
@@ -227,7 +246,7 @@ I want a short scene about canceling plans politely
             </div>
           </div>
 
-          <div className="rounded-lg border p-3">
+          <div className="rounded-xl bg-[rgb(246,246,246)] p-3">
             <button
               type="button"
               role="switch"
@@ -245,12 +264,12 @@ I want a short scene about canceling plans politely
               <span
                 className={cn(
                   "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
-                  reuseKnownChunks ? "bg-primary" : "bg-muted",
+                  reuseKnownChunks ? "bg-[rgb(32,44,60)]" : "bg-[rgb(220,220,220)]",
                 )}
               >
                 <span
                   className={cn(
-                    "inline-block h-5 w-5 transform rounded-full bg-background transition-transform",
+                    "inline-block h-5 w-5 transform rounded-full bg-white transition-transform",
                     reuseKnownChunks ? "translate-x-5" : "translate-x-1",
                   )}
                 />
@@ -261,10 +280,11 @@ I want a short scene about canceling plans politely
           {error ? <p className="text-sm text-destructive">{error}</p> : null}
         </div>
 
-        <SheetFooter className="border-t px-4 pt-3 pb-[calc(env(safe-area-inset-bottom)+12px)]">
+        <SheetFooter className="px-4 pt-3 pb-[calc(env(safe-area-inset-bottom)+12px)]">
           <Button
             type="button"
-            className="h-10 w-full"
+            variant="ghost"
+            className={cn("h-10 w-full", appleButtonClassName)}
             onClick={handleSubmit}
             disabled={submitting}
           >

@@ -1,9 +1,10 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { listAdminVariants } from "@/lib/server/admin/service";
+import { APPLE_BUTTON_BASE, APPLE_BUTTON_TEXT_SM, APPLE_INPUT_BASE, APPLE_SURFACE } from "@/lib/ui/apple-style";
 
 const parsePositiveInt = (value: string | undefined, fallback: number) => {
   const num = Number(value);
@@ -23,6 +24,7 @@ export default async function AdminVariantsPage({
     typeof params.page === "string" ? params.page : undefined,
     1,
   );
+  const appleButtonClassName = `${APPLE_BUTTON_BASE} ${APPLE_BUTTON_TEXT_SM}`;
 
   const result = await listAdminVariants({ page, pageSize: 30, search: q, sort });
   const hasPrev = result.page > 1;
@@ -39,7 +41,7 @@ export default async function AdminVariantsPage({
         description="查看生成变体并追溯所属场景。"
       />
 
-      <Card className="border-border/70">
+      <Card className={APPLE_SURFACE}>
         <CardContent className="pt-4">
           <form className="grid gap-2 sm:grid-cols-[1fr_auto_auto]">
             <Input
@@ -50,19 +52,19 @@ export default async function AdminVariantsPage({
             <select
               name="sort"
               defaultValue={sort}
-              className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm"
+              className={`h-8 px-2.5 text-sm ${APPLE_INPUT_BASE}`}
             >
               <option value="desc">按 created_at 倒序</option>
               <option value="asc">按 created_at 正序</option>
             </select>
-            <Button type="submit" variant="outline">
+            <Button type="submit" variant="ghost" className={appleButtonClassName}>
               筛选
             </Button>
           </form>
         </CardContent>
       </Card>
 
-      <div className="overflow-x-auto rounded-lg border border-border/70">
+      <div className={`overflow-x-auto rounded-lg ${APPLE_SURFACE}`}>
         <table className="min-w-full text-sm">
           <thead className="bg-muted/40 text-left text-xs text-muted-foreground">
             <tr>
@@ -77,7 +79,7 @@ export default async function AdminVariantsPage({
           </thead>
           <tbody>
             {result.rows.map((row) => (
-              <tr key={row.id} className="border-t border-border/50 align-top">
+              <tr key={row.id} className="align-top">
                 <td className="px-3 py-2">
                   <Link
                     href={`/admin/scenes/${row.scene_id}`}
@@ -115,27 +117,22 @@ export default async function AdminVariantsPage({
         </p>
         <div className="flex items-center gap-2">
           {hasPrev ? (
-            <Link
-              href={buildListUrl(result.page - 1)}
-              className="rounded border px-2 py-1 hover:bg-muted"
-            >
+            <Link href={buildListUrl(result.page - 1)} className={`${appleButtonClassName} px-2 py-1`}>
               上一页
             </Link>
           ) : (
-            <span className="rounded border px-2 py-1 opacity-40">上一页</span>
+            <span className={`${appleButtonClassName} px-2 py-1 opacity-40`}>上一页</span>
           )}
           {hasNext ? (
-            <Link
-              href={buildListUrl(result.page + 1)}
-              className="rounded border px-2 py-1 hover:bg-muted"
-            >
+            <Link href={buildListUrl(result.page + 1)} className={`${appleButtonClassName} px-2 py-1`}>
               下一页
             </Link>
           ) : (
-            <span className="rounded border px-2 py-1 opacity-40">下一页</span>
+            <span className={`${appleButtonClassName} px-2 py-1 opacity-40`}>下一页</span>
           )}
         </div>
       </div>
     </div>
   );
 }
+

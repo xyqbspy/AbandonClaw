@@ -11,6 +11,10 @@ translation is required for every dialogue line.
 translation must be concise natural Chinese.
 Do not omit translation even if the sentence is simple.
 Chunk must be a high-frequency phrase suitable for memorization and transfer, not single words.
+translation, meaningInSentence, usageNote, and example.zh must all be in concise natural Chinese.
+Each chunk must include at least 2 examples.
+Each example.en must be a complete natural English sentence that uses the chunk text in context.
+Do not return chunk text alone as an example.
 Keep translation, meaningInSentence, usageNote, examples concise and natural.`;
 
 export function buildSceneParseUserPrompt(input: {
@@ -34,6 +38,9 @@ Rules:
 10) glossary should include key reusable chunks across the scene.
 11) Focus on English input quality first.
 12) Output pure JSON only.
+13) chunk.translation, chunk.meaningInSentence, chunk.usageNote, and chunk.examples[].zh must be Chinese.
+14) each chunk must provide at least 2 examples.
+15) each chunk.examples[].en must be a full sentence using that chunk, not the chunk text itself.
 
 Required scene shape:
 {

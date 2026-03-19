@@ -1,9 +1,10 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { listAdminAiCache } from "@/lib/server/admin/service";
+import { APPLE_BUTTON_BASE, APPLE_BUTTON_TEXT_SM, APPLE_INPUT_BASE, APPLE_SURFACE } from "@/lib/ui/apple-style";
 
 const parsePositiveInt = (value: string | undefined, fallback: number) => {
   const num = Number(value);
@@ -25,6 +26,8 @@ export default async function AdminCachePage({
     typeof params.page === "string" ? params.page : undefined,
     1,
   );
+  const appleButtonClassName = `${APPLE_BUTTON_BASE} ${APPLE_BUTTON_TEXT_SM}`;
+
   const result = await listAdminAiCache({
     page,
     pageSize: 30,
@@ -50,14 +53,14 @@ export default async function AdminCachePage({
         description="只读查看缓存记录，用于 parse/variant 问题排查。"
       />
 
-      <Card className="border-border/70">
+      <Card className={APPLE_SURFACE}>
         <CardContent className="pt-4">
           <form className="grid gap-2 sm:grid-cols-[1fr_auto_auto_auto]">
             <Input name="q" defaultValue={q} placeholder="搜索 cache_key" />
             <select
               name="cacheType"
               defaultValue={cacheType}
-              className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm"
+              className={`h-8 px-2.5 text-sm ${APPLE_INPUT_BASE}`}
             >
               <option value="">全部类型</option>
               <option value="scene_parse">scene_parse</option>
@@ -66,20 +69,20 @@ export default async function AdminCachePage({
             <select
               name="status"
               defaultValue={status}
-              className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm"
+              className={`h-8 px-2.5 text-sm ${APPLE_INPUT_BASE}`}
             >
               <option value="">全部状态</option>
               <option value="success">success</option>
               <option value="error">error</option>
             </select>
-            <Button type="submit" variant="outline">
+            <Button type="submit" variant="ghost" className={appleButtonClassName}>
               筛选
             </Button>
           </form>
         </CardContent>
       </Card>
 
-      <div className="overflow-x-auto rounded-lg border border-border/70">
+      <div className={`overflow-x-auto rounded-lg ${APPLE_SURFACE}`}>
         <table className="min-w-full text-sm">
           <thead className="bg-muted/40 text-left text-xs text-muted-foreground">
             <tr>
@@ -95,7 +98,7 @@ export default async function AdminCachePage({
           </thead>
           <tbody>
             {result.rows.map((row) => (
-              <tr key={row.id} className="border-t border-border/50 align-top">
+              <tr key={row.id} className="align-top">
                 <td className="px-3 py-2 font-mono text-xs">
                   <Link
                     href={`/admin/cache?q=${encodeURIComponent(q)}&cacheType=${cacheType}&status=${status}&page=${result.page}&cacheKey=${encodeURIComponent(row.cache_key)}`}
@@ -125,7 +128,7 @@ export default async function AdminCachePage({
       </div>
 
       {selected ? (
-        <Card className="border-border/70">
+        <Card className={APPLE_SURFACE}>
           <CardContent className="space-y-2 pt-4 text-sm">
             <p>
               <span className="text-muted-foreground">cache_key:</span>{" "}
@@ -143,7 +146,7 @@ export default async function AdminCachePage({
             <p>
               <span className="text-muted-foreground">input/output 预览：</span>
             </p>
-            <pre className="max-h-40 overflow-auto rounded border border-border/60 bg-muted/20 p-2 text-xs">
+            <pre className="max-h-40 overflow-auto rounded bg-[rgb(240,240,240)] p-2 text-xs">
               {JSON.stringify(
                 {
                   input: selected.input_json,
@@ -168,27 +171,22 @@ export default async function AdminCachePage({
         </p>
         <div className="flex items-center gap-2">
           {hasPrev ? (
-            <Link
-              href={buildListUrl(result.page - 1)}
-              className="rounded border px-2 py-1 hover:bg-muted"
-            >
+            <Link href={buildListUrl(result.page - 1)} className={`${appleButtonClassName} px-2 py-1`}>
               上一页
             </Link>
           ) : (
-            <span className="rounded border px-2 py-1 opacity-40">上一页</span>
+            <span className={`${appleButtonClassName} px-2 py-1 opacity-40`}>上一页</span>
           )}
           {hasNext ? (
-            <Link
-              href={buildListUrl(result.page + 1)}
-              className="rounded border px-2 py-1 hover:bg-muted"
-            >
+            <Link href={buildListUrl(result.page + 1)} className={`${appleButtonClassName} px-2 py-1`}>
               下一页
             </Link>
           ) : (
-            <span className="rounded border px-2 py-1 opacity-40">下一页</span>
+            <span className={`${appleButtonClassName} px-2 py-1 opacity-40`}>下一页</span>
           )}
         </div>
       </div>
     </div>
   );
 }
+

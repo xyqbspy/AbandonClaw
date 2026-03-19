@@ -36,6 +36,7 @@ import { SelectionDetailSheet } from "@/features/lesson/components/selection-det
 import { SelectionToolbar } from "@/features/lesson/components/selection-toolbar";
 import { SentenceBlock } from "@/features/lesson/components/sentence-block";
 import { normalizePhraseText } from "@/lib/shared/phrases";
+import { APPLE_BUTTON_BASE, APPLE_BUTTON_TEXT_LG, APPLE_SURFACE } from "@/lib/ui/apple-style";
 
 type SelectionState = {
   text: string;
@@ -111,6 +112,7 @@ function groupSentencesForMobile(
 }
 
 const TOOLBAR_WIDTH = 256;
+const appleButtonLgClassName = `${APPLE_BUTTON_BASE} ${APPLE_BUTTON_TEXT_LG}`;
 
 function interactionReducer(
   state: InteractionState,
@@ -204,8 +206,6 @@ export function LessonReader({
   const sentenceLoopRef = useRef<string | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [dialogueTranslationOpenMap, setDialogueTranslationOpenMap] =
-    useState<Record<string, boolean>>({});
-  const [dialogueExpandOpenMap, setDialogueExpandOpenMap] =
     useState<Record<string, boolean>>({});
   const [mobileGroupTranslationOpenMap, setMobileGroupTranslationOpenMap] =
     useState<Record<string, boolean>>({});
@@ -404,32 +404,8 @@ export function LessonReader({
     [dispatchAction, isMobile, setSheetOpen],
   );
 
-  const handleOpenSentenceAnalysis = useCallback(
-    (sentence: LessonSentence) => {
-      dispatchAction({
-        type: "SENTENCE_CONTEXT_SET",
-        payload: { sentenceId: sentence.id },
-      });
-      dispatchAction({ type: "SELECTION_CLEARED" });
-      const firstChunk = sentence.chunks[0];
-      if (firstChunk) {
-        activateChunk(sentence.id, firstChunk);
-        return;
-      }
-      if (isMobile) setSheetOpen(true);
-    },
-    [activateChunk, dispatchAction, isMobile, setSheetOpen],
-  );
-
   const toggleDialogueTranslation = useCallback((sentenceId: string) => {
     setDialogueTranslationOpenMap((prev) => ({
-      ...prev,
-      [sentenceId]: !prev[sentenceId],
-    }));
-  }, []);
-
-  const toggleDialogueExpand = useCallback((sentenceId: string) => {
-    setDialogueExpandOpenMap((prev) => ({
       ...prev,
       [sentenceId]: !prev[sentenceId],
     }));
@@ -632,6 +608,38 @@ export function LessonReader({
     };
   }, [autoPlayActive, speakingText]);
 
+  useEffect(() => {
+    if (!sheetOpen) return;
+    if (state.activeChunkKey) return;
+
+    const activeSentence =
+      (state.activeSentenceId
+        ? sentenceOrder.find((item) => item.id === state.activeSentenceId)
+        : null) ?? firstSentence;
+    if (!activeSentence?.id) return;
+
+    const firstChunk = activeSentence.chunks[0];
+    if (firstChunk) {
+      dispatchAction({
+        type: "CHUNK_ACTIVATED",
+        payload: { sentenceId: activeSentence.id, chunkKey: firstChunk },
+      });
+      return;
+    }
+
+    dispatchAction({
+      type: "SENTENCE_CONTEXT_SET",
+      payload: { sentenceId: activeSentence.id },
+    });
+  }, [
+    dispatchAction,
+    firstSentence,
+    sentenceOrder,
+    sheetOpen,
+    state.activeChunkKey,
+    state.activeSentenceId,
+  ]);
+
   const toggleSequentialPlay = useCallback(() => {
     if (!supported) {
       toast.error("当前浏览器不支持发音功能");
@@ -732,9 +740,7 @@ export function LessonReader({
     (sentence: LessonSentence) => {
       const speaker = sentence.speaker ?? "A";
       const translationOpen = Boolean(dialogueTranslationOpenMap[sentence.id]);
-      const expandOpen = Boolean(dialogueExpandOpenMap[sentence.id]);
-      const showLearningArea = expandOpen;
-      const showTranslation = translationOpen || expandOpen;
+      const showTranslation = translationOpen;
       const sentenceSpeaking = speakingText === (sentence.audioText ?? sentence.text);
 
       return (
@@ -747,19 +753,19 @@ export function LessonReader({
         >
           <div
             className={cn(
-              "w-full max-w-[92%] sm:max-w-[80%]",
+              "w-full max-w-[90%] sm:max-w-[78%]",
               speaker === "B" ? "items-end" : "items-start",
             )}
           >
             <article
               className={cn(
-                "rounded-2xl px-3.5 py-2.5 transition-colors",
-                "border border-transparent hover:bg-muted/25",
-                speaker === "A" && "bg-slate-50/80",
-                speaker === "B" && "bg-emerald-50/65",
+                "rounded-lg px-3 py-2.5 transition-colors",
+                "hover:bg-muted/20",
+                speaker === "A" && "bg-[rgb(246,246,246)]",
+                speaker === "B" && "bg-[rgb(210,255,152)]",
               )}
             >
-              <div className="mb-1 flex items-center justify-between gap-2">
+              <div className="mb-1">
                 <Badge
                   variant="outline"
                   className={cn(
@@ -771,31 +777,6 @@ export function LessonReader({
                 >
                   {speakerLabel(speaker)}
                 </Badge>
-                <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
-                  <button
-                    type="button"
-                    className="inline-flex cursor-pointer items-center gap-1 transition-colors hover:text-foreground"
-                    onClick={() => toggleDialogueTranslation(sentence.id)}
-                  >
-                    <Languages className="size-3.5" />
-                    {translationOpen ? "收起" : "翻译"}
-                  </button>
-                  <button
-                    type="button"
-                    className="inline-flex cursor-pointer items-center gap-1 transition-colors hover:text-foreground"
-                    onClick={() => handlePronounce(sentence.audioText ?? sentence.text)}
-                  >
-                    <Volume2 className={cn("size-3.5", sentenceSpeaking && "animate-pulse text-primary")} />
-                    {sentenceSpeaking ? "停止" : "朗读"}
-                  </button>
-                  <button
-                    type="button"
-                    className="inline-flex cursor-pointer items-center gap-1 transition-colors hover:text-foreground"
-                    onClick={() => toggleDialogueExpand(sentence.id)}
-                  >
-                    拓展
-                  </button>
-                </div>
               </div>
 
               <p
@@ -808,53 +789,30 @@ export function LessonReader({
                 {sentence.text}
               </p>
 
+              <div className="mt-1 flex items-center gap-2 text-[11px] text-muted-foreground/60">
+                <button
+                  type="button"
+                  className="inline-flex cursor-pointer items-center gap-1 transition-colors hover:text-foreground"
+                  onClick={() => toggleDialogueTranslation(sentence.id)}
+                >
+                  <Languages className="size-3.5" />
+                  翻译
+                </button>
+                <span className="opacity-40">·</span>
+                <button
+                  type="button"
+                  className="inline-flex cursor-pointer items-center gap-1 transition-colors hover:text-foreground"
+                  onClick={() => handlePronounce(sentence.audioText ?? sentence.text)}
+                >
+                  <Volume2 className={cn("size-3.5", sentenceSpeaking && "animate-pulse text-primary")} />
+                  朗读
+                </button>
+              </div>
+
               {showTranslation ? (
-                <p className="mt-2 rounded-lg bg-background/70 px-2.5 py-1.5 text-sm leading-6 text-muted-foreground">
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">
                   {sentence.translation || "该句翻译暂未提供。"}
                 </p>
-              ) : null}
-
-              {showLearningArea ? (
-                <div className="mt-2.5 space-y-2 border-t border-border/50 pt-2.5">
-                  <p className="text-[11px] text-muted-foreground">这句里的表达</p>
-                  <div className="flex flex-wrap gap-2">
-                    {sentence.chunks.length > 0 ? (
-                      sentence.chunks.map((chunk) => (
-                        <button
-                          key={`${sentence.id}-${chunk}`}
-                          type="button"
-                          className={cn(
-                            "cursor-pointer rounded-full border border-border/70 bg-background px-2.5 py-1 text-xs transition",
-                            "hover:border-primary/40 hover:bg-accent active:scale-95",
-                            state.activeChunkKey?.toLowerCase() === chunk.toLowerCase() &&
-                              "border-primary/50 bg-accent",
-                            state.hoveredChunkKey?.toLowerCase() === chunk.toLowerCase() &&
-                              state.activeChunkKey?.toLowerCase() !== chunk.toLowerCase() &&
-                              "border-primary/40 bg-accent",
-                          )}
-                          onClick={() => activateChunk(sentence.id, chunk)}
-                          onMouseEnter={() =>
-                            dispatchAction({ type: "CHUNK_HOVERED", payload: { chunkKey: chunk } })
-                          }
-                          onMouseLeave={() =>
-                            dispatchAction({ type: "CHUNK_HOVERED", payload: { chunkKey: null } })
-                          }
-                        >
-                          {chunk}
-                        </button>
-                      ))
-                    ) : (
-                      <span className="text-xs text-muted-foreground">本句暂无可用表达</span>
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    className="inline-flex cursor-pointer items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
-                    onClick={() => handleOpenSentenceAnalysis(sentence)}
-                  >
-                    查看解析
-                  </button>
-                </div>
               ) : null}
             </article>
           </div>
@@ -862,17 +820,10 @@ export function LessonReader({
       );
     },
     [
-      activateChunk,
-      dialogueExpandOpenMap,
       dialogueTranslationOpenMap,
-      dispatchAction,
-      handleOpenSentenceAnalysis,
       handlePronounce,
       handleSentenceTap,
       speakingText,
-      state.activeChunkKey,
-      state.hoveredChunkKey,
-      toggleDialogueExpand,
       toggleDialogueTranslation,
     ],
   );
@@ -904,94 +855,114 @@ export function LessonReader({
         ref={readerRef}
         className={cn("space-y-5", isMobile && "space-y-1.5")}
       >
-        <Card
-          className={cn(
-            "bg-card/95",
-            isMobile && "border-0 ring-0 bg-primary/[0.035] shadow-none",
-          )}
-        >
-          <CardContent
+        {isDialogueScene ? (
+          <div className={cn("py-1.5", isMobile ? "px-1" : "px-1.5")}>
+            <div className="flex items-center justify-end gap-2">
+              {headerTools}
+              <button
+                type="button"
+                className={cn(
+                  `inline-flex items-center gap-1.5 text-foreground/85 ${appleButtonLgClassName}`,
+                  "cursor-pointer whitespace-nowrap",
+                  isMobile && "px-2 py-1 text-[15px]",
+                )}
+                onClick={toggleSequentialPlay}
+              >
+                <Play className={cn("size-4", isMobile && "size-3.5")} />
+                {autoPlayActive ? "停止循环" : "循环播放"}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <Card
             className={cn(
-              "space-y-4 p-5 sm:p-6",
-              isMobile && "space-y-1 p-2.5",
+              APPLE_SURFACE,
+              isMobile && "border-0 ring-0 bg-primary/[0.035] shadow-none",
             )}
           >
-            {isMobile ? (
-              <>
-                <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
-                  <h1 className="line-clamp-2 text-[1rem] font-semibold leading-6">
-                    {lesson.title}
-                  </h1>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    className="h-6 shrink-0 cursor-pointer gap-1 px-1.5 text-[10px] text-muted-foreground/80"
-                    onClick={toggleSequentialPlay}
-                  >
-                    <Play className="size-3" />
-                    {autoPlayActive ? "停止循环" : "循环播放"}
-                  </Button>
-                </div>
-                <p className="text-[10px] leading-4 whitespace-nowrap text-muted-foreground/80">
-                  {sceneMetaLabel}
-                </p>
-                {headerTools ? (
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    {headerTools}
-                  </div>
-                ) : null}
-              </>
-            ) : null}
-            <h1
+            <CardContent
               className={cn(
-                "text-3xl font-semibold sm:text-4xl",
-                isMobile && "hidden",
+                "space-y-4 p-5 sm:p-6",
+                isMobile && "space-y-1 p-2.5",
               )}
             >
-              {lesson.title}
-            </h1>
-            {isMobile ? null : (
-              <p className="max-w-2xl text-sm text-muted-foreground sm:text-base">
-                {lesson.subtitle}
-              </p>
-            )}
-            {!isMobile ? (
-              <LessonProgress value={lesson.completionRate} />
-            ) : null}
-            {!isMobile ? (
-              <>
-                <p className="text-sm text-muted-foreground">{sceneMetaLabel}</p>
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="cursor-pointer transition-all duration-150 hover:border-primary/40 hover:bg-accent"
-                    onClick={toggleSequentialPlay}
-                  >
-                    <Play className="size-4" />
-                    {autoPlayActive ? "停止循环" : "循环播放"}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="cursor-pointer transition-all duration-150 hover:border-primary/40 hover:bg-accent"
-                    onClick={() =>
-                      handlePronounce(currentSentence?.text ?? lesson.title)
-                    }
-                  >
-                    <Headphones className="size-4" />
-                    播放本节发音
-                  </Button>
-                  {headerTools}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  {appCopy.lesson.prompt}
+              {isMobile ? (
+                <>
+                  <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
+                    <h1 className="line-clamp-2 text-[1rem] font-semibold leading-6">
+                      {lesson.title}
+                    </h1>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className="h-6 shrink-0 cursor-pointer gap-1 px-1.5 text-[10px] text-muted-foreground/80"
+                      onClick={toggleSequentialPlay}
+                    >
+                      <Play className="size-3" />
+                      {autoPlayActive ? "停止循环" : "循环播放"}
+                    </Button>
+                  </div>
+                  <p className="text-[10px] leading-4 whitespace-nowrap text-muted-foreground/80">
+                    {sceneMetaLabel}
+                  </p>
+                  {headerTools ? (
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {headerTools}
+                    </div>
+                  ) : null}
+                </>
+              ) : null}
+              <h1
+                className={cn(
+                  "text-3xl font-semibold sm:text-4xl",
+                  isMobile && "hidden",
+                )}
+              >
+                {lesson.title}
+              </h1>
+              {isMobile ? null : (
+                <p className="max-w-2xl text-sm text-muted-foreground sm:text-base">
+                  {lesson.subtitle}
                 </p>
-              </>
-            ) : null}
-          </CardContent>
-        </Card>
+              )}
+              {!isMobile ? (
+                <LessonProgress value={lesson.completionRate} />
+              ) : null}
+              {!isMobile ? (
+                <>
+                  <p className="text-sm text-muted-foreground">{sceneMetaLabel}</p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="cursor-pointer transition-all duration-150 hover:border-primary/40 hover:bg-accent"
+                      onClick={toggleSequentialPlay}
+                    >
+                      <Play className="size-4" />
+                      {autoPlayActive ? "停止循环" : "循环播放"}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="cursor-pointer transition-all duration-150 hover:border-primary/40 hover:bg-accent"
+                      onClick={() =>
+                        handlePronounce(currentSentence?.text ?? lesson.title)
+                      }
+                    >
+                      <Headphones className="size-4" />
+                      播放本节发音
+                    </Button>
+                    {headerTools}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {appCopy.lesson.prompt}
+                  </p>
+                </>
+              ) : null}
+            </CardContent>
+          </Card>
+        )}
 
         {isDialogueScene ? (
           <div className={cn("space-y-2", isMobile && "space-y-1.5")}>

@@ -1,4 +1,4 @@
-import {
+﻿import {
   ParsedScene,
   ParsedSceneChunk,
   ParsedSceneDialogueLine,
@@ -26,11 +26,20 @@ const fallbackChunkFromLineText = (lineText: string): ParsedSceneChunk[] => {
     {
       key: text.slice(0, 60),
       text,
-      translation: text,
-      grammarLabel: "Chunk",
-      meaningInSentence: text,
-      usageNote: "Useful expression in this context.",
-      examples: [{ en: text, zh: text }],
+      translation: "该表达释义待补充。",
+      grammarLabel: "表达",
+      meaningInSentence: "在这句话里表示该表达在当前语境中的含义。",
+      usageNote: "先理解它在句中的作用，再放回整句复述。",
+      examples: [
+        {
+          en: `I used "${text}" in today's speaking practice.`,
+          zh: `我在今天的口语练习里用了“${text}”。`,
+        },
+        {
+          en: `She tried "${text}" in a real conversation.`,
+          zh: `她在真实对话里尝试了“${text}”。`,
+        },
+      ],
     },
   ];
 };
@@ -134,3 +143,4 @@ export const normalizeParsedSceneDialogue = (scene: ParsedScene): ParsedScene =>
     sections,
   };
 };
+

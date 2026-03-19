@@ -48,6 +48,8 @@ Constraints:
 12) You may optionally introduce 1-2 related chunk variants from the same expression family to support contrast learning.
 13) Do not replace all known chunks with new variants.
 14) Keep dialogue natural and realistic; variant use should feel organic.
+15) title must be bilingual in this format: English title（中文标题）.
+16) use full-width Chinese parentheses: （ ）.
 
 reuseKnownChunks: ${input.reuseKnownChunks ? "true" : "false"}
 Known user chunks:
@@ -58,7 +60,7 @@ ${relatedVariants}
 Return JSON with this exact shape:
 {
   "version": "v1",
-  "title": "short scene title",
+  "title": "short English title（中文标题）",
   "theme": "optional short theme",
   "dialogue": [
     {"speaker": "A", "text": "...", "translation": "...", "tts": "..."},

@@ -1,10 +1,16 @@
-﻿import { CirclePlay, Volume2 } from "lucide-react";
+﻿import { useState } from "react";
+import { CirclePlay, Languages, Volume2 } from "lucide-react";
 import { LessonSentence, SelectionChunkLayer } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import {
+  APPLE_BUTTON_BASE,
+  APPLE_BUTTON_TEXT_SM,
+  APPLE_SURFACE,
+} from "@/lib/ui/apple-style";
 
 const highlightSelected = (sentence: string, selected?: string) => {
   if (!sentence || !selected) return sentence;
@@ -23,16 +29,9 @@ const highlightSelected = (sentence: string, selected?: string) => {
 };
 
 const isLongChunk = (text: string) => text.length > 22;
-const speakerTextClassName = (speaker?: "A" | "B") => {
-  if (speaker === "A") return "text-sky-700";
-  if (speaker === "B") return "text-emerald-700";
-  return "text-muted-foreground";
-};
-const speakerLabel = (speaker?: "A" | "B") => {
-  if (speaker === "A") return "A";
-  if (speaker === "B") return "B";
-  return "";
-};
+const detailToneClassName = "bg-[rgb(246,246,246)]";
+const appleButtonClassName = `${APPLE_BUTTON_BASE} ${APPLE_BUTTON_TEXT_SM}`;
+const hasChinese = (value?: string) => /[\u4e00-\u9fff]/.test((value ?? "").trim());
 
 export function SelectionDetailPanel({
   currentSentence,
@@ -65,16 +64,13 @@ export function SelectionDetailPanel({
   showSpeaker?: boolean;
   sentenceSectionLabel?: string;
 }) {
+  const [exampleTranslationOpenMap, setExampleTranslationOpenMap] = useState<Record<string, boolean>>({});
+
   return (
     <div className="sticky top-20 hidden space-y-4 lg:block">
-      <Card className="overflow-hidden border-border/70 shadow-sm">
-        <CardHeader className="space-y-2 border-b border-border/60 bg-muted/30 pb-3">
-          <CardTitle className="text-lg">
-            {sentenceSectionLabel}
-            {showSpeaker && currentSentence?.speaker
-              ? `（${speakerLabel(currentSentence.speaker)}）`
-              : ""}
-          </CardTitle>
+      <Card className={cn("overflow-hidden", APPLE_SURFACE, detailToneClassName)}>
+        <CardHeader className="space-y-2 bg-[rgb(246,246,246)] pb-3">
+          <CardTitle className="text-lg">{sentenceSectionLabel}</CardTitle>
         </CardHeader>
         {loading ? (
           <CardContent className="space-y-3 pt-4">
@@ -86,27 +82,25 @@ export function SelectionDetailPanel({
             key={`sentence-${currentSentence.id}-${chunkDetail?.text ?? "none"}`}
             className="space-y-3 pt-4 animate-in fade-in-0 slide-in-from-right-1 duration-200"
           >
-            <div className="rounded-lg border border-border/70 bg-background px-3 py-2 text-sm leading-7 break-words">
-              {showSpeaker && currentSentence.speaker ? (
-                <p
-                  className={cn(
-                    "mb-1 text-[10px] tracking-[0.08em] uppercase",
-                    speakerTextClassName(currentSentence.speaker),
-                  )}
-                >
-                  {speakerLabel(currentSentence.speaker)}
-                </p>
-              ) : null}
+            <div
+              className={cn(
+                "rounded-lg px-3 py-2 text-sm leading-7 break-words",
+                detailToneClassName,
+              )}
+            >
               {highlightSelected(currentSentence.text, chunkDetail?.text)}
             </div>
-            <div className="rounded-lg border border-border/70 bg-muted/30 px-3 py-2">
+            <div className={cn("rounded-lg px-3 py-2", detailToneClassName)}>
               <p className="text-xs tracking-[0.08em] text-muted-foreground">整句翻译</p>
               <p className="mt-1 text-sm">{currentSentence.translation}</p>
             </div>
             <Button
               size="sm"
-              variant="outline"
-              className="w-full cursor-pointer justify-center transition-all duration-150 hover:border-primary/40"
+              variant="ghost"
+              className={cn(
+                "w-full cursor-pointer justify-center transition-all duration-150",
+                appleButtonClassName,
+              )}
               onClick={() => onPronounce(currentSentence.text)}
             >
               <Volume2 className={speakingText === currentSentence.text ? "size-4 animate-pulse" : "size-4"} />
@@ -120,8 +114,8 @@ export function SelectionDetailPanel({
         )}
       </Card>
 
-      <Card className="overflow-hidden border-border/70 shadow-sm">
-        <CardHeader className="space-y-2 border-b border-border/60 bg-muted/30 pb-3">
+      <Card className={cn("overflow-hidden", APPLE_SURFACE, detailToneClassName)}>
+        <CardHeader className="space-y-2 bg-[rgb(246,246,246)] pb-3">
           <CardTitle className="text-lg">短语解析</CardTitle>
         </CardHeader>
         {loading ? (
@@ -146,12 +140,12 @@ export function SelectionDetailPanel({
                       onFocus={() => onHoverChunk(chunk)}
                       onBlur={() => onHoverChunk(null)}
                       className={cn(
-                        "cursor-pointer rounded-full border border-border/70 bg-background px-2.5 py-1 text-xs transition-all duration-150",
-                        "hover:border-primary/40 hover:bg-accent active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
-                        chunkDetail?.text.toLowerCase() === chunk.toLowerCase() && "border-primary/50 bg-accent",
+                        "cursor-pointer rounded-full bg-[rgb(240,240,240)] px-2.5 py-1 text-xs transition-all duration-150",
+                        "hover:bg-accent active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+                        chunkDetail?.text.toLowerCase() === chunk.toLowerCase() && "bg-accent",
                         hoveredChunkKey?.toLowerCase() === chunk.toLowerCase() &&
                           chunkDetail?.text.toLowerCase() !== chunk.toLowerCase() &&
-                          "border-primary/40 bg-accent",
+                          "bg-accent",
                       )}
                     >
                       {chunk}
@@ -171,7 +165,7 @@ export function SelectionDetailPanel({
                 <div>
                   <p className="text-xs tracking-[0.08em] text-muted-foreground">已选短语</p>
                   {isLongChunk(chunkDetail.text) ? (
-                    <div className="mt-1 rounded-lg border border-border/70 bg-background px-3 py-2 text-sm leading-6 break-words">
+                    <div className="mt-1 rounded-lg bg-[rgb(246,246,246)] px-3 py-2 text-sm leading-6 break-words">
                       {chunkDetail.text}
                     </div>
                   ) : (
@@ -183,9 +177,9 @@ export function SelectionDetailPanel({
 
                 <div className="flex gap-2">
                   <Button
-                    variant="outline"
+                    variant="ghost"
                     size="sm"
-                    className="cursor-pointer"
+                    className={cn("cursor-pointer", appleButtonClassName)}
                     onClick={() => onPronounce(chunkDetail.text)}
                   >
                     <Volume2 className={speakingText === chunkDetail.text ? "size-4 animate-pulse" : "size-4"} />
@@ -207,45 +201,79 @@ export function SelectionDetailPanel({
                 </div>
                 <div>
                   <p className="text-xs tracking-[0.08em] text-muted-foreground">当前句中含义</p>
-                  <p className="mt-1 text-sm text-muted-foreground">{chunkDetail.meaningInSentence}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {hasChinese(chunkDetail.meaningInSentence)
+                      ? chunkDetail.meaningInSentence
+                      : `这里表示：${chunkDetail.translation || "该表达在本句中的含义。"}`
+                    }
+                  </p>
                 </div>
                 <div>
                   <p className="text-xs tracking-[0.08em] text-muted-foreground">常见用法</p>
                   <p className="mt-1 text-sm leading-7">
-                    {chunkDetail.grammarLabel ? `${chunkDetail.grammarLabel} · ` : ""}
-                    {chunkDetail.usageNote}
+                    {hasChinese(chunkDetail.grammarLabel) ? `${chunkDetail.grammarLabel} · ` : ""}
+                    {hasChinese(chunkDetail.usageNote)
+                      ? chunkDetail.usageNote
+                      : "先理解它在这句话里的作用，再放回整句复述。"}
                   </p>
                 </div>
 
                 <div className="space-y-2">
-                  <p className="text-xs tracking-[0.08em] text-muted-foreground">例句</p>
                   {chunkDetail.examples.slice(0, 2).map((example, index) => {
                     const key = `${example.en}-${index}`;
+                    const exampleText = example.en;
+                    const translationOpen = Boolean(exampleTranslationOpenMap[exampleText]);
                     return (
-                      <div key={key} className="rounded-lg border border-border/60 bg-background px-3 py-2 text-sm">
-                        <div className="flex items-center gap-2">
-                          <p className="flex-1 break-words">{example.en}</p>
-                          <Button
-                            size="icon-sm"
-                            variant="ghost"
-                            aria-label="播放例句发音"
-                            onClick={() => onPronounce(example.en)}
-                          >
-                            <CirclePlay className={speakingText === example.en ? "size-4 animate-pulse" : "size-4"} />
-                          </Button>
+                      <div key={key} className="rounded-lg bg-[rgb(240,240,240)] py-2 text-sm">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-xs tracking-[0.08em] text-muted-foreground">例句</p>
+                          <div className="inline-flex items-center gap-2">
+                            <button
+                              type="button"
+                              className="inline-flex cursor-pointer items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground active:opacity-70"
+                              onClick={() =>
+                                setExampleTranslationOpenMap((prev) => ({
+                                  ...prev,
+                                  [exampleText]: !prev[exampleText],
+                                }))
+                              }
+                            >
+                              <Languages className="size-3.5" />
+                              {translationOpen ? "收起" : "翻译"}
+                            </button>
+                            <Button
+                              size="icon-sm"
+                              variant="ghost"
+                              className={appleButtonClassName}
+                              aria-label="播放例句发音"
+                              onClick={() => onPronounce(exampleText)}
+                            >
+                              <CirclePlay className={speakingText === exampleText ? "size-4 animate-pulse" : "size-4"} />
+                            </Button>
+                          </div>
                         </div>
-                        {example.zh ? (
-                          <p className="mt-1 text-xs text-muted-foreground">{example.zh}</p>
-                        ) : null}
+                        <p className="mt-1 break-words">{exampleText}</p>
+                        <div
+                          className={cn(
+                            "grid overflow-hidden transition-all duration-200",
+                            translationOpen
+                              ? "mt-1.5 grid-rows-[1fr] opacity-100"
+                              : "mt-0.5 grid-rows-[0fr] opacity-0",
+                          )}
+                        >
+                          <p className="min-h-0 text-xs text-muted-foreground">
+                            {hasChinese(example.zh) ? example.zh : "该例句翻译待补充。"}
+                          </p>
+                        </div>
                       </div>
                   )})}
                 </div>
 
                 <div className="grid grid-cols-2 gap-2 pt-1">
-                  <Button size="sm" onClick={onSave}>
+                  <Button size="sm" variant="ghost" className={appleButtonClassName} onClick={onSave}>
                     {saved ? "已收藏" : "收藏短语"}
                   </Button>
-                  <Button size="sm" variant="secondary" onClick={onReview}>
+                  <Button size="sm" variant="ghost" className={appleButtonClassName} onClick={onReview}>
                     加入复习
                   </Button>
                 </div>
@@ -259,6 +287,13 @@ export function SelectionDetailPanel({
     </div>
   );
 }
+
+
+
+
+
+
+
 
 
 

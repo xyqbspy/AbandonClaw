@@ -21,7 +21,6 @@ import {
   UserPhraseItemResponse,
 } from "@/lib/utils/phrases-api";
 import { startReviewSession } from "@/lib/utils/review-session";
-import { PageHeader } from "@/components/shared/page-header";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -37,6 +36,11 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import {
+  APPLE_BUTTON_BASE,
+  APPLE_BUTTON_TEXT_SM,
+  APPLE_SURFACE,
+} from "@/lib/ui/apple-style";
 
 const zh = {
   loadFailed: "\u52a0\u8f7d\u8868\u8fbe\u5931\u8d25\u3002",
@@ -250,6 +254,7 @@ const SIMILAR_LABEL_FALLBACK = [
   zh.diffSpecific,
   zh.diffRelated,
 ];
+const appleButtonClassName = `${APPLE_BUTTON_BASE} ${APPLE_BUTTON_TEXT_SM}`;
 
 const normalizeSimilarLabel = (label: string | null | undefined) => {
   const trimmed = (label ?? "").trim();
@@ -1098,8 +1103,6 @@ export default function ChunksPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader eyebrow={zh.eyebrow} title={zh.title} description={zh.desc} />
-
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="relative w-full max-w-sm">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -1112,7 +1115,13 @@ export default function ChunksPage() {
         </div>
         <div className="flex items-center gap-2">
           <p className="text-xs text-muted-foreground">{summary}</p>
-          <Button type="button" size="sm" variant="outline" onClick={() => setAddSheetOpen(true)}>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className={appleButtonClassName}
+            onClick={() => setAddSheetOpen(true)}
+          >
             {zh.addExpression}
           </Button>
         </div>
@@ -1122,7 +1131,12 @@ export default function ChunksPage() {
         <Button
           type="button"
           size="sm"
-          variant={contentFilter === "expression" ? "default" : "outline"}
+          variant="ghost"
+          className={`${appleButtonClassName} ${
+            contentFilter === "expression"
+              ? "bg-[rgb(32,44,60)] text-white hover:bg-[rgb(25,36,50)]"
+              : ""
+          }`}
           onClick={() => {
             setContentFilter("expression");
             setReviewFilter("all");
@@ -1133,7 +1147,12 @@ export default function ChunksPage() {
         <Button
           type="button"
           size="sm"
-          variant={contentFilter === "sentence" ? "default" : "outline"}
+          variant="ghost"
+          className={`${appleButtonClassName} ${
+            contentFilter === "sentence"
+              ? "bg-[rgb(32,44,60)] text-white hover:bg-[rgb(25,36,50)]"
+              : ""
+          }`}
           onClick={() => {
             setContentFilter("sentence");
             setReviewFilter("all");
@@ -1154,7 +1173,12 @@ export default function ChunksPage() {
             key={tab.key}
             type="button"
             size="sm"
-            variant={reviewFilter === tab.key ? "default" : "outline"}
+            variant="ghost"
+            className={`${appleButtonClassName} ${
+              reviewFilter === tab.key
+                ? "bg-[rgb(32,44,60)] text-white hover:bg-[rgb(25,36,50)]"
+                : ""
+            }`}
             onClick={() => setReviewFilter(tab.key as PhraseReviewStatus | "all")}
           >
             {tab.label}
@@ -1163,7 +1187,7 @@ export default function ChunksPage() {
       </div>
 
       {expressionFamilyFilterId ? (
-        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border/70 bg-muted/40 px-3 py-2">
+        <div className="flex flex-wrap items-center gap-2 rounded-lg bg-[rgb(246,246,246)] px-3 py-2">
           <p className="text-xs text-muted-foreground">{zh.viewingFamilyFilter}</p>
           {familyFilterExpressionLabel ? (
             <p className="text-xs text-foreground/90">
@@ -1172,7 +1196,7 @@ export default function ChunksPage() {
               {zh.filteredFamilySuffix}
             </p>
           ) : null}
-          <Button type="button" size="sm" variant="ghost" className="h-7" onClick={clearFamilyFilter}>
+          <Button type="button" size="sm" variant="ghost" className={appleButtonClassName} onClick={clearFamilyFilter}>
             {zh.clearFamilyFilter}
           </Button>
         </div>
@@ -1201,7 +1225,7 @@ export default function ChunksPage() {
                 ? buildDifferenceNote(item.text, similarPreview[0].text)
                 : null;
             return (
-            <Card key={item.userPhraseId} className="h-full overflow-hidden">
+            <Card key={item.userPhraseId} className={`h-full overflow-hidden ${APPLE_SURFACE}`}>
               <CardHeader className="px-3 py-2.5">
                 <button
                   type="button"
@@ -1242,7 +1266,7 @@ export default function ChunksPage() {
                 </button>
               </CardHeader>
               <div
-                className={`overflow-hidden border-t border-border/50 transition-all duration-200 ${
+                className={`overflow-hidden transition-all duration-200 ${
                   expandedCardIds[item.userPhraseId]
                     ? "max-h-[780px] opacity-100"
                     : "max-h-0 opacity-0"
@@ -1275,14 +1299,14 @@ export default function ChunksPage() {
                               return (
                                 <div
                                   key={key}
-                                  className="flex items-center gap-1 rounded-full border border-border/60 px-2 py-1"
+                                  className="flex items-center gap-1 rounded-full bg-[rgb(240,240,240)] px-2 py-1"
                                 >
                                   <span className="text-xs text-foreground">{expression}</span>
                                   <Button
                                     type="button"
                                     size="sm"
                                     variant="ghost"
-                                    className="h-5 px-1.5 text-[11px]"
+                                    className={`${APPLE_BUTTON_BASE} h-5 px-1.5 py-0 text-[11px]`}
                                     disabled={isSaved || isSaving}
                                     onClick={() => void saveExpressionFromSentence(item, expression)}
                                   >
@@ -1304,7 +1328,7 @@ export default function ChunksPage() {
                   ) : (
                     <>
                       {item.aiEnrichmentStatus === "pending" ? (
-                        <div className="space-y-1 rounded-lg border border-border/60 bg-muted/30 p-2.5">
+                        <div className="space-y-1 rounded-lg bg-[rgb(246,246,246)] p-2.5">
                           <p className="text-xs text-muted-foreground">{zh.learningInfoPending}</p>
                           <p className="text-sm font-medium text-foreground">{item.text}</p>
                           <p className="text-xs text-muted-foreground">{zh.learningInfoPendingHint}</p>
@@ -1376,7 +1400,7 @@ export default function ChunksPage() {
                               : zh.diffRelated)}
                         </p>
                       </div>
-                      <div className="space-y-1.5 rounded-lg border border-border/60 p-2.5">
+                      <div className="space-y-1.5 rounded-lg bg-[rgb(246,246,246)] p-2.5">
                         <button
                           type="button"
                           className="flex w-full items-center justify-between text-left"
@@ -1392,10 +1416,7 @@ export default function ChunksPage() {
                           hasSimilarPreview ? (
                             <div className="space-y-2">
                               {similarPreview.map((similarItem) => (
-                                <div
-                                  key={similarItem.userPhraseId}
-                                  className="rounded-md border border-border/60 px-2 py-1.5"
-                                >
+                                <div key={similarItem.userPhraseId} className="rounded-md bg-[rgb(240,240,240)] px-2 py-1.5">
                                   <p className="text-xs font-medium text-foreground">{similarItem.text}</p>
                                   <p className="text-[11px] text-muted-foreground">
                                     {buildDifferenceNote(item.text, similarItem.text)}
@@ -1422,8 +1443,8 @@ export default function ChunksPage() {
                               <Button
                                 type="button"
                                 size="sm"
-                                variant="outline"
-                                className="h-7 text-xs"
+                                variant="ghost"
+                                className={`h-7 text-xs ${appleButtonClassName}`}
                                 disabled={generatingSimilarForId === item.userPhraseId}
                                 onClick={() => void openGenerateSimilarSheet(item)}
                               >
@@ -1475,15 +1496,15 @@ export default function ChunksPage() {
                     </div>
                   ) : null}
                 </CardContent>
-                <CardFooter className="flex flex-wrap gap-2 border-t border-border/40 px-3 py-2.5">
+                <CardFooter className="flex flex-wrap gap-2 px-3 py-2.5">
                   {item.learningItemType === "sentence" ? (
                     <>
                       {/* TODO: Re-enable one-click extraction after stable server-side chunk detection is available. */}
                       <Button
                         type="button"
                         size="sm"
-                        variant="outline"
-                        className="h-8 rounded-md px-3 text-xs"
+                        variant="ghost"
+                        className={appleButtonClassName}
                         onClick={() => openExpressionComposerFromSentence(item)}
                       >
                         {zh.sentenceRecordExpression}
@@ -1494,6 +1515,8 @@ export default function ChunksPage() {
                       <Button
                         type="button"
                         size="sm"
+                        variant="ghost"
+                        className={appleButtonClassName}
                         onClick={() => startReviewFromCard(item)}
                       >
                         {getPrimaryActionLabel(item)}
@@ -1501,7 +1524,8 @@ export default function ChunksPage() {
                       <Button
                         type="button"
                         size="sm"
-                        variant="outline"
+                        variant="ghost"
+                        className={appleButtonClassName}
                         disabled={!item.expressionFamilyId}
                         onClick={() => void openExpressionMap(item)}
                       >
@@ -1515,7 +1539,8 @@ export default function ChunksPage() {
                         <Button
                           type="button"
                           size="sm"
-                          variant="outline"
+                          variant="ghost"
+                          className={appleButtonClassName}
                           onClick={() => router.push(`/scene/${item.sourceSceneSlug}`)}
                         >
                           {zh.sourceScene}
@@ -1526,6 +1551,7 @@ export default function ChunksPage() {
                           type="button"
                           size="sm"
                           variant="ghost"
+                          className={appleButtonClassName}
                           disabled={Boolean(retryingEnrichmentIds[item.userPhraseId])}
                           onClick={() => void retryAiEnrichment(item)}
                         >
@@ -1551,7 +1577,7 @@ export default function ChunksPage() {
           if (!open && !savingManual) resetManualForm();
         }}
       >
-        <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto rounded-t-2xl">
+        <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto rounded-t-2xl border-0 bg-[rgb(246,246,246)]">
           <SheetHeader>
             <SheetTitle>{zh.manualAddTitle}</SheetTitle>
             <SheetDescription>{zh.manualAddDesc}</SheetDescription>
@@ -1670,7 +1696,8 @@ export default function ChunksPage() {
             >
               <Button
                 type="button"
-                variant="outline"
+                variant="ghost"
+                className={appleButtonClassName}
                 disabled={savingManual}
                 onClick={() => void handleSaveManualExpression("save")}
               >
@@ -1683,6 +1710,8 @@ export default function ChunksPage() {
               {manualItemType === "expression" ? (
                 <Button
                   type="button"
+                  variant="ghost"
+                  className={appleButtonClassName}
                   disabled={savingManual}
                   onClick={() => void handleSaveManualExpression("save_and_review")}
                 >
@@ -1705,7 +1734,7 @@ export default function ChunksPage() {
           }
         }}
       >
-        <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto rounded-t-2xl">
+        <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto rounded-t-2xl border-0 bg-[rgb(246,246,246)]">
           <SheetHeader>
             <SheetTitle>{zh.generatedSimilarTitle}</SheetTitle>
             <SheetDescription>{zh.generatedSimilarDesc}</SheetDescription>
@@ -1713,7 +1742,7 @@ export default function ChunksPage() {
 
           <div className="space-y-3 px-4 pb-2">
             {similarSeedExpression ? (
-              <div className="rounded-lg border border-border/60 p-2.5">
+              <div className="rounded-lg bg-[rgb(246,246,246)] p-2.5">
                 <p className="text-xs text-muted-foreground">{zh.centerExpression}</p>
                 <p className="text-sm font-medium">{similarSeedExpression.text}</p>
               </div>
@@ -1730,10 +1759,7 @@ export default function ChunksPage() {
                   const normalized = normalizePhraseText(candidate.text);
                   const checked = Boolean(selectedSimilarMap[normalized]);
                   return (
-                    <label
-                      key={normalized}
-                      className="flex cursor-pointer items-start gap-2 rounded-lg border border-border/60 p-2.5"
-                    >
+                    <label key={normalized} className="flex cursor-pointer items-start gap-2 rounded-lg bg-[rgb(246,246,246)] p-2.5">
                       <input
                         type="checkbox"
                         className="mt-0.5"
@@ -1755,11 +1781,13 @@ export default function ChunksPage() {
 
           <SheetFooter>
             <div className="grid grid-cols-2 gap-2 pb-safe">
-              <Button type="button" variant="outline" onClick={() => setSimilarSheetOpen(false)}>
+              <Button type="button" variant="ghost" className={appleButtonClassName} onClick={() => setSimilarSheetOpen(false)}>
                 {zh.close}
               </Button>
               <Button
                 type="button"
+                variant="ghost"
+                className={appleButtonClassName}
                 disabled={savingSelectedSimilar || generatingSimilarForId !== null}
                 onClick={() => void saveSelectedSimilarCandidates()}
               >
@@ -1771,7 +1799,7 @@ export default function ChunksPage() {
       </Sheet>
 
       <Sheet open={mapOpen} onOpenChange={setMapOpen}>
-        <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto rounded-t-2xl">
+        <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto rounded-t-2xl border-0 bg-[rgb(246,246,246)]">
           <SheetHeader>
             <SheetTitle>{zh.mapTitle}</SheetTitle>
             <SheetDescription>{zh.mapDesc}</SheetDescription>
@@ -1792,7 +1820,12 @@ export default function ChunksPage() {
                       key={family.id}
                       type="button"
                       size="sm"
-                      variant={activeFamilyId === family.id ? "default" : "outline"}
+                      variant="ghost"
+                      className={`${appleButtonClassName} ${
+                        activeFamilyId === family.id
+                          ? "bg-[rgb(32,44,60)] text-white hover:bg-[rgb(25,36,50)]"
+                          : ""
+                      }`}
                       onClick={() => setActiveFamilyId(family.id)}
                     >
                       {family.anchor}
@@ -1801,7 +1834,7 @@ export default function ChunksPage() {
                 </div>
 
                 {activeFamily ? (
-                  <div className="space-y-3 rounded-xl border border-border/70 p-3">
+                  <div className="space-y-3 rounded-xl bg-[rgb(246,246,246)] p-3">
                     <div className="space-y-1">
                       <p className="text-xs text-muted-foreground">{zh.centerExpression}</p>
                       <p className="text-sm font-medium">{centerExpressionText || activeFamily.anchor}</p>
@@ -1824,7 +1857,7 @@ export default function ChunksPage() {
                             text,
                           );
                           return (
-                            <div key={text} className="rounded-lg border border-border/60 p-2.5">
+                            <div key={text} className="rounded-lg bg-[rgb(246,246,246)] p-2.5">
                               <div className="flex items-center justify-between gap-2">
                                 <p className="text-sm font-medium">{text}</p>
                                 <Badge variant={status ? "secondary" : "outline"}>{statusText}</Badge>
@@ -1848,13 +1881,13 @@ export default function ChunksPage() {
 
           <SheetFooter>
             <div className="grid grid-cols-3 gap-2 pb-safe">
-              <Button type="button" variant="outline" onClick={() => setMapOpen(false)}>
+              <Button type="button" variant="ghost" className={appleButtonClassName} onClick={() => setMapOpen(false)}>
                 {zh.close}
               </Button>
-              <Button type="button" variant="secondary" onClick={handlePracticeFamily}>
+              <Button type="button" variant="ghost" className={appleButtonClassName} onClick={handlePracticeFamily}>
                 {zh.practiceFamily}
               </Button>
-              <Button type="button" disabled={addingFamily} onClick={() => void handleAddFamilyToReview()}>
+              <Button type="button" variant="ghost" className={appleButtonClassName} disabled={addingFamily} onClick={() => void handleAddFamilyToReview()}>
                 {addingFamily ? `${zh.addFamily}...` : zh.addFamily}
               </Button>
             </div>

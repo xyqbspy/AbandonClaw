@@ -1,10 +1,11 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { PageHeader } from "@/components/shared/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { listAdminScenes } from "@/lib/server/admin/service";
+import { APPLE_BUTTON_BASE, APPLE_BUTTON_TEXT_SM, APPLE_INPUT_BASE, APPLE_SURFACE } from "@/lib/ui/apple-style";
 
 const parsePositiveInt = (value: string | undefined, fallback: number) => {
   const num = Number(value);
@@ -24,6 +25,7 @@ export default async function AdminImportedScenesPage({
     1,
   );
   const pageSize = 20;
+  const appleButtonClassName = `${APPLE_BUTTON_BASE} ${APPLE_BUTTON_TEXT_SM}`;
 
   const result = await listAdminScenes({
     origin: "imported",
@@ -39,21 +41,21 @@ export default async function AdminImportedScenesPage({
       <PageHeader
         eyebrow="管理后台"
         title="导入场景"
-        description="快速查看 imported 内容，便于 parse 质量排查和清理。"
+        description="快速查看 imported 内容，便于 parse 质量排查与清理。"
       />
 
-      <Card className="border-border/70">
+      <Card className={APPLE_SURFACE}>
         <CardContent className="pt-4">
           <form className="grid gap-2 sm:grid-cols-[1fr_auto]">
             <Input name="q" defaultValue={q} placeholder="搜索标题或 slug" />
-            <Button type="submit" variant="outline">
+            <Button type="submit" variant="ghost" className={appleButtonClassName}>
               搜索
             </Button>
           </form>
         </CardContent>
       </Card>
 
-      <div className="overflow-x-auto rounded-lg border border-border/70">
+      <div className={`overflow-x-auto rounded-lg ${APPLE_SURFACE}`}>
         <table className="min-w-full text-sm">
           <thead className="bg-muted/40 text-left text-xs text-muted-foreground">
             <tr>
@@ -67,7 +69,7 @@ export default async function AdminImportedScenesPage({
           </thead>
           <tbody>
             {result.rows.map((row) => (
-              <tr key={row.id} className="border-t border-border/50 align-top">
+              <tr key={row.id} className="align-top">
                 <td className="px-3 py-2">
                   <Link
                     href={`/admin/scenes/${row.id}`}
@@ -81,9 +83,7 @@ export default async function AdminImportedScenesPage({
                   <Badge variant="outline">{row.origin}</Badge>
                 </td>
                 <td className="px-3 py-2">{row.is_public ? "true" : "false"}</td>
-                <td className="px-3 py-2 font-mono text-xs">
-                  {row.created_by ?? "-"}
-                </td>
+                <td className="px-3 py-2 font-mono text-xs">{row.created_by ?? "-"}</td>
                 <td className="px-3 py-2 whitespace-nowrap">{row.created_at}</td>
               </tr>
             ))}
@@ -107,25 +107,26 @@ export default async function AdminImportedScenesPage({
           {hasPrev ? (
             <Link
               href={`/admin/imported?q=${encodeURIComponent(q)}&page=${result.page - 1}`}
-              className="rounded border px-2 py-1 hover:bg-muted"
+              className={`${appleButtonClassName} px-2 py-1`}
             >
               上一页
             </Link>
           ) : (
-            <span className="rounded border px-2 py-1 opacity-40">上一页</span>
+            <span className={`${appleButtonClassName} px-2 py-1 opacity-40`}>上一页</span>
           )}
           {hasNext ? (
             <Link
               href={`/admin/imported?q=${encodeURIComponent(q)}&page=${result.page + 1}`}
-              className="rounded border px-2 py-1 hover:bg-muted"
+              className={`${appleButtonClassName} px-2 py-1`}
             >
               下一页
             </Link>
           ) : (
-            <span className="rounded border px-2 py-1 opacity-40">下一页</span>
+            <span className={`${appleButtonClassName} px-2 py-1 opacity-40`}>下一页</span>
           )}
         </div>
       </div>
     </div>
   );
 }
+

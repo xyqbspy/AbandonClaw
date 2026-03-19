@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { GenerateSceneSheet } from "@/components/scenes/generate-scene-sheet";
-import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -16,6 +15,12 @@ import {
   SceneListItemResponse,
 } from "@/lib/utils/scenes-api";
 import { getSceneListCache, setSceneListCache } from "@/lib/cache/scene-list-cache";
+import {
+  APPLE_BUTTON_BASE,
+  APPLE_BUTTON_DANGER,
+  APPLE_BUTTON_TEXT_SM,
+  APPLE_SURFACE,
+} from "@/lib/ui/apple-style";
 
 const difficultyLabel: Record<string, string> = {
   Beginner: "初级",
@@ -38,6 +43,7 @@ const placeholderExample = `A: Are we still on for dinner?
 B: I was just about to text you. Something came up at work.
 A: Again?
 B: Yeah, I'm stuck at the office.`;
+const appleButtonClassName = `${APPLE_BUTTON_BASE} ${APPLE_BUTTON_TEXT_SM}`;
 
 export default function ScenesPage() {
   const router = useRouter();
@@ -201,7 +207,7 @@ export default function ScenesPage() {
           return (
             <Card
               key={scene.id}
-              className="scene-card-motion h-full cursor-pointer border-border/70 transition-all duration-150 hover:border-primary/40 hover:shadow-sm"
+              className={`scene-card-motion h-full cursor-pointer ${APPLE_SURFACE} transition-all duration-150 hover:bg-[rgb(242,242,242)]`}
               onClick={() => router.push(`/scene/${scene.slug}`)}
             >
               <CardHeader className="space-y-0.5 p-2.5 pb-1.5 sm:p-3 sm:pb-2">
@@ -215,7 +221,7 @@ export default function ScenesPage() {
                         type="button"
                         data-scene-delete="true"
                         aria-label="删除场景"
-                        className="inline-flex h-6 w-6 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                        className={`inline-flex h-7 w-7 cursor-pointer items-center justify-center text-muted-foreground transition-colors hover:text-foreground ${APPLE_BUTTON_BASE}`}
                         onPointerDown={(event) => event.stopPropagation()}
                         onClick={(event) => {
                           event.preventDefault();
@@ -227,7 +233,7 @@ export default function ScenesPage() {
                       </button>
                       {confirmDeleteSceneId === scene.id ? (
                         <div
-                          className="absolute right-0 top-7 z-20 w-40 rounded-md border border-border/70 bg-background p-2 shadow-sm"
+                          className="absolute right-0 top-8 z-20 w-44 rounded-2xl border-0 bg-[rgb(246,246,246)] p-2 shadow-[0_8px_24px_rgba(0,0,0,0.08)]"
                           onPointerDown={(event) => event.stopPropagation()}
                           onClick={(event) => event.stopPropagation()}
                         >
@@ -235,7 +241,7 @@ export default function ScenesPage() {
                           <div className="mt-1.5 flex justify-end gap-1.5">
                             <button
                               type="button"
-                              className="rounded border px-2 py-0.5 text-[11px] text-muted-foreground hover:bg-muted"
+                              className={`${APPLE_BUTTON_BASE} px-2.5 py-1 text-[11px] font-medium text-muted-foreground`}
                               onClick={(event) => {
                                 event.preventDefault();
                                 event.stopPropagation();
@@ -246,7 +252,7 @@ export default function ScenesPage() {
                             </button>
                             <button
                               type="button"
-                              className="rounded border border-destructive/30 px-2 py-0.5 text-[11px] text-destructive hover:bg-destructive/5 disabled:opacity-60"
+                              className={`${APPLE_BUTTON_DANGER} px-2.5 py-1 text-[11px] font-medium disabled:opacity-60`}
                               disabled={deletingSceneId === scene.id}
                               onClick={(event) => {
                                 event.preventDefault();
@@ -275,24 +281,19 @@ export default function ScenesPage() {
                     {learningStatusLabel[scene.learningStatus]} · {Math.round(scene.progressPercent)}%
                   </p>
                   {scene.variantLinks.length > 0 ? (
-                    <div className="flex flex-wrap items-center justify-end gap-1">
-                      {scene.variantLinks.slice(0, 3).map((variant) => (
-                        <button
-                          key={variant.id}
-                          type="button"
-                          data-scene-variant-view="true"
-                          className="rounded border px-1.5 py-0.5 text-[10px] text-muted-foreground hover:bg-muted hover:text-foreground"
-                          onPointerDown={(event) => event.stopPropagation()}
-                          onClick={(event) => {
-                            event.preventDefault();
-                            event.stopPropagation();
-                            router.push(`/scene/${scene.slug}?view=variants`);
-                          }}
-                        >
-                          {variant.label}
-                        </button>
-                      ))}
-                    </div>
+                    <button
+                      type="button"
+                      data-scene-variant-view="true"
+                      className={`${APPLE_BUTTON_BASE} px-2.5 py-1 text-[11px] font-medium text-muted-foreground hover:text-foreground`}
+                      onPointerDown={(event) => event.stopPropagation()}
+                      onClick={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        router.push(`/scene/${scene.slug}?view=variants`);
+                      }}
+                    >
+                      查看变体
+                    </button>
                   ) : null}
                 </div>
               </CardContent>
@@ -313,43 +314,27 @@ export default function ScenesPage() {
 
   return (
     <div className="space-y-4">
-      <PageHeader
-        eyebrow="场景学习"
-        title="选择真实对话场景"
-        description="先在语境中阅读，再进入变体与练习。"
-      />
-
-      <Card className="border-border/70 bg-card">
-        <CardContent className="p-2.5 sm:p-3">
-          <div className="flex items-center justify-between gap-2">
-            <div className="min-w-0 space-y-0">
-              <p className="text-sm font-semibold leading-5">导入自定义场景</p>
-              <p className="line-clamp-1 text-[11px] text-muted-foreground">
-                粘贴英文对话并解析为可学习格式。
-              </p>
-              <p className="text-[11px] text-muted-foreground/90">来源：用户导入文本</p>
-            </div>
-            <Button
-              type="button"
-              size="sm"
-              className="h-7 cursor-pointer shrink-0 px-2 text-[11px]"
-              variant="outline"
-              onClick={() => setGenerateSheetOpen(true)}
-            >
-              生成我的场景
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              className="h-7 cursor-pointer shrink-0 px-2 text-[11px]"
-              onClick={() => setDialogOpen(true)}
-            >
-              <Plus className="size-3" />
-              导入
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="flex items-center justify-end gap-2">
+        <Button
+          type="button"
+          size="sm"
+          className={`h-8 cursor-pointer px-3 text-xs ${appleButtonClassName}`}
+          variant="ghost"
+          onClick={() => setGenerateSheetOpen(true)}
+        >
+          生成我的场景
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          className={`h-8 cursor-pointer px-3 text-xs ${appleButtonClassName}`}
+          variant="ghost"
+          onClick={() => setDialogOpen(true)}
+        >
+          <Plus className="size-3" />
+          导入
+        </Button>
+      </div>
 
       {renderSceneCards()}
 
@@ -367,7 +352,7 @@ export default function ScenesPage() {
             className="absolute inset-0"
             onClick={closeDialog}
           />
-          <Card className="relative z-10 w-full max-w-2xl border-border/80 animate-in slide-in-from-bottom-6 fade-in-0 duration-200 sm:slide-in-from-bottom-0 sm:zoom-in-95">
+          <Card className="relative z-10 w-full max-w-2xl border-0 bg-[rgb(246,246,246)] shadow-[0_16px_40px_rgba(0,0,0,0.12)] animate-in slide-in-from-bottom-6 fade-in-0 duration-200 sm:slide-in-from-bottom-0 sm:zoom-in-95">
             <CardHeader className="space-y-2">
               <div className="flex items-start justify-between gap-3">
                 <div>
@@ -380,7 +365,7 @@ export default function ScenesPage() {
                   type="button"
                   variant="ghost"
                   size="icon-sm"
-                  className="cursor-pointer"
+                  className="cursor-pointer rounded-full border border-black/5 bg-[rgb(246,246,246)] hover:bg-[rgb(238,238,238)]"
                   aria-label="关闭"
                   onClick={closeDialog}
                 >
@@ -402,16 +387,17 @@ export default function ScenesPage() {
               <div className="flex justify-end gap-2">
                 <Button
                   type="button"
-                  variant="outline"
+                  variant="ghost"
                   onClick={closeDialog}
-                  className="cursor-pointer"
+                  className={`cursor-pointer ${appleButtonClassName}`}
                 >
                   取消
                 </Button>
                 <Button
                   type="button"
+                  variant="ghost"
                   onClick={handleImport}
-                  className="cursor-pointer"
+                  className={`cursor-pointer ${appleButtonClassName}`}
                   disabled={importing}
                 >
                   {importing ? "导入中..." : "导入"}

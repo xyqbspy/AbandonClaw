@@ -60,6 +60,17 @@ const toOptionalTrimmed = (value: unknown, maxLength: number) => {
   if (!trimmed) return undefined;
   return trimmed.slice(0, maxLength);
 };
+const hasChinese = (value: string) => /[\u4e00-\u9fff]/.test(value);
+const normalizeGeneratedSceneTitle = (title: string | undefined, promptText: string) => {
+  const baseTitle = toOptionalTrimmed(title, 90) ?? "Daily Conversation";
+  if (hasChinese(baseTitle)) return baseTitle;
+
+  const promptFirstLine = promptText.split(/\r?\n/)[0]?.trim() ?? "";
+  const zhHint = hasChinese(promptFirstLine)
+    ? promptFirstLine.replace(/[。！？!?]+$/g, "").slice(0, 16)
+    : "场景练习";
+  return `${baseTitle}（${zhHint || "场景练习"}）`;
+};
 
 const normalizeSentenceCount = (value: unknown) => {
   if (typeof value !== "number" || Number.isNaN(value)) {
@@ -396,7 +407,7 @@ export async function generatePersonalizedSceneForUser(
     });
 
     generatedSourceText = toDraftSourceText(parsed);
-    generatedTitle = parsed.title.trim();
+    generatedTitle = normalizeGeneratedSceneTitle(parsed.title, promptText);
     generatedTheme = toOptionalTrimmed(parsed.theme, 80);
 
     await setAiCache({
@@ -458,10 +469,11 @@ export async function generatePersonalizedSceneForUser(
     parsed.parsedScene,
     generatedDialogueDraft,
   );
+  const finalGeneratedTitle = normalizeGeneratedSceneTitle(generatedTitle, promptText);
   const scene = await createImportedScene({
     userId,
     sourceText: generatedSourceText,
-    title: generatedTitle,
+    title: finalGeneratedTitle,
     theme: generatedTheme,
     parsedScene: scenePayload,
     model,

@@ -8,18 +8,16 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import {
+  APPLE_BUTTON_BASE,
+  APPLE_BUTTON_TEXT_SM,
+  APPLE_SURFACE,
+} from "@/lib/ui/apple-style";
 
 const isLongChunk = (text: string) => text.length > 22;
-const speakerTextClassName = (speaker?: "A" | "B") => {
-  if (speaker === "A") return "text-sky-700";
-  if (speaker === "B") return "text-emerald-700";
-  return "text-muted-foreground";
-};
-const speakerLabel = (speaker?: "A" | "B") => {
-  if (speaker === "A") return "A";
-  if (speaker === "B") return "B";
-  return "";
-};
+const detailToneClassName = "bg-[rgb(246,246,246)]";
+const appleButtonClassName = `${APPLE_BUTTON_BASE} ${APPLE_BUTTON_TEXT_SM}`;
+const hasChinese = (value?: string) => /[\u4e00-\u9fff]/.test((value ?? "").trim());
 
 export function SelectionDetailSheet({
   currentSentence,
@@ -102,19 +100,16 @@ export function SelectionDetailSheet({
         role="dialog"
         aria-modal="true"
         aria-label="学习详情"
-        className="absolute inset-x-0 bottom-0 z-[71] h-[78vh] max-h-[78vh] rounded-t-2xl border border-border/70 bg-background shadow-xl animate-in slide-in-from-bottom-6 fade-in-0 duration-200"
+        className={`absolute inset-x-0 bottom-0 z-[71] h-[78vh] max-h-[78vh] rounded-t-2xl shadow-xl animate-in slide-in-from-bottom-6 fade-in-0 duration-200 ${APPLE_SURFACE}`}
       >
-        <header className="flex items-start justify-between border-b border-border/70 px-4 pb-3 pt-3">
+        <header className="flex items-start justify-between px-4 pb-3 pt-3">
           <div>
             <h2 className="text-sm font-semibold">学习详情</h2>
-            <p className="text-xs text-muted-foreground">
-              {showSpeaker ? "点对话看翻译，再点短语看解析。" : "点表达看翻译，再点短语看解析。"}
-            </p>
           </div>
           <Button
             size="icon-sm"
             variant="ghost"
-            className="cursor-pointer"
+            className={cn("cursor-pointer", appleButtonClassName)}
             aria-label="关闭学习详情"
             onClick={() => onOpenChange(false)}
           >
@@ -132,14 +127,14 @@ export function SelectionDetailSheet({
           ) : (
           <div className="space-y-4 animate-in fade-in-0 slide-in-from-bottom-1 duration-200">
               {showSentenceSection ? (
-                <section className="rounded-xl border border-border/70 p-3">
+                <section
+                  className={cn(
+                    "rounded-xl p-3",
+                    detailToneClassName,
+                  )}
+                >
                 <div className="flex items-center justify-between gap-3">
-                  <h3 className="text-sm font-medium">
-                    {sentenceSectionLabel}
-                    {showSpeaker && currentSentence?.speaker
-                      ? `（${speakerLabel(currentSentence.speaker)}）`
-                      : ""}
-                  </h3>
+                  <h3 className="text-sm font-medium">{sentenceSectionLabel}</h3>
                   {currentSentence ? (
                     <div className="flex items-center gap-3">
                       <button
@@ -163,16 +158,6 @@ export function SelectionDetailSheet({
                 </div>
                 {currentSentence ? (
                   <>
-                    {showSpeaker && currentSentence.speaker ? (
-                      <p
-                        className={cn(
-                          "text-[10px] tracking-[0.08em] uppercase",
-                          speakerTextClassName(currentSentence.speaker),
-                        )}
-                      >
-                        {speakerLabel(currentSentence.speaker)}
-                      </p>
-                    ) : null}
                     <p className="mt-1 text-sm leading-7 break-words">{currentSentence.text}</p>
                     <div
                       className={cn(
@@ -182,7 +167,7 @@ export function SelectionDetailSheet({
                           : "mt-0.5 grid-rows-[0fr] opacity-0",
                       )}
                     >
-                      <p className="min-h-0 rounded-lg bg-muted px-3 py-2 text-sm leading-6">{currentSentence.translation}</p>
+                      <p className="min-h-0 rounded-lg bg-[rgb(246,246,246)] px-3 py-2 text-sm leading-6">{currentSentence.translation}</p>
                     </div>
 
                     <div className="mt-3 space-y-2">
@@ -195,12 +180,12 @@ export function SelectionDetailSheet({
                             key={chunk}
                             type="button"
                             className={cn(
-                              "cursor-pointer rounded-full border border-border/70 bg-background px-2.5 py-1 text-xs transition",
-                              "hover:border-primary/40 hover:bg-accent active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
-                              chunkDetail?.text.toLowerCase() === chunk.toLowerCase() && "border-primary/50 bg-accent",
+                              "cursor-pointer rounded-full bg-[rgb(246,246,246)] px-2.5 py-1 text-xs transition",
+                              "hover:bg-accent active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+                              chunkDetail?.text.toLowerCase() === chunk.toLowerCase() && "bg-accent",
                               hoveredChunkKey?.toLowerCase() === chunk.toLowerCase() &&
                                 chunkDetail?.text.toLowerCase() !== chunk.toLowerCase() &&
-                                "border-primary/40 bg-accent",
+                                "bg-accent",
                             )}
                             onClick={() => onSelectRelated(chunk)}
                             onMouseEnter={() => onHoverChunk(chunk)}
@@ -220,7 +205,7 @@ export function SelectionDetailSheet({
                 </section>
               ) : null}
 
-              <section className="space-y-3 rounded-xl border border-border/70 p-3">
+              <section className="space-y-3 rounded-xl bg-[rgb(246,246,246)] p-3">
                 <div className="flex items-center justify-between gap-3">
                   <h3 className="text-sm font-medium">{topHint}</h3>
                   {chunkDetail ? (
@@ -237,7 +222,7 @@ export function SelectionDetailSheet({
                 {chunkDetail ? (
                   <div key={`mobile-chunk-${chunkDetail.text}`} className="space-y-3 animate-in fade-in-0 slide-in-from-bottom-1 duration-200">
                     {isLongChunk(chunkDetail.text) ? (
-                      <p className="rounded-lg border border-border/70 bg-background px-3 py-2 text-sm leading-6 break-words">
+                      <p className="rounded-lg bg-[rgb(246,246,246)] px-3 py-2 text-sm leading-6 break-words">
                         {chunkDetail.text}
                       </p>
                     ) : (
@@ -249,42 +234,51 @@ export function SelectionDetailSheet({
                     </div>
                     <div>
                       <p className="text-xs tracking-[0.08em] text-muted-foreground">当前句中含义</p>
-                      <p className="mt-1 text-sm text-muted-foreground">{chunkDetail.meaningInSentence}</p>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        {hasChinese(chunkDetail.meaningInSentence)
+                          ? chunkDetail.meaningInSentence
+                          : `这里表示：${chunkDetail.translation || "该表达在本句中的含义。"}`
+                        }
+                      </p>
                     </div>
                     <div>
                       <p className="text-xs tracking-[0.08em] text-muted-foreground">常见用法</p>
                       <p className="mt-1 text-sm leading-7">
-                        {chunkDetail.grammarLabel ? `${chunkDetail.grammarLabel} · ` : ""}
-                        {chunkDetail.usageNote}
+                        {hasChinese(chunkDetail.grammarLabel) ? `${chunkDetail.grammarLabel} · ` : ""}
+                        {hasChinese(chunkDetail.usageNote)
+                          ? chunkDetail.usageNote
+                          : "先理解它在这句话里的作用，再放回整句复述。"}
                       </p>
                     </div>
                     <div className="space-y-2">
-                      <p className="text-xs tracking-[0.08em] text-muted-foreground">例句</p>
                       {chunkDetail.examples.slice(0, 2).map((example, index) => {
                         const exampleText = example.en;
                         const translation = example.zh;
                         return (
-                        <div key={`${example.en}-${index}`} className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-sm">
-                          <div className="flex items-center justify-end gap-3">
-                            <button
-                              type="button"
-                              className="inline-flex cursor-pointer items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground active:opacity-70"
-                              onClick={() => toggleExampleTranslation(exampleText)}
-                            >
-                              <Languages className="size-3.5" />
-                              {exampleTranslationOpenMap[exampleText] ? "收起" : "翻译"}
-                            </button>
-                            <Button
-                              size="icon-sm"
-                              variant="ghost"
-                              className="cursor-pointer"
-                              aria-label="播放例句发音"
-                              onClick={() => onPronounce(exampleText)}
-                            >
-                              <CirclePlay className={cn("size-4", speakingText === exampleText && "animate-pulse")} />
-                            </Button>
+                        <div key={`${example.en}-${index}`} className="rounded-lg bg-[rgb(246,246,246)] py-2 text-sm">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-xs tracking-[0.08em] text-muted-foreground">例句</p>
+                            <div className="inline-flex items-center gap-2">
+                              <button
+                                type="button"
+                                className="inline-flex cursor-pointer items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground active:opacity-70"
+                                onClick={() => toggleExampleTranslation(exampleText)}
+                              >
+                                <Languages className="size-3.5" />
+                                {exampleTranslationOpenMap[exampleText] ? "收起" : "翻译"}
+                              </button>
+                              <Button
+                                size="icon-sm"
+                                variant="ghost"
+                                className={cn("cursor-pointer", appleButtonClassName)}
+                                aria-label="播放例句发音"
+                                onClick={() => onPronounce(exampleText)}
+                              >
+                                <CirclePlay className={cn("size-4", speakingText === exampleText && "animate-pulse")} />
+                              </Button>
+                            </div>
                           </div>
-                          <p className="mt-1 flex-1 break-words leading-6">{exampleText}</p>
+                          <p className="mt-1 break-words leading-6">{exampleText}</p>
                           <div
                             className={cn(
                               "grid overflow-hidden transition-all duration-200",
@@ -293,8 +287,8 @@ export function SelectionDetailSheet({
                                 : "mt-0.5 grid-rows-[0fr] opacity-0",
                             )}
                           >
-                            <p className="min-h-0 rounded-lg bg-background px-2.5 py-1.5 text-sm leading-6 text-muted-foreground">
-                              {translation || "该例句翻译待补充。"}
+                            <p className="min-h-0 text-sm leading-6 text-muted-foreground">
+                              {hasChinese(translation) ? translation : "该例句翻译待补充。"}
                             </p>
                           </div>
                         </div>
@@ -309,12 +303,12 @@ export function SelectionDetailSheet({
           )}
         </div>
 
-        <footer className="border-t border-border/70 bg-background/95 p-3">
+        <footer className="bg-background/95 p-3">
           <div className="grid grid-cols-2 gap-2">
-            <Button className="cursor-pointer" onClick={onSave} disabled={!chunkDetail}>
+            <Button variant="ghost" className={cn("cursor-pointer", appleButtonClassName)} onClick={onSave} disabled={!chunkDetail}>
               {saved ? "已收藏" : "收藏短语"}
             </Button>
-            <Button variant="secondary" className="cursor-pointer" onClick={onReview} disabled={!chunkDetail}>
+            <Button variant="ghost" className={cn("cursor-pointer", appleButtonClassName)} onClick={onReview} disabled={!chunkDetail}>
               加入复习
             </Button>
           </div>
@@ -324,6 +318,8 @@ export function SelectionDetailSheet({
     document.body,
   );
 }
+
+
 
 
 

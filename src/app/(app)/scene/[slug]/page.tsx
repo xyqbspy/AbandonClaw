@@ -53,9 +53,12 @@ import {
 } from "@/lib/utils/phrases-api";
 import { normalizePhraseText } from "@/lib/shared/phrases";
 import {
-  getScenePhraseRecommendationsFromApi,
-  ScenePhraseRecommendationItem,
-} from "@/lib/utils/recommendations-api";
+  APPLE_BUTTON_BASE,
+  APPLE_BUTTON_DANGER,
+  APPLE_BUTTON_TEXT_LG,
+  APPLE_BUTTON_TEXT_SM,
+  APPLE_SURFACE,
+} from "@/lib/ui/apple-style";
 
 type SceneViewMode =
   | "scene"
@@ -120,11 +123,11 @@ const toVariantStatusLabel = (status: "unviewed" | "viewed" | "completed") => {
   return "未查看";
 };
 
-const toVariantTitle = (title: string, index: number) => {
-  const replaced = title.replace(/\(Variant\s*(\d+)\)/i, "（变体$1）");
-  if (replaced !== title) return replaced;
-  return `${title}（变体${index + 1}）`;
-};
+const toVariantTitle = (title: string) =>
+  title
+    .replace(/\s*\(Variant\s*\d+\)/gi, "")
+    .replace(/\s*[（(]变体\s*\d+[）)]/gi, "")
+    .trim();
 
 const findChunkContext = (
   chunkText: string,
@@ -167,6 +170,9 @@ const collectLessonChunkTexts = (lesson: Lesson) => {
 const extractSlugFromSceneCacheKey = (key: string) =>
   key.startsWith("scene:") ? key.slice("scene:".length) : "";
 
+const appleButtonSmClassName = `${APPLE_BUTTON_BASE} ${APPLE_BUTTON_TEXT_SM}`;
+const appleButtonLgClassName = `${APPLE_BUTTON_BASE} ${APPLE_BUTTON_TEXT_LG}`;
+
 export default function SceneDetailPage() {
   const params = useParams<{ slug: string }>();
   const router = useRouter();
@@ -203,12 +209,6 @@ export default function SceneDetailPage() {
   const [expressionMapVariantSetId, setExpressionMapVariantSetId] =
     useState<string | null>(null);
   const [savedPhraseTextSet, setSavedPhraseTextSet] = useState<Set<string>>(new Set());
-  const [recommendedPhrases, setRecommendedPhrases] = useState<
-    ScenePhraseRecommendationItem[]
-  >([]);
-  const [savingRecommendedKeys, setSavingRecommendedKeys] = useState<Set<string>>(
-    new Set(),
-  );
   const [generatedState, setGeneratedState] = useState<SceneGeneratedState>({
     latestPracticeSet: null,
     latestVariantSet: null,
@@ -511,28 +511,6 @@ export default function SceneDetailPage() {
     };
   }, [baseLesson]);
 
-  useEffect(() => {
-    if (!baseLesson) {
-      setRecommendedPhrases([]);
-      return;
-    }
-
-    let cancelled = false;
-    void getScenePhraseRecommendationsFromApi(baseLesson.slug, 3)
-      .then((items) => {
-        if (cancelled) return;
-        setRecommendedPhrases(items);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        // Silent fallback: recommendations should not block core scene flow.
-        setRecommendedPhrases([]);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [baseLesson]);
 
   useEffect(() => {
     if (!baseLesson) return;
@@ -897,44 +875,6 @@ export default function SceneDetailPage() {
     setVariantChunkModalOpen(true);
   };
 
-  const handleSaveRecommendedPhrase = useCallback(
-    (item: ScenePhraseRecommendationItem) => {
-      const key = item.normalizedText;
-      if (!key) return;
-      if (savingRecommendedKeys.has(key)) return;
-
-      setSavingRecommendedKeys((prev) => {
-        const next = new Set(prev);
-        next.add(key);
-        return next;
-      });
-
-      void savePhraseForScene({
-        text: item.text,
-        translation: item.translation ?? undefined,
-        sourceSentenceIndex: item.sourceSentenceIndex ?? undefined,
-        sourceSentenceText: item.sourceSentenceText ?? undefined,
-        sourceChunkText: item.sourceChunkText,
-      })
-        .then((result) => {
-          setRecommendedPhrases((prev) =>
-            prev.filter((candidate) => candidate.normalizedText !== key),
-          );
-          toast.success(result.created ? "已收藏推荐表达" : "该表达已在收藏中");
-        })
-        .catch((error) => {
-          toast.error(error instanceof Error ? error.message : "收藏失败");
-        })
-        .finally(() => {
-          setSavingRecommendedKeys((prev) => {
-            const next = new Set(prev);
-            next.delete(key);
-            return next;
-          });
-        });
-    },
-    [savePhraseForScene, savingRecommendedKeys],
-  );
 
   if (sceneLoading) {
     return <div className="p-4 text-sm text-muted-foreground">场景加载中...</div>;
@@ -945,8 +885,8 @@ export default function SceneDetailPage() {
   }
 
   const isDialogueScene = baseLesson.sceneType === "dialogue";
-  const practiceButtonLabel = isDialogueScene ? "练对话" : "练表达";
-  const viewPracticeButtonLabel = isDialogueScene ? "查看对话练习" : "查看表达练习";
+  const practiceButtonLabel = isDialogueScene ? "对话" : "表达";
+  const viewPracticeButtonLabel = isDialogueScene ? "查看对话" : "查看表达";
 
   const chunkDetailSheet = (
     <SelectionDetailSheet
@@ -976,18 +916,18 @@ export default function SceneDetailPage() {
   if (viewMode === "practice") {
     return (
       <div className="space-y-4">
-        <section className="space-y-3 rounded-lg border border-border/70 p-4">
+        <section className={`space-y-3 rounded-lg p-4 ${APPLE_SURFACE}`}>
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
-              className="rounded-md border px-3 py-1.5 text-sm hover:bg-muted"
+              className={`${appleButtonSmClassName} px-3 py-1.5 text-sm`}
               onClick={() => setViewModeWithRoute("scene")}
             >
               返回原场景
             </button>
             <button
               type="button"
-              className="rounded-md border px-3 py-1.5 text-sm text-destructive hover:bg-muted disabled:opacity-60"
+              className={`${APPLE_BUTTON_DANGER} px-3 py-1.5 text-sm disabled:opacity-60`}
               onClick={handleDeletePracticeSet}
               disabled={!latestPracticeSet}
             >
@@ -995,7 +935,7 @@ export default function SceneDetailPage() {
             </button>
             <button
               type="button"
-              className="rounded-md border px-3 py-1.5 text-sm hover:bg-muted disabled:opacity-60"
+              className={`${appleButtonSmClassName} px-3 py-1.5 text-sm disabled:opacity-60`}
               onClick={handleMarkPracticeComplete}
               disabled={!latestPracticeSet || latestPracticeSet.status === "completed"}
             >
@@ -1021,12 +961,12 @@ export default function SceneDetailPage() {
         {!latestPracticeSet ? (
           <p className="text-sm text-muted-foreground">还没有可查看的练习集。</p>
         ) : (
-          <section className="space-y-3 rounded-lg border border-border/70 p-4">
+          <section className={`space-y-3 rounded-lg p-4 ${APPLE_SURFACE}`}>
             <ul className="space-y-2">
               {latestPracticeSet.exercises.map((exercise, index) => {
                 const visible = Boolean(showAnswerMap[exercise.id]);
                 return (
-                  <li key={`${exercise.id}-${index}`} className="rounded-md border p-3 text-sm">
+                  <li key={`${exercise.id}-${index}`} className="rounded-md bg-[rgb(240,240,240)] p-3 text-sm">
                     <p className="text-xs text-muted-foreground">{exercise.type}</p>
                     <p className="mt-1">{exercise.prompt}</p>
                     {exercise.targetChunk ? (
@@ -1036,7 +976,7 @@ export default function SceneDetailPage() {
                     ) : null}
                     <button
                       type="button"
-                      className="mt-2 rounded border px-2 py-1 text-xs hover:bg-muted"
+                      className={`${appleButtonSmClassName} mt-2 px-2 py-1 text-xs`}
                       onClick={() =>
                         setShowAnswerMap((prev) => ({
                           ...prev,
@@ -1047,7 +987,7 @@ export default function SceneDetailPage() {
                       {visible ? "Hide Answer" : "Show Answer"}
                     </button>
                     {visible ? (
-                      <p className="mt-2 rounded bg-muted/40 p-2 text-sm">{exercise.answer}</p>
+                      <p className="mt-2 rounded bg-[rgb(240,240,240)] p-2 text-sm">{exercise.answer}</p>
                     ) : null}
                   </li>
                 );
@@ -1062,18 +1002,18 @@ export default function SceneDetailPage() {
   if (viewMode === "variants") {
     return (
       <div className="space-y-5">
-        <section className="space-y-4 rounded-xl border border-border/70 bg-card/70 p-4 sm:p-5">
+        <section className="space-y-4 rounded-xl border-0 bg-[rgb(246,246,246)] p-4 sm:p-5">
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
-              className="h-8 whitespace-nowrap rounded-full border px-3 text-xs hover:bg-muted"
+              className={`h-8 whitespace-nowrap ${appleButtonSmClassName}`}
               onClick={() => setViewModeWithRoute("scene")}
             >
               返回原场景
             </button>
             <button
               type="button"
-              className="h-8 whitespace-nowrap rounded-full border px-3 text-xs hover:bg-muted disabled:opacity-60"
+              className={`h-8 whitespace-nowrap ${appleButtonSmClassName} disabled:opacity-60`}
               onClick={handleMarkVariantSetComplete}
               disabled={!latestVariantSet || latestVariantSet.status === "completed"}
             >
@@ -1081,7 +1021,7 @@ export default function SceneDetailPage() {
             </button>
             <button
               type="button"
-              className="h-8 whitespace-nowrap rounded-full border border-destructive/30 px-3 text-xs text-destructive/80 hover:bg-destructive/5 disabled:opacity-60"
+              className={`h-8 whitespace-nowrap px-3 ${APPLE_BUTTON_DANGER} ${APPLE_BUTTON_TEXT_SM} disabled:opacity-60`}
               onClick={handleDeleteVariantSet}
               disabled={!latestVariantSet}
             >
@@ -1099,7 +1039,7 @@ export default function SceneDetailPage() {
               <h3 className="text-sm font-medium">核心表达</h3>
               <button
                 type="button"
-                className="h-7 whitespace-nowrap rounded-full border px-3 text-[11px] text-muted-foreground hover:bg-muted disabled:opacity-60"
+                className={`h-8 whitespace-nowrap ${APPLE_BUTTON_BASE} px-3 text-[11px] font-semibold text-muted-foreground disabled:opacity-60`}
                 onClick={handleOpenExpressionMap}
                 disabled={!latestVariantSet || expressionMapLoading}
               >
@@ -1112,7 +1052,7 @@ export default function SceneDetailPage() {
                   <button
                     key={chunk}
                     type="button"
-                    className="rounded-full border border-border/70 bg-muted/20 px-2.5 py-1 text-[11px] hover:bg-muted"
+                    className={`${APPLE_BUTTON_BASE} px-2.5 py-1 text-[11px] font-medium`}
                     onClick={() => handleOpenVariantChunk(chunk)}
                   >
                     {chunk}
@@ -1126,15 +1066,15 @@ export default function SceneDetailPage() {
         {!latestVariantSet ? (
           <p className="text-sm text-muted-foreground">还没有可查看的变体集。</p>
         ) : (
-          <section className="space-y-2 rounded-xl border border-border/70 p-4 sm:p-5">
+          <section className={`space-y-2 rounded-xl p-4 sm:p-5 ${APPLE_SURFACE}`}>
             <ul className="space-y-2">
-              {latestVariantSet.variants.map((variant, index) => (
+              {latestVariantSet.variants.map((variant) => (
                 <li
                   key={variant.id}
-                  className="flex items-center justify-between gap-3 rounded-lg border p-3 text-sm"
+                  className="flex items-center justify-between gap-3 rounded-lg bg-[rgb(246,246,246)] p-3 text-sm"
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="font-medium">{toVariantTitle(variant.lesson.title, index)}</p>
+                    <p className="font-medium">{toVariantTitle(variant.lesson.title)}</p>
                     <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
                       {variant.lesson.sections[0]?.summary ?? variant.lesson.subtitle}
                     </p>
@@ -1145,14 +1085,14 @@ export default function SceneDetailPage() {
                   <div className="flex shrink-0 items-center gap-1">
                     <button
                       type="button"
-                      className="h-8 whitespace-nowrap rounded-full border px-3 text-xs hover:bg-muted"
+                      className={`h-8 whitespace-nowrap ${appleButtonSmClassName}`}
                       onClick={() => handleOpenVariant(variant.id)}
                     >
                       打开
                     </button>
                     <button
                       type="button"
-                      className="h-8 whitespace-nowrap rounded-full border border-destructive/30 px-2.5 text-xs text-destructive/80 hover:bg-destructive/5"
+                      className={`h-8 whitespace-nowrap px-2.5 ${APPLE_BUTTON_DANGER} ${APPLE_BUTTON_TEXT_SM}`}
                       onClick={() => handleDeleteVariantItem(variant.id)}
                     >
                       删除
@@ -1173,11 +1113,11 @@ export default function SceneDetailPage() {
 
     return (
       <div className="space-y-4">
-        <section className="space-y-3 rounded-lg border border-border/70 p-4">
+        <section className={`space-y-3 rounded-lg p-4 ${APPLE_SURFACE}`}>
           <div className="flex items-center gap-2">
             <button
               type="button"
-              className="rounded-md border px-3 py-1.5 text-sm hover:bg-muted"
+              className={`${appleButtonSmClassName} px-3 py-1.5 text-sm`}
               onClick={() => setViewModeWithRoute("variants")}
             >
               返回变体页
@@ -1191,7 +1131,7 @@ export default function SceneDetailPage() {
           ) : null}
         </section>
 
-        <section className="space-y-2 rounded-lg border border-border/70 p-4">
+        <section className={`space-y-2 rounded-lg p-4 ${APPLE_SURFACE}`}>
           {families.length === 0 ? (
             <p className="text-sm text-muted-foreground">
               暂无表达家族。先生成变体后再查看表达地图。
@@ -1199,7 +1139,7 @@ export default function SceneDetailPage() {
           ) : (
             <ul className="space-y-2">
               {families.map((family) => (
-                <li key={family.id} className="space-y-2 rounded-md border p-3 text-sm">
+                <li key={family.id} className="space-y-2 rounded-md bg-[rgb(240,240,240)] p-3 text-sm">
                   <p className="font-medium">{family.anchor}</p>
                   <p className="text-xs text-muted-foreground">{family.meaning}</p>
                   <p className="text-xs text-muted-foreground">
@@ -1210,7 +1150,7 @@ export default function SceneDetailPage() {
                       <button
                         key={`${family.id}-${expression}`}
                         type="button"
-                        className="rounded-md border border-border/70 bg-muted/30 px-2 py-1 text-xs hover:bg-muted"
+                        className={`${APPLE_BUTTON_BASE} px-2 py-1 text-xs`}
                         onClick={() =>
                           handleOpenExpressionDetail(expression, family.expressions)
                         }
@@ -1232,11 +1172,11 @@ export default function SceneDetailPage() {
   if (viewMode === "variant-study" && activeVariantLesson) {
     return (
       <div className="space-y-4">
-        <section className="space-y-3 rounded-lg border border-border/70 p-4">
+        <section className={`space-y-3 rounded-lg p-4 ${APPLE_SURFACE}`}>
           <div className="flex items-center gap-2">
             <button
               type="button"
-              className="rounded-md border px-3 py-1.5 text-sm hover:bg-muted disabled:opacity-60"
+              className={`${appleButtonSmClassName} px-3 py-1.5 text-sm disabled:opacity-60`}
               disabled={!canGeneratePractice}
               onClick={() => handleGeneratePractice(activeVariantLesson)}
             >
@@ -1244,7 +1184,7 @@ export default function SceneDetailPage() {
             </button>
             <button
               type="button"
-              className="rounded-md border px-3 py-1.5 text-sm text-destructive hover:bg-muted"
+              className={`${APPLE_BUTTON_DANGER} px-3 py-1.5 text-sm`}
               onClick={() => handleDeleteVariantItem(activeVariantLesson.id)}
             >
               删除当前变体
@@ -1268,19 +1208,19 @@ export default function SceneDetailPage() {
     <>
       <button
         type="button"
-        className="rounded-md border px-2.5 py-1 text-xs hover:bg-muted disabled:opacity-60"
+        className={`${appleButtonLgClassName} px-3 py-1.5 disabled:opacity-60`}
         onClick={handlePracticeToolClick}
         disabled={practiceLoading}
       >
         {practiceLoading
           ? "练习中…"
           : generatedState.practiceStatus === "idle"
-            ? practiceButtonLabel
-            : viewPracticeButtonLabel}
+            ? "对话"
+            : "查看对话"}
       </button>
       <button
         type="button"
-        className="rounded-md border px-2.5 py-1 text-xs hover:bg-muted disabled:opacity-60"
+        className={`${appleButtonLgClassName} px-3 py-1.5 disabled:opacity-60`}
         onClick={handleVariantToolClick}
         disabled={variantsLoading}
       >
@@ -1293,52 +1233,10 @@ export default function SceneDetailPage() {
     </>
   );
 
-  const recommendedItems = recommendedPhrases.filter(
-    (item) => !savedPhraseTextSet.has(item.normalizedText),
-  );
-  const recommendedBlock =
-    recommendedItems.length > 0 ? (
-      <section className="space-y-2 rounded-lg border border-border/70 p-3">
-        <div className="flex items-center justify-between gap-2">
-          <p className="text-sm font-medium">值得收藏的表达</p>
-          <span className="text-xs text-muted-foreground">本场景推荐</span>
-        </div>
-        <ul className="space-y-2">
-          {recommendedItems.map((item) => (
-            <li
-              key={item.normalizedText}
-              className="flex items-start justify-between gap-3 rounded-md border p-2.5"
-            >
-              <div className="min-w-0 space-y-0.5">
-                <p className="text-sm font-medium">{item.text}</p>
-                {item.translation ? (
-                  <p className="text-xs text-muted-foreground">{item.translation}</p>
-                ) : null}
-                {item.sourceSentenceText ? (
-                  <p className="line-clamp-2 text-xs text-muted-foreground">
-                    {item.sourceSentenceText}
-                  </p>
-                ) : null}
-              </div>
-              <button
-                type="button"
-                className="h-7 shrink-0 rounded-md border px-2.5 text-xs hover:bg-muted disabled:opacity-60"
-                disabled={savingRecommendedKeys.has(item.normalizedText)}
-                onClick={() => handleSaveRecommendedPhrase(item)}
-              >
-                {savingRecommendedKeys.has(item.normalizedText) ? "收藏中..." : "收藏"}
-              </button>
-            </li>
-          ))}
-        </ul>
-      </section>
-    ) : null;
-
   return (
     <div className="space-y-5">
       {practiceError ? <p className="text-sm text-destructive">{practiceError}</p> : null}
       {variantsError ? <p className="text-sm text-destructive">{variantsError}</p> : null}
-      {recommendedBlock}
 
       <LessonReader
         lesson={baseLesson}

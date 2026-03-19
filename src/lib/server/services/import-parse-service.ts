@@ -49,6 +49,23 @@ const toSlug = (value: string) =>
 const toStringOr = (value: unknown, fallback: string) =>
   typeof value === "string" && value.trim() ? value.trim() : fallback;
 
+const hasChinese = (value: string) => /[\u4e00-\u9fff]/.test(value);
+
+const normalizeMeaningInSentence = (value: unknown, chunkTranslation: string) => {
+  const raw = typeof value === "string" ? value.trim() : "";
+  if (raw && hasChinese(raw)) return raw;
+  if (chunkTranslation && hasChinese(chunkTranslation)) {
+    return `这里表示：${chunkTranslation}`;
+  }
+  return "在这句话里表示该表达在当前语境中的含义。";
+};
+
+const normalizeUsageNote = (value: unknown) => {
+  const raw = typeof value === "string" ? value.trim() : "";
+  if (raw && hasChinese(raw)) return raw;
+  return "先理解它在句中的作用，再放回整句复述。";
+};
+
 const toDifficulty = (value: unknown): ParsedScene["difficulty"] =>
   value === "Beginner" || value === "Intermediate" || value === "Advanced"
     ? value
@@ -120,8 +137,8 @@ const coerceParsedSceneFromLooseResponse = (value: unknown): ParsedScene | null 
           text: chunkText,
           translation: chunkTranslation,
           grammarLabel: toStringOr(chunk.grammarLabel, "Chunk"),
-          meaningInSentence: toStringOr(chunk.meaningInSentence, chunkText),
-          usageNote: toStringOr(chunk.usageNote, "Useful expression in this context."),
+          meaningInSentence: normalizeMeaningInSentence(chunk.meaningInSentence, chunkTranslation),
+          usageNote: normalizeUsageNote(chunk.usageNote),
           examples: toExamples(chunk.examples, chunkText, chunkTranslation),
         });
       }
@@ -176,8 +193,8 @@ const coerceParsedSceneFromLooseResponse = (value: unknown): ParsedScene | null 
           text: chunkText,
           translation: chunkTranslation,
           grammarLabel: toStringOr(chunk.grammarLabel, "Chunk"),
-          meaningInSentence: toStringOr(chunk.meaningInSentence, chunkText),
-          usageNote: toStringOr(chunk.usageNote, "Useful expression in this context."),
+          meaningInSentence: normalizeMeaningInSentence(chunk.meaningInSentence, chunkTranslation),
+          usageNote: normalizeUsageNote(chunk.usageNote),
           examples: toExamples(chunk.examples, chunkText, chunkTranslation),
         });
       }
