@@ -4,15 +4,14 @@ import { useState } from "react";
 import { Languages, Volume2 } from "lucide-react";
 import { LessonSentence } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
 const speakerBadgeClassName = (speaker?: "A" | "B") => {
   if (speaker === "A") {
-    return "border-sky-300/70 bg-sky-50 text-sky-700";
+    return "border-sky-200/80 bg-sky-50/50 text-sky-700";
   }
   if (speaker === "B") {
-    return "border-emerald-300/70 bg-emerald-50 text-emerald-700";
+    return "border-emerald-200/80 bg-emerald-50/50 text-emerald-700";
   }
   return "";
 };
@@ -59,32 +58,22 @@ export function SentenceBlock({
   const translationText = sentence.translation.trim() || "该句翻译暂未提供。";
 
   return (
-    <Card
+    <div
       className={cn(
-        "space-y-3 border-border/70 p-4 transition-all duration-150 hover:border-primary/30 sm:p-5",
+        "transition-colors duration-150",
+        showSpeaker
+          ? "rounded-lg px-2 py-2.5 hover:bg-muted/35"
+          : "space-y-3 border border-border/70 p-4 hover:border-primary/30 sm:p-5",
         mobileTapEnabled &&
           "cursor-pointer active:scale-[0.998] active:border-primary/40",
-        showSpeaker && sentence.speaker === "A" && "sm:mr-12",
-        showSpeaker && sentence.speaker === "B" && "sm:ml-12",
+        showSpeaker && sentence.speaker === "A" && "sm:mr-14",
+        showSpeaker && sentence.speaker === "B" && "sm:ml-14",
       )}
       onClick={() => {
         if (mobileTapEnabled) onSentenceTap?.(sentence.id);
       }}
     >
-      <div className="flex items-center justify-between gap-2">
-        {showSpeaker && sentence.speaker ? (
-          <Badge
-            variant="outline"
-            className={cn(
-              "text-[10px] tracking-[0.08em] uppercase",
-              speakerBadgeClassName(sentence.speaker),
-            )}
-          >
-            {speakerLabel(sentence.speaker)}
-          </Badge>
-        ) : (
-          <span />
-        )}
+      <div className="mb-1 flex items-center justify-end gap-3 text-xs text-muted-foreground">
         <div className="flex items-center gap-3 text-xs text-muted-foreground">
           <button
             type="button"
@@ -111,17 +100,42 @@ export function SentenceBlock({
         </div>
       </div>
 
-      <p
-        data-sentence-id={sentence.id}
-        data-sentence-text={sentence.text}
-        data-sentence-translation={sentence.translation}
-        className={cn(
-          "cursor-text text-[1.04rem] leading-relaxed sm:text-lg",
-          mobileTapEnabled && "selection:bg-primary/20",
-        )}
-      >
-        {sentence.text}
-      </p>
+      {showSpeaker && sentence.speaker ? (
+        <div className="flex items-start gap-2">
+          <Badge
+            variant="outline"
+            className={cn(
+              "mt-0.5 h-5 min-w-5 justify-center px-1.5 text-[10px] tracking-[0.04em]",
+              speakerBadgeClassName(sentence.speaker),
+            )}
+          >
+            {speakerLabel(sentence.speaker)}
+          </Badge>
+          <p
+            data-sentence-id={sentence.id}
+            data-sentence-text={sentence.text}
+            data-sentence-translation={sentence.translation}
+            className={cn(
+              "cursor-text text-[1.04rem] leading-relaxed sm:text-lg",
+              mobileTapEnabled && "selection:bg-primary/20",
+            )}
+          >
+            {sentence.text}
+          </p>
+        </div>
+      ) : (
+        <p
+          data-sentence-id={sentence.id}
+          data-sentence-text={sentence.text}
+          data-sentence-translation={sentence.translation}
+          className={cn(
+            "cursor-text text-[1.04rem] leading-relaxed sm:text-lg",
+            mobileTapEnabled && "selection:bg-primary/20",
+          )}
+        >
+          {sentence.text}
+        </p>
+      )}
 
       <div
         className={cn(
@@ -184,7 +198,7 @@ export function SentenceBlock({
           })}
         </div>
       ) : null}
-    </Card>
+    </div>
   );
 }
 

@@ -26,6 +26,7 @@ import {
 import { useMobile } from "@/hooks/use-mobile";
 import { useSpeech } from "@/hooks/use-speech";
 import { Lesson, LessonSentence, SelectionChunkLayer } from "@/lib/types";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -67,12 +68,6 @@ type MobileSentenceGroup = {
   translation: string;
   relatedChunks: string[];
   speaker?: "A" | "B";
-};
-
-const speakerTextClassName = (speaker?: "A" | "B") => {
-  if (speaker === "A") return "text-sky-700";
-  if (speaker === "B") return "text-emerald-700";
-  return "text-muted-foreground/80";
 };
 
 const speakerLabel = (speaker?: "A" | "B") => {
@@ -208,6 +203,10 @@ export function LessonReader({
   const playFromIndexRef = useRef<(index: number) => void>(() => {});
   const sentenceLoopRef = useRef<string | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [dialogueTranslationOpenMap, setDialogueTranslationOpenMap] =
+    useState<Record<string, boolean>>({});
+  const [dialogueExpandOpenMap, setDialogueExpandOpenMap] =
+    useState<Record<string, boolean>>({});
   const [mobileGroupTranslationOpenMap, setMobileGroupTranslationOpenMap] =
     useState<Record<string, boolean>>({});
   const [mobileActiveGroup, setMobileActiveGroup] =
@@ -254,6 +253,7 @@ export function LessonReader({
   );
 
   const mobileDisplaySentence = useMemo<LessonSentence | null>(() => {
+    if (isDialogueScene) return currentSentence;
     if (!isMobile || !mobileActiveGroup) return currentSentence;
     return {
       id: mobileActiveGroup.key,
@@ -263,7 +263,7 @@ export function LessonReader({
       speaker: mobileActiveGroup.speaker,
       audioText: mobileActiveGroup.text,
     };
-  }, [currentSentence, isMobile, mobileActiveGroup]);
+  }, [currentSentence, isDialogueScene, isMobile, mobileActiveGroup]);
 
   const currentSection = useMemo(() => {
     if (!state.activeSentenceId) return lesson.sections[0] ?? null;
@@ -276,7 +276,7 @@ export function LessonReader({
     );
   }, [lesson.sections, state.activeSentenceId]);
 
-  const relatedChunks = isMobile
+  const relatedChunks = isMobile && !isDialogueScene
     ? (mobileActiveGroup?.relatedChunks ?? currentSentence?.chunks ?? [])
     : (currentSentence?.chunks ?? []);
 
@@ -403,6 +403,37 @@ export function LessonReader({
     },
     [dispatchAction, isMobile, setSheetOpen],
   );
+
+  const handleOpenSentenceAnalysis = useCallback(
+    (sentence: LessonSentence) => {
+      dispatchAction({
+        type: "SENTENCE_CONTEXT_SET",
+        payload: { sentenceId: sentence.id },
+      });
+      dispatchAction({ type: "SELECTION_CLEARED" });
+      const firstChunk = sentence.chunks[0];
+      if (firstChunk) {
+        activateChunk(sentence.id, firstChunk);
+        return;
+      }
+      if (isMobile) setSheetOpen(true);
+    },
+    [activateChunk, dispatchAction, isMobile, setSheetOpen],
+  );
+
+  const toggleDialogueTranslation = useCallback((sentenceId: string) => {
+    setDialogueTranslationOpenMap((prev) => ({
+      ...prev,
+      [sentenceId]: !prev[sentenceId],
+    }));
+  }, []);
+
+  const toggleDialogueExpand = useCallback((sentenceId: string) => {
+    setDialogueExpandOpenMap((prev) => ({
+      ...prev,
+      [sentenceId]: !prev[sentenceId],
+    }));
+  }, []);
 
   const handleMobileGroupTap = useCallback(
     (group: MobileSentenceGroup) => {
@@ -697,6 +728,155 @@ export function LessonReader({
     };
   }, [dispatchAction, extractSelectionInReader, isMobile]);
 
+  const renderDialogueBubble = useCallback(
+    (sentence: LessonSentence) => {
+      const speaker = sentence.speaker ?? "A";
+      const translationOpen = Boolean(dialogueTranslationOpenMap[sentence.id]);
+      const expandOpen = Boolean(dialogueExpandOpenMap[sentence.id]);
+      const showLearningArea = expandOpen;
+      const showTranslation = translationOpen || expandOpen;
+      const sentenceSpeaking = speakingText === (sentence.audioText ?? sentence.text);
+
+      return (
+        <div
+          key={sentence.id}
+          className={cn(
+            "flex w-full",
+            speaker === "B" ? "justify-end" : "justify-start",
+          )}
+        >
+          <div
+            className={cn(
+              "w-full max-w-[92%] sm:max-w-[80%]",
+              speaker === "B" ? "items-end" : "items-start",
+            )}
+          >
+            <article
+              className={cn(
+                "rounded-2xl px-3.5 py-2.5 transition-colors",
+                "border border-transparent hover:bg-muted/25",
+                speaker === "A" && "bg-slate-50/80",
+                speaker === "B" && "bg-emerald-50/65",
+              )}
+            >
+              <div className="mb-1 flex items-center justify-between gap-2">
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    "h-5 min-w-5 justify-center rounded-full px-1.5 text-[10px]",
+                    speaker === "A"
+                      ? "border-sky-200/80 bg-sky-50/40 text-sky-700"
+                      : "border-emerald-200/80 bg-emerald-50/40 text-emerald-700",
+                  )}
+                >
+                  {speakerLabel(speaker)}
+                </Badge>
+                <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
+                  <button
+                    type="button"
+                    className="inline-flex cursor-pointer items-center gap-1 transition-colors hover:text-foreground"
+                    onClick={() => toggleDialogueTranslation(sentence.id)}
+                  >
+                    <Languages className="size-3.5" />
+                    {translationOpen ? "收起" : "翻译"}
+                  </button>
+                  <button
+                    type="button"
+                    className="inline-flex cursor-pointer items-center gap-1 transition-colors hover:text-foreground"
+                    onClick={() => handlePronounce(sentence.audioText ?? sentence.text)}
+                  >
+                    <Volume2 className={cn("size-3.5", sentenceSpeaking && "animate-pulse text-primary")} />
+                    {sentenceSpeaking ? "停止" : "朗读"}
+                  </button>
+                  <button
+                    type="button"
+                    className="inline-flex cursor-pointer items-center gap-1 transition-colors hover:text-foreground"
+                    onClick={() => toggleDialogueExpand(sentence.id)}
+                  >
+                    拓展
+                  </button>
+                </div>
+              </div>
+
+              <p
+                data-sentence-id={sentence.id}
+                data-sentence-text={sentence.text}
+                data-sentence-translation={sentence.translation}
+                className="cursor-pointer text-[1.03rem] leading-relaxed text-foreground/95"
+                onClick={() => handleSentenceTap(sentence.id)}
+              >
+                {sentence.text}
+              </p>
+
+              {showTranslation ? (
+                <p className="mt-2 rounded-lg bg-background/70 px-2.5 py-1.5 text-sm leading-6 text-muted-foreground">
+                  {sentence.translation || "该句翻译暂未提供。"}
+                </p>
+              ) : null}
+
+              {showLearningArea ? (
+                <div className="mt-2.5 space-y-2 border-t border-border/50 pt-2.5">
+                  <p className="text-[11px] text-muted-foreground">这句里的表达</p>
+                  <div className="flex flex-wrap gap-2">
+                    {sentence.chunks.length > 0 ? (
+                      sentence.chunks.map((chunk) => (
+                        <button
+                          key={`${sentence.id}-${chunk}`}
+                          type="button"
+                          className={cn(
+                            "cursor-pointer rounded-full border border-border/70 bg-background px-2.5 py-1 text-xs transition",
+                            "hover:border-primary/40 hover:bg-accent active:scale-95",
+                            state.activeChunkKey?.toLowerCase() === chunk.toLowerCase() &&
+                              "border-primary/50 bg-accent",
+                            state.hoveredChunkKey?.toLowerCase() === chunk.toLowerCase() &&
+                              state.activeChunkKey?.toLowerCase() !== chunk.toLowerCase() &&
+                              "border-primary/40 bg-accent",
+                          )}
+                          onClick={() => activateChunk(sentence.id, chunk)}
+                          onMouseEnter={() =>
+                            dispatchAction({ type: "CHUNK_HOVERED", payload: { chunkKey: chunk } })
+                          }
+                          onMouseLeave={() =>
+                            dispatchAction({ type: "CHUNK_HOVERED", payload: { chunkKey: null } })
+                          }
+                        >
+                          {chunk}
+                        </button>
+                      ))
+                    ) : (
+                      <span className="text-xs text-muted-foreground">本句暂无可用表达</span>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    className="inline-flex cursor-pointer items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
+                    onClick={() => handleOpenSentenceAnalysis(sentence)}
+                  >
+                    查看解析
+                  </button>
+                </div>
+              ) : null}
+            </article>
+          </div>
+        </div>
+      );
+    },
+    [
+      activateChunk,
+      dialogueExpandOpenMap,
+      dialogueTranslationOpenMap,
+      dispatchAction,
+      handleOpenSentenceAnalysis,
+      handlePronounce,
+      handleSentenceTap,
+      speakingText,
+      state.activeChunkKey,
+      state.hoveredChunkKey,
+      toggleDialogueExpand,
+      toggleDialogueTranslation,
+    ],
+  );
+
   return (
     <div className="relative grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-8">
       <SelectionToolbar
@@ -722,7 +902,7 @@ export function LessonReader({
 
       <div
         ref={readerRef}
-        className={cn("space-y-5", isMobile && "space-y-0.5")}
+        className={cn("space-y-5", isMobile && "space-y-1.5")}
       >
         <Card
           className={cn(
@@ -813,59 +993,48 @@ export function LessonReader({
           </CardContent>
         </Card>
 
-        {isMobile ? (
+        {isDialogueScene ? (
+          <div className={cn("space-y-2", isMobile && "space-y-1.5")}>
+            {sentenceOrder.map((sentence) => renderDialogueBubble(sentence))}
+          </div>
+        ) : isMobile ? (
           <div className="overflow-hidden bg-transparent">
             {lesson.sections.map((section) => {
               const active = currentSection?.id === section.id;
-              const groupedSentences = groupSentencesForMobile(
-                section.sentences,
-              );
+              const groupedSentences = groupSentencesForMobile(section.sentences);
 
               return (
-                <div key={section.id} className="space-y-0">
+                <div key={section.id} className="space-y-1.5">
                   {groupedSentences.map((group, groupIndex) => {
                     const groupKey = `${section.id}-group-${groupIndex}`;
-                    const groupText = group
-                      .map((sentence) => sentence.text)
-                      .join(" ");
-                    const groupTranslation = group
-                      .map((sentence) => sentence.translation)
-                      .join(" ");
+                    const groupText = group.map((sentence) => sentence.text).join(" ");
+                    const groupTranslation = group.map((sentence) => sentence.translation).join(" ");
                     const groupPlaying = speakingText === groupText;
-                    const groupSelected = group.some(
-                      (sentence) => sentence.id === state.activeSentenceId,
-                    );
-                    const translationOpen = Boolean(
-                      mobileGroupTranslationOpenMap[groupKey],
-                    );
-                    const groupRelatedChunks = Array.from(
-                      new Set(group.flatMap((sentence) => sentence.chunks)),
-                    );
+                    const groupSelected = group.some((sentence) => sentence.id === state.activeSentenceId);
+                    const translationOpen = Boolean(mobileGroupTranslationOpenMap[groupKey]);
+                    const groupRelatedChunks = Array.from(new Set(group.flatMap((sentence) => sentence.chunks)));
                     const groupContext: MobileSentenceGroup = {
                       key: groupKey,
                       sentenceIds: group.map((sentence) => sentence.id),
                       text: groupText,
                       translation: groupTranslation,
                       relatedChunks: groupRelatedChunks,
-                      speaker:
-                        group.length === 1 ? group[0]?.speaker : undefined,
+                      speaker: group.length === 1 ? group[0]?.speaker : undefined,
                     };
 
                     return (
-                      <Card
+                      <div
                         key={groupKey}
                         className={cn(
-                          "rounded-xl border-t border-[#ebe7e1] bg-transparent shadow-none ring-0 transition-colors duration-150",
+                          "rounded-lg px-2 py-1 transition-colors duration-150",
                           groupSelected
-                            ? "bg-accent/10"
+                            ? "bg-accent/12"
                             : active
-                              ? "bg-muted/10"
-                              : "hover:bg-muted/8",
-                          isDialogueScene && groupContext.speaker === "A" && "mr-8",
-                          isDialogueScene && groupContext.speaker === "B" && "ml-8",
+                              ? "bg-muted/8"
+                              : "hover:bg-muted/20",
                         )}
                       >
-                        <div className="px-3 py-1">
+                        <div className="px-1.5 py-0.5">
                           <div
                             className={cn(
                               "cursor-pointer transition-colors",
@@ -873,75 +1042,48 @@ export function LessonReader({
                             )}
                             onClick={() => handleMobileGroupTap(groupContext)}
                           >
-                            <div
-                              className={cn(
-                                "mb-1 flex items-center justify-between gap-2",
-                                groupSelected && "text-primary",
-                              )}
-                            >
-                              {isDialogueScene && groupContext.speaker ? (
-                                <p
-                                  className={cn(
-                                    "text-[10px] tracking-[0.08em] uppercase",
-                                    speakerTextClassName(groupContext.speaker),
-                                  )}
-                                >
-                                  {speakerLabel(groupContext.speaker)}
-                                </p>
-                              ) : (
-                                <span />
-                              )}
-                              <div className="flex items-center gap-2">
-                                <button
-                                  type="button"
-                                  className={cn(
-                                    "inline-flex cursor-pointer items-center gap-1 text-[11px] leading-none transition-colors active:opacity-70",
-                                    groupSelected
-                                      ? "text-primary/80 hover:text-primary/95"
-                                      : "text-muted-foreground/70 hover:text-muted-foreground",
-                                  )}
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                    setMobileGroupTranslationOpenMap((prev) => ({
-                                      ...prev,
-                                      [groupKey]: !prev[groupKey],
-                                    }));
-                                  }}
-                                >
-                                  <Languages className="size-3" />
-                                  {translationOpen ? "收起" : "翻译"}
-                                </button>
-                                <button
-                                  type="button"
-                                  className={cn(
-                                    "inline-flex cursor-pointer items-center gap-1 text-[11px] leading-none transition-colors active:opacity-70",
-                                    groupSelected
-                                      ? "text-primary/80 hover:text-primary/95"
-                                      : "text-muted-foreground/70 hover:text-muted-foreground",
-                                  )}
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                    handleLoopSentence(groupText);
-                                  }}
-                                >
-                                  <Volume2
-                                    className={cn(
-                                      "size-3",
-                                      groupPlaying &&
-                                        "animate-pulse text-primary",
-                                    )}
-                                  />
-                                  {groupPlaying ? "停止" : "播放"}
-                                </button>
-                              </div>
+                            <div className={cn("mb-1 flex items-center justify-end gap-2", groupSelected && "text-primary")}>
+                              <button
+                                type="button"
+                                className={cn(
+                                  "inline-flex cursor-pointer items-center gap-1 text-[11px] leading-none transition-colors active:opacity-70",
+                                  groupSelected
+                                    ? "text-primary/80 hover:text-primary/95"
+                                    : "text-muted-foreground/70 hover:text-muted-foreground",
+                                )}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  setMobileGroupTranslationOpenMap((prev) => ({
+                                    ...prev,
+                                    [groupKey]: !prev[groupKey],
+                                  }));
+                                }}
+                              >
+                                <Languages className="size-3" />
+                                {translationOpen ? "收起" : "翻译"}
+                              </button>
+                              <button
+                                type="button"
+                                className={cn(
+                                  "inline-flex cursor-pointer items-center gap-1 text-[11px] leading-none transition-colors active:opacity-70",
+                                  groupSelected
+                                    ? "text-primary/80 hover:text-primary/95"
+                                    : "text-muted-foreground/70 hover:text-muted-foreground",
+                                )}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  handleLoopSentence(groupText);
+                                }}
+                              >
+                                <Volume2 className={cn("size-3", groupPlaying && "animate-pulse text-primary")} />
+                                {groupPlaying ? "停止" : "播放"}
+                              </button>
                             </div>
 
                             <div
                               className={cn(
                                 "grid overflow-hidden transition-all duration-200",
-                                translationOpen
-                                  ? "mb-2 grid-rows-[1fr] opacity-100"
-                                  : "grid-rows-[0fr] opacity-0",
+                                translationOpen ? "mb-2 grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
                               )}
                             >
                               <p className="min-h-0 rounded-sm bg-muted/35 px-2.5 py-1.5 text-[13px] leading-6 text-muted-foreground">
@@ -969,7 +1111,7 @@ export function LessonReader({
                             </p>
                           </div>
                         </div>
-                      </Card>
+                      </div>
                     );
                   })}
                 </div>
@@ -981,16 +1123,14 @@ export function LessonReader({
             <section key={section.id} className="space-y-3">
               <div className="space-y-1 px-1">
                 <h2 className="text-xl font-semibold">{section.title}</h2>
-                <p className="text-sm text-muted-foreground">
-                  {section.summary}
-                </p>
+                <p className="text-sm text-muted-foreground">{section.summary}</p>
               </div>
               <div className="space-y-3">
                 {section.sentences.map((sentence) => (
                   <SentenceBlock
                     key={sentence.id}
                     sentence={sentence}
-                    showSpeaker={isDialogueScene}
+                    showSpeaker={false}
                     speaking={speakingText === (sentence.audioText ?? sentence.text)}
                     activeChunkKey={state.activeChunkKey}
                     hoveredChunkKey={state.hoveredChunkKey}
