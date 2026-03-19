@@ -74,6 +74,7 @@ export async function GET(request: Request) {
           : (() => {
               throw new ValidationError("learningItemType must be all/expression/sentence.");
             })();
+    const expressionFamilyId = searchParams.get("expressionFamilyId")?.trim() ?? "";
 
     const result = await listUserSavedPhrases({
       userId: user.id,
@@ -83,6 +84,7 @@ export async function GET(request: Request) {
       status,
       reviewStatus,
       learningItemType,
+      expressionFamilyId: expressionFamilyId || undefined,
     });
 
     return NextResponse.json(result, { status: 200 });

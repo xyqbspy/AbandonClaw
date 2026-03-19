@@ -1,6 +1,7 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import {
   PhraseRow,
+  UserPhraseAiEnrichmentStatus,
   UserDailyLearningStatsRow,
   UserPhraseRow,
   UserPhraseReviewStatus,
@@ -9,6 +10,12 @@ import {
 import { normalizePhraseText } from "@/lib/shared/phrases";
 import { ValidationError } from "@/lib/server/errors";
 import { getSceneRecordBySlug } from "@/lib/server/services/scene-service";
+import { callGlmChatCompletion } from "@/lib/server/glm-client";
+import { extractJsonCandidate } from "@/lib/server/scene-json";
+import {
+  SIMILAR_EXPRESSION_ENRICH_SYSTEM_PROMPT,
+  buildSimilarExpressionEnrichUserPrompt,
+} from "@/lib/server/prompts/similar-expression-enrich-prompt";
 
 const nowIso = () => new Date().toISOString();
 const todayDate = () => new Date().toISOString().slice(0, 10);
@@ -90,6 +97,10 @@ export interface UserSavedPhraseItem {
   sourceSentenceText: string | null;
   sourceChunkText: string | null;
   expressionFamilyId: string | null;
+  aiEnrichmentStatus: UserPhraseAiEnrichmentStatus | null;
+  semanticFocus: string | null;
+  typicalScenario: string | null;
+  aiEnrichmentError: string | null;
   learningItemType: "expression" | "sentence";
   savedAt: string;
   lastSeenAt: string;
@@ -118,6 +129,18 @@ const parseTags = (value: unknown) => {
     .filter(Boolean)
     .slice(0, 8);
   return Array.from(new Set(tags));
+};
+
+const parseWithDiagnostics = (rawText: string) => {
+  try {
+    return JSON.parse(rawText) as unknown;
+  } catch {
+    const jsonCandidate = extractJsonCandidate(rawText);
+    if (!jsonCandidate) {
+      throw new Error("Model output is not valid JSON.");
+    }
+    return JSON.parse(jsonCandidate) as unknown;
+  }
 };
 
 const inferLearningItemType = (row: Pick<
@@ -282,6 +305,10 @@ const mapSavedPhraseRow = (row: UserPhraseRow & { phrase: PhraseRow | null }): U
   sourceSentenceText: row.source_sentence_text,
   sourceChunkText: row.source_chunk_text,
   expressionFamilyId: row.expression_family_id,
+  aiEnrichmentStatus: row.ai_enrichment_status ?? null,
+  semanticFocus: row.ai_semantic_focus ?? null,
+  typicalScenario: row.ai_typical_scenario ?? null,
+  aiEnrichmentError: row.ai_enrichment_error ?? null,
   savedAt: row.saved_at,
   lastSeenAt: row.last_seen_at,
   reviewStatus: row.review_status,
@@ -600,12 +627,143 @@ export async function savePhraseForUser(userId: string, input: SavePhraseInput) 
   };
 }
 
+export async function enrichAiExpressionLearningInfo(params: {
+  userId: string;
+  userPhraseId: string;
+  baseExpression?: string;
+  differenceLabel?: string;
+}) {
+  const admin = createSupabaseAdminClient();
+  const { data: userPhrase, error: readError } = await admin
+    .from("user_phrases")
+    .select("*, phrase:phrases(*)")
+    .eq("id", params.userPhraseId)
+    .eq("user_id", params.userId)
+    .maybeSingle<UserPhraseRow & { phrase: PhraseRow | null }>();
+
+  if (readError) {
+    throw new Error(`Failed to read user phrase for enrichment: ${readError.message}`);
+  }
+  if (!userPhrase) {
+    throw new ValidationError("Expression not found.");
+  }
+  if (inferLearningItemType(userPhrase) !== "expression") {
+    throw new ValidationError("Only expression items can be enriched.");
+  }
+
+  const expression = (userPhrase.phrase?.display_text ?? userPhrase.source_chunk_text ?? "").trim();
+  if (!expression) {
+    throw new ValidationError("Expression text is missing.");
+  }
+
+  const markPendingPayload = {
+    ai_enrichment_status: "pending" as const,
+    ai_enrichment_error: null,
+    last_seen_at: nowIso(),
+  };
+  const { error: pendingError } = await admin
+    .from("user_phrases")
+    .update(markPendingPayload as never)
+    .eq("id", params.userPhraseId)
+    .eq("user_id", params.userId);
+  if (pendingError) {
+    throw new Error(`Failed to mark enrichment pending: ${pendingError.message}`);
+  }
+
+  try {
+    const rawModelText = await callGlmChatCompletion({
+      systemPrompt: SIMILAR_EXPRESSION_ENRICH_SYSTEM_PROMPT,
+      userPrompt: buildSimilarExpressionEnrichUserPrompt({
+        expression,
+        baseExpression: parseOptionalTrimmed(params.baseExpression, 200) ?? undefined,
+        differenceLabel: parseOptionalTrimmed(params.differenceLabel, 40) ?? undefined,
+      }),
+      temperature: 0.2,
+    });
+    const parsed = parseWithDiagnostics(rawModelText) as Record<string, unknown>;
+
+    const translation = parseOptionalTrimmed(parsed.translation, 200);
+    const usageNote = parseOptionalTrimmed(parsed.usageNote, 300);
+    const exampleSentence = parseOptionalTrimmed(parsed.exampleSentence, 500);
+    const semanticFocus = parseOptionalTrimmed(parsed.semanticFocus, 40);
+    const typicalScenario = parseOptionalTrimmed(parsed.typicalScenario, 80);
+
+    const nextPhrasePayload = {
+      translation:
+        translation ??
+        parseOptionalTrimmed(userPhrase.phrase?.translation, 200) ??
+        null,
+      usage_note:
+        usageNote ??
+        parseOptionalTrimmed(userPhrase.phrase?.usage_note, 300) ??
+        null,
+    };
+
+    const { error: phraseUpdateError } = await admin
+      .from("phrases")
+      .update(nextPhrasePayload as never)
+      .eq("id", userPhrase.phrase_id);
+    if (phraseUpdateError) {
+      throw new Error(`Failed to update phrase learning info: ${phraseUpdateError.message}`);
+    }
+
+    const nextUserPhrasePayload = {
+      source_sentence_text:
+        exampleSentence ??
+        parseOptionalTrimmed(userPhrase.source_sentence_text, 500) ??
+        null,
+      ai_semantic_focus:
+        semanticFocus ??
+        parseOptionalTrimmed(userPhrase.ai_semantic_focus, 40) ??
+        null,
+      ai_typical_scenario:
+        typicalScenario ??
+        parseOptionalTrimmed(userPhrase.ai_typical_scenario, 80) ??
+        null,
+      ai_enrichment_status: "done" as const,
+      ai_enrichment_error: null,
+      last_seen_at: nowIso(),
+    };
+    const { error: doneError } = await admin
+      .from("user_phrases")
+      .update(nextUserPhrasePayload as never)
+      .eq("id", params.userPhraseId)
+      .eq("user_id", params.userId);
+    if (doneError) {
+      throw new Error(`Failed to write enrichment result: ${doneError.message}`);
+    }
+
+    return {
+      userPhraseId: params.userPhraseId,
+      status: "done" as const,
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown enrichment error";
+    const { error: failedError } = await admin
+      .from("user_phrases")
+      .update({
+        ai_enrichment_status: "failed",
+        ai_enrichment_error: message.slice(0, 300),
+        last_seen_at: nowIso(),
+      } as never)
+      .eq("id", params.userPhraseId)
+      .eq("user_id", params.userId);
+    if (failedError) {
+      throw new Error(
+        `Enrichment failed and failed status could not be saved: ${failedError.message}`,
+      );
+    }
+    throw error;
+  }
+}
+
 export async function listUserSavedPhrases(params: {
   userId: string;
   query?: string;
   status?: "saved" | "archived";
   reviewStatus?: UserPhraseReviewStatus | "all";
   learningItemType?: "expression" | "sentence" | "all";
+  expressionFamilyId?: string;
   page?: number;
   limit?: number;
 }) {
@@ -623,6 +781,9 @@ export async function listUserSavedPhrases(params: {
     .range(from, to);
 
   query = query.eq("status", params.status ?? "saved");
+  if (params.expressionFamilyId) {
+    query = query.eq("expression_family_id", params.expressionFamilyId);
+  }
   if (params.reviewStatus && params.reviewStatus !== "all") {
     query = query.eq("review_status", params.reviewStatus);
   }

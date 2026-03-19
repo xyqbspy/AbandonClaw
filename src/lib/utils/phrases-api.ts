@@ -40,6 +40,10 @@ export interface UserPhraseItemResponse {
   sourceSentenceText: string | null;
   sourceChunkText: string | null;
   expressionFamilyId: string | null;
+  aiEnrichmentStatus: "pending" | "done" | "failed" | null;
+  semanticFocus: string | null;
+  typicalScenario: string | null;
+  aiEnrichmentError: string | null;
   learningItemType: "expression" | "sentence";
   savedAt: string;
   lastSeenAt: string;
@@ -94,6 +98,7 @@ export async function getMyPhrasesFromApi(params?: {
   status?: "saved" | "archived";
   reviewStatus?: PhraseReviewStatus | "all";
   learningItemType?: "expression" | "sentence" | "all";
+  expressionFamilyId?: string;
 }) {
   const search = new URLSearchParams();
   if (params?.query) search.set("query", params.query);
@@ -102,6 +107,7 @@ export async function getMyPhrasesFromApi(params?: {
   if (params?.status) search.set("status", params.status);
   if (params?.reviewStatus) search.set("reviewStatus", params.reviewStatus);
   if (params?.learningItemType) search.set("learningItemType", params.learningItemType);
+  if (params?.expressionFamilyId) search.set("expressionFamilyId", params.expressionFamilyId);
   const suffix = search.toString();
   const response = await fetch(`/api/phrases/mine${suffix ? `?${suffix}` : ""}`, {
     method: "GET",
@@ -114,6 +120,45 @@ export async function getMyPhrasesFromApi(params?: {
     total: number;
     page: number;
     limit: number;
+  };
+}
+
+export interface SimilarExpressionCandidateResponse {
+  text: string;
+  differenceLabel: string;
+}
+
+export async function enrichSimilarExpressionFromApi(payload: {
+  userPhraseId: string;
+  baseExpression?: string;
+  differenceLabel?: string;
+}) {
+  const response = await fetch("/api/phrases/similar/enrich", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    throw await toApiError(response, "补全学习信息失败。");
+  }
+  return (await response.json()) as { userPhraseId: string; status: "done" };
+}
+
+export async function generateSimilarExpressionsFromApi(payload: {
+  baseExpression: string;
+  existingExpressions?: string[];
+}) {
+  const response = await fetch("/api/phrases/similar/generate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    throw await toApiError(response, "生成同类表达失败。");
+  }
+  return (await response.json()) as {
+    version: "v1";
+    candidates: SimilarExpressionCandidateResponse[];
   };
 }
 

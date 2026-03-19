@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronDown, Search } from "lucide-react";
 import { toast } from "sonner";
 import { getPhraseListCache, setPhraseListCache } from "@/lib/cache/phrase-list-cache";
@@ -9,8 +9,11 @@ import { normalizePhraseText } from "@/lib/shared/phrases";
 import { generateExpressionMapFromApi } from "@/lib/utils/expression-map-api";
 import { ExpressionFamily, ExpressionMapResponse } from "@/lib/types/expression-map";
 import {
+  enrichSimilarExpressionFromApi,
+  generateSimilarExpressionsFromApi,
   getMyPhrasesFromApi,
   PhraseReviewStatus,
+  SimilarExpressionCandidateResponse,
   savePhraseFromApi,
   UserPhraseItemResponse,
 } from "@/lib/utils/phrases-api";
@@ -107,6 +110,12 @@ const zh = {
   sourceSentence: "\u4f8b\u53e5",
   noSourceSentence: "\u6682\u65e0\u53e5\u5b50\u4e0a\u4e0b\u6587",
   usageHint: "\u4f7f\u7528\u63d0\u793a",
+  learningInfoPending: "\u5b66\u4e60\u4fe1\u606f\u751f\u6210\u4e2d",
+  learningInfoFailed: "\u5b66\u4e60\u4fe1\u606f\u6682\u672a\u751f\u6210\uff0c\u53ef\u7a0d\u540e\u518d\u770b\u3002",
+  semanticFocusLabel: "\u8bed\u4e49\u4fa7\u91cd",
+  typicalScenarioLabel: "\u5178\u578b\u573a\u666f",
+  semanticFocusPending: "\u6b63\u5728\u8865\u5168",
+  typicalScenarioPending: "\u6b63\u5728\u8865\u5168",
   usageHintFallback: "\u8bd5\u7740\u628a\u8fd9\u4e2a\u8868\u8fbe\u653e\u8fdb\u4f60\u81ea\u5df1\u7684\u4e00\u53e5\u8bdd\u91cc\u3002",
   reviewStage: "\u5f53\u524d\u9636\u6bb5",
   reviewStageSavedHint: "\u5148\u8fc7\u4e00\u8f6e\uff0c\u5efa\u7acb\u719f\u6089\u611f\u3002",
@@ -152,6 +161,26 @@ const zh = {
   diffRestart: "\u66f4\u504f\u91cd\u65b0\u5f00\u59cb",
   mapLimitedPrefix: "\u4ec5\u5c55\u793a\u6700\u76f8\u5173\u7684",
   mapLimitedSuffix: "\u6761",
+  similarExpressions: "\u540c\u7c7b\u8868\u8fbe",
+  showSimilar: "\u5c55\u5f00\u540c\u7c7b\u8868\u8fbe",
+  hideSimilar: "\u6536\u8d77\u540c\u7c7b\u8868\u8fbe",
+  similarEmpty: "\u6682\u65e0\u5df2\u5efa\u7acb\u7684\u540c\u7c7b\u8868\u8fbe\u3002",
+  viewAllSimilar: "\u67e5\u770b\u66f4\u591a\u540c\u7c7b\u8868\u8fbe",
+  findMoreSimilar: "\u627e\u66f4\u591a\u540c\u7c7b\u8868\u8fbe",
+  expandSimilar: "\u6269\u5c55\u540c\u7c7b\u8868\u8fbe",
+  generatingSimilar: "\u540c\u7c7b\u8868\u8fbe\u751f\u6210\u4e2d",
+  generatedSimilarTitle: "AI \u5019\u9009\u540c\u7c7b\u8868\u8fbe",
+  generatedSimilarDesc:
+    "\u5148\u52fe\u9009\u4f60\u8981\u7684\u5019\u9009\uff0c\u518d\u52a0\u5165\u8868\u8fbe\u5e93\u5e76\u5efa\u7acb\u540c\u7c7b\u5173\u8054\u3002",
+  noGeneratedSimilar: "\u6682\u672a\u751f\u6210\u5230\u5408\u9002\u5019\u9009\uff0c\u53ef\u518d\u8bd5\u4e00\u6b21\u3002",
+  addSelectedSimilar: "\u52a0\u5165\u8868\u8fbe\u5e93\u5e76\u5efa\u7acb\u540c\u7c7b\u5173\u8054",
+  addSelectedSimilarSuccess: "\u5df2\u52a0\u5165\u9009\u4e2d\u5019\u9009\u5e76\u5efa\u7acb\u540c\u7c7b\u5173\u8054\u3002",
+  selectAtLeastOne: "\u8bf7\u81f3\u5c11\u9009\u62e9 1 \u4e2a\u5019\u9009\u3002",
+  viewingFamilyFilter: "\u5df2\u7b5b\u9009\u8be5\u540c\u7c7b\u7ec4",
+  clearFamilyFilter: "\u6e05\u9664\u540c\u7c7b\u7ec4\u7b5b\u9009",
+  diffDirectPrediction: "\u66f4\u504f\u76f4\u63a5\u9884\u6d4b",
+  diffEvidenceBased: "\u66f4\u504f\u6709\u8ff9\u8c61",
+  diffTiredState: "\u66f4\u5e38\u7528\u4e8e\u75b2\u60eb\u72b6\u6001",
   close: "\u5173\u95ed",
 };
 
@@ -195,24 +224,53 @@ const hasContraction = (value: string) => /(?:\w+'\w+)|(?:\w+n['’]t)/i.test(va
 const hasAnyToken = (tokens: string[], candidates: string[]) =>
   candidates.some((candidate) => tokens.includes(candidate));
 
+const SIMILAR_LABEL_FALLBACK = [
+  zh.diffColloquial,
+  zh.diffDirectPrediction,
+  zh.diffEvidenceBased,
+  zh.diffTiredState,
+  zh.diffSpecific,
+  zh.diffRelated,
+];
+
+const normalizeSimilarLabel = (label: string | null | undefined) => {
+  const trimmed = (label ?? "").trim();
+  if (!trimmed) return zh.diffRelated;
+  if (SIMILAR_LABEL_FALLBACK.includes(trimmed)) return trimmed;
+  return zh.diffRelated;
+};
+
 const buildDifferenceNote = (centerExpression: string, targetExpression: string) => {
   const center = normalizePhraseText(centerExpression);
   const target = normalizePhraseText(targetExpression);
   if (!center || !target) return zh.diffRelated;
   if (center === target) return zh.diffSame;
 
-  const centerTokens = tokenize(centerExpression);
   const targetTokens = tokenize(targetExpression);
-  if (hasAnyToken(targetTokens, ["back", "routine", "rhythm", "normal", "track"])) {
-    return zh.diffRecoverRoutine;
+  if (
+    hasAnyToken(targetTokens, [
+      "sign",
+      "signs",
+      "looking",
+      "seem",
+      "appears",
+      "seems",
+      "likely",
+      "headed",
+    ])
+  ) {
+    return zh.diffEvidenceBased;
   }
-  if (hasAnyToken(targetTokens, ["restart", "reset", "again", "fresh", "begin", "start", "over"])) {
-    return zh.diffRestart;
+  if (hasAnyToken(targetTokens, ["going", "gonna", "will"])) {
+    return zh.diffDirectPrediction;
+  }
+  if (hasAnyToken(targetTokens, ["tired", "worn", "exhausted", "wiped", "drained", "empty"])) {
+    return zh.diffTiredState;
   }
   if (hasContraction(targetExpression) && !hasContraction(centerExpression)) {
     return zh.diffColloquial;
   }
-  if (targetTokens.length >= centerTokens.length + 2) {
+  if (targetTokens.length >= tokenize(centerExpression).length + 2) {
     return zh.diffSpecific;
   }
   return zh.diffRelated;
@@ -291,12 +349,15 @@ const extractExpressionsFromSentenceItem = (item: UserPhraseItemResponse) => {
 
 export default function ChunksPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const familyFromQuery = searchParams.get("family")?.trim() ?? "";
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [phrases, setPhrases] = useState<UserPhraseItemResponse[]>([]);
   const [total, setTotal] = useState(0);
   const [reviewFilter, setReviewFilter] = useState<PhraseReviewStatus | "all">("all");
   const [contentFilter, setContentFilter] = useState<"expression" | "sentence">("expression");
+  const [expressionFamilyFilterId, setExpressionFamilyFilterId] = useState<string>(familyFromQuery);
   const [listDataSource, setListDataSource] = useState<"none" | "cache" | "network">("none");
 
   const [mapOpen, setMapOpen] = useState(false);
@@ -311,6 +372,7 @@ export default function ChunksPage() {
   const [mapOpeningForId, setMapOpeningForId] = useState<string | null>(null);
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
   const [expandedCardIds, setExpandedCardIds] = useState<Record<string, boolean>>({});
+  const [expandedSimilarIds, setExpandedSimilarIds] = useState<Record<string, boolean>>({});
   const [addSheetOpen, setAddSheetOpen] = useState(false);
   const [manualItemType, setManualItemType] = useState<"expression" | "sentence">("expression");
   const [manualText, setManualText] = useState("");
@@ -326,6 +388,14 @@ export default function ChunksPage() {
   const [savedSentenceExpressionKeys, setSavedSentenceExpressionKeys] = useState<
     Record<string, boolean>
   >({});
+  const [similarSheetOpen, setSimilarSheetOpen] = useState(false);
+  const [similarSeedExpression, setSimilarSeedExpression] = useState<UserPhraseItemResponse | null>(null);
+  const [generatingSimilarForId, setGeneratingSimilarForId] = useState<string | null>(null);
+  const [generatedSimilarCandidates, setGeneratedSimilarCandidates] = useState<
+    SimilarExpressionCandidateResponse[]
+  >([]);
+  const [selectedSimilarMap, setSelectedSimilarMap] = useState<Record<string, boolean>>({});
+  const [savingSelectedSimilar, setSavingSelectedSimilar] = useState(false);
 
   const activeLoadTokenRef = useRef(0);
 
@@ -333,6 +403,7 @@ export default function ChunksPage() {
     nextQuery: string,
     nextFilter: PhraseReviewStatus | "all",
     nextContentFilter: "expression" | "sentence",
+    nextExpressionFamilyFilterId: string,
     options?: { preferCache?: boolean },
   ) => {
     const token = activeLoadTokenRef.current + 1;
@@ -352,6 +423,7 @@ export default function ChunksPage() {
       status: "saved" as const,
       reviewStatus: nextFilter,
       learningItemType: nextContentFilter,
+      expressionFamilyId: nextExpressionFamilyFilterId || undefined,
     };
 
     if (preferCache) {
@@ -361,6 +433,7 @@ export default function ChunksPage() {
           status: requestParams.status,
           reviewStatus: requestParams.reviewStatus,
           learningItemType: requestParams.learningItemType,
+          expressionFamilyId: requestParams.expressionFamilyId,
           page: requestParams.page,
           limit: requestParams.limit,
         });
@@ -394,6 +467,7 @@ export default function ChunksPage() {
           status: requestParams.status,
           reviewStatus: requestParams.reviewStatus,
           learningItemType: requestParams.learningItemType,
+          expressionFamilyId: requestParams.expressionFamilyId,
           page: requestParams.page,
           limit: requestParams.limit,
         },
@@ -414,10 +488,16 @@ export default function ChunksPage() {
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      void loadPhrases(query, reviewFilter, contentFilter, { preferCache: true });
+      void loadPhrases(query, reviewFilter, contentFilter, expressionFamilyFilterId, {
+        preferCache: true,
+      });
     }, 180);
     return () => window.clearTimeout(timer);
-  }, [query, reviewFilter, contentFilter]);
+  }, [query, reviewFilter, contentFilter, expressionFamilyFilterId]);
+
+  useEffect(() => {
+    setExpressionFamilyFilterId(familyFromQuery);
+  }, [familyFromQuery]);
 
   useEffect(() => {
     if (process.env.NODE_ENV !== "development") return;
@@ -426,8 +506,9 @@ export default function ChunksPage() {
       count: phrases.length,
       filter: reviewFilter,
       contentFilter,
+      expressionFamilyFilterId,
     });
-  }, [listDataSource, phrases.length, reviewFilter, contentFilter]);
+  }, [listDataSource, phrases.length, reviewFilter, contentFilter, expressionFamilyFilterId]);
 
   const summary = useMemo(() => {
     if (loading) return zh.loading;
@@ -454,6 +535,22 @@ export default function ChunksPage() {
     }
     return map;
   }, [phrases]);
+
+  const familyMembersByFamilyId = useMemo(() => {
+    const map = new Map<string, UserPhraseItemResponse[]>();
+    for (const row of phrases) {
+      if (row.learningItemType !== "expression" || !row.expressionFamilyId) continue;
+      const bucket = map.get(row.expressionFamilyId) ?? [];
+      bucket.push(row);
+      map.set(row.expressionFamilyId, bucket);
+    }
+    return map;
+  }, [phrases]);
+
+  const expressionRows = useMemo(
+    () => phrases.filter((row) => row.learningItemType === "expression"),
+    [phrases],
+  );
 
   const centerExpressionText = useMemo(() => {
     if (!activeFamily) return mapSourceExpression?.text ?? "";
@@ -631,7 +728,132 @@ export default function ChunksPage() {
     setExpandedCardIds((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
+  const toggleSimilarExpanded = (id: string) => {
+    setExpandedSimilarIds((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const applyFamilyFilter = (familyId: string, sourceExpressionText?: string) => {
+    const normalized = familyId.trim();
+    if (!normalized) return;
+    setExpressionFamilyFilterId(normalized);
+    setQuery("");
+    setContentFilter("expression");
+    setReviewFilter("all");
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("family", normalized);
+    router.replace(`/chunks?${params.toString()}`);
+    if (sourceExpressionText) {
+      toast.message(`${zh.viewingFamilyFilter}：${sourceExpressionText}`);
+    }
+  };
+
+  const clearFamilyFilter = () => {
+    setExpressionFamilyFilterId("");
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("family");
+    const suffix = params.toString();
+    router.replace(`/chunks${suffix ? `?${suffix}` : ""}`);
+  };
+
+  const openGenerateSimilarSheet = async (item: UserPhraseItemResponse) => {
+    if (item.learningItemType !== "expression") return;
+    if (generatingSimilarForId === item.userPhraseId) return;
+    setGeneratingSimilarForId(item.userPhraseId);
+    setSimilarSeedExpression(item);
+    setGeneratedSimilarCandidates([]);
+    setSelectedSimilarMap({});
+    setSimilarSheetOpen(true);
+    try {
+      const existingExpressions = expressionRows.map((row) => row.text);
+      const response = await generateSimilarExpressionsFromApi({
+        baseExpression: item.text,
+        existingExpressions,
+      });
+      setGeneratedSimilarCandidates(response.candidates);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : zh.loadFailed);
+    } finally {
+      setGeneratingSimilarForId(null);
+    }
+  };
+
+  const toggleCandidateSelected = (candidateText: string) => {
+    const key = normalizePhraseText(candidateText);
+    if (!key) return;
+    setSelectedSimilarMap((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const selectedSimilarCandidates = useMemo(
+    () =>
+      generatedSimilarCandidates.filter((candidate) =>
+        Boolean(selectedSimilarMap[normalizePhraseText(candidate.text)]),
+      ),
+    [generatedSimilarCandidates, selectedSimilarMap],
+  );
+
+  const saveSelectedSimilarCandidates = async () => {
+    if (!similarSeedExpression || savingSelectedSimilar) return;
+    if (selectedSimilarCandidates.length === 0) {
+      toast.message(zh.selectAtLeastOne);
+      return;
+    }
+    setSavingSelectedSimilar(true);
+    try {
+      const familyId =
+        similarSeedExpression.expressionFamilyId ??
+        `fam:manual:${normalizePhraseText(similarSeedExpression.text).replace(/\s+/g, "-").slice(0, 30) || similarSeedExpression.userPhraseId.slice(0, 8)}`;
+
+      await savePhraseFromApi({
+        text: similarSeedExpression.text,
+        expressionFamilyId: familyId,
+        sourceType: similarSeedExpression.sourceType,
+        sourceSceneSlug: similarSeedExpression.sourceSceneSlug ?? undefined,
+        sourceSentenceText: similarSeedExpression.sourceSentenceText ?? undefined,
+        sourceChunkText: similarSeedExpression.text,
+        translation: similarSeedExpression.translation ?? undefined,
+      });
+
+      const savedResponses = await Promise.all(
+        selectedSimilarCandidates.map((candidate) =>
+          savePhraseFromApi({
+            text: candidate.text,
+            expressionFamilyId: familyId,
+            sourceType: "manual",
+            sourceNote: "similar-ai-mvp",
+            sourceSentenceText: similarSeedExpression.sourceSentenceText ?? undefined,
+            sourceChunkText: candidate.text,
+          }),
+        ),
+      );
+
+      const enrichTasks = savedResponses.map((response, index) => {
+        const candidate = selectedSimilarCandidates[index];
+        return enrichSimilarExpressionFromApi({
+          userPhraseId: response.userPhrase.id,
+          baseExpression: similarSeedExpression.text,
+          differenceLabel: normalizeSimilarLabel(candidate?.differenceLabel),
+        });
+      });
+      void Promise.allSettled(enrichTasks).finally(() => {
+        window.setTimeout(() => {
+          void loadPhrases(query, reviewFilter, contentFilter, familyId, { preferCache: false });
+        }, 600);
+      });
+
+      await loadPhrases(query, reviewFilter, contentFilter, familyId, { preferCache: false });
+      applyFamilyFilter(familyId, similarSeedExpression.text);
+      setSimilarSheetOpen(false);
+      toast.success(zh.addSelectedSimilarSuccess);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : zh.loadFailed);
+    } finally {
+      setSavingSelectedSimilar(false);
+    }
+  };
+
   const getUsageHint = (item: UserPhraseItemResponse) => {
+    if (item.aiEnrichmentStatus === "pending") return zh.learningInfoPending;
+    if (item.aiEnrichmentStatus === "failed") return zh.learningInfoFailed;
     const raw = (item.usageNote ?? "").trim();
     if (raw.length === 0) return zh.usageHintFallback;
     if (raw.length <= 70) return raw;
@@ -687,7 +909,9 @@ export default function ChunksPage() {
 
       if (tasks.length > 0) {
         await Promise.all(tasks);
-        await loadPhrases(query, reviewFilter, contentFilter, { preferCache: false });
+        await loadPhrases(query, reviewFilter, contentFilter, expressionFamilyFilterId, {
+          preferCache: false,
+        });
       }
       toast.success(zh.addFamilySuccess);
     } catch (error) {
@@ -742,7 +966,9 @@ export default function ChunksPage() {
       if (nextContentFilter !== contentFilter) {
         setContentFilter(nextContentFilter);
       }
-      await loadPhrases(query, reviewFilter, nextContentFilter, { preferCache: false });
+      await loadPhrases(query, reviewFilter, nextContentFilter, expressionFamilyFilterId, {
+        preferCache: false,
+      });
       if (mode === "save_and_review" && manualItemType === "expression") {
         toast.success(response.created ? zh.saveReviewSuccess : zh.saveDuplicateReviewSuccess);
         startReviewSession({
@@ -840,6 +1066,18 @@ export default function ChunksPage() {
         ))}
       </div>
 
+      {expressionFamilyFilterId ? (
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border/70 bg-muted/40 px-3 py-2">
+          <p className="text-xs text-muted-foreground">{zh.viewingFamilyFilter}</p>
+          <code className="rounded bg-background px-1.5 py-0.5 text-[11px]">
+            {expressionFamilyFilterId}
+          </code>
+          <Button type="button" size="sm" variant="ghost" className="h-7" onClick={clearFamilyFilter}>
+            {zh.clearFamilyFilter}
+          </Button>
+        </div>
+      ) : null}
+
       {loading ? (
         <p className="text-sm text-muted-foreground">{zh.listLoading}</p>
       ) : phrases.length === 0 ? (
@@ -849,6 +1087,15 @@ export default function ChunksPage() {
           {phrases.map((item) => {
             const sentenceExpressions =
               item.learningItemType === "sentence" ? extractExpressionsFromSentenceItem(item) : [];
+            const familyMembers =
+              item.learningItemType === "expression" && item.expressionFamilyId
+                ? (familyMembersByFamilyId.get(item.expressionFamilyId) ?? []).filter(
+                    (row) => row.userPhraseId !== item.userPhraseId,
+                  )
+                : [];
+            const similarPreview = familyMembers.slice(0, 5);
+            const hasSimilarPreview = similarPreview.length > 0;
+            const isSimilarExpanded = Boolean(expandedSimilarIds[item.userPhraseId]);
             return (
             <Card key={item.userPhraseId} className="h-full overflow-hidden">
               <CardHeader className="px-3 py-2.5">
@@ -868,11 +1115,19 @@ export default function ChunksPage() {
                         {item.text}
                       </p>
                       <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
-                        {item.translation ?? zh.noTranslation}
+                        {item.translation ??
+                          (item.aiEnrichmentStatus === "pending"
+                            ? zh.learningInfoPending
+                            : item.aiEnrichmentStatus === "failed"
+                              ? zh.learningInfoFailed
+                              : zh.noTranslation)}
                       </p>
                     </div>
                     <div className="mt-0.5 flex shrink-0 items-center gap-1.5">
                       <Badge variant="secondary">{reviewStatusLabel[item.reviewStatus]}</Badge>
+                      {item.aiEnrichmentStatus === "pending" ? (
+                        <Badge variant="outline">{zh.learningInfoPending}</Badge>
+                      ) : null}
                       <ChevronDown
                         className={`size-4 text-muted-foreground transition-transform duration-200 ${
                           expandedCardIds[item.userPhraseId] ? "rotate-180" : "rotate-0"
@@ -885,7 +1140,7 @@ export default function ChunksPage() {
               <div
                 className={`overflow-hidden border-t border-border/50 transition-all duration-200 ${
                   expandedCardIds[item.userPhraseId]
-                    ? "max-h-[560px] opacity-100"
+                    ? "max-h-[780px] opacity-100"
                     : "max-h-0 opacity-0"
                 }`}
               >
@@ -953,8 +1208,87 @@ export default function ChunksPage() {
                         <p className="line-clamp-2 text-sm text-muted-foreground">
                           {item.sourceSentenceText
                             ? renderSentenceWithExpressionHighlight(item.sourceSentenceText, item.text)
-                            : zh.noSourceSentence}
+                            : item.aiEnrichmentStatus === "pending"
+                              ? zh.learningInfoPending
+                              : zh.noSourceSentence}
                         </p>
+                      </div>
+                      <div className="space-y-0.5">
+                        <p className="text-xs text-muted-foreground">{zh.semanticFocusLabel}</p>
+                        <p className="text-sm text-foreground/90">
+                          {item.semanticFocus ??
+                            (item.aiEnrichmentStatus === "pending"
+                              ? zh.semanticFocusPending
+                              : zh.diffRelated)}
+                        </p>
+                      </div>
+                      <div className="space-y-0.5">
+                        <p className="text-xs text-muted-foreground">{zh.typicalScenarioLabel}</p>
+                        <p className="text-sm text-foreground/90">
+                          {item.typicalScenario ??
+                            (item.aiEnrichmentStatus === "pending"
+                              ? zh.typicalScenarioPending
+                              : zh.diffRelated)}
+                        </p>
+                      </div>
+                      <div className="space-y-1.5 rounded-lg border border-border/60 p-2.5">
+                        <button
+                          type="button"
+                          className="flex w-full items-center justify-between text-left"
+                          onClick={() => toggleSimilarExpanded(item.userPhraseId)}
+                          aria-expanded={isSimilarExpanded}
+                        >
+                          <p className="text-xs text-muted-foreground">{zh.similarExpressions}</p>
+                          <p className="text-[11px] text-muted-foreground">
+                            {isSimilarExpanded ? zh.hideSimilar : zh.showSimilar}
+                          </p>
+                        </button>
+                        {isSimilarExpanded ? (
+                          hasSimilarPreview ? (
+                            <div className="space-y-2">
+                              {similarPreview.map((similarItem) => (
+                                <div
+                                  key={similarItem.userPhraseId}
+                                  className="rounded-md border border-border/60 px-2 py-1.5"
+                                >
+                                  <p className="text-xs font-medium text-foreground">{similarItem.text}</p>
+                                  <p className="text-[11px] text-muted-foreground">
+                                    {buildDifferenceNote(item.text, similarItem.text)}
+                                  </p>
+                                </div>
+                              ))}
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 px-0 text-xs"
+                                onClick={() =>
+                                  item.expressionFamilyId
+                                    ? applyFamilyFilter(item.expressionFamilyId, item.text)
+                                    : void openGenerateSimilarSheet(item)
+                                }
+                              >
+                                {zh.viewAllSimilar}
+                              </Button>
+                            </div>
+                          ) : (
+                            <div className="space-y-2">
+                              <p className="text-xs text-muted-foreground">{zh.similarEmpty}</p>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                className="h-7 text-xs"
+                                disabled={generatingSimilarForId === item.userPhraseId}
+                                onClick={() => void openGenerateSimilarSheet(item)}
+                              >
+                                {generatingSimilarForId === item.userPhraseId
+                                  ? `${zh.generatingSimilar}...`
+                                  : zh.findMoreSimilar}
+                              </Button>
+                            </div>
+                          )
+                        ) : null}
                       </div>
                     </>
                   )}
@@ -1197,6 +1531,82 @@ export default function ChunksPage() {
                   {savingManual ? `${zh.saveAndReview}...` : zh.saveAndReview}
                 </Button>
               ) : null}
+            </div>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
+
+      <Sheet
+        open={similarSheetOpen}
+        onOpenChange={(open) => {
+          setSimilarSheetOpen(open);
+          if (!open && !savingSelectedSimilar) {
+            setGeneratedSimilarCandidates([]);
+            setSelectedSimilarMap({});
+            setSimilarSeedExpression(null);
+          }
+        }}
+      >
+        <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto rounded-t-2xl">
+          <SheetHeader>
+            <SheetTitle>{zh.generatedSimilarTitle}</SheetTitle>
+            <SheetDescription>{zh.generatedSimilarDesc}</SheetDescription>
+          </SheetHeader>
+
+          <div className="space-y-3 px-4 pb-2">
+            {similarSeedExpression ? (
+              <div className="rounded-lg border border-border/60 p-2.5">
+                <p className="text-xs text-muted-foreground">{zh.centerExpression}</p>
+                <p className="text-sm font-medium">{similarSeedExpression.text}</p>
+              </div>
+            ) : null}
+            {generatingSimilarForId ? (
+              <p className="text-sm text-muted-foreground">{zh.generatingSimilar}...</p>
+            ) : null}
+            {!generatingSimilarForId && generatedSimilarCandidates.length === 0 ? (
+              <p className="text-sm text-muted-foreground">{zh.noGeneratedSimilar}</p>
+            ) : null}
+            {!generatingSimilarForId && generatedSimilarCandidates.length > 0 ? (
+              <div className="space-y-2">
+                {generatedSimilarCandidates.map((candidate) => {
+                  const normalized = normalizePhraseText(candidate.text);
+                  const checked = Boolean(selectedSimilarMap[normalized]);
+                  return (
+                    <label
+                      key={normalized}
+                      className="flex cursor-pointer items-start gap-2 rounded-lg border border-border/60 p-2.5"
+                    >
+                      <input
+                        type="checkbox"
+                        className="mt-0.5"
+                        checked={checked}
+                        onChange={() => toggleCandidateSelected(candidate.text)}
+                      />
+                      <div className="space-y-0.5">
+                        <p className="text-sm font-medium">{candidate.text}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {normalizeSimilarLabel(candidate.differenceLabel)}
+                        </p>
+                      </div>
+                    </label>
+                  );
+                })}
+              </div>
+            ) : null}
+          </div>
+
+          <SheetFooter>
+            <div className="grid grid-cols-2 gap-2 pb-safe">
+              <Button type="button" variant="outline" onClick={() => setSimilarSheetOpen(false)}>
+                {zh.close}
+              </Button>
+              <Button
+                type="button"
+                disabled={savingSelectedSimilar || generatingSimilarForId !== null}
+                onClick={() => void saveSelectedSimilarCandidates()}
+              >
+                {savingSelectedSimilar ? `${zh.addSelectedSimilar}...` : zh.addSelectedSimilar}
+              </Button>
             </div>
           </SheetFooter>
         </SheetContent>

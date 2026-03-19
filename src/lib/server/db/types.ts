@@ -103,6 +103,7 @@ export interface PhraseRow {
 
 export type UserPhraseStatus = "saved" | "archived";
 export type UserPhraseReviewStatus = "saved" | "reviewing" | "mastered" | "archived";
+export type UserPhraseAiEnrichmentStatus = "pending" | "done" | "failed";
 
 export interface UserPhraseRow {
   id: string;
@@ -124,6 +125,10 @@ export interface UserPhraseRow {
   source_sentence_text: string | null;
   source_chunk_text: string | null;
   expression_family_id: string | null;
+  ai_enrichment_status: UserPhraseAiEnrichmentStatus | null;
+  ai_semantic_focus: string | null;
+  ai_typical_scenario: string | null;
+  ai_enrichment_error: string | null;
   learning_item_type: "expression" | "sentence" | null;
   saved_at: string;
   last_seen_at: string;

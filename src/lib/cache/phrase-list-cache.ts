@@ -6,13 +6,14 @@ import {
 import { UserPhraseItemResponse } from "@/lib/utils/phrases-api";
 
 export type PhraseListCacheRecord = {
-  schemaVersion: "phrase-list-cache-v4";
+  schemaVersion: "phrase-list-cache-v5";
   key: string;
   type: "phrase_list";
   query: string;
   status: "saved" | "archived";
   reviewStatus: "saved" | "reviewing" | "mastered" | "archived" | "all";
   learningItemType: "expression" | "sentence" | "all";
+  expressionFamilyId: string;
   page: number;
   limit: number;
   data: {
@@ -26,7 +27,7 @@ export type PhraseListCacheRecord = {
   expiresAt: number;
 };
 
-const CACHE_SCHEMA_VERSION: PhraseListCacheRecord["schemaVersion"] = "phrase-list-cache-v4";
+const CACHE_SCHEMA_VERSION: PhraseListCacheRecord["schemaVersion"] = "phrase-list-cache-v5";
 const PHRASE_LIST_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 const memoryPhraseListRecords = new Map<string, PhraseListCacheRecord>();
@@ -40,10 +41,11 @@ const cacheKey = (params: {
   status: "saved" | "archived";
   reviewStatus: "saved" | "reviewing" | "mastered" | "archived" | "all";
   learningItemType: "expression" | "sentence" | "all";
+  expressionFamilyId: string;
   page: number;
   limit: number;
 }) =>
-  `phrase-list:v4:${params.status}:r=${params.reviewStatus}:t=${params.learningItemType}:q=${encodeURIComponent(normalizeQuery(params.query))}:p=${params.page}:l=${params.limit}`;
+  `phrase-list:v5:${params.status}:r=${params.reviewStatus}:t=${params.learningItemType}:f=${encodeURIComponent(params.expressionFamilyId)}:q=${encodeURIComponent(normalizeQuery(params.query))}:p=${params.page}:l=${params.limit}`;
 
 const isPhraseListItemValid = (item: UserPhraseItemResponse) =>
   typeof item?.userPhraseId === "string" &&
@@ -62,6 +64,7 @@ const isPhraseListCacheValid = (record: PhraseListCacheRecord, expectedKey: stri
   record.type === "phrase_list" &&
   ["saved", "reviewing", "mastered", "archived", "all"].includes(record.reviewStatus) &&
   ["expression", "sentence", "all"].includes(record.learningItemType) &&
+  typeof record.expressionFamilyId === "string" &&
   Array.isArray(record.data?.rows) &&
   record.data.rows.every(isPhraseListItemValid) &&
   Number.isFinite(record.data.total) &&
@@ -78,6 +81,7 @@ export async function getPhraseListCache(params: {
   status?: "saved" | "archived";
   reviewStatus?: "saved" | "reviewing" | "mastered" | "archived" | "all";
   learningItemType?: "expression" | "sentence" | "all";
+  expressionFamilyId?: string;
   page?: number;
   limit?: number;
 }): Promise<{
@@ -90,6 +94,7 @@ export async function getPhraseListCache(params: {
     status: params.status ?? "saved",
     reviewStatus: params.reviewStatus ?? "all",
     learningItemType: params.learningItemType ?? "all",
+    expressionFamilyId: params.expressionFamilyId?.trim() ?? "",
     page: params.page ?? 1,
     limit: params.limit ?? 100,
   };
@@ -128,9 +133,10 @@ export async function setPhraseListCache(
     query: string;
     status?: "saved" | "archived";
     reviewStatus?: "saved" | "reviewing" | "mastered" | "archived" | "all";
-    learningItemType?: "expression" | "sentence" | "all";
-    page?: number;
-    limit?: number;
+  learningItemType?: "expression" | "sentence" | "all";
+  expressionFamilyId?: string;
+  page?: number;
+  limit?: number;
   },
   payload: {
     rows: UserPhraseItemResponse[];
@@ -148,6 +154,7 @@ export async function setPhraseListCache(
     status: params.status ?? "saved",
     reviewStatus: params.reviewStatus ?? "all",
     learningItemType: params.learningItemType ?? "all",
+    expressionFamilyId: params.expressionFamilyId?.trim() ?? "",
     page: params.page ?? 1,
     limit: params.limit ?? 100,
   };
@@ -161,6 +168,7 @@ export async function setPhraseListCache(
     status: normalizedParams.status,
     reviewStatus: normalizedParams.reviewStatus,
     learningItemType: normalizedParams.learningItemType,
+    expressionFamilyId: normalizedParams.expressionFamilyId,
     page: normalizedParams.page,
     limit: normalizedParams.limit,
     data: payload,
