@@ -1003,13 +1003,13 @@ export default function SceneDetailPage() {
     return (
       <div className="space-y-5">
         <section className="space-y-4 rounded-xl border-0 bg-[rgb(246,246,246)] p-4 sm:p-5">
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
             <button
               type="button"
               className={`h-8 whitespace-nowrap ${appleButtonSmClassName}`}
               onClick={() => setViewModeWithRoute("scene")}
             >
-              返回原场景
+              返回
             </button>
             <button
               type="button"
@@ -1017,7 +1017,7 @@ export default function SceneDetailPage() {
               onClick={handleMarkVariantSetComplete}
               disabled={!latestVariantSet || latestVariantSet.status === "completed"}
             >
-              标记为已完成
+              完成学习
             </button>
             <button
               type="button"
@@ -1025,7 +1025,7 @@ export default function SceneDetailPage() {
               onClick={handleDeleteVariantSet}
               disabled={!latestVariantSet}
             >
-              删除当前变体
+              删除变体
             </button>
           </div>
 
@@ -1170,32 +1170,41 @@ export default function SceneDetailPage() {
   }
 
   if (viewMode === "variant-study" && activeVariantLesson) {
+    const variantStudyHeaderTools = (
+      <>
+        <button
+          type="button"
+          className={`${appleButtonLgClassName} px-3 py-1.5 disabled:opacity-60`}
+          disabled={!canGeneratePractice}
+          onClick={() => handleGeneratePractice(activeVariantLesson)}
+        >
+          {practiceLoading ? "练习中…" : practiceButtonLabel}
+        </button>
+        <button
+          type="button"
+          className={`${APPLE_BUTTON_DANGER} ${APPLE_BUTTON_TEXT_LG} px-3 py-1.5`}
+          onClick={() => handleDeleteVariantItem(activeVariantLesson.id)}
+        >
+          删除变体
+        </button>
+      </>
+    );
+
     return (
       <div className="space-y-4">
-        <section className={`space-y-3 rounded-lg p-4 ${APPLE_SURFACE}`}>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              className={`${appleButtonSmClassName} px-3 py-1.5 text-sm disabled:opacity-60`}
-              disabled={!canGeneratePractice}
-              onClick={() => handleGeneratePractice(activeVariantLesson)}
-            >
-              {practiceLoading ? "练习中…" : practiceButtonLabel}
-            </button>
-            <button
-              type="button"
-              className={`${APPLE_BUTTON_DANGER} px-3 py-1.5 text-sm`}
-              onClick={() => handleDeleteVariantItem(activeVariantLesson.id)}
-            >
-              删除当前变体
-            </button>
-          </div>
-          <p className="text-sm text-muted-foreground">
-            当前学习中：{activeVariantLesson.title}。你可以基于这个 variant 继续生成练习。
-          </p>
-        </section>
         <LessonReader
           lesson={activeVariantLesson}
+          minimalHeader
+          topRightTool={
+            <button
+              type="button"
+              className={`${appleButtonLgClassName} px-3 py-1.5`}
+              onClick={() => setViewModeWithRoute("variants")}
+            >
+              返回
+            </button>
+          }
+          headerTools={variantStudyHeaderTools}
           savedPhraseTexts={Array.from(savedPhraseTextSet)}
           onSavePhrase={savePhraseForScene}
           onReviewPhrase={savePhraseForScene}

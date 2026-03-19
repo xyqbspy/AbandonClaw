@@ -10,8 +10,13 @@ export const extractJsonCandidate = (text: string) => {
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
   if (fenced?.[1]) return fenced[1].trim();
 
-  const start = text.indexOf("{");
-  if (start < 0) return null;
+  const objectStart = text.indexOf("{");
+  const arrayStart = text.indexOf("[");
+  const startCandidates = [objectStart, arrayStart].filter((value) => value >= 0);
+  if (startCandidates.length === 0) return null;
+  const start = Math.min(...startCandidates);
+  const opening = text[start];
+  const closing = opening === "[" ? "]" : "}";
 
   let depth = 0;
   let inString = false;
@@ -31,8 +36,8 @@ export const extractJsonCandidate = (text: string) => {
       continue;
     }
 
-    if (char === "{") depth += 1;
-    if (char === "}") {
+    if (char === opening) depth += 1;
+    if (char === closing) {
       depth -= 1;
       if (depth === 0) return text.slice(start, i + 1).trim();
     }
@@ -41,20 +46,86 @@ export const extractJsonCandidate = (text: string) => {
   return null;
 };
 
+const normalizeJsonLikeText = (value: string) =>
+  value
+    .replace(/^\uFEFF/, "")
+    .replace(/[“”]/g, '"')
+    .replace(/[‘’]/g, "'")
+    .replace(/，/g, ",")
+    .replace(/：/g, ":")
+    .replace(/；/g, ";")
+    .replace(/（/g, "(")
+    .replace(/）/g, ")")
+    .replace(/\r\n/g, "\n")
+    .trim();
+
+const stripInvalidControlChars = (value: string) =>
+  value.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "");
+
+const removeJsonComments = (value: string) =>
+  value
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/(^|[^:\\])\/\/.*$/gm, "$1");
+
+const removeTrailingCommas = (value: string) =>
+  value.replace(/,\s*([}\]])/g, "$1");
+
+const tryParseWithRepairs = (candidate: string) => {
+  const seeds = [
+    candidate,
+    removeTrailingCommas(candidate),
+    removeTrailingCommas(removeJsonComments(candidate)),
+    removeTrailingCommas(removeJsonComments(stripInvalidControlChars(candidate))),
+  ];
+  const tried = new Set<string>();
+  for (const seed of seeds) {
+    const normalized = normalizeJsonLikeText(seed);
+    if (!normalized || tried.has(normalized)) continue;
+    tried.add(normalized);
+    try {
+      return JSON.parse(normalized) as unknown;
+    } catch {
+      // Try next repair candidate.
+    }
+  }
+  return null;
+};
+
+const trimToLikelyJsonBounds = (value: string) => {
+  const firstBrace = value.indexOf("{");
+  const firstBracket = value.indexOf("[");
+  const starts = [firstBrace, firstBracket].filter((idx) => idx >= 0);
+  if (starts.length === 0) return value;
+  const start = Math.min(...starts);
+
+  const lastBrace = value.lastIndexOf("}");
+  const lastBracket = value.lastIndexOf("]");
+  const ends = [lastBrace, lastBracket].filter((idx) => idx >= 0);
+  if (ends.length === 0) return value.slice(start);
+  const end = Math.max(...ends);
+  return value.slice(start, end + 1).trim();
+};
+
 export const parseJsonWithFallback = (raw: string) => {
+  const normalizedRaw = normalizeJsonLikeText(raw);
   try {
-    return JSON.parse(raw) as unknown;
+    return JSON.parse(normalizedRaw) as unknown;
   } catch {
-    const candidate = extractJsonCandidate(raw);
-    if (!candidate) {
+    const candidate = extractJsonCandidate(normalizedRaw);
+    const normalizedCandidate = candidate ? trimToLikelyJsonBounds(normalizeJsonLikeText(candidate)) : null;
+    if (!normalizedCandidate) {
       throw new Error("Model output is not valid JSON and no JSON object could be extracted.");
     }
-
-    try {
-      return JSON.parse(candidate) as unknown;
-    } catch {
-      throw new Error("Extracted JSON candidate is still invalid JSON.");
+    const repairedParsed = tryParseWithRepairs(normalizedCandidate);
+    if (repairedParsed !== null) {
+      return repairedParsed;
     }
+    const broadCandidate = trimToLikelyJsonBounds(normalizedRaw);
+    const broadParsed = tryParseWithRepairs(broadCandidate);
+    if (broadParsed !== null) {
+      return broadParsed;
+    }
+    throw new Error("Extracted JSON candidate is still invalid JSON.");
   }
 };
 

@@ -314,7 +314,24 @@ export async function generateSceneVariants(params: {
       temperature: 0.3,
   });
 
-  const parsed = normalizeMutateResponseVersion(parseJsonWithFallback(rawModelText));
+  let parsed: unknown;
+  try {
+    parsed = normalizeMutateResponseVersion(parseJsonWithFallback(rawModelText));
+  } catch {
+    const retryModelText = await callGlmChatCompletion({
+      model,
+      systemPrompt: `${SCENE_MUTATE_SYSTEM_PROMPT}\n\nOutput contract is strict: return valid JSON only, no prose, no markdown fences.`,
+      userPrompt: `${buildSceneMutateUserPrompt({
+        sceneJson: JSON.stringify(params.scene),
+        variantCount: normalized.variantCount,
+        retainChunkRatio: normalized.retainChunkRatio,
+        theme: normalized.theme,
+        preferredKnownChunks: effectiveKnownChunks,
+      })}\n\nIMPORTANT: If unsure, still return a valid JSON object with \"version\" and \"variants\" fields only.`,
+      temperature: 0.1,
+    });
+    parsed = normalizeMutateResponseVersion(parseJsonWithFallback(retryModelText));
+  }
   if (!isValidSceneMutateResponse(parsed)) {
     throw new Error("Model output JSON does not match SceneMutateResponse structure.");
   }

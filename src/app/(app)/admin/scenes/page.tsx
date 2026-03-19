@@ -1,11 +1,18 @@
 ﻿import Link from "next/link";
+import { deleteSceneAction } from "@/app/(app)/admin/actions";
 import { PageHeader } from "@/components/shared/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { listAdminScenes } from "@/lib/server/admin/service";
-import { APPLE_BUTTON_BASE, APPLE_BUTTON_TEXT_SM, APPLE_INPUT_BASE, APPLE_SURFACE } from "@/lib/ui/apple-style";
+import {
+  APPLE_BUTTON_BASE,
+  APPLE_BUTTON_DANGER,
+  APPLE_BUTTON_TEXT_SM,
+  APPLE_INPUT_BASE,
+  APPLE_SURFACE,
+} from "@/lib/ui/apple-style";
 
 const parsePositiveInt = (value: string | undefined, fallback: number) => {
   const num = Number(value);
@@ -94,6 +101,7 @@ export default async function AdminScenesPage({
               <th className="px-3 py-2">created_by</th>
               <th className="px-3 py-2">created_at</th>
               <th className="px-3 py-2">updated_at</th>
+              <th className="px-3 py-2">操作</th>
             </tr>
           </thead>
           <tbody>
@@ -115,11 +123,24 @@ export default async function AdminScenesPage({
                 <td className="px-3 py-2 font-mono text-xs">{row.created_by ?? "-"}</td>
                 <td className="px-3 py-2 whitespace-nowrap">{row.created_at}</td>
                 <td className="px-3 py-2 whitespace-nowrap">{row.updated_at}</td>
+                <td className="px-3 py-2">
+                  <form action={deleteSceneAction}>
+                    <input type="hidden" name="sceneId" value={row.id} />
+                    <Button
+                      type="submit"
+                      size="sm"
+                      variant="ghost"
+                      className={`${APPLE_BUTTON_DANGER} ${APPLE_BUTTON_TEXT_SM}`}
+                    >
+                      删除
+                    </Button>
+                  </form>
+                </td>
               </tr>
             ))}
             {result.rows.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-3 py-6 text-center text-muted-foreground">
+                <td colSpan={8} className="px-3 py-6 text-center text-muted-foreground">
                   未找到场景。
                 </td>
               </tr>
@@ -153,4 +174,3 @@ export default async function AdminScenesPage({
     </div>
   );
 }
-

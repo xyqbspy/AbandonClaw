@@ -5,7 +5,7 @@ import {
   SCENE_PARSE_SYSTEM_PROMPT,
 } from "@/lib/server/prompts/scene-parse-prompt";
 import {
-  extractJsonCandidate,
+  parseJsonWithFallback,
   normalizeSceneParserResponseVersion,
 } from "@/lib/server/scene-json";
 import { ParseSceneRequest } from "@/lib/types/scene-parser";
@@ -24,28 +24,10 @@ const isValidPayload = (
 };
 
 const parseWithDiagnostics = (rawText: string) => {
-  try {
-    return {
-      jsonCandidate: rawText,
-      parsed: JSON.parse(rawText) as unknown,
-    };
-  } catch {
-    const jsonCandidate = extractJsonCandidate(rawText);
-    if (!jsonCandidate) {
-      throw new Error(
-        "Model output is not valid JSON and no JSON object could be extracted.",
-      );
-    }
-
-    try {
-      return {
-        jsonCandidate,
-        parsed: JSON.parse(jsonCandidate) as unknown,
-      };
-    } catch {
-      throw new Error("Extracted JSON candidate is still invalid JSON.");
-    }
-  }
+  return {
+    jsonCandidate: rawText,
+    parsed: parseJsonWithFallback(rawText),
+  };
 };
 
 const isObject = (value: unknown): value is Record<string, unknown> =>

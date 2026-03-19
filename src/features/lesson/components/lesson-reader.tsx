@@ -158,12 +158,16 @@ function interactionReducer(
 export function LessonReader({
   lesson,
   headerTools,
+  topRightTool,
+  minimalHeader = false,
   savedPhraseTexts,
   onSavePhrase,
   onReviewPhrase,
 }: {
   lesson: Lesson;
   headerTools?: ReactNode;
+  topRightTool?: ReactNode;
+  minimalHeader?: boolean;
   savedPhraseTexts?: string[];
   onSavePhrase?: (payload: {
     text: string;
@@ -855,7 +859,28 @@ export function LessonReader({
         ref={readerRef}
         className={cn("space-y-5", isMobile && "space-y-1.5")}
       >
-        {isDialogueScene ? (
+        {minimalHeader ? (
+          <div className={cn("space-y-2 py-1.5", isMobile ? "px-1" : "px-1.5")}>
+            {topRightTool ? (
+              <div className="flex items-center justify-end gap-2">{topRightTool}</div>
+            ) : null}
+            <div className="flex items-center justify-end gap-2">
+              {headerTools}
+              <button
+                type="button"
+                className={cn(
+                  `inline-flex items-center gap-1.5 text-foreground/85 ${appleButtonLgClassName}`,
+                  "cursor-pointer whitespace-nowrap",
+                  isMobile && "px-2 py-1 text-[15px]",
+                )}
+                onClick={toggleSequentialPlay}
+              >
+                <Play className={cn("size-4", isMobile && "size-3.5")} />
+                {autoPlayActive ? "停止循环" : "循环播放"}
+              </button>
+            </div>
+          </div>
+        ) : isDialogueScene ? (
           <div className={cn("py-1.5", isMobile ? "px-1" : "px-1.5")}>
             <div className="flex items-center justify-end gap-2">
               {headerTools}

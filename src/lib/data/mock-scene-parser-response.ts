@@ -34,6 +34,7 @@ export const takeTheMorningOffParserResponse: SceneParserResponse = {
     estimatedMinutes: 10,
     completionRate: 0,
     tags: ["health", "work"],
+    type: "dialogue",
     dialogue: [
       {
         id: "tmo-1",
