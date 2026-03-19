@@ -183,6 +183,30 @@ export async function enrichSimilarExpressionFromApi(payload: {
   return (await response.json()) as { userPhraseId: string; status: "done" };
 }
 
+export async function enrichSimilarExpressionsBatchFromApi(payload: {
+  items: Array<{
+    userPhraseId: string;
+    baseExpression?: string;
+    differenceLabel?: string;
+  }>;
+}) {
+  const response = await fetch("/api/phrases/similar/enrich-all", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    throw await toApiError(response, "批量补全学习信息失败。");
+  }
+  return (await response.json()) as {
+    items: Array<{
+      userPhraseId: string;
+      status: "done" | "failed";
+      error?: string;
+    }>;
+  };
+}
+
 export async function generateSimilarExpressionsFromApi(payload: {
   baseExpression: string;
   existingExpressions?: string[];

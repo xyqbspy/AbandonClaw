@@ -140,9 +140,34 @@ export default function ScenesPage() {
     }
   };
 
-  const handleGenerateSuccess = async (scene: { slug: string; title: string }) => {
+  const handleGenerateSuccess = async (scene: {
+    slug: string;
+    title: string;
+    migrationInsight?: {
+      relatedChunkVariantsUsed: Array<{
+        text: string;
+        differenceLabel: string;
+        knownChunkText?: string | null;
+      }>;
+      relatedChunkVariantsMatched: Array<{
+        text: string;
+        differenceLabel: string;
+        knownChunkText?: string | null;
+      }>;
+    };
+  }) => {
     await refreshScenes({ preferCache: false });
     toast.success("新场景已生成");
+    const matchedVariants = scene.migrationInsight?.relatedChunkVariantsMatched ?? [];
+    if (matchedVariants.length > 0) {
+      const sample = matchedVariants[0];
+      const comparison = sample.knownChunkText
+        ? `你熟悉的表达：${sample.knownChunkText} -> 这次出现的变体：${sample.text}`
+        : `这次出现的变体：${sample.text}`;
+      toast.message(`这次场景里带入了 ${matchedVariants.length} 个相关表达变体`, {
+        description: `${comparison}${sample.differenceLabel ? `（${sample.differenceLabel}）` : ""}`,
+      });
+    }
     router.push(`/scene/${scene.slug}`);
   };
 

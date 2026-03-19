@@ -121,6 +121,34 @@ const parseOptionalTrimmed = (value: unknown, maxLength = 500) => {
   return trimmed.slice(0, maxLength);
 };
 
+const hasChinese = (value: string | null | undefined) =>
+  Boolean(value && /[\u4e00-\u9fff]/.test(value));
+
+const toChineseUsageNoteFallback = (expression: string, translation: string | null) => {
+  const zh = parseOptionalTrimmed(translation, 200);
+  if (zh) {
+    return `常用于表达“${zh}”这一意思，语气自然，适合日常口语场景。`;
+  }
+  return `常用于日常表达，语气自然。可先用一句简单句练习：I wish I could..., but ....`;
+};
+
+const toChineseSemanticFocusFallback = (
+  semanticFocus: string | null,
+  differenceLabel: string | null,
+) => {
+  const raw = parseOptionalTrimmed(semanticFocus, 40);
+  if (raw && hasChinese(raw)) return raw;
+  const diff = parseOptionalTrimmed(differenceLabel, 40);
+  if (diff && hasChinese(diff)) return diff;
+  return "相关说法";
+};
+
+const toChineseTypicalScenarioFallback = (typicalScenario: string | null) => {
+  const raw = parseOptionalTrimmed(typicalScenario, 80);
+  if (raw && hasChinese(raw)) return raw;
+  return "日常沟通场景";
+};
+
 const parseTags = (value: unknown) => {
   if (!Array.isArray(value)) return [];
   const tags = value
@@ -687,16 +715,22 @@ export async function enrichAiExpressionLearningInfo(params: {
     const exampleSentence = parseOptionalTrimmed(parsed.exampleSentence, 500);
     const semanticFocus = parseOptionalTrimmed(parsed.semanticFocus, 40);
     const typicalScenario = parseOptionalTrimmed(parsed.typicalScenario, 80);
+    const zhTranslation =
+      translation ??
+      parseOptionalTrimmed(userPhrase.phrase?.translation, 200) ??
+      null;
+    const zhUsageNote = hasChinese(usageNote)
+      ? usageNote
+      : toChineseUsageNoteFallback(expression, zhTranslation);
+    const zhSemanticFocus = toChineseSemanticFocusFallback(
+      semanticFocus,
+      parseOptionalTrimmed(params.differenceLabel, 40),
+    );
+    const zhTypicalScenario = toChineseTypicalScenarioFallback(typicalScenario);
 
     const nextPhrasePayload = {
-      translation:
-        translation ??
-        parseOptionalTrimmed(userPhrase.phrase?.translation, 200) ??
-        null,
-      usage_note:
-        usageNote ??
-        parseOptionalTrimmed(userPhrase.phrase?.usage_note, 300) ??
-        null,
+      translation: zhTranslation,
+      usage_note: zhUsageNote,
     };
 
     const { error: phraseUpdateError } = await admin
@@ -713,11 +747,11 @@ export async function enrichAiExpressionLearningInfo(params: {
         parseOptionalTrimmed(userPhrase.source_sentence_text, 500) ??
         null,
       ai_semantic_focus:
-        semanticFocus ??
+        zhSemanticFocus ??
         parseOptionalTrimmed(userPhrase.ai_semantic_focus, 40) ??
         null,
       ai_typical_scenario:
-        typicalScenario ??
+        zhTypicalScenario ??
         parseOptionalTrimmed(userPhrase.ai_typical_scenario, 80) ??
         null,
       ai_enrichment_status: "done" as const,

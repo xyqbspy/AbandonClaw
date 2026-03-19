@@ -5,6 +5,7 @@ import { AiCacheRow, SceneRow, SceneVariantRow } from "@/lib/server/db/types";
 import { runSeedScenesSync } from "@/lib/server/services/scene-service";
 import { listRecentAiCacheStats } from "@/lib/server/services/ai-cache-service";
 import { NotFoundError } from "@/lib/server/errors";
+import { enrichAiExpressionLearningInfo } from "@/lib/server/phrases/service";
 
 export interface AdminSceneListFilters {
   page?: number;
@@ -20,6 +21,29 @@ export interface AdminAiCacheFilters {
   search?: string;
   cacheType?: string;
   status?: "success" | "error";
+}
+
+export interface AdminPhraseListFilters {
+  page?: number;
+  pageSize?: number;
+  search?: string;
+  learningItemType?: "all" | "expression" | "sentence";
+}
+
+export interface AdminPhraseListItem {
+  userPhraseId: string;
+  phraseId: string;
+  userId: string;
+  text: string;
+  translation: string | null;
+  sourceSentenceText: string | null;
+  sourceChunkText: string | null;
+  sourceSceneSlug: string | null;
+  learningItemType: "expression" | "sentence";
+  reviewStatus: string;
+  aiEnrichmentStatus: "pending" | "done" | "failed" | null;
+  createdAt: string;
+  savedAt: string;
 }
 
 const clampPage = (value: number | undefined) => {
@@ -39,6 +63,21 @@ const normalizeSearch = (value: string | undefined) => {
 
 const isMissingProgressStatusColumn = (error: { code?: string | null; message: string }) =>
   error.code === "42703" || error.message.includes("column user_scene_progress.status does not exist");
+
+const inferAdminPhraseItemType = (row: {
+  learning_item_type: string | null;
+  source_sentence_text: string | null;
+  source_chunk_text: string | null;
+}) => {
+  if (row.learning_item_type === "sentence") return "sentence" as const;
+  if (row.learning_item_type === "expression") return "expression" as const;
+  const chunkText = row.source_chunk_text?.trim() ?? "";
+  const hasSentence = Boolean(row.source_sentence_text?.trim());
+  if (hasSentence && /^sentence-[0-9a-f]{8}$/i.test(chunkText)) {
+    return "sentence" as const;
+  }
+  return "expression" as const;
+};
 
 export async function listAdminScenes(filters: AdminSceneListFilters) {
   await runSeedScenesSync();
@@ -349,6 +388,140 @@ export async function listAdminAiCache(filters: AdminAiCacheFilters) {
     total: count ?? 0,
     page,
     pageSize,
+  };
+}
+
+export async function listAdminPhrases(filters: AdminPhraseListFilters) {
+  const admin = createSupabaseAdminClient();
+  const page = clampPage(filters.page);
+  const pageSize = clampPageSize(filters.pageSize);
+  const search = normalizeSearch(filters.search);
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+
+  let query = admin
+    .from("user_phrases")
+    .select("*, phrase:phrases(id,display_text,translation,normalized_text)", { count: "exact" })
+    .order("saved_at", { ascending: false })
+    .range(from, to);
+
+  if (search) {
+    query = query.or(
+      `source_chunk_text.ilike.%${search}%,source_sentence_text.ilike.%${search}%,phrase.display_text.ilike.%${search}%,phrase.translation.ilike.%${search}%`,
+    );
+  }
+
+  const { data, error, count } = await query;
+  if (error) {
+    throw new Error(`Failed to list admin phrases: ${error.message}`);
+  }
+
+  const rows = (data ?? []) as Array<{
+    id: string;
+    phrase_id: string;
+    user_id: string;
+    source_sentence_text: string | null;
+    source_chunk_text: string | null;
+    source_scene_slug: string | null;
+    review_status: string;
+    ai_enrichment_status: "pending" | "done" | "failed" | null;
+    created_at: string;
+    saved_at: string;
+    learning_item_type: string | null;
+    phrase: {
+      id: string;
+      display_text: string | null;
+      translation: string | null;
+      normalized_text: string | null;
+    } | null;
+  }>;
+
+  const mapped = rows.map<AdminPhraseListItem>((row) => {
+    const learningItemType = inferAdminPhraseItemType(row);
+    const text =
+      learningItemType === "sentence"
+        ? row.source_sentence_text ?? row.phrase?.display_text ?? row.source_chunk_text ?? ""
+        : row.phrase?.display_text ?? row.source_chunk_text ?? row.source_sentence_text ?? "";
+
+    return {
+      userPhraseId: row.id,
+      phraseId: row.phrase_id,
+      userId: row.user_id,
+      text,
+      translation: row.phrase?.translation ?? null,
+      sourceSentenceText: row.source_sentence_text,
+      sourceChunkText: row.source_chunk_text,
+      sourceSceneSlug: row.source_scene_slug,
+      learningItemType,
+      reviewStatus: row.review_status,
+      aiEnrichmentStatus: row.ai_enrichment_status ?? null,
+      createdAt: row.created_at,
+      savedAt: row.saved_at,
+    };
+  });
+
+  const learningItemType = filters.learningItemType ?? "all";
+  const filtered =
+    learningItemType === "all"
+      ? mapped
+      : mapped.filter((row) => row.learningItemType === learningItemType);
+
+  return {
+    rows: filtered,
+    total: learningItemType === "all" ? count ?? 0 : filtered.length,
+    page,
+    pageSize,
+  };
+}
+
+export async function deleteAdminUserPhraseById(userPhraseId: string) {
+  const admin = createSupabaseAdminClient();
+  const { error } = await admin.from("user_phrases").delete().eq("id", userPhraseId);
+  if (error) {
+    throw new Error(`Failed to delete user phrase: ${error.message}`);
+  }
+}
+
+export async function enrichAdminUserPhraseById(userPhraseId: string) {
+  const admin = createSupabaseAdminClient();
+  const { data, error } = await admin
+    .from("user_phrases")
+    .select("id,user_id,learning_item_type,source_chunk_text,source_sentence_text")
+    .eq("id", userPhraseId)
+    .maybeSingle<{
+      id: string;
+      user_id: string;
+      learning_item_type: "expression" | "sentence" | null;
+      source_chunk_text: string | null;
+      source_sentence_text: string | null;
+    }>();
+  if (error) {
+    throw new Error(`Failed to load user phrase for enrichment: ${error.message}`);
+  }
+  if (!data) {
+    throw new NotFoundError("User phrase not found.");
+  }
+
+  const itemType = inferAdminPhraseItemType({
+    learning_item_type: data.learning_item_type,
+    source_chunk_text: data.source_chunk_text,
+    source_sentence_text: data.source_sentence_text,
+  });
+  if (itemType !== "expression") {
+    return {
+      userPhraseId: data.id,
+      status: "skipped" as const,
+      reason: "non_expression",
+    };
+  }
+
+  const result = await enrichAiExpressionLearningInfo({
+    userId: data.user_id,
+    userPhraseId: data.id,
+  });
+  return {
+    userPhraseId: result.userPhraseId,
+    status: "done" as const,
   };
 }
 

@@ -17,12 +17,24 @@ import { generatePersonalizedSceneFromApi } from "@/lib/utils/scenes-api";
 
 type Tone = "natural" | "polite" | "casual" | "simple";
 type Difficulty = "easy" | "medium";
-type SentenceCount = 4 | 6 | 8;
+type SentenceCount = 6 | 10 | 14;
+type RelatedChunkVariant = {
+  text: string;
+  differenceLabel: string;
+  knownChunkText?: string | null;
+};
 
 interface GenerateSceneSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onGenerated: (scene: { slug: string; title: string }) => Promise<void> | void;
+  onGenerated: (scene: {
+    slug: string;
+    title: string;
+    migrationInsight?: {
+      relatedChunkVariantsUsed: RelatedChunkVariant[];
+      relatedChunkVariantsMatched: RelatedChunkVariant[];
+    };
+  }) => Promise<void> | void;
 }
 
 const toneOptions: Array<{ value: Tone; label: string }> = [
@@ -37,13 +49,13 @@ const difficultyOptions: Array<{ value: Difficulty; label: string }> = [
   { value: "medium", label: "中等" },
 ];
 
-const sentenceCountOptions: SentenceCount[] = [4, 6, 8];
+const sentenceCountOptions: SentenceCount[] = [6, 10, 14];
 
 const defaultForm = {
   promptText: "",
   tone: "natural" as Tone,
   difficulty: "easy" as Difficulty,
-  sentenceCount: 6 as SentenceCount,
+  sentenceCount: 10 as SentenceCount,
   reuseKnownChunks: true,
 };
 
@@ -93,7 +105,7 @@ export function GenerateSceneSheet({
     setError(null);
 
     try {
-      const scene = await generatePersonalizedSceneFromApi({
+      const result = await generatePersonalizedSceneFromApi({
         promptText: nextPrompt,
         tone,
         difficulty,
@@ -101,7 +113,15 @@ export function GenerateSceneSheet({
         reuseKnownChunks,
       });
       onOpenChange(false);
-      await onGenerated({ slug: scene.slug, title: scene.title });
+      await onGenerated({
+        slug: result.scene.slug,
+        title: result.scene.title,
+        migrationInsight: {
+          relatedChunkVariantsUsed: result.personalization?.relatedChunkVariantsUsed ?? [],
+          relatedChunkVariantsMatched:
+            result.personalization?.relatedChunkVariantsMatched ?? [],
+        },
+      });
     } catch (submitError) {
       if (process.env.NODE_ENV === "development") {
         console.debug("[generate-scene-sheet] submit failed", submitError);

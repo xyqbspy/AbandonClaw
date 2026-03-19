@@ -6,6 +6,7 @@ import {
 } from "@/lib/server/services/ai-cache-service";
 import { ValidationError } from "@/lib/server/errors";
 import { callGlmChatCompletion } from "@/lib/server/glm-client";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import {
   buildSceneGenerateUserPrompt,
   SCENE_GENERATE_SYSTEM_PROMPT,
@@ -14,9 +15,17 @@ import { parseJsonWithFallback } from "@/lib/server/scene-json";
 import { parseImportedSceneWithCache } from "@/lib/server/services/import-parse-service";
 import { createImportedScene } from "@/lib/server/services/scene-service";
 import { getUserChunkCandidatesForSceneMutation } from "@/lib/server/chunks/service";
+import { normalizePhraseText } from "@/lib/shared/phrases";
 
 const SCENE_GENERATE_PROMPT_VERSION = "scene-generate-v1";
-const DEFAULT_SENTENCE_COUNT = 6;
+const DEFAULT_SENTENCE_COUNT = 10;
+const MAX_RELATED_VARIANTS = 2;
+
+interface RelatedChunkVariant {
+  text: string;
+  differenceLabel: string;
+  knownChunkText: string | null;
+}
 
 interface GeneratedSceneDraftLine {
   speaker?: string;
@@ -52,7 +61,7 @@ const normalizeSentenceCount = (value: unknown) => {
   if (typeof value !== "number" || Number.isNaN(value)) {
     return DEFAULT_SENTENCE_COUNT;
   }
-  return clamp(Math.round(value), 4, 8);
+  return clamp(Math.round(value), 6, 14);
 };
 
 const normalizeTone = (value: unknown) => {
@@ -69,6 +78,20 @@ const normalizeDifficulty = (value: unknown) => {
   return "medium";
 };
 
+const toShortDifferenceLabel = (value: unknown) => {
+  if (typeof value !== "string") return "similar nuance";
+  const trimmed = value.trim();
+  if (!trimmed) return "similar nuance";
+  return trimmed.slice(0, 36);
+};
+
+const sceneTextContainsExpression = (sceneText: string, expressionText: string) => {
+  const normalizedScene = normalizePhraseText(sceneText);
+  const normalizedExpression = normalizePhraseText(expressionText);
+  if (!normalizedScene || !normalizedExpression) return false;
+  return normalizedScene.includes(normalizedExpression);
+};
+
 const isDraftLine = (value: unknown): value is GeneratedSceneDraftLine => {
   if (!value || typeof value !== "object") return false;
   const row = value as Record<string, unknown>;
@@ -81,7 +104,7 @@ const isGeneratedSceneDraft = (value: unknown): value is GeneratedSceneDraft => 
   if (row.version !== "v1") return false;
   if (typeof row.title !== "string" || !row.title.trim()) return false;
   if (!Array.isArray(row.lines)) return false;
-  if (row.lines.length < 4 || row.lines.length > 8) return false;
+  if (row.lines.length < 6 || row.lines.length > 14) return false;
   return row.lines.every(isDraftLine);
 };
 
@@ -129,6 +152,93 @@ export async function getUserChunkCandidatesForSceneGeneration(
   });
 }
 
+async function getRelatedChunkVariantsForSceneGeneration(
+  userId: string,
+  knownChunks: string[],
+): Promise<RelatedChunkVariant[]> {
+  const knownNormalized = Array.from(
+    new Set(knownChunks.map((text) => normalizePhraseText(text)).filter(Boolean)),
+  );
+  if (knownNormalized.length === 0) return [];
+
+  const admin = createSupabaseAdminClient();
+  const { data, error } = await admin
+    .from("user_phrases")
+    .select("id, expression_family_id, source_chunk_text, ai_semantic_focus, phrase:phrases(display_text, normalized_text)")
+    .eq("user_id", userId)
+    .eq("status", "saved")
+    .not("expression_family_id", "is", null)
+    .order("last_seen_at", { ascending: false })
+    .limit(320);
+  if (error) {
+    console.warn("[scene.generate] related variants lookup failed", {
+      userId,
+      message: error.message,
+    });
+    return [];
+  }
+
+  type PhraseShape = { display_text: string | null; normalized_text: string | null };
+  type FamilyRow = {
+    id: string;
+    expression_family_id: string | null;
+    source_chunk_text: string | null;
+    ai_semantic_focus: string | null;
+    phrase: PhraseShape | PhraseShape[] | null;
+  };
+  const rows = (data ?? []) as FamilyRow[];
+  if (rows.length === 0) return [];
+
+  const toPhrase = (value: FamilyRow["phrase"]): PhraseShape | null =>
+    Array.isArray(value) ? (value[0] ?? null) : value;
+
+  const candidateFamilyIds = new Set<string>();
+  const knownChunksByFamilyId = new Map<string, string[]>();
+  for (const row of rows) {
+    const familyId = row.expression_family_id?.trim();
+    if (!familyId) continue;
+    const phrase = toPhrase(row.phrase);
+    const normalized = normalizePhraseText(
+      phrase?.normalized_text ?? phrase?.display_text ?? row.source_chunk_text ?? "",
+    );
+    if (!normalized) continue;
+    if (knownNormalized.includes(normalized)) {
+      candidateFamilyIds.add(familyId);
+      const knownInFamily = knownChunksByFamilyId.get(familyId) ?? [];
+      const knownText = (phrase?.display_text ?? row.source_chunk_text ?? "").trim();
+      if (knownText && !knownInFamily.includes(knownText)) {
+        knownInFamily.push(knownText);
+      }
+      knownChunksByFamilyId.set(familyId, knownInFamily);
+    }
+  }
+  if (candidateFamilyIds.size === 0) return [];
+
+  const knownSet = new Set(knownNormalized);
+  const variants: RelatedChunkVariant[] = [];
+  const used = new Set<string>();
+  for (const row of rows) {
+    if (variants.length >= MAX_RELATED_VARIANTS) break;
+    const familyId = row.expression_family_id?.trim();
+    if (!familyId || !candidateFamilyIds.has(familyId)) continue;
+
+    const phrase = toPhrase(row.phrase);
+    const text = (phrase?.display_text ?? row.source_chunk_text ?? "").trim();
+    if (!text) continue;
+    const normalized = normalizePhraseText(text);
+    if (!normalized || knownSet.has(normalized) || used.has(normalized)) continue;
+
+    variants.push({
+      text,
+      differenceLabel: toShortDifferenceLabel(row.ai_semantic_focus),
+      knownChunkText: (knownChunksByFamilyId.get(familyId)?.[0] ?? null),
+    });
+    used.add(normalized);
+  }
+
+  return variants;
+}
+
 export async function generatePersonalizedSceneForUser(
   userId: string,
   rawInput: GeneratePersonalizedSceneInput,
@@ -161,7 +271,12 @@ export async function generatePersonalizedSceneForUser(
       })
     : [];
   const knownChunks = knownChunkCandidates.map((item) => item.text).slice(0, 12);
+  const relatedChunkVariants = reuseKnownChunks
+    ? await getRelatedChunkVariantsForSceneGeneration(userId, knownChunks)
+    : [];
   const knownChunksHash = knownChunks.length > 0 ? hashPayload(knownChunks) : null;
+  const relatedChunkVariantsHash =
+    relatedChunkVariants.length > 0 ? hashPayload(relatedChunkVariants) : null;
 
   const cacheKey = buildStableCacheKey("scene-generate", {
     cache_type: "scene_generate",
@@ -174,6 +289,7 @@ export async function generatePersonalizedSceneForUser(
     sentenceCount,
     reuseKnownChunks,
     knownChunksHash,
+    relatedChunkVariantsHash,
   });
 
   console.log("[scene.generate] cache lookup", { runId, cacheKey });
@@ -209,6 +325,7 @@ export async function generatePersonalizedSceneForUser(
         difficulty,
         sentenceCount,
         preferredKnownChunks: knownChunks,
+        relatedChunkVariants,
         reuseKnownChunks,
       }),
       temperature: 0.35,
@@ -252,6 +369,7 @@ export async function generatePersonalizedSceneForUser(
         sentenceCount,
         reuseKnownChunks,
         knownChunksHash,
+        relatedChunkVariantsHash,
       }),
       inputJson: {
         promptText,
@@ -259,12 +377,14 @@ export async function generatePersonalizedSceneForUser(
         difficulty,
         sentenceCount,
         reuseKnownChunks,
+        relatedChunkVariants,
       },
       outputJson: {
         generatedSourceText,
         generatedTitle: generatedTitle ?? null,
         generatedTheme: generatedTheme ?? null,
         knownChunksUsed: knownChunks,
+        relatedChunkVariantsUsed: relatedChunkVariants,
       },
       metaJson: {
         promptVersion: SCENE_GENERATE_PROMPT_VERSION,
@@ -307,6 +427,9 @@ export async function generatePersonalizedSceneForUser(
     sceneSlug: scene.slug,
     title: scene.title,
   });
+  const relatedChunkVariantsMatched = relatedChunkVariants.filter((item) =>
+    sceneTextContainsExpression(generatedSourceText, item.text),
+  );
 
   return {
     scene,
@@ -318,6 +441,8 @@ export async function generatePersonalizedSceneForUser(
     personalization: {
       knownChunkCandidateCount: knownChunkCandidates.length,
       knownChunksUsed: knownChunks.slice(0, 6),
+      relatedChunkVariantsUsed: relatedChunkVariants,
+      relatedChunkVariantsMatched,
       reuseKnownChunks,
     },
   };

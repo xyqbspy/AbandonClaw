@@ -7,6 +7,7 @@ import {
   parseOptionalNonNegativeInt,
   parseOptionalTrimmedString,
 } from "@/lib/server/validation";
+import { normalizePhraseText } from "@/lib/shared/phrases";
 
 interface SavePhrasePayload {
   text?: unknown;
@@ -98,7 +99,29 @@ export async function POST(request: Request) {
     if (!Array.isArray(payload.items)) {
       return NextResponse.json({ error: "items must be an array." }, { status: 400 });
     }
-    const items = payload.items.slice(0, 50);
+    const safeTrim = (value: unknown, maxLength: number) =>
+      typeof value === "string" ? value.trim().slice(0, maxLength) : "";
+    const rawItems = payload.items.slice(0, 50);
+    const dedupe = new Set<string>();
+    const items = rawItems.filter((raw) => {
+      const candidate = (raw ?? {}) as SavePhrasePayload;
+      const learningItemTypeRaw = safeTrim(candidate.learningItemType, 20);
+      const learningItemType =
+        learningItemTypeRaw === "sentence"
+          ? "sentence"
+          : learningItemTypeRaw === "expression"
+            ? "expression"
+            : "expression";
+      const text =
+        learningItemType === "sentence"
+          ? safeTrim(candidate.sentenceText, 3000)
+          : safeTrim(candidate.text, 200);
+      const key = `${learningItemType}:${normalizePhraseText(text)}`;
+      if (!key || key.endsWith(":")) return true;
+      if (dedupe.has(key)) return false;
+      dedupe.add(key);
+      return true;
+    });
     if (items.length === 0) {
       return NextResponse.json({ error: "items is empty." }, { status: 400 });
     }

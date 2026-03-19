@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/server/auth";
 import {
+  deleteAdminUserPhraseById,
+  enrichAdminUserPhraseById,
   deleteSceneById,
   regenerateSceneVariants,
   updateSceneVisibility,
@@ -19,6 +21,7 @@ import {
 const refreshAdminPages = (sceneId?: string) => {
   revalidatePath("/admin");
   revalidatePath("/admin/scenes");
+  revalidatePath("/admin/phrases");
   revalidatePath("/admin/imported");
   revalidatePath("/admin/variants");
   revalidatePath("/admin/cache");
@@ -74,4 +77,25 @@ export async function syncSeedScenesAction() {
   await requireAdmin();
   await runSeedScenesSync();
   refreshAdminPages();
+}
+
+export async function deleteAdminPhraseAction(formData: FormData) {
+  await requireAdmin();
+  const userPhraseId = parseRequiredIdFromForm(formData.get("userPhraseId"), "userPhraseId");
+  await deleteAdminUserPhraseById(userPhraseId);
+  revalidatePath("/admin/phrases");
+}
+
+export async function enrichAdminPhraseAction(formData: FormData) {
+  await requireAdmin();
+  const userPhraseId = parseRequiredIdFromForm(formData.get("userPhraseId"), "userPhraseId");
+  try {
+    await enrichAdminUserPhraseById(userPhraseId);
+  } catch (error) {
+    console.warn("[admin][phrases] enrich failed", {
+      userPhraseId,
+      error: error instanceof Error ? error.message : "unknown",
+    });
+  }
+  revalidatePath("/admin/phrases");
 }

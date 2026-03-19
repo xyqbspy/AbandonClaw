@@ -34,7 +34,7 @@ const extractError = async (response: Response, fallback: string) => {
 export async function getScenesFromApi() {
   const response = await fetch("/api/scenes", { method: "GET" });
   if (!response.ok) {
-    throw new Error(await extractError(response, "加载场景失败。"));
+    throw new Error(await extractError(response, "Failed to load scenes."));
   }
   const data = (await response.json()) as { scenes?: SceneListItemResponse[] };
   return data.scenes ?? [];
@@ -45,10 +45,10 @@ export async function getSceneDetailBySlugFromApi(slug: string): Promise<Lesson>
     method: "GET",
   });
   if (!response.ok) {
-    throw new Error(await extractError(response, "加载场景详情失败。"));
+    throw new Error(await extractError(response, "Failed to load scene detail."));
   }
   const data = (await response.json()) as { scene?: Lesson };
-  if (!data.scene) throw new Error("场景详情响应无效。");
+  if (!data.scene) throw new Error("Invalid scene detail response.");
   return data.scene;
 }
 
@@ -65,10 +65,10 @@ export async function importSceneFromApi(payload: {
     body: JSON.stringify(payload),
   });
   if (!response.ok) {
-    throw new Error(await extractError(response, "导入场景失败。"));
+    throw new Error(await extractError(response, "Failed to import scene."));
   }
   const data = (await response.json()) as { scene?: Lesson };
-  if (!data.scene) throw new Error("导入响应无效。");
+  if (!data.scene) throw new Error("Invalid import response.");
   return data.scene;
 }
 
@@ -77,7 +77,7 @@ export async function deleteSceneBySlugFromApi(slug: string) {
     method: "DELETE",
   });
   if (!response.ok) {
-    throw new Error(await extractError(response, "删除场景失败。"));
+    throw new Error(await extractError(response, "Failed to delete scene."));
   }
 }
 
@@ -101,7 +101,7 @@ export async function getSceneVariantsFromApi(sceneSlug: string) {
     method: "GET",
   });
   if (!response.ok) {
-    throw new Error(await extractError(response, "加载变体失败。"));
+    throw new Error(await extractError(response, "Failed to load variants."));
   }
   const data = (await response.json()) as {
     variants?: ParsedScene[];
@@ -128,7 +128,7 @@ export async function generateSceneVariantsFromApi(params: {
     }),
   });
   if (!response.ok) {
-    throw new Error(await extractError(response, "生成变体失败。"));
+    throw new Error(await extractError(response, "Failed to generate variants."));
   }
   const data = (await response.json()) as { variants?: ParsedScene[] };
   const variants = data.variants ?? [];
@@ -150,9 +150,26 @@ export async function generatePersonalizedSceneFromApi(payload: {
     body: JSON.stringify(payload),
   });
   if (!response.ok) {
-    throw new Error(await extractError(response, "生成场景失败。"));
+    throw new Error(await extractError(response, "Failed to generate scene."));
   }
-  const data = (await response.json()) as { scene?: Lesson };
-  if (!data.scene) throw new Error("生成场景响应无效。");
-  return data.scene;
+  const data = (await response.json()) as {
+    scene?: Lesson;
+    personalization?: {
+      relatedChunkVariantsUsed?: Array<{
+        text: string;
+        differenceLabel: string;
+        knownChunkText?: string | null;
+      }>;
+      relatedChunkVariantsMatched?: Array<{
+        text: string;
+        differenceLabel: string;
+        knownChunkText?: string | null;
+      }>;
+    };
+  };
+  if (!data.scene) throw new Error("Invalid generated scene response.");
+  return {
+    scene: data.scene,
+    personalization: data.personalization,
+  };
 }

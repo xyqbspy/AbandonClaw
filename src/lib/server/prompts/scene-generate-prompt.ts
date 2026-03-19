@@ -14,11 +14,18 @@ export function buildSceneGenerateUserPrompt(input: {
   difficulty?: string;
   sentenceCount: number;
   preferredKnownChunks: string[];
+  relatedChunkVariants: Array<{ text: string; differenceLabel: string }>;
   reuseKnownChunks: boolean;
 }) {
   const knownChunks =
     input.preferredKnownChunks.length > 0
       ? input.preferredKnownChunks.join(", ")
+      : "none";
+  const relatedVariants =
+    input.relatedChunkVariants.length > 0
+      ? input.relatedChunkVariants
+          .map((item) => `${item.text} (${item.differenceLabel})`)
+          .join("; ")
       : "none";
 
   return `Create one English learning scene.
@@ -28,7 +35,7 @@ ${input.promptText}
 
 Constraints:
 1) Generate one coherent scenario with clear context and goal.
-2) Use 4-8 short conversational lines. Target line count: ${input.sentenceCount}.
+2) Use 6-14 short conversational lines. Target line count: ${input.sentenceCount}.
 3) Keep language natural spoken English, not academic.
 4) Difficulty should be ${input.difficulty ?? "medium"}.
 5) Tone should be ${input.tone ?? "natural"}.
@@ -37,10 +44,16 @@ Constraints:
 8) Avoid irrelevant topic drifting.
 9) If reuseKnownChunks is true, naturally reuse some suitable known chunks, but never force.
 10) If a known chunk does not fit the context, skip it.
+11) Prioritize known chunks first for familiarity.
+12) You may optionally introduce 1-2 related chunk variants from the same expression family to support contrast learning.
+13) Do not replace all known chunks with new variants.
+14) Keep dialogue natural and realistic; variant use should feel organic.
 
 reuseKnownChunks: ${input.reuseKnownChunks ? "true" : "false"}
 Known user chunks:
 ${knownChunks}
+Related chunk variants (text + tiny nuance):
+${relatedVariants}
 
 Return JSON with this exact shape:
 {
@@ -54,7 +67,7 @@ Return JSON with this exact shape:
 }
 
 Rules for lines:
-- lines length must be between 4 and 8.
+- lines length must be between 6 and 14.
 - each line text should be concise.
 - speaker should be short labels like A/B or Clerk/Customer.
 

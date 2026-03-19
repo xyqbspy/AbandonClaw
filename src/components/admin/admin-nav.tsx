@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 const adminNavItems = [
   { label: "总览", href: "/admin" },
   { label: "场景", href: "/admin/scenes" },
+  { label: "表达库", href: "/admin/phrases" },
   { label: "导入场景", href: "/admin/imported" },
   { label: "变体", href: "/admin/variants" },
   { label: "AI 缓存", href: "/admin/cache" },
