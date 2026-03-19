@@ -13,6 +13,7 @@ import {
   generateSimilarExpressionsFromApi,
   getMyPhrasesFromApi,
   PhraseReviewStatus,
+  savePhrasesBatchFromApi,
   SimilarExpressionCandidateResponse,
   savePhraseFromApi,
   UserPhraseItemResponse,
@@ -813,18 +814,17 @@ export default function ChunksPage() {
         translation: similarSeedExpression.translation ?? undefined,
       });
 
-      const savedResponses = await Promise.all(
-        selectedSimilarCandidates.map((candidate) =>
-          savePhraseFromApi({
-            text: candidate.text,
-            expressionFamilyId: familyId,
-            sourceType: "manual",
-            sourceNote: "similar-ai-mvp",
-            sourceSentenceText: similarSeedExpression.sourceSentenceText ?? undefined,
-            sourceChunkText: candidate.text,
-          }),
-        ),
-      );
+      const batchResult = await savePhrasesBatchFromApi({
+        items: selectedSimilarCandidates.map((candidate) => ({
+          text: candidate.text,
+          expressionFamilyId: familyId,
+          sourceType: "manual" as const,
+          sourceNote: "similar-ai-mvp",
+          sourceSentenceText: similarSeedExpression.sourceSentenceText ?? undefined,
+          sourceChunkText: candidate.text,
+        })),
+      });
+      const savedResponses = batchResult.items;
 
       const enrichTasks = savedResponses.map((response, index) => {
         const candidate = selectedSimilarCandidates[index];
@@ -892,23 +892,22 @@ export default function ChunksPage() {
     try {
       const familyId = mapSourceExpression.expressionFamilyId ?? activeFamily.id;
       const existingNormalized = new Set(phrases.map((row) => normalizePhraseText(row.text)));
-      const tasks = Array.from(
+      const newTexts = Array.from(
         new Set(activeFamily.expressions.map((text) => text.trim()).filter(Boolean)),
       )
         .slice(0, 20)
-        .filter((text) => !existingNormalized.has(normalizePhraseText(text)))
-        .map((text) =>
-          savePhraseFromApi({
+        .filter((text) => !existingNormalized.has(normalizePhraseText(text)));
+
+      if (newTexts.length > 0) {
+        await savePhrasesBatchFromApi({
+          items: newTexts.map((text) => ({
             text,
             sourceSceneSlug: mapSourceExpression.sourceSceneSlug ?? undefined,
             sourceSentenceText: mapSourceExpression.sourceSentenceText ?? undefined,
             sourceChunkText: text,
             expressionFamilyId: familyId,
-          }),
-        );
-
-      if (tasks.length > 0) {
-        await Promise.all(tasks);
+          })),
+        });
         await loadPhrases(query, reviewFilter, contentFilter, expressionFamilyFilterId, {
           preferCache: false,
         });

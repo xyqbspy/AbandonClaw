@@ -91,6 +91,45 @@ export async function savePhraseFromApi(payload: {
   return data;
 }
 
+export async function savePhrasesBatchFromApi(payload: {
+  items: Array<{
+    text?: string;
+    learningItemType?: "expression" | "sentence";
+    sentenceText?: string;
+    translation?: string;
+    usageNote?: string;
+    difficulty?: string;
+    tags?: string[];
+    sourceSceneSlug?: string;
+    sourceType?: "scene" | "manual";
+    sourceNote?: string;
+    sourceSentenceIndex?: number;
+    sourceSentenceText?: string;
+    sourceChunkText?: string;
+    expressionFamilyId?: string;
+  }>;
+}) {
+  const response = await fetch("/api/phrases/save-all", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    throw await toApiError(response, "批量保存表达失败。");
+  }
+  const data = (await response.json()) as {
+    items: Array<{
+      created: boolean;
+      phrase: { id: string; normalized_text: string; display_text: string };
+      userPhrase: { id: string };
+    }>;
+  };
+  void clearLearningDashboardCache().catch(() => {
+    // Non-blocking.
+  });
+  return data;
+}
+
 export async function getMyPhrasesFromApi(params?: {
   query?: string;
   page?: number;
