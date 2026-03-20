@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { access, copyFile, mkdir, readFile, rm } from "node:fs/promises";
+import { mkdir, readFile, rm } from "node:fs/promises";
 import path from "node:path";
 import crypto from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
@@ -8,6 +8,7 @@ import { MsEdgeTTS, OUTPUT_FORMAT } from "msedge-tts";
 const cwd = process.cwd();
 const chunkKeyFallbackPrefix = "chunk";
 const sentenceAudioKeyPrefix = "sentence";
+const ttsStorageBucket = process.env.TTS_STORAGE_BUCKET?.trim() || "tts-audio";
 
 const loadEnvFile = async (filePath) => {
   try {
@@ -75,15 +76,6 @@ const buildSentenceAudioKey = ({ sentenceId, text, speaker, mode }) => {
   return `${sentenceAudioKeyPrefix}-${normalizedSentenceId}-${fingerprint}`;
 };
 
-const exists = async (targetPath) => {
-  try {
-    await access(targetPath);
-    return true;
-  } catch {
-    return false;
-  }
-};
-
 const voiceForSpeaker = (speaker) => {
   if (String(speaker ?? "").trim().toUpperCase() === "B") {
     return "en-US-GuyNeural";
@@ -91,9 +83,38 @@ const voiceForSpeaker = (speaker) => {
   return "en-US-JennyNeural";
 };
 
+const ensureTtsStorageBucket = async (admin) => {
+  const { data, error } = await admin.storage.listBuckets();
+  if (error) throw new Error(`Failed to list storage buckets: ${error.message}`);
+  const existsBucket = (data ?? []).some((bucket) => bucket.name === ttsStorageBucket);
+  if (existsBucket) return;
+  const { error: createError } = await admin.storage.createBucket(ttsStorageBucket, {
+    public: false,
+    fileSizeLimit: "20MB",
+  });
+  if (createError && !createError.message.toLowerCase().includes("already exists")) {
+    throw new Error(`Failed to create storage bucket: ${createError.message}`);
+  }
+};
+
+const storageExists = async (admin, storagePath) => {
+  const { data, error } = await admin.storage.from(ttsStorageBucket).createSignedUrl(storagePath, 60);
+  if (!error && data?.signedUrl) return true;
+  const message = error?.message?.toLowerCase() ?? "";
+  if (
+    message.includes("not found") ||
+    message.includes("object not found") ||
+    message.includes("no such") ||
+    message.includes("404")
+  ) {
+    return false;
+  }
+  throw new Error(`Failed to check storage object: ${error?.message ?? "unknown error"}`);
+};
+
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const synthesizeToPath = async ({ text, voice, targetPath }) => {
+const synthesizeToBuffer = async ({ text, voice }) => {
   const tempDir = path.join(
     cwd,
     ".tmp",
@@ -105,12 +126,12 @@ const synthesizeToPath = async ({ text, voice, targetPath }) => {
   try {
     await tts.setMetadata(voice, OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3);
     const result = await tts.toFile(tempDir, text, { rate: "default" });
-    await mkdir(path.dirname(targetPath), { recursive: true });
-    await copyFile(result.audioFilePath, targetPath);
+    const buffer = await readFile(result.audioFilePath);
     await rm(result.audioFilePath, { force: true });
     if (result.metadataFilePath) {
       await rm(result.metadataFilePath, { force: true });
     }
+    return buffer;
   } finally {
     tts.close();
     await rm(tempDir, { recursive: true, force: true });
@@ -123,12 +144,10 @@ const synthesizeWithRetry = async (task, maxAttempts = 3) => {
   while (attempt < maxAttempts) {
     attempt += 1;
     try {
-      await synthesizeToPath({
+      return await synthesizeToBuffer({
         text: task.text,
         voice: task.voice,
-        targetPath: task.targetPath,
       });
-      return;
     } catch (error) {
       lastError = error;
       if (attempt >= maxAttempts) break;
@@ -166,15 +185,7 @@ const collectTasksFromScene = (row) => {
             key: `${sceneSlug}/${sentenceAudioKey}`,
             text: sentenceText,
             voice: voiceForSpeaker(sentenceSpeaker),
-            targetPath: path.join(
-              cwd,
-              "public",
-              "audio",
-              "scenes",
-              sceneSlug,
-              "sentences",
-              `${sentenceAudioKey}.mp3`,
-            ),
+            storagePath: `scenes/${sceneSlug}/sentences/${sentenceAudioKey}.mp3`,
           });
         }
 
@@ -186,9 +197,7 @@ const collectTasksFromScene = (row) => {
         }
         const chunks = Array.isArray(sentence?.chunks) ? sentence.chunks : [];
         for (const chunk of chunks) {
-          const text = String(
-            typeof chunk === "string" ? chunk : chunk?.text || "",
-          ).trim();
+          const text = String(typeof chunk === "string" ? chunk : chunk?.text || "").trim();
           if (text) chunkTextSet.add(text);
         }
         for (const chunkText of chunkTextSet) {
@@ -198,7 +207,7 @@ const collectTasksFromScene = (row) => {
             key: chunkKey,
             text: chunkText,
             voice: "en-US-JennyNeural",
-            targetPath: path.join(cwd, "public", "audio", "chunks", `${chunkKey}.mp3`),
+            storagePath: `chunks/${chunkKey}.mp3`,
           });
         }
       }
@@ -226,6 +235,7 @@ const parseArgs = () => {
   const options = {
     slug: "",
     concurrency: 4,
+    force: false,
   };
   for (const arg of args) {
     if (arg.startsWith("--slug=")) {
@@ -237,6 +247,10 @@ const parseArgs = () => {
       if (Number.isFinite(parsed) && parsed > 0) {
         options.concurrency = Math.floor(parsed);
       }
+      continue;
+    }
+    if (arg === "--force") {
+      options.force = true;
     }
   }
   return options;
@@ -252,10 +266,11 @@ const main = async () => {
     throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
   }
 
-  const { slug, concurrency } = parseArgs();
+  const { slug, concurrency, force } = parseArgs();
   const admin = createClient(supabaseUrl, serviceRoleKey, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
+  await ensureTtsStorageBucket(admin);
 
   let query = admin.from("scenes").select("slug, scene_json").order("created_at", { ascending: false });
   if (slug) {
@@ -286,12 +301,12 @@ const main = async () => {
   let failed = 0;
 
   console.log(
-    `[tts:warmup] scenes=${rows.length} sentence=${sentenceMap.size} chunk=${chunkMap.size} total=${allTasks.length} concurrency=${concurrency}`,
+    `[tts:warmup] scenes=${rows.length} sentence=${sentenceMap.size} chunk=${chunkMap.size} total=${allTasks.length} concurrency=${concurrency} force=${force}`,
   );
   console.log("[tts:warmup] slow mode skipped by design (TODO: enable later).");
 
   await runWithConcurrency(allTasks, concurrency, async (task, idx) => {
-    const existsAlready = await exists(task.targetPath);
+    const existsAlready = force ? false : await storageExists(admin, task.storagePath);
     if (existsAlready) {
       reused += 1;
       if ((idx + 1) % 50 === 0) {
@@ -301,7 +316,16 @@ const main = async () => {
     }
 
     try {
-      await synthesizeWithRetry(task);
+      const buffer = await synthesizeWithRetry(task);
+      const { error: uploadError } = await admin.storage
+        .from(ttsStorageBucket)
+        .upload(task.storagePath, buffer, {
+          contentType: "audio/mpeg",
+          upsert: force,
+        });
+      if (uploadError && !(force === false && uploadError.message.toLowerCase().includes("already exists"))) {
+        throw new Error(uploadError.message);
+      }
       generated += 1;
     } catch (error) {
       failed += 1;

@@ -1,10 +1,11 @@
-import { access, copyFile, mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { NextResponse } from "next/server";
 import { MsEdgeTTS, OUTPUT_FORMAT } from "msedge-tts";
 import { requireCurrentProfile } from "@/lib/server/auth";
 import { toApiErrorResponse } from "@/lib/server/api-error";
 import { ValidationError } from "@/lib/server/errors";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import {
   buildChunkAudioKey,
   buildSceneFullAudioKey,
@@ -34,8 +35,16 @@ type SceneFullSegment = {
   speaker?: string;
 };
 
+type SynthesizedAudioResult = {
+  buffer: Buffer;
+  persisted: boolean;
+};
+
 const voiceJenny = "en-US-JennyNeural";
 const voiceGuy = "en-US-GuyNeural";
+const ttsStorageBucket = process.env.TTS_STORAGE_BUCKET?.trim() || "tts-audio";
+const signedUrlTtlSeconds = 60 * 60;
+let ensureBucketPromise: Promise<void> | null = null;
 
 const parseTtsKind = (value: unknown): TtsKind => {
   if (value === "sentence" || value === "chunk" || value === "scene_full") return value;
@@ -109,16 +118,85 @@ const ensureDir = async (filePath: string) => {
   await mkdir(path.dirname(filePath), { recursive: true });
 };
 
-const exists = async (filePath: string) => {
+const canFallbackToInlineAudio = (error: unknown) => {
+  if (!error || typeof error !== "object") return false;
+  const code = "code" in error ? String((error as { code?: unknown }).code ?? "") : "";
+  return code === "ENOENT" || code === "EROFS" || code === "EPERM" || code === "EACCES";
+};
+
+const toInlineAudioUrl = (buffer: Buffer) => `data:audio/mpeg;base64,${buffer.toString("base64")}`;
+
+const ensureTtsStorageBucket = async () => {
+  if (ensureBucketPromise) return ensureBucketPromise;
+
+  ensureBucketPromise = (async () => {
+    const admin = createSupabaseAdminClient();
+    const { data, error } = await admin.storage.listBuckets();
+    if (error) {
+      throw new Error(`Failed to list storage buckets: ${error.message}`);
+    }
+
+    const bucketExists = (data ?? []).some((bucket) => bucket.name === ttsStorageBucket);
+    if (bucketExists) return;
+
+    const { error: createError } = await admin.storage.createBucket(ttsStorageBucket, {
+      public: false,
+      fileSizeLimit: "20MB",
+    });
+    if (createError && !createError.message.toLowerCase().includes("already exists")) {
+      throw new Error(`Failed to create storage bucket: ${createError.message}`);
+    }
+  })().catch((error) => {
+    ensureBucketPromise = null;
+    throw error;
+  });
+
+  return ensureBucketPromise;
+};
+
+const createStorageSignedUrl = async (storagePath: string) => {
+  await ensureTtsStorageBucket();
+  const admin = createSupabaseAdminClient();
+  const { data, error } = await admin.storage
+    .from(ttsStorageBucket)
+    .createSignedUrl(storagePath, signedUrlTtlSeconds);
+  if (error || !data?.signedUrl) {
+    throw new Error(`Failed to create signed audio url: ${error?.message ?? "unknown error"}`);
+  }
+  return data.signedUrl;
+};
+
+const getStorageSignedUrlIfExists = async (storagePath: string) => {
   try {
-    await access(filePath);
-    return true;
-  } catch {
-    return false;
+    return await createStorageSignedUrl(storagePath);
+  } catch (error) {
+    const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+    if (
+      message.includes("not found") ||
+      message.includes("object not found") ||
+      message.includes("no such") ||
+      message.includes("404")
+    ) {
+      return null;
+    }
+    throw error;
   }
 };
 
-const synthesizeToFile = async (targetPath: string, text: string, voice: string, mode: TtsMode) => {
+const uploadAudioToStorage = async (storagePath: string, buffer: Buffer) => {
+  await ensureTtsStorageBucket();
+  const admin = createSupabaseAdminClient();
+  const { error } = await admin.storage.from(ttsStorageBucket).upload(storagePath, buffer, {
+    contentType: "audio/mpeg",
+    upsert: false,
+  });
+  if (error && !error.message.toLowerCase().includes("already exists")) {
+    throw new Error(`Failed to upload audio to storage: ${error.message}`);
+  }
+  return createStorageSignedUrl(storagePath);
+};
+
+const synthesizeToBuffer = async (text: string, voice: string, mode: TtsMode) => {
   const tempDir = path.join(process.cwd(), ".tmp", "edge-tts");
   await mkdir(tempDir, { recursive: true });
 
@@ -128,19 +206,47 @@ const synthesizeToFile = async (targetPath: string, text: string, voice: string,
     const result = await tts.toFile(tempDir, text, {
       rate: mode === "slow" ? "-25%" : "default",
     });
-    await ensureDir(targetPath);
-    await copyFile(result.audioFilePath, targetPath);
+    const buffer = await readFile(result.audioFilePath);
     await rm(result.audioFilePath, { force: true });
     if (result.metadataFilePath) {
       await rm(result.metadataFilePath, { force: true });
     }
+    return buffer;
   } finally {
     tts.close();
   }
 };
 
-const synthesizeSceneFullToFile = async (
+const persistBufferIfPossible = async (targetPath: string, buffer: Buffer) => {
+  await ensureDir(targetPath);
+  await writeFile(targetPath, buffer);
+};
+
+const synthesizeToFile = async (
   targetPath: string,
+  text: string,
+  voice: string,
+  mode: TtsMode,
+): Promise<SynthesizedAudioResult> => {
+  const buffer = await synthesizeToBuffer(text, voice, mode);
+  try {
+    await persistBufferIfPossible(targetPath, buffer);
+    return {
+      buffer,
+      persisted: true,
+    };
+  } catch (error) {
+    if (!canFallbackToInlineAudio(error)) {
+      throw error;
+    }
+    return {
+      buffer,
+      persisted: false,
+    };
+  }
+};
+
+const synthesizeSceneFullBuffer = async (
   segments: SceneFullSegment[],
   sceneType: "dialogue" | "monologue",
 ) => {
@@ -174,10 +280,32 @@ const synthesizeSceneFullToFile = async (
     if (buffers.length === 0) {
       throw new Error("No audio data received");
     }
-    await ensureDir(targetPath);
-    await writeFile(targetPath, Buffer.concat(buffers));
+    return Buffer.concat(buffers);
   } finally {
     tts.close();
+  }
+};
+
+const synthesizeSceneFullToFile = async (
+  targetPath: string,
+  segments: SceneFullSegment[],
+  sceneType: "dialogue" | "monologue",
+): Promise<SynthesizedAudioResult> => {
+  const buffer = await synthesizeSceneFullBuffer(segments, sceneType);
+  try {
+    await persistBufferIfPossible(targetPath, buffer);
+    return {
+      buffer,
+      persisted: true,
+    };
+  } catch (error) {
+    if (!canFallbackToInlineAudio(error)) {
+      throw error;
+    }
+    return {
+      buffer,
+      persisted: false,
+    };
   }
 };
 
@@ -198,9 +326,9 @@ const resolveAudioTarget = (payload: {
       "scene",
     );
     const fileName = `${payload.sceneFullKey || "full"}.mp3`;
-    const relativePath = `/audio/scenes/${sceneSlug}/${fileName}`;
+    const storagePath = `scenes/${sceneSlug}/${fileName}`;
     return {
-      relativePath,
+      storagePath,
       absolutePath: path.join(process.cwd(), "public", "audio", "scenes", sceneSlug, fileName),
       voice: voiceJenny,
       mode: "normal" as TtsMode,
@@ -217,9 +345,9 @@ const resolveAudioTarget = (payload: {
       "sentence",
     );
     const fileName = `${payload.sentenceAudioKey || sentenceId}.mp3`;
-    const relativePath = `/audio/scenes/${sceneSlug}/sentences/${fileName}`;
+    const storagePath = `scenes/${sceneSlug}/sentences/${fileName}`;
     return {
-      relativePath,
+      storagePath,
       absolutePath: path.join(process.cwd(), "public", "audio", "scenes", sceneSlug, "sentences", fileName),
       voice: resolveVoiceBySpeaker(payload.speaker),
       mode: payload.mode,
@@ -233,9 +361,9 @@ const resolveAudioTarget = (payload: {
     "chunk",
   );
   const fileName = `${chunkKey}.mp3`;
-  const relativePath = `/audio/chunks/${fileName}`;
+  const storagePath = `chunks/${fileName}`;
   return {
-    relativePath,
+    storagePath,
     absolutePath: path.join(process.cwd(), "public", "audio", "chunks", fileName),
     voice: voiceJenny,
     mode: "normal" as TtsMode,
@@ -278,18 +406,35 @@ export async function POST(request: Request) {
       text,
     });
 
-    const cached = await exists(target.absolutePath);
-    if (!cached) {
+    let responseUrl = await getStorageSignedUrlIfExists(target.storagePath);
+    let cached = Boolean(responseUrl);
+    if (!responseUrl) {
       if (kind === "scene_full") {
-        await synthesizeSceneFullToFile(target.absolutePath, mergedSceneFullSegments, sceneType);
+        const result = await synthesizeSceneFullToFile(
+          target.absolutePath,
+          mergedSceneFullSegments,
+          sceneType,
+        );
+        if (result.persisted) {
+          responseUrl = await uploadAudioToStorage(target.storagePath, result.buffer);
+        } else {
+          responseUrl = toInlineAudioUrl(result.buffer);
+        }
+        cached = false;
       } else {
-        await synthesizeToFile(target.absolutePath, text, target.voice, target.mode);
+        const result = await synthesizeToFile(target.absolutePath, text, target.voice, target.mode);
+        if (result.persisted) {
+          responseUrl = await uploadAudioToStorage(target.storagePath, result.buffer);
+        } else {
+          responseUrl = toInlineAudioUrl(result.buffer);
+        }
+        cached = false;
       }
     }
 
     return NextResponse.json(
       {
-        url: target.relativePath,
+        url: responseUrl,
         cached,
       },
       {

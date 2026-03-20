@@ -3,10 +3,12 @@ import { scenes as seedLessons } from "@/lib/data/mock-lessons";
 import { Lesson } from "@/lib/types";
 import { ParsedScene, SceneParserResponse } from "@/lib/types/scene-parser";
 import { normalizeParsedSceneDialogue } from "@/lib/shared/scene-dialogue";
-import { SceneRow, SceneVariantRow, UserSceneProgressRow } from "@/lib/server/db/types";
+import { SceneRow, UserSceneProgressRow } from "@/lib/server/db/types";
 import { getSceneVariantsBySceneId } from "@/lib/server/services/variant-service";
+import { warmLessonTtsAudio } from "@/lib/server/services/tts-storage-service";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import {
+  deleteObsoleteSeedScenes,
   deleteImportedSceneByOwner,
   getVisibleSceneById,
   getVisibleSceneBySlug,
@@ -93,6 +95,19 @@ const normalizeSceneFromRow = (row: SceneRow): ParsedScene => {
   return normalized;
 };
 
+const tryNormalizeSceneFromRow = (row: SceneRow): ParsedScene | null => {
+  try {
+    return normalizeSceneFromRow(row);
+  } catch (error) {
+    console.warn(
+      `[scene-service] skip invalid scene slug=${row.slug}: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+    return null;
+  }
+};
+
 const rowToLesson = (row: SceneRow): Lesson => {
   const response: SceneParserResponse = {
     version: "v1",
@@ -104,41 +119,6 @@ const rowToLesson = (row: SceneRow): Lesson => {
   lesson.title = row.title;
   lesson.sourceType = toSceneOriginSourceType(row.origin);
   return lesson;
-};
-
-const toSceneSummary = (
-  row: SceneRow,
-  variants: SceneVariantRow[],
-  progress?: UserSceneProgressRow | null,
-): SceneListItem => {
-  const scene = normalizeSceneFromRow(row);
-  const latestCacheKey = variants[0]?.cache_key ?? null;
-  const latestRows = latestCacheKey
-    ? variants.filter((item) => item.cache_key === latestCacheKey)
-    : variants;
-  const variantLinks = latestRows
-    .sort((a, b) => a.variant_index - b.variant_index)
-    .map((variant) => ({
-      id: variant.id,
-      label: `变体${variant.variant_index}`,
-    }));
-
-  return {
-    id: row.id,
-    slug: row.slug,
-    title: row.title,
-    subtitle: scene.subtitle ?? "",
-    difficulty: scene.difficulty ?? "Intermediate",
-    estimatedMinutes: scene.estimatedMinutes ?? 8,
-    sentenceCount: getSceneSentenceCount(scene),
-    sceneType: scene.type ?? "monologue",
-    sourceType: toSceneOriginSourceType(row.origin),
-    createdAt: row.created_at,
-    variantLinks,
-    learningStatus: progress?.status ?? "not_started",
-    progressPercent: Number(progress?.progress_percent ?? 0),
-    lastViewedAt: progress?.last_viewed_at ?? null,
-  };
 };
 
 export async function upsertSeedScenesIfNeeded() {
@@ -161,6 +141,8 @@ export async function upsertSeedScenesIfNeeded() {
       } as never,
     );
   }
+
+  await deleteObsoleteSeedScenes(seedLessons.map((lesson) => lesson.slug));
 }
 
 export async function runSeedScenesSync() {
@@ -193,13 +175,40 @@ export async function listScenes(params: { userId: string }) {
     progressBySceneId.set(row.scene_id, row);
   }
 
-  return rows.map((row, index) =>
-    toSceneSummary(
-      row,
-      variantRows[index] ?? [],
-      progressBySceneId.get(row.id) ?? null,
-    ),
-  );
+  const items: SceneListItem[] = [];
+  for (const [index, row] of rows.entries()) {
+    const scene = tryNormalizeSceneFromRow(row);
+    if (!scene) continue;
+    const latestCacheKey = variantRows[index]?.[0]?.cache_key ?? null;
+    const latestRows = latestCacheKey
+      ? (variantRows[index] ?? []).filter((item) => item.cache_key === latestCacheKey)
+      : (variantRows[index] ?? []);
+    const variantLinks = latestRows
+      .sort((a, b) => a.variant_index - b.variant_index)
+      .map((variant) => ({
+        id: variant.id,
+        label: `变体${variant.variant_index}`,
+      }));
+
+    items.push({
+      id: row.id,
+      slug: row.slug,
+      title: row.title,
+      subtitle: scene.subtitle ?? "",
+      difficulty: scene.difficulty ?? "Intermediate",
+      estimatedMinutes: scene.estimatedMinutes ?? 8,
+      sentenceCount: getSceneSentenceCount(scene),
+      sceneType: scene.type ?? "monologue",
+      sourceType: toSceneOriginSourceType(row.origin),
+      createdAt: row.created_at,
+      variantLinks,
+      learningStatus: progressBySceneId.get(row.id)?.status ?? "not_started",
+      progressPercent: Number(progressBySceneId.get(row.id)?.progress_percent ?? 0),
+      lastViewedAt: progressBySceneId.get(row.id)?.last_viewed_at ?? null,
+    });
+  }
+
+  return items;
 }
 
 export async function getSceneBySlug(params: { slug: string; userId: string }) {
@@ -275,7 +284,22 @@ export async function createImportedScene(params: {
     } as never,
   );
 
-  return rowToLesson(data);
+  const lesson = rowToLesson(data);
+  try {
+    await warmLessonTtsAudio(lesson, {
+      force: false,
+      includeSceneFull: true,
+      concurrency: 3,
+    });
+  } catch (error) {
+    console.warn(
+      `[scene-service] tts warmup failed slug=${lesson.slug}: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+  }
+
+  return lesson;
 }
 
 export async function deleteImportedScene(params: {

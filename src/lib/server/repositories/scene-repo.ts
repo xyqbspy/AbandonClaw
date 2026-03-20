@@ -81,3 +81,17 @@ export async function deleteImportedSceneByOwner(params: {
   }
 }
 
+export async function deleteObsoleteSeedScenes(keepSlugs: string[]) {
+  const admin = createSupabaseAdminClient();
+  let query = admin.from("scenes").delete().eq("origin", "seed");
+
+  if (keepSlugs.length > 0) {
+    query = query.not("slug", "in", `(${keepSlugs.map((slug) => `"${slug}"`).join(",")})`);
+  }
+
+  const { error } = await query;
+  if (error) {
+    throw new Error(`Failed to delete obsolete seed scenes: ${error.message}`);
+  }
+}
+
