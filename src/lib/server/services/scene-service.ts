@@ -35,6 +35,41 @@ export interface SceneListItem {
 const SCENE_PARSE_PROMPT_VERSION = "scene-parse-v1";
 const toSceneOriginSourceType = (origin: string): "builtin" | "imported" =>
   origin === "imported" ? "imported" : "builtin";
+const hasChinese = (value: string) => /[\u4e00-\u9fff]/.test(value);
+const stripParenSuffix = (value: string) =>
+  value.replace(/\s*[\(\（][^)\）]*[\)\）]\s*$/, "").trim();
+const toShortChineseHint = (value: string | undefined) => {
+  const source = (value ?? "").trim();
+  if (!source || !hasChinese(source)) return "";
+  const onlyChinese = source
+    .replace(/[A-Za-z0-9]/g, " ")
+    .replace(/[^\u4e00-\u9fff\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return onlyChinese.slice(0, 16);
+};
+const toBilingualTitle = (title: string, subtitle?: string, description?: string) => {
+  const trimmed = title.trim();
+  if (!trimmed) return "Imported Scene（导入场景）";
+  if (hasChinese(trimmed)) return trimmed;
+  const englishBase = stripParenSuffix(trimmed);
+  const zh =
+    toShortChineseHint(subtitle) ||
+    toShortChineseHint(description) ||
+    "导入场景";
+  return `${englishBase}（${zh}）`;
+};
+
+const getSceneSentenceCount = (scene: ParsedScene) =>
+  scene.sections.reduce(
+    (total, section) =>
+      total +
+      section.blocks.reduce(
+        (sectionTotal, block) => sectionTotal + block.sentences.length,
+        0,
+      ),
+    0,
+  );
 
 const normalizeSceneFromRow = (row: SceneRow): ParsedScene => {
   const raw = row.scene_json as ParsedScene;
@@ -53,7 +88,7 @@ const normalizeSceneFromRow = (row: SceneRow): ParsedScene => {
       typeof raw.estimatedMinutes === "number" ? raw.estimatedMinutes : 10,
     tags: Array.isArray(raw.tags) ? raw.tags : [],
     sections: Array.isArray(raw.sections) ? raw.sections : [],
-    dialogue: Array.isArray(raw.dialogue) ? raw.dialogue : [],
+    type: raw.type === "dialogue" || raw.type === "monologue" ? raw.type : "monologue",
   });
   return normalized;
 };
@@ -92,10 +127,10 @@ const toSceneSummary = (
     id: row.id,
     slug: row.slug,
     title: row.title,
-    subtitle: scene.subtitle,
-    difficulty: scene.difficulty,
-    estimatedMinutes: scene.estimatedMinutes,
-    sentenceCount: scene.dialogue.length,
+    subtitle: scene.subtitle ?? "",
+    difficulty: scene.difficulty ?? "Intermediate",
+    estimatedMinutes: scene.estimatedMinutes ?? 8,
+    sentenceCount: getSceneSentenceCount(scene),
     sceneType: scene.type ?? "monologue",
     sourceType: toSceneOriginSourceType(row.origin),
     createdAt: row.created_at,
@@ -206,7 +241,12 @@ export async function createImportedScene(params: {
   promptVersion?: string;
   cacheKey?: string;
 }) {
-  const parsedTitle = params.title?.trim() || params.parsedScene.title;
+  const preferredTitle = params.title?.trim() || params.parsedScene.title;
+  const parsedTitle = toBilingualTitle(
+    preferredTitle,
+    params.parsedScene.subtitle,
+    params.parsedScene.description,
+  );
   const parsedSlugBase = params.parsedScene.slug || `imported-${Date.now()}`;
   const uniqueSlug = `${parsedSlugBase}-${Math.random().toString(36).slice(2, 8)}`;
   const mergedTags = Array.from(new Set([...(params.parsedScene.tags ?? []), "imported"]));

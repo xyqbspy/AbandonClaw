@@ -1,4 +1,4 @@
-const DB_NAME = "abandon-en-cache-v1";
+﻿const DB_NAME = "abandon-en-cache-v2";
 const DB_VERSION = 1;
 const STORE_SCENE_RECORDS = "scene_records";
 const STORE_META = "meta";

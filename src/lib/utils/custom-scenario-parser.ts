@@ -105,11 +105,9 @@ const toSentenceData = (turns: ParsedTurn[], sceneId: string): LessonSentence[] 
     translation: "",
     chunks: [],
     speaker:
-      typeof turn.speaker === "string" && turn.speaker.trim().toUpperCase() === "B"
-        ? "B"
-        : typeof turn.speaker === "string" && turn.speaker.trim().toUpperCase() === "A"
-          ? "A"
-          : undefined,
+      typeof turn.speaker === "string" && turn.speaker.trim()
+        ? turn.speaker.trim().toUpperCase()
+        : "A",
     audioText: turn.text,
   }));
 
@@ -181,7 +179,14 @@ export function parseCustomScenario(input: string): ParseCustomScenarioResult {
         id: `${sceneId}-section-1`,
         title,
         summary: "Custom dialogue imported by user.",
-        sentences,
+        blocks: sentences.map((sentence, index) => ({
+          id: `${sceneId}-block-${index + 1}`,
+          kind: "dialogue",
+          speaker: sentence.speaker ?? "A",
+          translation: sentence.translation,
+          tts: sentence.tts ?? sentence.audioText ?? sentence.text,
+          sentences: [sentence],
+        })),
       },
     ],
     explanations: [],

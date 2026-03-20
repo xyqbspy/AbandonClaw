@@ -28,6 +28,10 @@ type RelatedChunkVariant = {
 interface GenerateSceneSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onGeneratingStatusChange?: (payload: {
+    status: "running" | "failed";
+    message?: string;
+  }) => void;
   onGenerated: (scene: {
     slug: string;
     title: string;
@@ -42,7 +46,7 @@ const toneOptions: Array<{ value: Tone; label: string }> = [
   { value: "natural", label: "自然" },
   { value: "polite", label: "礼貌" },
   { value: "casual", label: "口语" },
-  { value: "simple", label: "简单" },
+  { value: "simple", label: "简洁" },
 ];
 
 const difficultyOptions: Array<{ value: Difficulty; label: string }> = [
@@ -52,8 +56,7 @@ const difficultyOptions: Array<{ value: Difficulty; label: string }> = [
 
 const sentenceCountOptions: SentenceCount[] = [6, 10, 14];
 const appleButtonClassName = `${APPLE_BUTTON_BASE} ${APPLE_BUTTON_TEXT_MD}`;
-const appleSegmentBaseClassName =
-  `${APPLE_BUTTON_BASE} h-9 px-3 text-sm font-medium`;
+const appleSegmentBaseClassName = `${APPLE_BUTTON_BASE} h-9 px-3 text-sm font-medium`;
 
 const defaultForm = {
   promptText: "",
@@ -66,6 +69,7 @@ const defaultForm = {
 export function GenerateSceneSheet({
   open,
   onOpenChange,
+  onGeneratingStatusChange,
   onGenerated,
 }: GenerateSceneSheetProps) {
   const [promptText, setPromptText] = useState(defaultForm.promptText);
@@ -101,12 +105,13 @@ export function GenerateSceneSheet({
       return;
     }
     if (nextPrompt.length < 3) {
-      setError("再多写一点点，至少 3 个字符。");
+      setError("再多写一点，至少 3 个字符。");
       return;
     }
 
     setSubmitting(true);
     setError(null);
+    onGeneratingStatusChange?.({ status: "running", message: "正在生成场景..." });
 
     try {
       const result = await generatePersonalizedSceneFromApi({
@@ -130,7 +135,9 @@ export function GenerateSceneSheet({
       if (process.env.NODE_ENV === "development") {
         console.debug("[generate-scene-sheet] submit failed", submitError);
       }
-      setError("生成失败了，请稍后重试。");
+      const message = "生成失败了，请稍后重试。";
+      setError(message);
+      onGeneratingStatusChange?.({ status: "failed", message });
     } finally {
       setSubmitting(false);
     }
@@ -140,7 +147,7 @@ export function GenerateSceneSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="bottom"
-        className="max-h-[92vh] rounded-t-2xl border-0 bg-[rgb(246,246,246)] p-0 sm:mx-auto sm:max-w-2xl sm:rounded-2xl"
+        className="max-h-[92vh] rounded-t-2xl border-0 bg-white p-0 sm:mx-auto sm:max-w-2xl sm:rounded-2xl"
         showCloseButton
       >
         <SheetHeader className="space-y-1 px-4 pb-3 pt-4">
@@ -295,3 +302,4 @@ I want a short scene about canceling plans politely
     </Sheet>
   );
 }
+

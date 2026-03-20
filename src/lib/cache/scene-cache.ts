@@ -1,4 +1,4 @@
-import { Lesson } from "@/lib/types";
+﻿import { Lesson } from "@/lib/types";
 import {
   idbDeleteSceneRecord,
   idbGetMeta,
@@ -8,7 +8,7 @@ import {
 } from "@/lib/cache/indexeddb";
 
 export type SceneCacheRecord<T> = {
-  schemaVersion: "scene-cache-v1";
+  schemaVersion: "scene-cache-v2";
   key: string;
   type: "scene";
   slug: string;
@@ -32,9 +32,9 @@ type SceneCacheMap = Map<string, SceneCacheRecord<Lesson>>;
 
 const SCENE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const SCENE_MAX_ITEMS = 20;
-const QUEUE_META_KEY = "scene_queue_v1";
+const QUEUE_META_KEY = "scene_queue_v2";
 const EXPIRED_HARD_DELETE_AFTER_MS = 7 * 24 * 60 * 60 * 1000;
-const SCHEMA_VERSION: SceneCacheRecord<Lesson>["schemaVersion"] = "scene-cache-v1";
+const SCHEMA_VERSION: SceneCacheRecord<Lesson>["schemaVersion"] = "scene-cache-v2";
 
 const memorySceneRecords: SceneCacheMap = new Map();
 let memoryQueue: CacheQueueItem[] = [];
@@ -61,6 +61,16 @@ const isLessonCacheable = (lesson: Lesson, expectedSlug: string) => {
   if (normalizeSceneSlug(lesson.slug) !== normalizeSceneSlug(expectedSlug)) return false;
   if (typeof lesson.title !== "string" || !lesson.title.trim()) return false;
   if (!Array.isArray(lesson.sections) || lesson.sections.length === 0) return false;
+  if (
+    lesson.sections.some(
+      (section) =>
+        !Array.isArray(section.blocks) ||
+        section.blocks.length === 0 ||
+        section.blocks.some((block) => !Array.isArray(block.sentences) || block.sentences.length === 0),
+    )
+  ) {
+    return false;
+  }
   if (typeof lesson.estimatedMinutes !== "number" || Number.isNaN(lesson.estimatedMinutes)) {
     return false;
   }

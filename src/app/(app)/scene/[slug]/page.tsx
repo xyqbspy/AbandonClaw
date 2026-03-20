@@ -24,7 +24,6 @@ import {
   saveVariantSet,
 } from "@/lib/utils/scene-learning-flow-storage";
 import { SceneGeneratedState } from "@/lib/types/learning-flow";
-import { useSpeech } from "@/hooks/use-speech";
 import { ExpressionMapResponse } from "@/lib/types/expression-map";
 import { generateExpressionMapFromApi } from "@/lib/utils/expression-map-api";
 import {
@@ -52,6 +51,15 @@ import {
   savePhraseFromApi,
 } from "@/lib/utils/phrases-api";
 import { normalizePhraseText } from "@/lib/shared/phrases";
+import { buildChunkAudioKey } from "@/lib/shared/tts";
+import { useTtsPlaybackState } from "@/hooks/use-tts-playback-state";
+import { getLessonSentences } from "@/lib/shared/lesson-content";
+import {
+  playChunkAudio,
+  playSentenceAudio,
+  setTtsLooping,
+  stopTtsPlayback,
+} from "@/lib/utils/tts-api";
 import {
   APPLE_BUTTON_BASE,
   APPLE_BUTTON_DANGER,
@@ -72,7 +80,7 @@ const buildReusedChunks = (lesson: Lesson, limit = 12) => {
   const chunks: string[] = [];
 
   for (const section of lesson.sections) {
-    for (const sentence of section.sentences) {
+    for (const sentence of section.blocks.flatMap((block) => block.sentences)) {
       const source = sentence.chunkDetails?.map((item) => item.text) ?? sentence.chunks;
       for (const chunk of source) {
         const normalized = chunk.trim();
@@ -106,7 +114,7 @@ const findSentenceForChunk = (
   const lower = chunkText.trim().toLowerCase();
   if (!lower) return null;
   for (const section of lesson.sections) {
-    for (const sentence of section.sentences) {
+    for (const sentence of section.blocks.flatMap((block) => block.sentences)) {
       const inChunks = sentence.chunks.some((chunk) => chunk.toLowerCase() === lower);
       const inChunkDetails = sentence.chunkDetails?.some(
         (chunk) => chunk.text.toLowerCase() === lower,
@@ -151,7 +159,7 @@ const findChunkContext = (
 const collectLessonChunkTexts = (lesson: Lesson) => {
   const texts = new Set<string>();
   for (const section of lesson.sections) {
-    for (const sentence of section.sentences) {
+    for (const sentence of section.blocks.flatMap((block) => block.sentences)) {
       for (const chunk of sentence.chunks) {
         const normalized = normalizePhraseText(chunk);
         if (!normalized) continue;
@@ -215,7 +223,7 @@ export default function SceneDetailPage() {
     practiceStatus: "idle",
     variantStatus: "idle",
   });
-  const { supported, speak, stop, speakingText } = useSpeech();
+  const playbackState = useTtsPlaybackState();
   const activeLoadTokenRef = useRef(0);
   const latestSceneSlugRef = useRef(normalizeSceneSlug(sceneSlug));
   const learningStartedRef = useRef(false);
@@ -255,7 +263,7 @@ export default function SceneDetailPage() {
     if (!variantChunkDetail?.text) return;
     const sentenceIndex = variantChunkSentence
       ? (baseLesson?.sections
-          .flatMap((section) => section.sentences)
+          .flatMap((section) => section.blocks.flatMap((block) => block.sentences))
           .findIndex((sentence) => sentence.id === variantChunkSentence.id) ?? -1)
       : -1;
     void savePhraseForScene({
@@ -791,27 +799,114 @@ export default function SceneDetailPage() {
     setViewModeWithRoute("variants");
   };
 
+  const effectiveSpeakingText = playbackState.text ?? null;
+
+  const stopGeneratedAudio = useCallback(() => {
+    stopTtsPlayback();
+    setTtsLooping(false);
+  }, []);
+
+  useEffect(
+    () => () => {
+      stopGeneratedAudio();
+    },
+    [stopGeneratedAudio],
+  );
+
   const handlePronounce = (text: string) => {
-    if (!text.trim()) return;
-    if (!supported) {
-      toast.error("当前浏览器不支持发音功能");
+    const clean = text.trim();
+    if (!clean) return;
+    if (effectiveSpeakingText === clean) {
+      stopGeneratedAudio();
       return;
     }
-    speak(text, { lang: "en-US" });
+
+    const sentence = variantChunkSentence;
+    const selectedChunkText = variantChunkDetail?.text?.trim();
+    if (selectedChunkText && clean.toLowerCase() === selectedChunkText.toLowerCase()) {
+      const chunkPlaybackKey = `chunk:${buildChunkAudioKey(clean)}`;
+      if (playbackState.kind === "chunk" && playbackState.chunkKey === buildChunkAudioKey(clean)) {
+        stopGeneratedAudio();
+        return;
+      }
+      void (async () => {
+        stopTtsPlayback();
+        setTtsLooping(false);
+        try {
+          await playChunkAudio({
+            chunkText: clean,
+            chunkKey: buildChunkAudioKey(clean),
+          });
+        } catch (error) {
+          toast.error(error instanceof Error ? error.message : "播放失败，请稍后重试");
+        }
+      })();
+      return;
+    }
+
+    if (sentence && clean === sentence.text.trim()) {
+      const sentencePlaybackKey = `sentence:${sentence.id}:normal`;
+      if (
+        playbackState.kind === "sentence" &&
+        playbackState.sentenceId === sentence.id &&
+        (playbackState.mode ?? "normal") === "normal"
+      ) {
+        stopGeneratedAudio();
+        return;
+      }
+      void (async () => {
+        stopTtsPlayback();
+        setTtsLooping(false);
+        try {
+          await playSentenceAudio({
+            sceneSlug: (baseLesson?.slug ?? sceneSlug).trim() || "scene",
+            sentenceId: sentence.id,
+            text: clean,
+            mode: "normal",
+            speaker: sentence.speaker,
+          });
+        } catch (error) {
+          toast.error(error instanceof Error ? error.message : "播放失败，请稍后重试");
+        }
+      })();
+      return;
+    }
+
+    void (async () => {
+      stopTtsPlayback();
+      setTtsLooping(false);
+      try {
+        await playChunkAudio({
+          chunkText: clean,
+          chunkKey: buildChunkAudioKey(clean),
+        });
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "播放失败，请稍后重试");
+      }
+    })();
   };
 
   const handleLoopSentence = (text: string) => {
     const clean = text.trim();
     if (!clean) return;
-    if (!supported) {
-      toast.error("当前浏览器不支持发音功能");
+    if (effectiveSpeakingText === clean) {
+      stopGeneratedAudio();
       return;
     }
-    if (speakingText === clean) {
-      stop();
-      return;
-    }
-    speak(clean, { lang: "en-US" });
+    void (async () => {
+      stopTtsPlayback();
+      setTtsLooping(true);
+      try {
+        await playChunkAudio({
+          chunkText: clean,
+          chunkKey: buildChunkAudioKey(clean),
+        });
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "播放失败，请稍后重试");
+      } finally {
+        setTtsLooping(false);
+      }
+    })();
   };
 
   const handleOpenVariantChunk = (chunk: string) => {
@@ -895,7 +990,7 @@ export default function SceneDetailPage() {
       relatedChunks={variantChunkRelatedChunks}
       open={variantChunkModalOpen}
       loading={false}
-      speakingText={speakingText}
+      speakingText={effectiveSpeakingText}
       onOpenChange={setVariantChunkModalOpen}
       onSave={handleSaveFromVariantSheet}
       onReview={handleSaveFromVariantSheet}
@@ -909,6 +1004,7 @@ export default function SceneDetailPage() {
       onSelectRelated={handleOpenVariantChunk}
       hoveredChunkKey={variantChunkHoveredKey}
       onHoverChunk={setVariantChunkHoveredKey}
+      playingChunkKey={playbackState.kind === "chunk" ? (playbackState.text ?? null) : null}
       showSentenceSection={false}
     />
   );
@@ -969,9 +1065,9 @@ export default function SceneDetailPage() {
                   <li key={`${exercise.id}-${index}`} className="rounded-md bg-[rgb(240,240,240)] p-3 text-sm">
                     <p className="text-xs text-muted-foreground">{exercise.type}</p>
                     <p className="mt-1">{exercise.prompt}</p>
-                    {exercise.targetChunk ? (
+                    {exercise.chunkId ? (
                       <p className="mt-1 text-xs text-muted-foreground">
-                        targetChunk: {exercise.targetChunk}
+                        chunk: {exercise.chunkId}
                       </p>
                     ) : null}
                     <button
@@ -987,7 +1083,7 @@ export default function SceneDetailPage() {
                       {visible ? "Hide Answer" : "Show Answer"}
                     </button>
                     {visible ? (
-                      <p className="mt-2 rounded bg-[rgb(240,240,240)] p-2 text-sm">{exercise.answer}</p>
+                      <p className="mt-2 rounded bg-[rgb(240,240,240)] p-2 text-sm">{exercise.answer.text}</p>
                     ) : null}
                   </li>
                 );

@@ -6,7 +6,7 @@ import { ChevronDown, Search, Volume2 } from "lucide-react";
 import { toast } from "sonner";
 import { getPhraseListCache, setPhraseListCache } from "@/lib/cache/phrase-list-cache";
 import { normalizePhraseText } from "@/lib/shared/phrases";
-import { useSpeech } from "@/hooks/use-speech";
+import { playChunkAudio, stopTtsPlayback } from "@/lib/utils/tts-api";
 import { generateExpressionMapFromApi } from "@/lib/utils/expression-map-api";
 import { ExpressionFamily, ExpressionMapResponse } from "@/lib/types/expression-map";
 import {
@@ -399,7 +399,7 @@ const extractExpressionsFromSentenceItem = (item: UserPhraseItemResponse) => {
 
 export default function ChunksPage() {
   const router = useRouter();
-  const { speak, stop, supported, speakingText } = useSpeech();
+  const [playingText, setPlayingText] = useState<string | null>(null);
   const searchParams = useSearchParams();
   const familyFromQuery = searchParams.get("family")?.trim() ?? "";
   const [query, setQuery] = useState("");
@@ -450,6 +450,13 @@ export default function ChunksPage() {
   const [retryingEnrichmentIds, setRetryingEnrichmentIds] = useState<Record<string, boolean>>({});
 
   const activeLoadTokenRef = useRef(0);
+
+  useEffect(
+    () => () => {
+      stopTtsPlayback();
+    },
+    [],
+  );
 
   const loadPhrases = async (
     nextQuery: string,
@@ -951,15 +958,22 @@ export default function ChunksPage() {
   const handlePronounceSentence = (sentence: string | null | undefined) => {
     const text = (sentence ?? "").trim();
     if (!text) return;
-    if (!supported) {
-      toast.message(zh.speechUnsupported);
+    if (playingText === text) {
+      stopTtsPlayback();
+      setPlayingText(null);
       return;
     }
-    if (speakingText === text) {
-      stop();
-      return;
-    }
-    speak(text, { lang: "en-US", rate: 1 });
+    void (async () => {
+      stopTtsPlayback();
+      setPlayingText(text);
+      try {
+        await playChunkAudio({ chunkText: text });
+      } catch {
+        toast.message(zh.speechUnsupported);
+      } finally {
+        setPlayingText((prev) => (prev === text ? null : prev));
+      }
+    })();
   };
 
   const getReviewActionHint = (status: PhraseReviewStatus) => {
@@ -1369,7 +1383,7 @@ export default function ChunksPage() {
                             onClick={() => handlePronounceSentence(item.sourceSentenceText)}
                           >
                             <Volume2 className="mr-1 size-3" />
-                            {speakingText === (item.sourceSentenceText ?? "").trim()
+                            {playingText === (item.sourceSentenceText ?? "").trim()
                               ? zh.stopSpeaking
                               : zh.speakSentence}
                           </Button>
@@ -1577,7 +1591,7 @@ export default function ChunksPage() {
           if (!open && !savingManual) resetManualForm();
         }}
       >
-        <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto rounded-t-2xl border-0 bg-[rgb(246,246,246)]">
+        <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto rounded-t-2xl border-0 bg-white">
           <SheetHeader>
             <SheetTitle>{zh.manualAddTitle}</SheetTitle>
             <SheetDescription>{zh.manualAddDesc}</SheetDescription>
@@ -1734,7 +1748,7 @@ export default function ChunksPage() {
           }
         }}
       >
-        <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto rounded-t-2xl border-0 bg-[rgb(246,246,246)]">
+        <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto rounded-t-2xl border-0 bg-white">
           <SheetHeader>
             <SheetTitle>{zh.generatedSimilarTitle}</SheetTitle>
             <SheetDescription>{zh.generatedSimilarDesc}</SheetDescription>
@@ -1799,7 +1813,7 @@ export default function ChunksPage() {
       </Sheet>
 
       <Sheet open={mapOpen} onOpenChange={setMapOpen}>
-        <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto rounded-t-2xl border-0 bg-[rgb(246,246,246)]">
+        <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto rounded-t-2xl border-0 bg-white">
           <SheetHeader>
             <SheetTitle>{zh.mapTitle}</SheetTitle>
             <SheetDescription>{zh.mapDesc}</SheetDescription>

@@ -37,7 +37,7 @@ async function withAuthRetry<T>(
     return { message: String(value) };
   };
 
-  for (let attempt = 1; attempt <= 2; attempt += 1) {
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
     const result = await fn();
     const error = toErrorLike(result.error);
     if (!error) {
@@ -48,7 +48,7 @@ async function withAuthRetry<T>(
     }
     lastError = error;
 
-    if (!isTransientAuthNetworkError(error.message) || attempt >= 2) {
+    if (!isTransientAuthNetworkError(error.message) || attempt >= 3) {
       break;
     }
 
@@ -57,7 +57,7 @@ async function withAuthRetry<T>(
       attempt,
       message: error.message,
     });
-    await waitMs(250);
+    await waitMs(250 * attempt);
   }
 
   return {
@@ -80,9 +80,10 @@ export async function getCurrentSession(): Promise<Session | null> {
   if (error) {
     if (isMissingSessionError(error.message)) return null;
     if (isTransientAuthNetworkError(error.message)) {
-      throw new Error(
-        "Supabase auth network timeout while reading session. Please retry.",
-      );
+      console.warn("[auth] transient timeout in getCurrentSession, fallback to null", {
+        message: error.message,
+      });
+      return null;
     }
     throw new Error(error.message);
   }
@@ -98,9 +99,15 @@ export async function getCurrentUser(): Promise<User | null> {
   if (error) {
     if (isMissingSessionError(error.message)) return null;
     if (isTransientAuthNetworkError(error.message)) {
-      throw new Error(
-        "Supabase auth network timeout while reading current user. Please retry.",
-      );
+      console.warn("[auth] transient timeout in getCurrentUser, trying session fallback", {
+        message: error.message,
+      });
+      try {
+        const fallback = await getCurrentSession();
+        return fallback?.user ?? null;
+      } catch {
+        return null;
+      }
     }
     throw new Error(error.message);
   }

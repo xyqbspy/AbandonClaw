@@ -32,8 +32,13 @@ const extractError = async (response: Response, fallback: string) => {
   return message;
 };
 
-export async function getScenesFromApi() {
-  const response = await fetch("/api/scenes", { method: "GET" });
+export async function getScenesFromApi(options?: { noStore?: boolean }) {
+  const noStore = options?.noStore === true;
+  const url = noStore ? `/api/scenes?_t=${Date.now()}` : "/api/scenes";
+  const response = await fetch(url, {
+    method: "GET",
+    cache: noStore ? "no-store" : "default",
+  });
   if (!response.ok) {
     throw new Error(await extractError(response, "Failed to load scenes."));
   }

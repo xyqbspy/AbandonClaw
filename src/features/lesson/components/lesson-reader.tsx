@@ -10,7 +10,6 @@ import {
   useState,
 } from "react";
 import {
-  Headphones,
   Languages,
   Play,
   Volume2,
@@ -24,8 +23,8 @@ import {
   getSentenceById,
 } from "@/lib/data/mock-lessons";
 import { useMobile } from "@/hooks/use-mobile";
-import { useSpeech } from "@/hooks/use-speech";
-import { Lesson, LessonSentence, SelectionChunkLayer } from "@/lib/types";
+import { useTtsPlaybackState } from "@/hooks/use-tts-playback-state";
+import { Lesson, LessonBlock, LessonSentence, SelectionChunkLayer } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -34,9 +33,26 @@ import { LessonProgress } from "@/features/lesson/components/lesson-progress";
 import { SelectionDetailPanel } from "@/features/lesson/components/selection-detail-panel";
 import { SelectionDetailSheet } from "@/features/lesson/components/selection-detail-sheet";
 import { SelectionToolbar } from "@/features/lesson/components/selection-toolbar";
-import { SentenceBlock } from "@/features/lesson/components/sentence-block";
 import { normalizePhraseText } from "@/lib/shared/phrases";
+import { buildChunkAudioKey } from "@/lib/shared/tts";
+import {
+  getLessonBlocks,
+  getLessonSentences,
+  getSectionBlocks,
+  getSectionSentences,
+} from "@/lib/shared/lesson-content";
+import {
+  playChunkAudio,
+  playSceneLoopAudio,
+  playSentenceAudio,
+  setTtsLooping,
+  stopTtsPlayback,
+} from "@/lib/utils/tts-api";
 import { APPLE_BUTTON_BASE, APPLE_BUTTON_TEXT_LG, APPLE_SURFACE } from "@/lib/ui/apple-style";
+import {
+  LESSON_DIALOGUE_A_BG_CLASS,
+  LESSON_DIALOGUE_B_BG_CLASS,
+} from "@/features/lesson/styles/dialogue-theme";
 
 type SelectionState = {
   text: string;
@@ -68,17 +84,15 @@ type MobileSentenceGroup = {
   text: string;
   translation: string;
   relatedChunks: string[];
-  speaker?: "A" | "B";
+  speaker?: string;
 };
 
-const speakerLabel = (speaker?: "A" | "B") => {
-  if (speaker === "A") return "A";
-  if (speaker === "B") return "B";
-  return "";
-};
+const normalizeSpeaker = (speaker?: string) => (speaker ?? "").trim().toUpperCase();
+const isPrimarySpeaker = (speaker?: string) => normalizeSpeaker(speaker) === "A";
+const speakerLabel = (speaker?: string) => normalizeSpeaker(speaker);
 
 function groupSentencesForMobile(
-  sentences: Lesson["sections"][number]["sentences"],
+  sentences: LessonSentence[],
 ) {
   const groups: Array<typeof sentences> = [];
   let index = 0;
@@ -113,6 +127,7 @@ function groupSentencesForMobile(
 
 const TOOLBAR_WIDTH = 256;
 const appleButtonLgClassName = `${APPLE_BUTTON_BASE} ${APPLE_BUTTON_TEXT_LG}`;
+const hasSpeakerTag = (speaker?: string) => /^[A-Z]$/.test((speaker ?? "").trim().toUpperCase());
 
 function interactionReducer(
   state: InteractionState,
@@ -194,29 +209,28 @@ export function LessonReader({
       : lesson.difficulty === "Advanced"
         ? "进阶"
         : "中级";
-  const isDialogueScene = lesson.sceneType === "dialogue";
+  const blockOrder = useMemo(() => getLessonBlocks(lesson), [lesson]);
+  const hasDialogueLikeSpeakers =
+    blockOrder.length > 0 && blockOrder.every((block) => hasSpeakerTag(block.speaker));
+  const isDialogueScene =
+    lesson.sceneType === "dialogue" ||
+    blockOrder.some((block) => (block.kind ?? lesson.sceneType ?? "monologue") === "dialogue") ||
+    hasDialogueLikeSpeakers;
 
   const firstSentence = getFirstSentence(lesson) ?? null;
   const isMobile = useMobile();
-  const { speak, stop, supported, speakingText } = useSpeech();
   const toolbarRef = useRef<HTMLDivElement | null>(null);
   const readerRef = useRef<HTMLDivElement | null>(null);
   const suppressSelectionClearRef = useRef(false);
   const sentenceNodeMapRef = useRef<Record<string, HTMLDivElement | null>>({});
-  const autoPlayActiveRef = useRef(false);
-  const autoPlayIndexRef = useRef(0);
-  const autoPlayWatchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const playFromIndexRef = useRef<(index: number) => void>(() => {});
   const sentenceLoopRef = useRef<string | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [dialogueTranslationOpenMap, setDialogueTranslationOpenMap] =
+  const [dialogueBlockTranslationOpenMap, setDialogueBlockTranslationOpenMap] =
     useState<Record<string, boolean>>({});
   const [mobileGroupTranslationOpenMap, setMobileGroupTranslationOpenMap] =
     useState<Record<string, boolean>>({});
   const [mobileActiveGroup, setMobileActiveGroup] =
     useState<MobileSentenceGroup | null>(null);
-  const [autoPlayActive, setAutoPlayActive] = useState(false);
-  const [, setAutoPlayIndex] = useState(0);
   const [localSavedPhraseTexts, setLocalSavedPhraseTexts] = useState<Set<string>>(new Set());
   const [state, dispatch] = useReducer(interactionReducer, {
     activeSentenceId: firstSentence?.id ?? null,
@@ -231,21 +245,17 @@ export function LessonReader({
   }, []);
 
   const sentenceCount = useMemo(
-    () =>
-      lesson.sections.reduce(
-        (total, section) => total + section.sentences.length,
-        0,
-      ),
-    [lesson.sections],
+    () => getLessonSentences(lesson).length,
+    [lesson],
   );
   const sceneTypeMetaLabel = isDialogueScene
     ? `双人对话 · ${sentenceCount}轮`
     : `自述练习 · ${sentenceCount}句`;
   const sceneMetaLabel = `${difficultyLabel} · ${lesson.estimatedMinutes}分钟 · ${sceneTypeMetaLabel}`;
-  const sentenceSectionLabel = isDialogueScene ? "当前对话" : "当前表达";
+  const sentenceSectionLabel = isDialogueScene ? "当前对话块" : "当前表达块";
   const sentenceOrder = useMemo(
-    () => lesson.sections.flatMap((section) => section.sentences),
-    [lesson.sections],
+    () => getLessonSentences(lesson),
+    [lesson],
   );
 
   const currentSentence = useMemo(
@@ -254,6 +264,15 @@ export function LessonReader({
         ? (getSentenceById(lesson, state.activeSentenceId) ?? null)
         : null,
     [lesson, state.activeSentenceId],
+  );
+  const currentBlock = useMemo(
+    () =>
+      state.activeSentenceId
+        ? (blockOrder.find((block) =>
+            block.sentences.some((sentence) => sentence.id === state.activeSentenceId),
+          ) ?? null)
+        : null,
+    [blockOrder, state.activeSentenceId],
   );
 
   const mobileDisplaySentence = useMemo<LessonSentence | null>(() => {
@@ -273,16 +292,18 @@ export function LessonReader({
     if (!state.activeSentenceId) return lesson.sections[0] ?? null;
     return (
       lesson.sections.find((section) =>
-        section.sentences.some(
+        getSectionSentences(section, lesson.sceneType ?? "monologue").some(
           (sentence) => sentence.id === state.activeSentenceId,
         ),
       ) ?? null
     );
-  }, [lesson.sections, state.activeSentenceId]);
+  }, [lesson, lesson.sections, state.activeSentenceId]);
 
   const relatedChunks = isMobile && !isDialogueScene
     ? (mobileActiveGroup?.relatedChunks ?? currentSentence?.chunks ?? [])
-    : (currentSentence?.chunks ?? []);
+    : isDialogueScene && currentBlock
+      ? Array.from(new Set(currentBlock.sentences.flatMap((sentence) => sentence.chunks)))
+      : (currentSentence?.chunks ?? []);
 
   const chunkDetail = useMemo<SelectionChunkLayer | null>(() => {
     if (!currentSentence || !state.activeChunkKey) return null;
@@ -321,9 +342,76 @@ export function LessonReader({
     };
   }, [chunkDetail, currentSentence, lesson.slug, sentenceOrder]);
 
-  useEffect(() => {
-    autoPlayActiveRef.current = autoPlayActive;
-  }, [autoPlayActive]);
+  const playbackState = useTtsPlaybackState();
+  const isSceneLooping =
+    playbackState.kind === "scene" &&
+    playbackState.sceneSlug === lesson.slug &&
+    Boolean(playbackState.isLooping);
+  const effectiveSpeakingText = playbackState.text ?? null;
+  const isSentencePlaying = useCallback(
+    (sentenceId: string, mode?: "normal" | "slow") => {
+      if (playbackState.kind !== "sentence") return false;
+      if (playbackState.sentenceId !== sentenceId) return false;
+      if (!mode) return true;
+      return (playbackState.mode ?? "normal") === mode;
+    },
+    [playbackState.kind, playbackState.mode, playbackState.sentenceId],
+  );
+  const isChunkPlaying = useCallback(
+    (chunk: string) =>
+      playbackState.kind === "chunk" &&
+      playbackState.chunkKey === buildChunkAudioKey(chunk),
+    [playbackState.chunkKey, playbackState.kind],
+  );
+  const stopAudio = useCallback(() => {
+    stopTtsPlayback();
+    setTtsLooping(false);
+  }, []);
+
+  const playBlockTts = useCallback(
+    async (block: LessonBlock) => {
+      const blockReadText =
+        block.tts?.trim() ||
+        block.sentences
+          .map((sentence) => sentence.tts?.trim() || sentence.audioText?.trim() || sentence.text)
+          .filter(Boolean)
+          .join(" ");
+      if (!blockReadText) return;
+
+      const blockPlaybackId = `block-${block.id}`;
+      if (
+        playbackState.kind === "sentence" &&
+        playbackState.sentenceId === blockPlaybackId &&
+        (playbackState.mode ?? "normal") === "normal"
+      ) {
+        stopAudio();
+        return;
+      }
+
+      sentenceLoopRef.current = null;
+      stopTtsPlayback();
+      setTtsLooping(false);
+      try {
+        await playSentenceAudio({
+          sceneSlug: lesson.slug,
+          sentenceId: blockPlaybackId,
+          text: blockReadText,
+          mode: "normal",
+          speaker: block.speaker,
+        });
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "发音失败，请稍后重试");
+      }
+    },
+    [lesson.slug, playbackState.kind, playbackState.mode, playbackState.sentenceId, stopAudio],
+  );
+
+  useEffect(
+    () => () => {
+      stopAudio();
+    },
+    [stopAudio],
+  );
 
   useEffect(() => {
     // Temporary debugging aid for race/ownership validation.
@@ -408,10 +496,10 @@ export function LessonReader({
     [dispatchAction, isMobile, setSheetOpen],
   );
 
-  const toggleDialogueTranslation = useCallback((sentenceId: string) => {
-    setDialogueTranslationOpenMap((prev) => ({
+  const toggleDialogueBlockTranslation = useCallback((blockId: string) => {
+    setDialogueBlockTranslationOpenMap((prev) => ({
       ...prev,
-      [sentenceId]: !prev[sentenceId],
+      [blockId]: !prev[blockId],
     }));
   }, []);
 
@@ -422,7 +510,6 @@ export function LessonReader({
         sentenceIds: group.sentenceIds,
       });
       const anchorSentenceId = group.sentenceIds[0];
-      const anchorSentence = findSentenceById(anchorSentenceId);
       dispatchAction({
         type: "SENTENCE_CONTEXT_SET",
         payload: { sentenceId: anchorSentenceId },
@@ -430,10 +517,8 @@ export function LessonReader({
       dispatchAction({ type: "SELECTION_CLEARED" });
       setMobileActiveGroup(group);
       setSheetOpen(true);
-      const firstChunk = anchorSentence?.chunks[0];
-      if (firstChunk) activateChunk(anchorSentenceId, firstChunk);
     },
-    [activateChunk, dispatchAction, findSentenceById, setSheetOpen],
+    [dispatchAction, setSheetOpen],
   );
 
   const extractSelectionInReader = useCallback(() => {
@@ -478,143 +563,108 @@ export function LessonReader({
 
   const handlePronounce = useCallback(
     (text: string) => {
-      if (!text.trim()) return;
-      if (!supported) {
-        toast.error("当前浏览器不支持发音功能");
+      const clean = text.trim();
+      if (!clean) return;
+      if (effectiveSpeakingText === clean) {
+        stopAudio();
         return;
       }
-
-      if (speakingText === text) {
-        stop();
-        return;
-      }
-
-      const success = speak(text, { lang: "en-US" });
-      if (!success) toast.error("发音失败，请稍后重试");
+      const sentence = sentenceOrder.find((item) => item.text.trim() === clean);
+      setTtsLooping(false);
+      void (async () => {
+        try {
+          if (sentence) {
+            await playSentenceAudio({
+              sceneSlug: lesson.slug,
+              sentenceId: sentence.id,
+              text: sentence.tts?.trim() || sentence.audioText?.trim() || sentence.text,
+              mode: "normal",
+              speaker: sentence.speaker,
+            });
+          } else {
+            await playChunkAudio({
+              chunkText: clean,
+              chunkKey: buildChunkAudioKey(clean),
+            });
+          }
+        } catch (error) {
+          toast.error(error instanceof Error ? error.message : "发音失败，请稍后重试");
+        }
+      })();
     },
-    [speak, speakingText, stop, supported],
+    [effectiveSpeakingText, lesson.slug, sentenceOrder, stopAudio],
   );
 
   const handleLoopSentence = useCallback(
     (text: string) => {
       const clean = text.trim();
       if (!clean) return;
-      if (!supported) {
-        toast.error("当前浏览器不支持发音功能");
-        return;
-      }
 
-      if (sentenceLoopRef.current === clean && speakingText === clean) {
+      if (sentenceLoopRef.current === clean && effectiveSpeakingText === clean) {
         sentenceLoopRef.current = null;
-        stop();
+        stopAudio();
         return;
       }
 
-      autoPlayActiveRef.current = false;
-      setAutoPlayActive(false);
       sentenceLoopRef.current = clean;
+      stopAudio();
+      setTtsLooping(true);
 
-      const speakLoop = () => {
-        if (sentenceLoopRef.current !== clean) return;
-        const success = speak(clean, {
-          lang: "en-US",
-          onEnd: () => {
-            if (sentenceLoopRef.current !== clean) return;
-            window.setTimeout(speakLoop, 80);
-          },
-          onError: () => {
+      void (async () => {
+        while (sentenceLoopRef.current === clean) {
+          try {
+            await playChunkAudio({
+              chunkText: clean,
+              chunkKey: buildChunkAudioKey(clean),
+            });
+          } catch (error) {
             sentenceLoopRef.current = null;
-          },
-        });
-        if (!success) {
-          sentenceLoopRef.current = null;
-          toast.error("播放失败，请稍后重试");
+            toast.error(error instanceof Error ? error.message : "播放失败，请稍后重试");
+            break;
+          }
+          if (sentenceLoopRef.current !== clean) break;
+          await new Promise<void>((resolve) => window.setTimeout(resolve, 80));
         }
-      };
-
-      speakLoop();
+        setTtsLooping(false);
+      })();
     },
-    [speak, speakingText, stop, supported],
+    [effectiveSpeakingText, stopAudio],
   );
-  const startSequentialPlay = useCallback(
-    (startIndex = 0) => {
-      if (sentenceOrder.length === 0) return;
-      const nextIndex = Math.max(
-        0,
-        Math.min(startIndex, sentenceOrder.length - 1),
-      );
-      const target = sentenceOrder[nextIndex];
-      autoPlayActiveRef.current = true;
-      autoPlayIndexRef.current = nextIndex;
-      const success = speak(target.text, {
-        lang: "en-US",
-        onEnd: () => {
-          if (!autoPlayActiveRef.current) return;
-          const next = (autoPlayIndexRef.current + 1) % sentenceOrder.length;
-          autoPlayIndexRef.current = next;
-          setAutoPlayIndex(next);
-          window.setTimeout(() => playFromIndexRef.current(next), 80);
-        },
-        onError: () => {
-          if (!autoPlayActiveRef.current) return;
-          const next = (autoPlayIndexRef.current + 1) % sentenceOrder.length;
-          autoPlayIndexRef.current = next;
-          setAutoPlayIndex(next);
-          window.setTimeout(() => playFromIndexRef.current(next), 120);
-        },
-      });
-      if (!success) {
-        autoPlayActiveRef.current = false;
-        setAutoPlayActive(false);
-        setAutoPlayIndex(0);
-        toast.error("连播启动失败，请稍后重试");
-        return;
-      }
-      setAutoPlayIndex(nextIndex);
-      setAutoPlayActive(true);
-    },
-    [sentenceOrder, speak],
-  );
-  useEffect(() => {
-    playFromIndexRef.current = startSequentialPlay;
-  }, [startSequentialPlay]);
 
-  const stopSequentialPlay = useCallback(() => {
-    autoPlayActiveRef.current = false;
-    if (autoPlayWatchdogRef.current) {
-      clearTimeout(autoPlayWatchdogRef.current);
-      autoPlayWatchdogRef.current = null;
-    }
-    stop();
-    setAutoPlayActive(false);
-    setAutoPlayIndex(0);
-  }, [stop]);
-
-  useEffect(() => {
-    if (!autoPlayActive) {
-      if (autoPlayWatchdogRef.current) {
-        clearTimeout(autoPlayWatchdogRef.current);
-        autoPlayWatchdogRef.current = null;
-      }
+  const toggleSceneLoopPlayback = useCallback(() => {
+    if (isSceneLooping) {
+      stopAudio();
       return;
     }
-    if (speakingText) return;
-    autoPlayWatchdogRef.current = setTimeout(() => {
-      if (!autoPlayActiveRef.current) return;
-      playFromIndexRef.current(autoPlayIndexRef.current);
-    }, 1800);
 
-    return () => {
-      if (autoPlayWatchdogRef.current) {
-        clearTimeout(autoPlayWatchdogRef.current);
-        autoPlayWatchdogRef.current = null;
+    const segments = blockOrder
+      .flatMap((block) =>
+        block.sentences.map((sentence) => ({
+          text: (sentence.tts?.trim() || sentence.audioText?.trim() || sentence.text).trim(),
+          speaker: (block.speaker ?? sentence.speaker ?? "").trim().toUpperCase() || undefined,
+        })),
+      )
+      .filter((segment) => Boolean(segment.text));
+    if (segments.length === 0) {
+      toast.message("当前场景没有可播放内容。");
+      return;
+    }
+
+    void (async () => {
+      try {
+        await playSceneLoopAudio({
+          sceneSlug: lesson.slug,
+          sceneType: lesson.sceneType ?? "monologue",
+          segments,
+        });
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "完整场景音频暂不可用");
       }
-    };
-  }, [autoPlayActive, speakingText]);
+    })();
+  }, [blockOrder, isSceneLooping, lesson.sceneType, lesson.slug, stopAudio]);
 
   useEffect(() => {
     if (!sheetOpen) return;
-    if (state.activeChunkKey) return;
 
     const activeSentence =
       (state.activeSentenceId
@@ -622,13 +672,15 @@ export function LessonReader({
         : null) ?? firstSentence;
     if (!activeSentence?.id) return;
 
-    const firstChunk = activeSentence.chunks[0];
-    if (firstChunk) {
-      dispatchAction({
-        type: "CHUNK_ACTIVATED",
-        payload: { sentenceId: activeSentence.id, chunkKey: firstChunk },
-      });
-      return;
+    if (isMobile && !state.activeChunkKey) {
+      const firstChunk = activeSentence.chunks[0];
+      if (firstChunk) {
+        dispatchAction({
+          type: "CHUNK_ACTIVATED",
+          payload: { sentenceId: activeSentence.id, chunkKey: firstChunk },
+        });
+        return;
+      }
     }
 
     dispatchAction({
@@ -638,23 +690,12 @@ export function LessonReader({
   }, [
     dispatchAction,
     firstSentence,
+    isMobile,
     sentenceOrder,
     sheetOpen,
     state.activeChunkKey,
     state.activeSentenceId,
   ]);
-
-  const toggleSequentialPlay = useCallback(() => {
-    if (!supported) {
-      toast.error("当前浏览器不支持发音功能");
-      return;
-    }
-    if (autoPlayActive) {
-      stopSequentialPlay();
-      return;
-    }
-    startSequentialPlay(0);
-  }, [autoPlayActive, startSequentialPlay, stopSequentialPlay, supported]);
 
   const handleSave = useCallback(async () => {
     const payload = buildPhrasePayload();
@@ -695,6 +736,28 @@ export function LessonReader({
       toast.error(error instanceof Error ? error.message : "加入复习失败");
     }
   }, [buildPhrasePayload, onReviewPhrase, onSavePhrase]);
+
+  const resolveSentenceIdForChunk = useCallback(
+    (chunk: string) => {
+      if (isMobile && !isDialogueScene && mobileActiveGroup) {
+        return (
+          mobileActiveGroup.sentenceIds.find((id) => {
+            const sentence = findSentenceById(id);
+            return sentence?.chunks.some((item) => item.toLowerCase() === chunk.toLowerCase());
+          }) ?? mobileActiveGroup.sentenceIds[0]
+        );
+      }
+      if (currentBlock) {
+        return (
+          currentBlock.sentences.find((sentence) =>
+            sentence.chunks.some((item) => item.toLowerCase() === chunk.toLowerCase()),
+          )?.id ?? state.activeSentenceId
+        );
+      }
+      return state.activeSentenceId;
+    },
+    [currentBlock, findSentenceById, isDialogueScene, isMobile, mobileActiveGroup, state.activeSentenceId],
+  );
 
   useEffect(() => {
     if (isMobile) return;
@@ -740,33 +803,42 @@ export function LessonReader({
     };
   }, [dispatchAction, extractSelectionInReader, isMobile]);
 
-  const renderDialogueBubble = useCallback(
-    (sentence: LessonSentence) => {
-      const speaker = sentence.speaker ?? "A";
-      const translationOpen = Boolean(dialogueTranslationOpenMap[sentence.id]);
-      const showTranslation = translationOpen;
-      const sentenceSpeaking = speakingText === (sentence.audioText ?? sentence.text);
+  const renderDialogueBlock = useCallback(
+    (block: LessonBlock, blockIndex: number) => {
+      const speaker = block.speaker ?? "A";
+      const primarySpeaker = isPrimarySpeaker(speaker);
+      const translationOpen = Boolean(dialogueBlockTranslationOpenMap[block.id]);
+      const blockTranslation =
+        block.translation?.trim() ||
+        block.sentences
+          .map((sentence) => sentence.translation?.trim())
+          .filter(Boolean)
+          .join(" ");
+      const blockPlaybackId = `block-${block.id}`;
+      const isBlockSpeaking =
+        (playbackState.kind === "sentence" &&
+          playbackState.sentenceId === blockPlaybackId) ||
+        block.sentences.some((sentence) => isSentencePlaying(sentence.id));
 
       return (
         <div
-          key={sentence.id}
+          key={block.id}
           className={cn(
             "flex w-full",
-            speaker === "B" ? "justify-end" : "justify-start",
+            primarySpeaker ? "justify-start" : "justify-end",
           )}
         >
           <div
             className={cn(
               "w-full max-w-[90%] sm:max-w-[78%]",
-              speaker === "B" ? "items-end" : "items-start",
+              primarySpeaker ? "items-start" : "items-end",
             )}
           >
             <article
               className={cn(
                 "rounded-lg px-3 py-2.5 transition-colors",
                 "hover:bg-muted/20",
-                speaker === "A" && "bg-[rgb(246,246,246)]",
-                speaker === "B" && "bg-[rgb(210,255,152)]",
+                primarySpeaker ? LESSON_DIALOGUE_A_BG_CLASS : LESSON_DIALOGUE_B_BG_CLASS,
               )}
             >
               <div className="mb-1">
@@ -774,30 +846,44 @@ export function LessonReader({
                   variant="outline"
                   className={cn(
                     "h-5 min-w-5 justify-center rounded-full px-1.5 text-[10px]",
-                    speaker === "A"
+                    primarySpeaker
                       ? "border-sky-200/80 bg-sky-50/40 text-sky-700"
                       : "border-emerald-200/80 bg-emerald-50/40 text-emerald-700",
                   )}
                 >
-                  {speakerLabel(speaker)}
+                  {speakerLabel(speaker) || "A"}
                 </Badge>
               </div>
 
-              <p
-                data-sentence-id={sentence.id}
-                data-sentence-text={sentence.text}
-                data-sentence-translation={sentence.translation}
-                className="cursor-pointer text-[1.03rem] leading-relaxed text-foreground/95"
-                onClick={() => handleSentenceTap(sentence.id)}
-              >
-                {sentence.text}
-              </p>
+              <div className="space-y-2">
+                {block.sentences.map((sentence) => {
+                  return (
+                    <div key={sentence.id} className="space-y-1">
+                      <p
+                        data-sentence-id={sentence.id}
+                        data-sentence-text={sentence.text}
+                        data-sentence-translation={sentence.translation}
+                        className={cn(
+                          "cursor-pointer text-[1.03rem] leading-relaxed text-foreground/95",
+                          isSentencePlaying(sentence.id) && "text-primary",
+                        )}
+                        onClick={() => handleSentenceTap(sentence.id)}
+                      >
+                        {sentence.text}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
 
               <div className="mt-1 flex items-center gap-2 text-[11px] text-muted-foreground/60">
                 <button
                   type="button"
-                  className="inline-flex cursor-pointer items-center gap-1 transition-colors hover:text-foreground"
-                  onClick={() => toggleDialogueTranslation(sentence.id)}
+                  className={cn(
+                    "inline-flex cursor-pointer items-center gap-1 transition-colors hover:text-foreground",
+                    isBlockSpeaking && "text-primary",
+                  )}
+                  onClick={() => toggleDialogueBlockTranslation(block.id)}
                 >
                   <Languages className="size-3.5" />
                   翻译
@@ -805,17 +891,23 @@ export function LessonReader({
                 <span className="opacity-40">·</span>
                 <button
                   type="button"
-                  className="inline-flex cursor-pointer items-center gap-1 transition-colors hover:text-foreground"
-                  onClick={() => handlePronounce(sentence.audioText ?? sentence.text)}
+                  className={cn(
+                    "inline-flex cursor-pointer items-center gap-1 transition-colors hover:text-foreground",
+                    isBlockSpeaking && "text-primary",
+                  )}
+                  onClick={() => {
+                    void playBlockTts(block);
+                  }}
                 >
-                  <Volume2 className={cn("size-3.5", sentenceSpeaking && "animate-pulse text-primary")} />
+                  <Volume2 className={cn("size-3.5", isBlockSpeaking && "animate-pulse text-primary")} />
                   朗读
                 </button>
+                {/* TODO(audio): 暂时屏蔽慢速朗读按钮，批量生成慢速音频后再恢复。 */}
               </div>
 
-              {showTranslation ? (
+              {translationOpen ? (
                 <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                  {sentence.translation || "该句翻译暂未提供。"}
+                  {blockTranslation || "该段翻译暂未提供。"}
                 </p>
               ) : null}
             </article>
@@ -824,11 +916,12 @@ export function LessonReader({
       );
     },
     [
-      dialogueTranslationOpenMap,
-      handlePronounce,
-      handleSentenceTap,
-      speakingText,
-      toggleDialogueTranslation,
+      playBlockTts,
+      isSentencePlaying,
+      playbackState.kind,
+      playbackState.sentenceId,
+      toggleDialogueBlockTranslation,
+      dialogueBlockTranslationOpenMap,
     ],
   );
 
@@ -871,12 +964,13 @@ export function LessonReader({
                 className={cn(
                   `inline-flex items-center gap-1.5 text-foreground/85 ${appleButtonLgClassName}`,
                   "cursor-pointer whitespace-nowrap",
+                  isSceneLooping && "text-primary",
                   isMobile && "px-2 py-1 text-[15px]",
                 )}
-                onClick={toggleSequentialPlay}
+                onClick={toggleSceneLoopPlayback}
               >
                 <Play className={cn("size-4", isMobile && "size-3.5")} />
-                {autoPlayActive ? "停止循环" : "循环播放"}
+                {isSceneLooping ? "停止循环" : "循环播放"}
               </button>
             </div>
           </div>
@@ -889,12 +983,13 @@ export function LessonReader({
                 className={cn(
                   `inline-flex items-center gap-1.5 text-foreground/85 ${appleButtonLgClassName}`,
                   "cursor-pointer whitespace-nowrap",
+                  isSceneLooping && "text-primary",
                   isMobile && "px-2 py-1 text-[15px]",
                 )}
-                onClick={toggleSequentialPlay}
+                onClick={toggleSceneLoopPlayback}
               >
                 <Play className={cn("size-4", isMobile && "size-3.5")} />
-                {autoPlayActive ? "停止循环" : "循环播放"}
+                {isSceneLooping ? "停止循环" : "循环播放"}
               </button>
             </div>
           </div>
@@ -921,11 +1016,16 @@ export function LessonReader({
                       type="button"
                       size="sm"
                       variant="ghost"
-                      className="h-6 shrink-0 cursor-pointer gap-1 px-1.5 text-[10px] text-muted-foreground/80"
-                      onClick={toggleSequentialPlay}
+                      className={cn(
+                        "h-6 shrink-0 cursor-pointer gap-1 px-1.5 text-[10px]",
+                        isSceneLooping
+                          ? "text-primary"
+                          : "text-muted-foreground/80",
+                      )}
+                      onClick={toggleSceneLoopPlayback}
                     >
                       <Play className="size-3" />
-                      {autoPlayActive ? "停止循环" : "循环播放"}
+                      {isSceneLooping ? "停止循环" : "循环播放"}
                     </Button>
                   </div>
                   <p className="text-[10px] leading-4 whitespace-nowrap text-muted-foreground/80">
@@ -961,11 +1061,14 @@ export function LessonReader({
                     <Button
                       size="sm"
                       variant="outline"
-                      className="cursor-pointer transition-all duration-150 hover:border-primary/40 hover:bg-accent"
-                      onClick={toggleSequentialPlay}
+                      className={cn(
+                        "cursor-pointer transition-all duration-150 hover:border-primary/40 hover:bg-accent",
+                        isSceneLooping && "text-primary",
+                      )}
+                      onClick={toggleSceneLoopPlayback}
                     >
                       <Play className="size-4" />
-                      {autoPlayActive ? "停止循环" : "循环播放"}
+                      {isSceneLooping ? "停止循环" : "循环播放"}
                     </Button>
                     <Button
                       size="sm"
@@ -975,8 +1078,8 @@ export function LessonReader({
                         handlePronounce(currentSentence?.text ?? lesson.title)
                       }
                     >
-                      <Headphones className="size-4" />
-                      播放本节发音
+                      <Volume2 className="size-4" />
+                      朗读
                     </Button>
                     {headerTools}
                   </div>
@@ -991,13 +1094,15 @@ export function LessonReader({
 
         {isDialogueScene ? (
           <div className={cn("space-y-2", isMobile && "space-y-1.5")}>
-            {sentenceOrder.map((sentence) => renderDialogueBubble(sentence))}
+            {blockOrder.map((block, index) => renderDialogueBlock(block, index))}
           </div>
         ) : isMobile ? (
           <div className="overflow-hidden bg-transparent">
             {lesson.sections.map((section) => {
               const active = currentSection?.id === section.id;
-              const groupedSentences = groupSentencesForMobile(section.sentences);
+              const groupedSentences = groupSentencesForMobile(
+                getSectionSentences(section, lesson.sceneType ?? "monologue"),
+              );
 
               return (
                 <div key={section.id} className="space-y-1.5">
@@ -1005,7 +1110,7 @@ export function LessonReader({
                     const groupKey = `${section.id}-group-${groupIndex}`;
                     const groupText = group.map((sentence) => sentence.text).join(" ");
                     const groupTranslation = group.map((sentence) => sentence.translation).join(" ");
-                    const groupPlaying = speakingText === groupText;
+                    const groupPlaying = effectiveSpeakingText === groupText;
                     const groupSelected = group.some((sentence) => sentence.id === state.activeSentenceId);
                     const translationOpen = Boolean(mobileGroupTranslationOpenMap[groupKey]);
                     const groupRelatedChunks = Array.from(new Set(group.flatMap((sentence) => sentence.chunks)));
@@ -1072,7 +1177,7 @@ export function LessonReader({
                                 }}
                               >
                                 <Volume2 className={cn("size-3", groupPlaying && "animate-pulse text-primary")} />
-                                {groupPlaying ? "停止" : "播放"}
+                                {groupPlaying ? "停止" : "朗读"}
                               </button>
                             </div>
 
@@ -1098,12 +1203,12 @@ export function LessonReader({
                             onClick={() => handleMobileGroupTap(groupContext)}
                           >
                             <p
-                              className={cn(
-                                "text-[16px] leading-[1.72] font-normal tracking-[0.01em] text-foreground/95",
-                                groupSelected && "text-primary",
-                              )}
-                            >
-                              {groupText}
+                            className={cn(
+                              "text-[16px] leading-[1.72] font-normal tracking-[0.01em] text-foreground/95",
+                              groupSelected && "text-primary",
+                            )}
+                          >
+                            {groupText}
                             </p>
                           </div>
                         </div>
@@ -1122,28 +1227,62 @@ export function LessonReader({
                 <p className="text-sm text-muted-foreground">{section.summary}</p>
               </div>
               <div className="space-y-3">
-                {section.sentences.map((sentence) => (
-                  <SentenceBlock
-                    key={sentence.id}
-                    sentence={sentence}
-                    showSpeaker={false}
-                    speaking={speakingText === (sentence.audioText ?? sentence.text)}
-                    activeChunkKey={state.activeChunkKey}
-                    hoveredChunkKey={state.hoveredChunkKey}
-                    onPronounce={handlePronounce}
-                    onSentenceTap={handleSentenceTap}
-                    mobileTapEnabled={isMobile}
-                    onSelectText={(chunk, meta) => {
-                      if (!meta?.sentenceId) return;
-                      activateChunk(meta.sentenceId, chunk);
-                    }}
-                    onHoverChunk={(chunkKey) =>
-                      dispatchAction({
-                        type: "CHUNK_HOVERED",
-                        payload: { chunkKey },
-                      })
-                    }
-                  />
+                {getSectionBlocks(section, lesson.sceneType ?? "monologue").map((block) => (
+                  <div key={block.id} className="space-y-2">
+                    <article className={cn("rounded-lg px-3 py-2.5 transition-colors hover:bg-muted/20", LESSON_DIALOGUE_A_BG_CLASS)}>
+                      <div className="space-y-2">
+                        {block.sentences.map((sentence) => (
+                          <p
+                            key={sentence.id}
+                            data-sentence-id={sentence.id}
+                            data-sentence-text={sentence.text}
+                            data-sentence-translation={sentence.translation}
+                            className="cursor-pointer text-[1.03rem] leading-relaxed text-foreground/95"
+                            onClick={() => handleSentenceTap(sentence.id)}
+                          >
+                            {sentence.text}
+                          </p>
+                        ))}
+                      </div>
+
+                      <div className="mt-1 flex items-center gap-2 text-[11px] text-muted-foreground/60">
+                        <button
+                          type="button"
+                          className="inline-flex cursor-pointer items-center gap-1 transition-colors hover:text-foreground"
+                          onClick={() => toggleDialogueBlockTranslation(block.id)}
+                        >
+                          <Languages className="size-3.5" />
+                          翻译
+                        </button>
+                        <span className="opacity-40">·</span>
+                        <button
+                          type="button"
+                          className="inline-flex cursor-pointer items-center gap-1 transition-colors hover:text-foreground"
+                          onClick={() => handlePronounce(
+                            block.tts?.trim() ||
+                              block.sentences
+                                .map((sentence) => sentence.tts?.trim() || sentence.audioText || sentence.text)
+                                .filter(Boolean)
+                                .join(" "),
+                          )}
+                        >
+                          <Volume2 className="size-3.5" />
+                          朗读
+                        </button>
+                      </div>
+
+                      {dialogueBlockTranslationOpenMap[block.id] ? (
+                        <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                          {block.translation?.trim() ||
+                            block.sentences
+                              .map((sentence) => sentence.translation?.trim())
+                              .filter(Boolean)
+                              .join(" ") ||
+                            "该段翻译暂未提供。"}
+                        </p>
+                      ) : null}
+                    </article>
+                  </div>
                 ))}
               </div>
             </section>
@@ -1161,48 +1300,41 @@ export function LessonReader({
       >
         <SelectionDetailPanel
           currentSentence={mobileDisplaySentence}
+          blockSentences={isDialogueScene ? (currentBlock?.sentences ?? []) : []}
           chunkDetail={chunkDetail}
           relatedChunks={relatedChunks}
           showSpeaker={isDialogueScene}
           sentenceSectionLabel={sentenceSectionLabel}
           loading={false}
-          speakingText={speakingText}
+          speakingText={effectiveSpeakingText}
           onSave={handleSave}
           onReview={handleAddReview}
           saved={chunkSaved}
           onPronounce={handlePronounce}
           onSelectRelated={(chunk) => {
-            if (isMobile && mobileActiveGroup) {
-              const matchSentenceId =
-                mobileActiveGroup.sentenceIds.find((id) => {
-                  const sentence = findSentenceById(id);
-                  return sentence?.chunks.some(
-                    (item) => item.toLowerCase() === chunk.toLowerCase(),
-                  );
-                }) ?? mobileActiveGroup.sentenceIds[0];
-              if (!matchSentenceId) return;
-              activateChunk(matchSentenceId, chunk);
-              return;
-            }
-            if (!state.activeSentenceId) return;
-            activateChunk(state.activeSentenceId, chunk);
+            const targetSentenceId = resolveSentenceIdForChunk(chunk);
+            if (!targetSentenceId) return;
+            activateChunk(targetSentenceId, chunk);
           }}
           hoveredChunkKey={state.hoveredChunkKey}
           onHoverChunk={(chunkKey) =>
             dispatchAction({ type: "CHUNK_HOVERED", payload: { chunkKey } })
           }
+          playingChunkKey={playbackState.kind === "chunk" ? (playbackState.text ?? null) : null}
+          onSelectSentence={(sentenceId) => handleSentenceTap(sentenceId)}
         />
       </div>
 
       <SelectionDetailSheet
         currentSentence={mobileDisplaySentence}
+        blockSentences={isDialogueScene ? (currentBlock?.sentences ?? []) : []}
         chunkDetail={chunkDetail}
         relatedChunks={relatedChunks}
         open={sheetOpen}
         showSpeaker={isDialogueScene}
         sentenceSectionLabel={sentenceSectionLabel}
         loading={false}
-        speakingText={speakingText}
+        speakingText={effectiveSpeakingText}
         onOpenChange={setSheetOpen}
         onSave={handleSave}
         onReview={handleAddReview}
@@ -1210,25 +1342,16 @@ export function LessonReader({
         onPronounce={handlePronounce}
         onLoopSentence={handleLoopSentence}
         onSelectRelated={(chunk) => {
-          if (isMobile && mobileActiveGroup) {
-            const matchSentenceId =
-              mobileActiveGroup.sentenceIds.find((id) => {
-                const sentence = findSentenceById(id);
-                return sentence?.chunks.some(
-                  (item) => item.toLowerCase() === chunk.toLowerCase(),
-                );
-              }) ?? mobileActiveGroup.sentenceIds[0];
-            if (!matchSentenceId) return;
-            activateChunk(matchSentenceId, chunk);
-            return;
-          }
-          if (!state.activeSentenceId) return;
-          activateChunk(state.activeSentenceId, chunk);
+          const targetSentenceId = resolveSentenceIdForChunk(chunk);
+          if (!targetSentenceId) return;
+          activateChunk(targetSentenceId, chunk);
         }}
         hoveredChunkKey={state.hoveredChunkKey}
         onHoverChunk={(chunkKey) =>
           dispatchAction({ type: "CHUNK_HOVERED", payload: { chunkKey } })
         }
+        playingChunkKey={playbackState.kind === "chunk" ? (playbackState.text ?? null) : null}
+        onSelectSentence={(sentenceId) => handleSentenceTap(sentenceId)}
       />
     </div>
   );

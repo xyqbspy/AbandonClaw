@@ -19,8 +19,9 @@ export interface LessonSentence {
   text: string;
   translation: string;
   chunks: string[];
-  speaker?: "A" | "B";
+  speaker?: string;
   audioText?: string;
+  tts?: string;
   chunkDetails?: SentenceChunkDetail[];
 }
 
@@ -30,6 +31,7 @@ export interface ChunkExample {
 }
 
 export interface SentenceChunkDetail {
+  id?: string;
   text: string;
   translation: string;
   grammarLabel: string;
@@ -37,14 +39,26 @@ export interface SentenceChunkDetail {
   usageNote: string;
   examples: ChunkExample[];
   pronunciation?: string;
+  notes?: string[];
   synonyms?: string[];
+  start: number;
+  end: number;
+}
+
+export interface LessonBlock {
+  id: string;
+  speaker?: string;
+  kind?: "dialogue" | "monologue";
+  translation?: string;
+  tts?: string;
+  sentences: LessonSentence[];
 }
 
 export interface LessonSection {
   id: string;
-  title: string;
-  summary: string;
-  sentences: LessonSentence[];
+  title?: string;
+  summary?: string;
+  blocks: LessonBlock[];
 }
 
 export interface AIExplanation {
@@ -63,8 +77,8 @@ export interface Lesson {
   id: string;
   slug: string;
   title: string;
-  subtitle: string;
-  description: string;
+  subtitle?: string;
+  description?: string;
   difficulty: "Beginner" | "Intermediate" | "Advanced";
   estimatedMinutes: number;
   completionRate: number;

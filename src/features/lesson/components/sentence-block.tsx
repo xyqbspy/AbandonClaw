@@ -6,21 +6,17 @@ import { LessonSentence } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
-const speakerBadgeClassName = (speaker?: "A" | "B") => {
-  if (speaker === "A") {
+const normalizeSpeaker = (speaker?: string) => (speaker ?? "").trim().toUpperCase();
+const isPrimarySpeaker = (speaker?: string) => normalizeSpeaker(speaker) === "A";
+
+const speakerBadgeClassName = (speaker?: string) => {
+  if (isPrimarySpeaker(speaker)) {
     return "border-sky-200/80 bg-sky-50/50 text-sky-700";
   }
-  if (speaker === "B") {
-    return "border-emerald-200/80 bg-emerald-50/50 text-emerald-700";
-  }
-  return "";
+  return "border-emerald-200/80 bg-emerald-50/50 text-emerald-700";
 };
 
-const speakerLabel = (speaker?: "A" | "B") => {
-  if (speaker === "A") return "A";
-  if (speaker === "B") return "B";
-  return "";
-};
+const speakerLabel = (speaker?: string) => normalizeSpeaker(speaker) || "A";
 
 export function SentenceBlock({
   sentence,
@@ -66,8 +62,8 @@ export function SentenceBlock({
           : "space-y-3 border border-border/70 p-4 hover:border-primary/30 sm:p-5",
         mobileTapEnabled &&
           "cursor-pointer active:scale-[0.998] active:border-primary/40",
-        showSpeaker && sentence.speaker === "A" && "sm:mr-14",
-        showSpeaker && sentence.speaker === "B" && "sm:ml-14",
+        showSpeaker && isPrimarySpeaker(sentence.speaker) && "sm:mr-14",
+        showSpeaker && !isPrimarySpeaker(sentence.speaker) && "sm:ml-14",
       )}
       onClick={() => {
         if (mobileTapEnabled) onSentenceTap?.(sentence.id);
@@ -95,7 +91,7 @@ export function SentenceBlock({
             }}
           >
             <Volume2 className={cn("size-3.5", speaking && "animate-pulse text-primary")} />
-            {speaking ? "停止" : "播放"}
+            {speaking ? "停止" : "朗读"}
           </button>
         </div>
       </div>

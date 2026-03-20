@@ -13,6 +13,7 @@ import {
   PracticeGenerateRequest,
   PracticeGenerateResponse,
 } from "@/lib/types/scene-parser";
+import { buildExerciseSpecsFromScene } from "@/lib/server/exercises/spec-builder";
 
 const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value));
@@ -23,12 +24,12 @@ const sanitizeExerciseCount = (value: unknown) => {
 };
 
 const isValidExerciseType = (value: unknown): value is PracticeExerciseType =>
-  value === "recall" ||
-  value === "fill_chunk" ||
-  value === "rewrite" ||
-  value === "expression_switch" ||
-  value === "expression_replace" ||
-  value === "expression_choice";
+  value === "chunk_cloze" ||
+  value === "keyword_cloze" ||
+  value === "multiple_choice" ||
+  value === "typing" ||
+  value === "sentence_rebuild" ||
+  value === "translation_prompt";
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
   Boolean(value) && typeof value === "object";
@@ -63,10 +64,12 @@ const buildExpressionFamiliesForPrompt = (
 ): string => {
   const sceneExpressions = new Set<string>();
   for (const section of scene.sections) {
-    for (const sentence of section.sentences) {
-      for (const chunk of sentence.chunks) {
-        if (!chunk?.text) continue;
-        sceneExpressions.add(normalizeExpression(chunk.text));
+    for (const block of section.blocks) {
+      for (const sentence of block.sentences) {
+        for (const chunk of sentence.chunks) {
+          if (!chunk?.text) continue;
+          sceneExpressions.add(normalizeExpression(chunk.text));
+        }
       }
     }
   }
@@ -206,7 +209,10 @@ const validatePracticeGenerateResponse = (
       return { ok: false, error: `exercises[${i}] missing required prompt.` };
     }
 
-    if (typeof exercise.answer !== "string" || !exercise.answer.trim()) {
+    if (!isObject(exercise.answer)) {
+      return { ok: false, error: `exercises[${i}] missing required answer object.` };
+    }
+    if (typeof exercise.answer.text !== "string" || !exercise.answer.text.trim()) {
       return { ok: false, error: `exercises[${i}] missing required answer.` };
     }
   }
@@ -239,11 +245,13 @@ export async function POST(request: Request) {
     const parsed = normalizePracticeResponse(parsedJson);
     const validation = validatePracticeGenerateResponse(parsed);
     if (!validation.ok) {
+      const fallback = buildExerciseSpecsFromScene(scene, exerciseCount);
       return NextResponse.json(
         {
-          error: validation.error,
+          version: "v1",
+          exercises: fallback,
         },
-        { status: 500 },
+        { status: 200 },
       );
     }
 

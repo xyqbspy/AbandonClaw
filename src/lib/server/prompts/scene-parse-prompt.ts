@@ -1,21 +1,34 @@
-export const SCENE_PARSE_SYSTEM_PROMPT = `You are an English learning scene parser.
-Convert the user input into a SceneParserResponse JSON object.
+﻿export const SCENE_PARSE_SYSTEM_PROMPT = `You are an English learning scene parser.
+Convert raw input into a SceneParserResponse JSON object.
 Output must be pure JSON only.
 No markdown.
 No explanation.
 No extra fields.
-Keep structure: version, scene, dialogue, chunks, glossary.
-Every dialogue line must include: id, speaker, text, translation, tts, chunks.
-speaker must be "A" or "B".
-translation is required for every dialogue line.
-translation must be concise natural Chinese.
-Do not omit translation even if the sentence is simple.
-Chunk must be a high-frequency phrase suitable for memorization and transfer, not single words.
-translation, meaningInSentence, usageNote, and example.zh must all be in concise natural Chinese.
-Each chunk must include at least 2 examples.
-Each example.en must be a complete natural English sentence that uses the chunk text in context.
-Do not return chunk text alone as an example.
-Keep translation, meaningInSentence, usageNote, examples concise and natural.`;
+
+Target content model:
+scene -> sections -> blocks -> sentences -> chunks
+
+Rules:
+- scene.type must be "dialogue" or "monologue".
+- sections must be non-empty.
+- each section must include blocks.
+- each block must include 1-2 sentences only.
+- block.type must equal scene.type.
+- dialogue blocks must include speaker.
+- monologue blocks may omit speaker; if included, use only "A".
+- block.translation and block.tts are optional but recommended.
+- each sentence must include text, translation, tts.
+- each sentence should include high-value chunks when possible.
+- if a sentence has no clear high-value chunk, chunks may be an empty array.
+- do not create trivial chunks from low-value function words.
+- chunk.id, chunk.key, chunk.text, chunk.start, chunk.end are required.
+- chunk.start/end are based on sentence.text (0-based, half-open).
+- sentence.text.slice(chunk.start, chunk.end) must equal chunk.text exactly.
+- chunk.translation, chunk.meaningInSentence, chunk.usageNote, chunk.examples[].zh should be concise natural Chinese.
+- each chunk should include at least 2 examples when possible.
+- if a block has 2 sentences, block.translation should be a natural block-level translation, not a mechanical sentence-by-sentence concatenation.
+- prefer concise, learnable, reusable chunks.`;
+
 
 export function buildSceneParseUserPrompt(input: {
   rawText: string;
@@ -26,40 +39,98 @@ export function buildSceneParseUserPrompt(input: {
   return `Parse this scenario into SceneParserResponse.
 
 Rules:
-1) Return exactly one JSON object matching SceneParserResponse.
+1) Return exactly one JSON object.
 2) version must be "v1".
-3) Keep one coherent dialogue with ordered lines.
-4) line.id should be stable short ids like s1, s2...
-5) Every dialogue line must include: id, speaker, text, translation, tts, chunks.
-6) speaker must be "A" or "B".
-7) translation is required for every dialogue line.
-8) tts should be clean and usually equal to text.
-9) Each dialogue line must include chunks as phrase-level units.
-10) glossary should include key reusable chunks across the scene.
-11) Focus on English input quality first.
-12) Output pure JSON only.
-13) chunk.translation, chunk.meaningInSentence, chunk.usageNote, and chunk.examples[].zh must be Chinese.
-14) each chunk must provide at least 2 examples.
-15) each chunk.examples[].en must be a full sentence using that chunk, not the chunk text itself.
+3) scene.type must be "dialogue" or "monologue".
+4) Build scene with sections[].blocks[].sentences[].chunks[].
+4.1) Prefer bilingual title format: English（中文）.
+5) block.type must equal scene.type.
+
+Dialogue rules:
+6) Each dialogue block is one speaking turn.
+7) Speaker changes => must start a new block.
+8) Dialogue blocks must include speaker (A/B/C/D...).
+9) Default: one sentence per dialogue block.
+10) If the same speaker has two tightly connected sentences said in one breath, they may be merged into one block.
+11) Max 2 sentences per dialogue block.
+
+Monologue / opinion / story / news rules:
+12) Default: one sentence per block.
+13) Adjacent two sentences may be merged only when they clearly express one complete point, one causal chain, or one narrative beat.
+14) Must split when there is a semantic turn, time shift, conclusion shift, or action-goal shift.
+15) Max 2 sentences per monologue block.
+16) Monologue blocks may omit speaker; if speaker is present, use only "A".
+
+Block-level rules:
+17) Prefer setting block.translation and block.tts for block-level rendering.
+18) If a block has 1 sentence, block.translation may be similar to the sentence translation.
+19) If a block has 2 sentences, block.translation should be a natural whole-block translation, not a mechanical concatenation.
+
+Sentence-level rules:
+20) Every sentence must include translation and tts.
+21) sentence.text should be natural English suitable for learning and TTS.
+
+Chunk rules:
+22) Every chunk must include id, key, text, start, end.
+23) chunk position must match sentence.text exactly:
+    sentence.text.slice(start, end) === chunk.text
+24) Prefer high-value chunks:
+    - common fixed expressions
+    - collocations
+    - grammar frames
+    - reusable natural phrasing
+25) Do not create trivial chunks from low-value function words.
+26) If a sentence has no clear high-value chunk, chunks may be [].
+27) Each chunk should include concise natural Chinese translation and explanation.
+28) Each chunk should include at least 2 examples when possible.
 
 Required scene shape:
 {
-  "id": "scene-slug-like-id",
-  "slug": "scene-slug-like-id",
+  "id": "scene-id",
+  "slug": "scene-slug",
   "title": "short title",
   "subtitle": "short subtitle",
   "description": "short description",
   "difficulty": "Intermediate",
   "estimatedMinutes": 8,
   "tags": ["tag1"],
-  "dialogue": [
+  "type": "dialogue",
+  "sections": [
     {
-      "id": "s1",
-      "speaker": "A",
-      "text": "...",
-      "translation": "...",
-      "tts": "...",
-      "chunks": [ ... ]
+      "id": "sec-1",
+      "title": "...",
+      "summary": "...",
+      "blocks": [
+        {
+          "id": "blk-1",
+          "type": "dialogue",
+          "speaker": "A",
+          "translation": "...",
+          "tts": "...",
+          "sentences": [
+            {
+              "id": "s1",
+              "text": "...",
+              "translation": "...",
+              "tts": "...",
+              "chunks": [
+                {
+                  "id": "c1",
+                  "key": "...",
+                  "text": "...",
+                  "translation": "...",
+                  "grammarLabel": "...",
+                  "meaningInSentence": "...",
+                  "usageNote": "...",
+                  "examples": [{"en": "...", "zh": "..."}],
+                  "start": 0,
+                  "end": 5
+                }
+              ]
+            }
+          ]
+        }
+      ]
     }
   ]
 }

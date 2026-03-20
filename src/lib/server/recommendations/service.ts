@@ -78,25 +78,29 @@ const extractScenePhraseCandidates = (scene: ParsedScene): ScenePhraseCandidate[
   const uniqueByNormalized = new Map<string, ScenePhraseCandidate>();
   let sentenceIndex = 0;
 
-  for (const line of normalizedScene.dialogue ?? []) {
-    for (const chunk of line.chunks ?? []) {
-      const text = chunk?.text?.trim();
-      if (!text) continue;
-      const normalizedText = normalizePhraseText(text);
-      if (!normalizedText) continue;
-      if (!looksLikeUsefulChunk(text)) continue;
-      if (uniqueByNormalized.has(normalizedText)) continue;
+  for (const section of normalizedScene.sections ?? []) {
+    for (const block of section.blocks ?? []) {
+      for (const sentence of block.sentences ?? []) {
+        for (const chunk of sentence.chunks ?? []) {
+          const text = chunk?.text?.trim();
+          if (!text) continue;
+          const normalizedText = normalizePhraseText(text);
+          if (!normalizedText) continue;
+          if (!looksLikeUsefulChunk(text)) continue;
+          if (uniqueByNormalized.has(normalizedText)) continue;
 
-      uniqueByNormalized.set(normalizedText, {
-        text,
-        normalizedText,
-        translation: chunk.translation?.trim() || null,
-        sourceSentenceIndex: sentenceIndex,
-        sourceSentenceText: line.text?.trim() || null,
-        sourceChunkText: text,
-      });
+          uniqueByNormalized.set(normalizedText, {
+            text,
+            normalizedText,
+            translation: chunk.translation?.trim() || null,
+            sourceSentenceIndex: sentenceIndex,
+            sourceSentenceText: sentence.text?.trim() || null,
+            sourceChunkText: text,
+          });
+        }
+        sentenceIndex += 1;
+      }
     }
-    sentenceIndex += 1;
   }
 
   return Array.from(uniqueByNormalized.values());

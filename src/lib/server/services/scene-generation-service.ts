@@ -144,24 +144,39 @@ const mergeDraftDialogueIntoParsedScene = (
   const normalized = normalizeParsedSceneDialogue(parsedScene);
   if (!draft) return normalized;
 
-  const dialogue = normalized.dialogue.map((line, index) => {
-    const draftLine = draft.dialogue[index];
-    if (!draftLine) return line;
-    return {
-      ...line,
-      speaker: draftLine.speaker,
-      text: draftLine.text.trim() || line.text,
-      translation: draftLine.translation.trim() || line.translation,
-      tts: (draftLine.tts?.trim() || draftLine.text || line.text).trim(),
-      chunks: line.chunks,
-    };
-  });
+  let draftCursor = 0;
+  const nextSections = normalized.sections.map((section) => ({
+    ...section,
+    blocks: section.blocks.map((block) => {
+      const firstSentence = block.sentences[0];
+      const draftLine = draft.dialogue[draftCursor];
+      draftCursor += block.sentences.length;
+      if (!draftLine || !firstSentence) return block;
+      const nextFirstSentence = {
+        ...firstSentence,
+        text: draftLine.text.trim() || firstSentence.text,
+        translation: draftLine.translation.trim() || firstSentence.translation,
+        tts: (draftLine.tts?.trim() || draftLine.text || firstSentence.text).trim(),
+      };
+      return {
+        ...block,
+        type: "dialogue" as const,
+        speaker: draftLine.speaker,
+        translation: nextFirstSentence.translation,
+        tts: nextFirstSentence.tts,
+        sentences: [
+          nextFirstSentence,
+          ...block.sentences.slice(1),
+        ],
+      };
+    }),
+  }));
 
   return normalizeParsedSceneDialogue({
     ...normalized,
+    type: "dialogue",
     title: draft.title.trim() || normalized.title,
-    dialogue,
-    sections: [],
+    sections: nextSections,
   });
 };
 
@@ -486,7 +501,11 @@ export async function generatePersonalizedSceneForUser(
     sceneSlug: scene.slug,
     title: scene.title,
   });
-  const sceneTextForMatch = scenePayload.dialogue.map((line) => line.text).join(" ");
+  const sceneTextForMatch = scenePayload.sections
+    .flatMap((section) => section.blocks)
+    .flatMap((block) => block.sentences)
+    .map((sentence) => sentence.text)
+    .join(" ");
   const relatedChunkVariantsMatched = relatedChunkVariants.filter((item) =>
     sceneTextContainsExpression(sceneTextForMatch, item.text),
   );

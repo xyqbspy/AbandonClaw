@@ -133,53 +133,56 @@ const isValidChunk = (value: unknown) => {
   if (!isObject(value)) return false;
   return (
     typeof value.key === "string" &&
+    typeof value.id === "string" &&
     typeof value.text === "string" &&
-    Array.isArray(value.examples)
+    typeof value.start === "number" &&
+    typeof value.end === "number"
   );
 };
 
-const isValidSpeaker = (value: unknown) => value === "A" || value === "B";
+const isValidSpeaker = (value: unknown) =>
+  typeof value === "string" && value.trim().length > 0;
 
-const isValidDialogueLine = (value: unknown) => {
+const isValidSentence = (value: unknown) => {
   if (!isObject(value)) return false;
-  if (!isValidSpeaker(value.speaker)) return false;
   if (typeof value.id !== "string" || typeof value.text !== "string") return false;
-  if (typeof value.translation !== "string") return false;
+  if (value.translation !== undefined && typeof value.translation !== "string") return false;
   if (value.tts !== undefined && typeof value.tts !== "string") return false;
   if (!Array.isArray(value.chunks)) return false;
   return value.chunks.every(isValidChunk);
 };
 
-const isValidSentence = (value: unknown) => {
+const isValidBlock = (value: unknown) => {
   if (!isObject(value)) return false;
-  if (typeof value.id !== "string" || typeof value.text !== "string") {
-    return false;
-  }
-  if (!Array.isArray(value.chunks)) return false;
-  return value.chunks.every(isValidChunk);
+  if (typeof value.id !== "string") return false;
+  if (value.type !== "dialogue" && value.type !== "monologue") return false;
+  if (value.type === "dialogue" && !isValidSpeaker(value.speaker)) return false;
+  if (value.speaker !== undefined && !isValidSpeaker(value.speaker)) return false;
+  if (value.translation !== undefined && typeof value.translation !== "string") return false;
+  if (value.tts !== undefined && typeof value.tts !== "string") return false;
+  if (!Array.isArray(value.sentences) || value.sentences.length === 0) return false;
+  if (value.sentences.length > 2) return false;
+  return value.sentences.every(isValidSentence);
 };
 
 const isValidSection = (value: unknown) => {
   if (!isObject(value)) return false;
-  if (!Array.isArray(value.sentences) || value.sentences.length === 0) {
+  if (!Array.isArray(value.blocks) || value.blocks.length === 0) {
     return false;
   }
-  return value.sentences.every(isValidSentence);
+  return value.blocks.every(isValidBlock);
 };
 
 export const isValidParsedScene = (value: unknown): value is ParsedScene => {
   if (!isObject(value)) return false;
   if (typeof value.id !== "string" || !value.id.trim()) return false;
   if (typeof value.slug !== "string" || !value.slug.trim()) return false;
-  const hasValidDialogue =
-    Array.isArray(value.dialogue) &&
-    value.dialogue.length > 0 &&
-    value.dialogue.every(isValidDialogueLine);
+  if (value.type !== "dialogue" && value.type !== "monologue") return false;
   const hasValidSections =
     Array.isArray(value.sections) &&
     value.sections.length > 0 &&
     value.sections.every(isValidSection);
-  if (!hasValidDialogue && !hasValidSections) {
+  if (!hasValidSections) {
     return false;
   }
   return true;

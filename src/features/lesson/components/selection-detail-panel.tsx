@@ -1,5 +1,5 @@
 ﻿import { useState } from "react";
-import { CirclePlay, Languages, Volume2 } from "lucide-react";
+import { Languages, Volume2 } from "lucide-react";
 import { LessonSentence, SelectionChunkLayer } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -9,8 +9,14 @@ import { cn } from "@/lib/utils";
 import {
   APPLE_BUTTON_BASE,
   APPLE_BUTTON_TEXT_SM,
-  APPLE_SURFACE,
 } from "@/lib/ui/apple-style";
+import {
+  LESSON_CHIP_ACTIVE_CLASS,
+  LESSON_CHIP_BASE_CLASS,
+  LESSON_CHIP_HOVER_CLASS,
+  LESSON_CHIP_INACTIVE_CLASS,
+  LESSON_DETAIL_BLOCK_BG_CLASS,
+} from "@/features/lesson/styles/dialogue-theme";
 
 const highlightSelected = (sentence: string, selected?: string) => {
   if (!sentence || !selected) return sentence;
@@ -29,12 +35,12 @@ const highlightSelected = (sentence: string, selected?: string) => {
 };
 
 const isLongChunk = (text: string) => text.length > 22;
-const detailToneClassName = "bg-[rgb(246,246,246)]";
 const appleButtonClassName = `${APPLE_BUTTON_BASE} ${APPLE_BUTTON_TEXT_SM}`;
 const hasChinese = (value?: string) => /[\u4e00-\u9fff]/.test((value ?? "").trim());
 
 export function SelectionDetailPanel({
   currentSentence,
+  blockSentences = [],
   chunkDetail,
   relatedChunks,
   loading,
@@ -46,10 +52,13 @@ export function SelectionDetailPanel({
   onSelectRelated,
   hoveredChunkKey,
   onHoverChunk,
+  playingChunkKey,
   showSpeaker = true,
   sentenceSectionLabel = "当前句子",
+  onSelectSentence,
 }: {
   currentSentence: LessonSentence | null;
+  blockSentences?: LessonSentence[];
   chunkDetail: SelectionChunkLayer | null;
   relatedChunks: string[];
   loading: boolean;
@@ -61,15 +70,18 @@ export function SelectionDetailPanel({
   onSelectRelated: (chunk: string) => void;
   hoveredChunkKey: string | null;
   onHoverChunk: (chunkKey: string | null) => void;
+  playingChunkKey?: string | null;
   showSpeaker?: boolean;
   sentenceSectionLabel?: string;
+  onSelectSentence?: (sentenceId: string) => void;
 }) {
   const [exampleTranslationOpenMap, setExampleTranslationOpenMap] = useState<Record<string, boolean>>({});
+  const panelSurfaceClassName = "overflow-hidden border-0 bg-white shadow-none";
 
   return (
     <div className="sticky top-20 hidden space-y-4 lg:block">
-      <Card className={cn("overflow-hidden", APPLE_SURFACE, detailToneClassName)}>
-        <CardHeader className="space-y-2 bg-[rgb(246,246,246)] pb-3">
+      <Card className={panelSurfaceClassName}>
+        <CardHeader className={cn("space-y-2 pb-3", LESSON_DETAIL_BLOCK_BG_CLASS)}>
           <CardTitle className="text-lg">{sentenceSectionLabel}</CardTitle>
         </CardHeader>
         {loading ? (
@@ -80,20 +92,40 @@ export function SelectionDetailPanel({
         ) : currentSentence ? (
           <CardContent
             key={`sentence-${currentSentence.id}-${chunkDetail?.text ?? "none"}`}
-            className="space-y-3 pt-4 animate-in fade-in-0 slide-in-from-right-1 duration-200"
+            className="space-y-2 pt-4 animate-in fade-in-0 slide-in-from-right-1 duration-200"
           >
             <div
               className={cn(
-                "rounded-lg px-3 py-2 text-sm leading-7 break-words",
-                detailToneClassName,
+                "rounded-lg px-0 py-2 text-sm leading-7 break-words",
+                LESSON_DETAIL_BLOCK_BG_CLASS,
               )}
             >
               {highlightSelected(currentSentence.text, chunkDetail?.text)}
             </div>
-            <div className={cn("rounded-lg px-3 py-2", detailToneClassName)}>
+            <div className={cn("rounded-lg px-0 py-2", LESSON_DETAIL_BLOCK_BG_CLASS)}>
               <p className="text-xs tracking-[0.08em] text-muted-foreground">整句翻译</p>
               <p className="mt-1 text-sm">{currentSentence.translation}</p>
             </div>
+            {blockSentences.length > 1 ? (
+              <div className="mt-1 flex flex-wrap gap-2">
+                {blockSentences.map((sentence, index) => {
+                  const active = sentence.id === currentSentence.id;
+                  return (
+                    <button
+                      key={sentence.id}
+                      type="button"
+                      className={cn(
+                        LESSON_CHIP_BASE_CLASS,
+                        active ? LESSON_CHIP_ACTIVE_CLASS : LESSON_CHIP_INACTIVE_CLASS,
+                      )}
+                      onClick={() => onSelectSentence?.(sentence.id)}
+                    >
+                      {`句子${index + 1}`}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
             <Button
               size="sm"
               variant="ghost"
@@ -104,7 +136,7 @@ export function SelectionDetailPanel({
               onClick={() => onPronounce(currentSentence.text)}
             >
               <Volume2 className={speakingText === currentSentence.text ? "size-4 animate-pulse" : "size-4"} />
-              播放整句发音
+              朗读
             </Button>
           </CardContent>
         ) : (
@@ -114,8 +146,8 @@ export function SelectionDetailPanel({
         )}
       </Card>
 
-      <Card className={cn("overflow-hidden", APPLE_SURFACE, detailToneClassName)}>
-        <CardHeader className="space-y-2 bg-[rgb(246,246,246)] pb-3">
+      <Card className={panelSurfaceClassName}>
+        <CardHeader className={cn("space-y-2 pb-3", LESSON_DETAIL_BLOCK_BG_CLASS)}>
           <CardTitle className="text-lg">短语解析</CardTitle>
         </CardHeader>
         {loading ? (
@@ -140,12 +172,19 @@ export function SelectionDetailPanel({
                       onFocus={() => onHoverChunk(chunk)}
                       onBlur={() => onHoverChunk(null)}
                       className={cn(
-                        "cursor-pointer rounded-full bg-[rgb(240,240,240)] px-2.5 py-1 text-xs transition-all duration-150",
-                        "hover:bg-accent active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
-                        chunkDetail?.text.toLowerCase() === chunk.toLowerCase() && "bg-accent",
+                        LESSON_CHIP_BASE_CLASS,
+                        "active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+                        chunkDetail?.text.toLowerCase() === chunk.toLowerCase() && LESSON_CHIP_ACTIVE_CLASS,
                         hoveredChunkKey?.toLowerCase() === chunk.toLowerCase() &&
                           chunkDetail?.text.toLowerCase() !== chunk.toLowerCase() &&
-                          "bg-accent",
+                          LESSON_CHIP_HOVER_CLASS,
+                        playingChunkKey?.toLowerCase() === chunk.toLowerCase() &&
+                          "ring-1 ring-primary/45 text-primary",
+                        !(
+                          chunkDetail?.text.toLowerCase() === chunk.toLowerCase() ||
+                          hoveredChunkKey?.toLowerCase() === chunk.toLowerCase() ||
+                          playingChunkKey?.toLowerCase() === chunk.toLowerCase()
+                        ) && LESSON_CHIP_INACTIVE_CLASS,
                       )}
                     >
                       {chunk}
@@ -165,7 +204,7 @@ export function SelectionDetailPanel({
                 <div>
                   <p className="text-xs tracking-[0.08em] text-muted-foreground">已选短语</p>
                   {isLongChunk(chunkDetail.text) ? (
-                    <div className="mt-1 rounded-lg bg-[rgb(246,246,246)] px-3 py-2 text-sm leading-6 break-words">
+                    <div className={cn("mt-1 rounded-lg px-3 py-2 text-sm leading-6 break-words", LESSON_DETAIL_BLOCK_BG_CLASS)}>
                       {chunkDetail.text}
                     </div>
                   ) : (
@@ -183,15 +222,7 @@ export function SelectionDetailPanel({
                     onClick={() => onPronounce(chunkDetail.text)}
                   >
                     <Volume2 className={speakingText === chunkDetail.text ? "size-4 animate-pulse" : "size-4"} />
-                    发音
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label="播放例句发音"
-                    onClick={() => onPronounce(chunkDetail.examples[0]?.en ?? chunkDetail.text)}
-                  >
-                    <CirclePlay className="size-4" />
+                    朗读
                   </Button>
                 </div>
 
@@ -224,7 +255,7 @@ export function SelectionDetailPanel({
                     const exampleText = example.en;
                     const translationOpen = Boolean(exampleTranslationOpenMap[exampleText]);
                     return (
-                      <div key={key} className="rounded-lg bg-[rgb(240,240,240)] py-2 text-sm">
+                      <div key={key} className={cn("rounded-lg py-2 text-sm", LESSON_DETAIL_BLOCK_BG_CLASS)}>
                         <div className="flex items-center justify-between gap-2">
                           <p className="text-xs tracking-[0.08em] text-muted-foreground">例句</p>
                           <div className="inline-flex items-center gap-2">
@@ -241,15 +272,15 @@ export function SelectionDetailPanel({
                               <Languages className="size-3.5" />
                               {translationOpen ? "收起" : "翻译"}
                             </button>
-                            <Button
-                              size="icon-sm"
-                              variant="ghost"
-                              className={appleButtonClassName}
-                              aria-label="播放例句发音"
+                            <button
+                              type="button"
+                              className="inline-flex cursor-pointer items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground active:opacity-70"
+                              aria-label="朗读例句"
                               onClick={() => onPronounce(exampleText)}
                             >
-                              <CirclePlay className={speakingText === exampleText ? "size-4 animate-pulse" : "size-4"} />
-                            </Button>
+                              <Volume2 className={speakingText === exampleText ? "size-4 animate-pulse" : "size-4"} />
+                              朗读
+                            </button>
                           </div>
                         </div>
                         <p className="mt-1 break-words">{exampleText}</p>

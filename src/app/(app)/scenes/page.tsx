@@ -14,7 +14,11 @@ import {
   importSceneFromApi,
   SceneListItemResponse,
 } from "@/lib/utils/scenes-api";
-import { getSceneListCache, setSceneListCache } from "@/lib/cache/scene-list-cache";
+import {
+  clearSceneListCache,
+  getSceneListCache,
+  setSceneListCache,
+} from "@/lib/cache/scene-list-cache";
 import {
   APPLE_BUTTON_BASE,
   APPLE_BUTTON_DANGER,
@@ -44,6 +48,11 @@ B: I was just about to text you. Something came up at work.
 A: Again?
 B: Yeah, I'm stuck at the office.`;
 const appleButtonClassName = `${APPLE_BUTTON_BASE} ${APPLE_BUTTON_TEXT_SM}`;
+type TopTaskStatus = "running" | "done" | "failed";
+type TopTask = {
+  status: TopTaskStatus;
+  message: string;
+};
 
 export default function ScenesPage() {
   const router = useRouter();
@@ -57,14 +66,16 @@ export default function ScenesPage() {
   const [listDataSource, setListDataSource] = useState<"none" | "cache" | "network">("none");
   const [confirmDeleteSceneId, setConfirmDeleteSceneId] = useState<string | null>(null);
   const [deletingSceneId, setDeletingSceneId] = useState<string | null>(null);
+  const [topTask, setTopTask] = useState<TopTask | null>(null);
   const activeLoadTokenRef = useRef(0);
 
-  const refreshScenes = async (options?: { preferCache?: boolean }) => {
+  const refreshScenes = async (options?: { preferCache?: boolean; forceNetwork?: boolean }) => {
     const token = activeLoadTokenRef.current + 1;
     activeLoadTokenRef.current = token;
     let hasCacheFallback = false;
     let cacheFresh = false;
     const preferCache = options?.preferCache ?? false;
+    const forceNetwork = options?.forceNetwork ?? false;
     setLoading(true);
     if (!preferCache) {
       setListDataSource("none");
@@ -72,7 +83,7 @@ export default function ScenesPage() {
 
     const canApply = () => activeLoadTokenRef.current === token;
 
-    if (preferCache) {
+    if (preferCache && !forceNetwork) {
       try {
         const cache = await getSceneListCache();
         if (canApply() && cache.found && cache.record) {
@@ -85,11 +96,13 @@ export default function ScenesPage() {
       } catch {
         // Non-blocking.
       }
-      if (cacheFresh) return;
+      if (cacheFresh) {
+        // Stale-while-revalidate: render cache first, then refresh from network.
+      }
     }
 
     try {
-      const nextScenes = await getScenesFromApi();
+      const nextScenes = await getScenesFromApi({ noStore: forceNetwork });
       if (!canApply()) return;
       setAllScenes(nextScenes);
       setListDataSource("network");
@@ -119,6 +132,14 @@ export default function ScenesPage() {
     };
   }, [dialogOpen]);
 
+  useEffect(() => {
+    if (!topTask || topTask.status === "running") return;
+    const timer = window.setTimeout(() => {
+      setTopTask(null);
+    }, 4500);
+    return () => window.clearTimeout(timer);
+  }, [topTask]);
+
   const closeDialog = () => {
     setDialogOpen(false);
     setError("");
@@ -133,18 +154,23 @@ export default function ScenesPage() {
 
     setImporting(true);
     setError("");
+    setTopTask({ status: "running", message: "正在导入场景..." });
 
     try {
-      const importedScene = await importSceneFromApi({ sourceText });
+      await importSceneFromApi({ sourceText });
       setInput("");
       closeDialog();
-      await refreshScenes({ preferCache: false });
+      await clearSceneListCache();
+      await refreshScenes({ preferCache: false, forceNetwork: true });
+      setTopTask({ status: "done", message: "导入完成，场景列表已刷新。" });
       toast.success("场景导入成功。");
-      router.push(`/scene/${importedScene.slug}`);
     } catch (importError) {
+      const message =
+        importError instanceof Error ? importError.message : "导入失败，请重试。";
       setError(
-        importError instanceof Error ? importError.message : "导入失败，请重试。",
+        message,
       );
+      setTopTask({ status: "failed", message });
     } finally {
       setImporting(false);
     }
@@ -166,7 +192,10 @@ export default function ScenesPage() {
       }>;
     };
   }) => {
-    await refreshScenes({ preferCache: false });
+    setTopTask({ status: "running", message: "正在生成场景..." });
+    await clearSceneListCache();
+    await refreshScenes({ preferCache: false, forceNetwork: true });
+    setTopTask({ status: "done", message: `已生成：${scene.title}` });
     toast.success("新场景已生成");
     const matchedVariants = scene.migrationInsight?.relatedChunkVariantsMatched ?? [];
     if (matchedVariants.length > 0) {
@@ -178,7 +207,6 @@ export default function ScenesPage() {
         description: `${comparison}${sample.differenceLabel ? `（${sample.differenceLabel}）` : ""}`,
       });
     }
-    router.push(`/scene/${scene.slug}`);
   };
 
   const handleDeleteCustomScene = async (scene: SceneListItemResponse) => {
@@ -186,7 +214,8 @@ export default function ScenesPage() {
     setDeletingSceneId(scene.id);
     try {
       await deleteSceneBySlugFromApi(scene.slug);
-      await refreshScenes({ preferCache: false });
+      await clearSceneListCache();
+      await refreshScenes({ preferCache: false, forceNetwork: true });
       toast.success("自定义场景已删除。");
       setConfirmDeleteSceneId(null);
     } catch (deleteError) {
@@ -336,11 +365,32 @@ export default function ScenesPage() {
         </Button>
       </div>
 
+      {topTask ? (
+        <div
+          className={`rounded-lg px-3 py-2 text-sm ${
+            topTask.status === "running"
+              ? "bg-[rgb(246,246,246)] text-foreground"
+              : topTask.status === "done"
+                ? "bg-[rgb(232,246,232)] text-foreground"
+                : "bg-[rgb(253,236,236)] text-destructive"
+          }`}
+        >
+          {topTask.message}
+        </div>
+      ) : null}
+
       {renderSceneCards()}
 
       <GenerateSceneSheet
         open={generateSheetOpen}
         onOpenChange={setGenerateSheetOpen}
+        onGeneratingStatusChange={(payload) => {
+          if (payload.status === "running") {
+            setTopTask({ status: "running", message: payload.message ?? "正在生成场景..." });
+            return;
+          }
+          setTopTask({ status: "failed", message: payload.message ?? "生成失败，请稍后重试。" });
+        }}
         onGenerated={handleGenerateSuccess}
       />
 
@@ -352,7 +402,7 @@ export default function ScenesPage() {
             className="absolute inset-0"
             onClick={closeDialog}
           />
-          <Card className="relative z-10 w-full max-w-2xl border-0 bg-[rgb(246,246,246)] shadow-[0_16px_40px_rgba(0,0,0,0.12)] animate-in slide-in-from-bottom-6 fade-in-0 duration-200 sm:slide-in-from-bottom-0 sm:zoom-in-95">
+          <Card className="relative z-10 w-full max-w-2xl border-0 bg-white shadow-[0_16px_40px_rgba(0,0,0,0.12)] animate-in slide-in-from-bottom-6 fade-in-0 duration-200 sm:slide-in-from-bottom-0 sm:zoom-in-95">
             <CardHeader className="space-y-2">
               <div className="flex items-start justify-between gap-3">
                 <div>
@@ -365,7 +415,7 @@ export default function ScenesPage() {
                   type="button"
                   variant="ghost"
                   size="icon-sm"
-                  className="cursor-pointer rounded-full border border-black/5 bg-[rgb(246,246,246)] hover:bg-[rgb(238,238,238)]"
+                  className="cursor-pointer rounded-full border border-black/5 bg-white hover:bg-[rgb(246,246,246)]"
                   aria-label="关闭"
                   onClick={closeDialog}
                 >
@@ -374,15 +424,17 @@ export default function ScenesPage() {
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              <Textarea
-                value={input}
-                onChange={(event) => {
-                  setInput(event.target.value);
-                  if (error) setError("");
-                }}
-                placeholder={placeholderExample}
-                className="min-h-44 text-sm leading-6"
-              />
+              <div className="rounded-xl bg-[rgb(246,246,246)] p-3">
+                <Textarea
+                  value={input}
+                  onChange={(event) => {
+                    setInput(event.target.value);
+                    if (error) setError("");
+                  }}
+                  placeholder={placeholderExample}
+                  className="min-h-44 border-0 bg-[rgb(246,246,246)] text-sm leading-6 shadow-none focus-visible:ring-0"
+                />
+              </div>
               {error ? <p className="text-sm text-destructive">{error}</p> : null}
               <div className="flex justify-end gap-2">
                 <Button

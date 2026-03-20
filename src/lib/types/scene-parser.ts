@@ -1,5 +1,7 @@
 ﻿export type SceneDifficulty = "Beginner" | "Intermediate" | "Advanced";
 export type SceneSourceLanguage = "en" | "zh" | "mixed";
+export type SceneType = "dialogue" | "monologue";
+export type SceneSpeaker = string;
 
 export interface ParseSceneRequest {
   rawText: string;
@@ -12,42 +14,45 @@ export interface ParsedSceneChunkExample {
 }
 
 export interface ParsedSceneChunk {
+  id: string;
   key: string;
   text: string;
-  translation: string;
-  grammarLabel: string;
-  meaningInSentence: string;
-  usageNote: string;
-  examples: ParsedSceneChunkExample[];
+
+  translation?: string;
+  grammarLabel?: string;
+  meaningInSentence?: string;
+  usageNote?: string;
   pronunciation?: string;
-  synonyms?: string[];
-}
 
-export type ParsedSceneSpeaker = "A" | "B";
+  examples?: ParsedSceneChunkExample[];
+  notes?: string[];
 
-export interface ParsedSceneDialogueLine {
-  id: string;
-  speaker: ParsedSceneSpeaker;
-  text: string;
-  translation: string;
-  tts?: string;
-  chunks: ParsedSceneChunk[];
+  start: number;
+  end: number;
 }
 
 export interface ParsedSceneSentence {
   id: string;
-  speaker?: ParsedSceneSpeaker;
   text: string;
-  translation: string;
-  audioText?: string;
+  translation?: string;
+  tts?: string;
   chunks: ParsedSceneChunk[];
+}
+
+export interface ParsedSceneBlock {
+  id: string;
+  type: SceneType;
+  speaker?: SceneSpeaker;
+  translation?: string;
+  tts?: string;
+  sentences: ParsedSceneSentence[];
 }
 
 export interface ParsedSceneSection {
   id: string;
-  title: string;
-  summary: string;
-  sentences: ParsedSceneSentence[];
+  title?: string;
+  summary?: string;
+  blocks: ParsedSceneBlock[];
 }
 
 export interface ParsedSceneGlossaryItem {
@@ -66,14 +71,14 @@ export interface ParsedScene {
   id: string;
   slug: string;
   title: string;
-  subtitle: string;
-  description: string;
-  difficulty: SceneDifficulty;
-  estimatedMinutes: number;
+  subtitle?: string;
+  description?: string;
+  difficulty?: SceneDifficulty;
+  estimatedMinutes?: number;
   completionRate?: number;
-  tags: string[];
-  type?: "dialogue" | "monologue";
-  dialogue: ParsedSceneDialogueLine[];
+  tags?: string[];
+
+  type: SceneType;
   sections: ParsedSceneSection[];
   glossary?: ParsedSceneGlossaryItem[];
 }
@@ -95,29 +100,59 @@ export interface SceneMutateResponse {
   variants: ParsedScene[];
 }
 
+export type ExerciseType =
+  | "chunk_cloze"
+  | "keyword_cloze"
+  | "multiple_choice"
+  | "typing"
+  | "sentence_rebuild"
+  | "translation_prompt";
+
+export type ExerciseInputMode = "choice" | "typing";
+
+export interface ClozeSpec {
+  displayText: string;
+  blankStart?: number;
+  blankEnd?: number;
+}
+
+export interface ExerciseAnswerSpec {
+  text: string;
+  acceptedAnswers?: string[];
+}
+
+export interface ExerciseSpec {
+  id: string;
+
+  type: ExerciseType;
+  inputMode: ExerciseInputMode;
+
+  sceneId: string;
+  sectionId?: string;
+  blockId?: string;
+  sentenceId: string;
+  chunkId?: string;
+
+  prompt?: string;
+  hint?: string;
+
+  answer: ExerciseAnswerSpec;
+
+  cloze?: ClozeSpec;
+  options?: string[];
+
+  metadata?: Record<string, unknown>;
+}
+
+export type PracticeExerciseType = ExerciseType;
+export type PracticeExercise = ExerciseSpec;
+
 export interface PracticeGenerateRequest {
   scene: ParsedScene;
   exerciseCount?: number;
 }
 
-export type PracticeExerciseType =
-  | "recall"
-  | "fill_chunk"
-  | "rewrite"
-  | "expression_switch"
-  | "expression_replace"
-  | "expression_choice";
-
-export interface PracticeExercise {
-  id: string;
-  type: PracticeExerciseType;
-  prompt: string;
-  answer: string;
-  referenceSentence?: string;
-  targetChunk?: string;
-}
-
 export interface PracticeGenerateResponse {
   version: "v1";
-  exercises: PracticeExercise[];
+  exercises: ExerciseSpec[];
 }

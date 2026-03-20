@@ -1,6 +1,6 @@
-import { Lesson } from "@/lib/types";
+﻿import { Lesson } from "@/lib/types";
 
-const CUSTOM_SCENARIOS_STORAGE_KEY = "custom-scenarios";
+const CUSTOM_SCENARIOS_STORAGE_KEY = "custom-scenarios-v2";
 const EMPTY_SCENARIOS: Lesson[] = [];
 
 let cachedRaw: string | null = null;
@@ -9,11 +9,23 @@ let cachedScenarios: Lesson[] = EMPTY_SCENARIOS;
 const isLessonShape = (value: unknown): value is Lesson => {
   if (!value || typeof value !== "object") return false;
   const maybeLesson = value as Lesson;
+  const hasBlocks =
+    Array.isArray(maybeLesson.sections) &&
+    maybeLesson.sections.length > 0 &&
+    maybeLesson.sections.every(
+      (section) =>
+        Array.isArray(section.blocks) &&
+        section.blocks.length > 0 &&
+        section.blocks.every(
+          (block) =>
+            Array.isArray(block.sentences) && block.sentences.length > 0,
+        ),
+    );
   return (
     typeof maybeLesson.id === "string" &&
     typeof maybeLesson.slug === "string" &&
     typeof maybeLesson.title === "string" &&
-    Array.isArray(maybeLesson.sections)
+    hasBlocks
   );
 };
 

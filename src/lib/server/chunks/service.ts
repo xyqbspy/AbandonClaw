@@ -361,10 +361,14 @@ export async function listUserChunks(params: {
 export const extractChunkTextsFromParsedScene = (scene: ParsedScene) => {
   const normalized = normalizeParsedSceneDialogue(scene);
   const collected: string[] = [];
-  for (const line of normalized.dialogue ?? []) {
-    for (const chunk of line.chunks ?? []) {
-      if (chunk?.text && chunk.text.trim()) {
-        collected.push(chunk.text.trim());
+  for (const section of normalized.sections ?? []) {
+    for (const block of section.blocks ?? []) {
+      for (const sentence of block.sentences ?? []) {
+        for (const chunk of sentence.chunks ?? []) {
+          if (chunk?.text && chunk.text.trim()) {
+            collected.push(chunk.text.trim());
+          }
+        }
       }
     }
   }

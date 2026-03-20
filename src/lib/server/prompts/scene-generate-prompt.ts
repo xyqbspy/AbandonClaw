@@ -48,8 +48,11 @@ Constraints:
 12) You may optionally introduce 1-2 related chunk variants from the same expression family to support contrast learning.
 13) Do not replace all known chunks with new variants.
 14) Keep dialogue natural and realistic; variant use should feel organic.
-15) title must be bilingual in this format: English title（中文标题）.
-16) use full-width Chinese parentheses: （ ）.
+15) Block-splitting intent (for downstream parser):
+   - default one line = one block.
+   - speaker change implies a new block.
+   - same speaker can have up to 2 consecutive lines only when tightly connected as one thought.
+16) title must be bilingual in this format: English title（中文标题）.
 
 reuseKnownChunks: ${input.reuseKnownChunks ? "true" : "false"}
 Known user chunks:
@@ -71,9 +74,10 @@ Return JSON with this exact shape:
 Rules for dialogue:
 - dialogue length must be between 6 and 14.
 - each line text should be concise.
-- speaker must be either "A" or "B".
+- speaker should use uppercase labels such as A/B/C/D when needed.
 - translation must be concise natural Chinese.
 - tts should be clean, no emoji/symbol noise, usually same as text.
 
 Return pure JSON only.`;
 }
+

@@ -1,11 +1,11 @@
-import {
+﻿import {
   PracticeSet,
   SceneGeneratedState,
   VariantItemStatus,
   VariantSet,
 } from "@/lib/types/learning-flow";
 
-const STORAGE_KEY = "scene-learning-flow-v1";
+const STORAGE_KEY = "scene-learning-flow-v2";
 
 type StoreShape = {
   practiceByScene: Record<string, PracticeSet[]>;

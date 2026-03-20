@@ -52,9 +52,11 @@ export function SelectionToolbar({
         <RotateCcw className="size-3.5" />
         复习
       </Button>
-      <Button size="icon-sm" variant="ghost" className="size-7" onClick={onPronounce} aria-label="发音">
+      <Button size="sm" variant="ghost" className="h-7 px-2" onClick={onPronounce} aria-label="朗读">
         <Volume2 className="size-3.5" />
+        朗读
       </Button>
     </div>
   );
 }
+

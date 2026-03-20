@@ -2,12 +2,15 @@
 import {
   ParsedScene,
   ParsedSceneChunk,
-  ParsedSceneDialogueLine,
+  ParsedSceneSection,
   SceneParserResponse,
+  SceneType,
 } from "@/lib/types/scene-parser";
 import { normalizeParsedSceneDialogue } from "@/lib/shared/scene-dialogue";
+import { normalizeLessonStructure } from "@/lib/shared/lesson-content";
 
 const hasChinese = (value: string) => /[\u4e00-\u9fff]/.test(value);
+
 const normalizeChineseText = (value: string | undefined, fallback: string) => {
   const raw = (value ?? "").trim();
   if (!raw) return fallback;
@@ -18,18 +21,18 @@ const buildFallbackExamples = (chunkText: string) => {
   const safeChunk = chunkText.trim() || "this expression";
   return [
     {
-      en: `I used "${safeChunk}" in today's speaking practice.`,
+      en: `I used \"${safeChunk}\" in today's speaking practice.`,
       zh: `我在今天的口语练习里用了“${safeChunk}”。`,
     },
     {
-      en: `She tried "${safeChunk}" in a real conversation.`,
+      en: `She tried \"${safeChunk}\" in a real conversation.`,
       zh: `她在真实对话里尝试了“${safeChunk}”。`,
     },
   ];
 };
 
 const normalizeChunkExamples = (
-  examples: ParsedSceneChunk["examples"] | undefined,
+  examples: Array<{ en: string; zh: string }> | undefined,
   chunkText: string,
   chunkTranslation: string,
 ) => {
@@ -55,21 +58,12 @@ const normalizeChunkExamples = (
   return [...normalized, ...buildFallbackExamples(chunkText)].slice(0, 2);
 };
 
-const normalizeMeaningInSentence = (
-  value: string | undefined,
-  chunkTranslation: string | undefined,
-) => {
-  const raw = (value ?? "").trim();
-  if (raw && hasChinese(raw)) return raw;
-  const translation = (chunkTranslation ?? "").trim();
-  if (translation && hasChinese(translation)) return `这里表示：${translation}`;
-  return "在这句话里表示该表达在当前语境中的含义。";
-};
-
-const normalizeUsageNote = (value: string | undefined) => {
-  const raw = (value ?? "").trim();
-  if (raw && hasChinese(raw)) return raw;
-  return "先理解它在这句话里的作用，再放回整句复述。";
+const normalizeRange = (start: number | undefined, end: number | undefined, text: string) => {
+  if (typeof start === "number" && typeof end === "number" && start >= 0 && end >= start) {
+    return { start, end };
+  }
+  const trimmed = text.trim();
+  return { start: 0, end: Math.max(0, trimmed.length) };
 };
 
 const toUniqueChunkTexts = (chunks: ParsedSceneChunk[]) => {
@@ -95,45 +89,51 @@ export function mapParsedSceneToLesson(response: SceneParserResponse): Lesson {
     title: scene.title,
     subtitle: scene.subtitle,
     description: scene.description,
-    difficulty: scene.difficulty,
-    estimatedMinutes: scene.estimatedMinutes,
+    difficulty: scene.difficulty ?? "Intermediate",
+    estimatedMinutes: scene.estimatedMinutes ?? 8,
     completionRate: scene.completionRate ?? 0,
-    tags: scene.tags,
-    sceneType: scene.type ?? (scene.dialogue.length > 0 ? "dialogue" : "monologue"),
+    tags: scene.tags ?? [],
+    sceneType: scene.type,
     sourceType: "builtin",
     sections: scene.sections.map((section) => ({
       id: section.id,
       title: section.title,
       summary: section.summary,
-      sentences: section.sentences.map((sentence) => ({
-        id: sentence.id,
-        speaker: sentence.speaker,
-        text: sentence.text,
-        translation: normalizeChineseText(
-          sentence.translation,
-          "该句翻译待补充。",
-        ),
-        audioText: sentence.audioText ?? sentence.text,
-        chunks: toUniqueChunkTexts(sentence.chunks),
-        chunkDetails: sentence.chunks.map((chunk) => ({
-          text: chunk.text,
-          translation: normalizeChineseText(
-            chunk.translation,
-            "该短语释义待补充。",
-          ),
-          grammarLabel: chunk.grammarLabel,
-          meaningInSentence: normalizeMeaningInSentence(
-            chunk.meaningInSentence,
-            chunk.translation,
-          ),
-          usageNote: normalizeUsageNote(chunk.usageNote),
-          examples: normalizeChunkExamples(
-            chunk.examples,
-            chunk.text,
-            chunk.translation,
-          ),
-          pronunciation: chunk.pronunciation,
-          synonyms: chunk.synonyms,
+      blocks: section.blocks.map((block) => ({
+        id: block.id,
+        kind: block.type,
+        speaker: block.speaker,
+        translation: block.translation,
+        tts: block.tts,
+        sentences: block.sentences.map((sentence) => ({
+          id: sentence.id,
+          speaker: block.speaker,
+          text: sentence.text,
+          translation: normalizeChineseText(sentence.translation, "该句翻译待补充。"),
+          tts: sentence.tts ?? sentence.text,
+          chunks: toUniqueChunkTexts(sentence.chunks),
+          chunkDetails: sentence.chunks.map((chunk) => {
+            const range = normalizeRange(chunk.start, chunk.end, chunk.text);
+            return {
+              id: chunk.id,
+              text: chunk.text,
+              translation: normalizeChineseText(chunk.translation, "该短语释义待补充。"),
+              grammarLabel: chunk.grammarLabel ?? "Chunk",
+              meaningInSentence: normalizeChineseText(
+                chunk.meaningInSentence,
+                "在这句话里表示该表达在当前语境中的含义。",
+              ),
+              usageNote: normalizeChineseText(
+                chunk.usageNote,
+                "先理解它在这句话里的作用，再放回整句复述。",
+              ),
+              examples: normalizeChunkExamples(chunk.examples, chunk.text, chunk.translation ?? ""),
+              pronunciation: chunk.pronunciation,
+              notes: chunk.notes ?? [],
+              start: range.start,
+              end: range.end,
+            };
+          }),
         })),
       })),
     })),
@@ -152,93 +152,100 @@ export function mapParsedSceneToLesson(response: SceneParserResponse): Lesson {
   };
 }
 
-export function mapLessonToParsedScene(lesson: Lesson): ParsedScene {
-  const sentenceRows = lesson.sections.flatMap((section) => section.sentences);
-  const inferredType =
-    lesson.sceneType ??
-    (sentenceRows.some((sentence) => sentence.speaker === "A" || sentence.speaker === "B")
-      ? "dialogue"
-      : "monologue");
-  const dialogue: ParsedSceneDialogueLine[] =
-    inferredType === "dialogue"
-      ? sentenceRows
-          .filter((sentence) => sentence.speaker === "A" || sentence.speaker === "B")
-          .map((sentence) => ({
-            id: sentence.id,
-            speaker: sentence.speaker === "B" ? "B" : "A",
-            text: sentence.text,
-            translation: sentence.translation,
-            tts: sentence.audioText ?? sentence.text,
-            chunks:
-              sentence.chunkDetails?.map((chunk) => ({
-                key: chunk.text,
-                text: chunk.text,
-                translation: chunk.translation,
-                grammarLabel: chunk.grammarLabel,
-                meaningInSentence: chunk.meaningInSentence,
-                usageNote: chunk.usageNote,
-                examples: chunk.examples,
-                pronunciation: chunk.pronunciation,
-                synonyms: chunk.synonyms,
-              })) ??
-              sentence.chunks.map((chunkText) => ({
-                key: chunkText,
-                text: chunkText,
-                translation: "",
-                grammarLabel: "",
-                meaningInSentence: "",
-                usageNote: "",
-                examples: [],
-              })),
-          }))
-      : [];
+const findChunkRange = (sentenceText: string, chunkText: string) => {
+  const text = sentenceText ?? "";
+  const chunk = (chunkText ?? "").trim();
+  if (!chunk) return { start: 0, end: 0 };
+
+  const exact = text.indexOf(chunk);
+  if (exact >= 0) return { start: exact, end: exact + chunk.length };
+
+  const lowerText = text.toLowerCase();
+  const lowerChunk = chunk.toLowerCase();
+  const lower = lowerText.indexOf(lowerChunk);
+  if (lower >= 0) return { start: lower, end: lower + chunk.length };
+  return { start: 0, end: Math.min(text.length, chunk.length) };
+};
+
+const mapLessonChunkToParsed = (sentenceText: string, chunk: {
+  id?: string;
+  text: string;
+  translation?: string;
+  grammarLabel?: string;
+  meaningInSentence?: string;
+  usageNote?: string;
+  examples?: Array<{ en: string; zh: string }>;
+  pronunciation?: string;
+  notes?: string[];
+  start?: number;
+  end?: number;
+}): ParsedSceneChunk => {
+  const range =
+    typeof chunk.start === "number" && typeof chunk.end === "number"
+      ? { start: chunk.start, end: chunk.end }
+      : findChunkRange(sentenceText, chunk.text);
 
   return {
-    id: lesson.id,
-    slug: lesson.slug,
-    title: lesson.title,
-    subtitle: lesson.subtitle,
-    description: lesson.description,
-    difficulty: lesson.difficulty,
-    estimatedMinutes: lesson.estimatedMinutes,
-    completionRate: lesson.completionRate,
-    tags: lesson.tags,
-    type: inferredType,
-    dialogue,
-    sections: lesson.sections.map((section) => ({
-      id: section.id,
-      title: section.title,
-      summary: section.summary,
-      sentences: section.sentences.map((sentence) => ({
-        id: sentence.id,
-        speaker: sentence.speaker,
+    id: chunk.id || chunk.text,
+    key: chunk.text,
+    text: chunk.text,
+    translation: chunk.translation,
+    grammarLabel: chunk.grammarLabel,
+    meaningInSentence: chunk.meaningInSentence,
+    usageNote: chunk.usageNote,
+    examples: chunk.examples ?? [],
+    pronunciation: chunk.pronunciation,
+    notes: chunk.notes,
+    start: range.start,
+    end: range.end,
+  };
+};
+
+export function mapLessonToParsedScene(lesson: Lesson): ParsedScene {
+  const normalized = normalizeLessonStructure(lesson);
+  const sceneType: SceneType = normalized.sceneType ?? "monologue";
+
+  const sections: ParsedSceneSection[] = normalized.sections.map((section, sectionIndex) => ({
+    id: section.id || `section-${sectionIndex + 1}`,
+    title: section.title,
+    summary: section.summary,
+    blocks: section.blocks.map((block, blockIndex) => ({
+      id: block.id || `block-${sectionIndex + 1}-${blockIndex + 1}`,
+      type: block.kind ?? sceneType,
+      speaker: block.speaker,
+      translation: block.translation,
+      tts: block.tts,
+      sentences: block.sentences.map((sentence, sentenceIndex) => ({
+        id: sentence.id || `sentence-${sectionIndex + 1}-${blockIndex + 1}-${sentenceIndex + 1}`,
         text: sentence.text,
         translation: sentence.translation,
-        audioText: sentence.audioText ?? sentence.text,
+        tts: sentence.tts ?? sentence.text,
         chunks:
-          sentence.chunkDetails?.map((chunk) => ({
-            key: chunk.text,
-            text: chunk.text,
-            translation: chunk.translation,
-            grammarLabel: chunk.grammarLabel,
-            meaningInSentence: chunk.meaningInSentence,
-            usageNote: chunk.usageNote,
-            examples: chunk.examples,
-            pronunciation: chunk.pronunciation,
-            synonyms: chunk.synonyms,
-          })) ??
-          sentence.chunks.map((chunkText) => ({
-            key: chunkText,
-            text: chunkText,
-            translation: "",
-            grammarLabel: "",
-            meaningInSentence: "",
-            usageNote: "",
-            examples: [],
-          })),
+          sentence.chunkDetails && sentence.chunkDetails.length > 0
+            ? sentence.chunkDetails.map((chunk) => mapLessonChunkToParsed(sentence.text, chunk))
+            : sentence.chunks.map((chunkText) =>
+                mapLessonChunkToParsed(sentence.text, {
+                  id: chunkText,
+                  text: chunkText,
+                }),
+              ),
       })),
     })),
-    glossary: lesson.explanations.map((item) => ({
+  }));
+
+  return {
+    id: normalized.id,
+    slug: normalized.slug,
+    title: normalized.title,
+    subtitle: normalized.subtitle,
+    description: normalized.description,
+    difficulty: normalized.difficulty,
+    estimatedMinutes: normalized.estimatedMinutes,
+    completionRate: normalized.completionRate,
+    tags: normalized.tags,
+    type: sceneType,
+    sections,
+    glossary: normalized.explanations.map((item) => ({
       key: item.key,
       text: item.text,
       translation: item.translation,
