@@ -100,6 +100,7 @@ export interface UserSavedPhraseItem {
   aiEnrichmentStatus: UserPhraseAiEnrichmentStatus | null;
   semanticFocus: string | null;
   typicalScenario: string | null;
+  exampleSentences: Array<{ en: string; zh: string }>;
   aiEnrichmentError: string | null;
   learningItemType: "expression" | "sentence";
   savedAt: string;
@@ -157,6 +158,18 @@ const parseTags = (value: unknown) => {
     .filter(Boolean)
     .slice(0, 8);
   return Array.from(new Set(tags));
+};
+
+const parseExampleSentences = (value: unknown) => {
+  if (!Array.isArray(value)) return [] as Array<{ en: string; zh: string }>;
+  return value
+    .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object")
+    .map((item) => ({
+      en: parseOptionalTrimmed(item.en, 500) ?? "",
+      zh: parseOptionalTrimmed(item.zh, 200) ?? "",
+    }))
+    .filter((item) => item.en && item.zh)
+    .slice(0, 2);
 };
 
 const parseWithDiagnostics = (rawText: string) => {
@@ -336,6 +349,7 @@ const mapSavedPhraseRow = (row: UserPhraseRow & { phrase: PhraseRow | null }): U
   aiEnrichmentStatus: row.ai_enrichment_status ?? null,
   semanticFocus: row.ai_semantic_focus ?? null,
   typicalScenario: row.ai_typical_scenario ?? null,
+  exampleSentences: parseExampleSentences(row.ai_example_sentences),
   aiEnrichmentError: row.ai_enrichment_error ?? null,
   savedAt: row.saved_at,
   lastSeenAt: row.last_seen_at,
@@ -712,21 +726,29 @@ export async function enrichAiExpressionLearningInfo(params: {
 
     const translation = parseOptionalTrimmed(parsed.translation, 200);
     const usageNote = parseOptionalTrimmed(parsed.usageNote, 300);
-    const exampleSentence = parseOptionalTrimmed(parsed.exampleSentence, 500);
+    const examples = parseExampleSentences(parsed.examples);
     const semanticFocus = parseOptionalTrimmed(parsed.semanticFocus, 40);
     const typicalScenario = parseOptionalTrimmed(parsed.typicalScenario, 80);
+    const existingTranslation = parseOptionalTrimmed(userPhrase.phrase?.translation, 200);
+    const existingUsageNote = parseOptionalTrimmed(userPhrase.phrase?.usage_note, 300);
+    const existingSentenceText = parseOptionalTrimmed(userPhrase.source_sentence_text, 500);
+    const existingExamples = parseExampleSentences(userPhrase.ai_example_sentences);
+    const existingSemanticFocus = parseOptionalTrimmed(userPhrase.ai_semantic_focus, 40);
+    const existingTypicalScenario = parseOptionalTrimmed(userPhrase.ai_typical_scenario, 80);
     const zhTranslation =
+      existingTranslation ??
       translation ??
-      parseOptionalTrimmed(userPhrase.phrase?.translation, 200) ??
       null;
     const zhUsageNote = hasChinese(usageNote)
       ? usageNote
-      : toChineseUsageNoteFallback(expression, zhTranslation);
+      : existingUsageNote ?? toChineseUsageNoteFallback(expression, zhTranslation);
     const zhSemanticFocus = toChineseSemanticFocusFallback(
-      semanticFocus,
+      existingSemanticFocus ?? semanticFocus,
       parseOptionalTrimmed(params.differenceLabel, 40),
     );
-    const zhTypicalScenario = toChineseTypicalScenarioFallback(typicalScenario);
+    const zhTypicalScenario = toChineseTypicalScenarioFallback(
+      existingTypicalScenario ?? typicalScenario,
+    );
 
     const nextPhrasePayload = {
       translation: zhTranslation,
@@ -743,16 +765,20 @@ export async function enrichAiExpressionLearningInfo(params: {
 
     const nextUserPhrasePayload = {
       source_sentence_text:
-        exampleSentence ??
-        parseOptionalTrimmed(userPhrase.source_sentence_text, 500) ??
+        existingSentenceText ??
+        examples[0]?.en ??
         null,
+      ai_example_sentences:
+        existingExamples.length > 0
+          ? existingExamples
+          : examples,
       ai_semantic_focus:
+        existingSemanticFocus ??
         zhSemanticFocus ??
-        parseOptionalTrimmed(userPhrase.ai_semantic_focus, 40) ??
         null,
       ai_typical_scenario:
+        existingTypicalScenario ??
         zhTypicalScenario ??
-        parseOptionalTrimmed(userPhrase.ai_typical_scenario, 80) ??
         null,
       ai_enrichment_status: "done" as const,
       ai_enrichment_error: null,

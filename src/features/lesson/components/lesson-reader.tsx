@@ -11,11 +11,11 @@ import {
 } from "react";
 import {
   Languages,
-  Play,
-  Volume2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { appCopy } from "@/lib/constants/copy";
+import { LoopActionButton } from "@/components/audio/loop-action-button";
+import { TtsActionButton } from "@/components/audio/tts-action-button";
 import {
   findMatchingChunkInSentence,
   getChunkLayerFromLesson,
@@ -26,7 +26,6 @@ import { useMobile } from "@/hooks/use-mobile";
 import { useTtsPlaybackState } from "@/hooks/use-tts-playback-state";
 import { Lesson, LessonBlock, LessonSentence, SelectionChunkLayer } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { LessonProgress } from "@/features/lesson/components/lesson-progress";
@@ -884,19 +883,15 @@ export function LessonReader({
                   翻译
                 </button>
                 <span className="opacity-40">·</span>
-                <button
-                  type="button"
-                  className={cn(
-                    "inline-flex cursor-pointer items-center gap-1 transition-colors hover:text-foreground",
-                    isBlockSpeaking && "text-primary",
-                  )}
+                <TtsActionButton
+                  active={isBlockSpeaking}
+                  variant="ghost"
+                  size="sm"
+                  className="h-auto px-0 text-inherit hover:text-foreground"
                   onClick={() => {
                     void playBlockTts(block);
                   }}
-                >
-                  <Volume2 className={cn("size-3.5", isBlockSpeaking && "animate-pulse text-primary")} />
-                  朗读
-                </button>
+                />
                 {/* TODO(audio): 暂时屏蔽慢速朗读按钮，批量生成慢速音频后再恢复。 */}
               </div>
 
@@ -955,38 +950,36 @@ export function LessonReader({
             ) : null}
             <div className="flex items-center justify-end gap-2">
               {headerTools}
-              <button
-                type="button"
+              <LoopActionButton
+                active={isSceneLooping}
+                variant="ghost"
+                size="sm"
                 className={cn(
-                  `inline-flex items-center gap-1.5 text-foreground/85 ${appleButtonLgClassName}`,
-                  "cursor-pointer whitespace-nowrap",
-                  isSceneLooping && "text-primary",
+                  appleButtonLgClassName,
+                  "whitespace-nowrap text-foreground/85",
                   isMobile && "px-2 py-1 text-[15px]",
                 )}
+                iconClassName={cn("size-4", isMobile && "size-3.5")}
                 onClick={toggleSceneLoopPlayback}
-              >
-                <Play className={cn("size-4", isMobile && "size-3.5")} />
-                {isSceneLooping ? "停止循环" : "循环播放"}
-              </button>
+              />
             </div>
           </div>
         ) : isDialogueScene ? (
           <div className={cn("py-1.5", isMobile ? "px-1" : "px-1.5")}>
             <div className="flex items-center justify-end gap-2">
               {headerTools}
-              <button
-                type="button"
+              <LoopActionButton
+                active={isSceneLooping}
+                variant="ghost"
+                size="sm"
                 className={cn(
-                  `inline-flex items-center gap-1.5 text-foreground/85 ${appleButtonLgClassName}`,
-                  "cursor-pointer whitespace-nowrap",
-                  isSceneLooping && "text-primary",
+                  appleButtonLgClassName,
+                  "whitespace-nowrap text-foreground/85",
                   isMobile && "px-2 py-1 text-[15px]",
                 )}
+                iconClassName={cn("size-4", isMobile && "size-3.5")}
                 onClick={toggleSceneLoopPlayback}
-              >
-                <Play className={cn("size-4", isMobile && "size-3.5")} />
-                {isSceneLooping ? "停止循环" : "循环播放"}
-              </button>
+              />
             </div>
           </div>
         ) : (
@@ -1008,21 +1001,14 @@ export function LessonReader({
                     <h1 className="line-clamp-2 text-[1rem] font-semibold leading-6">
                       {lesson.title}
                     </h1>
-                    <Button
-                      type="button"
-                      size="sm"
+                    <LoopActionButton
+                      active={isSceneLooping}
                       variant="ghost"
-                      className={cn(
-                        "h-6 shrink-0 cursor-pointer gap-1 px-1.5 text-[10px]",
-                        isSceneLooping
-                          ? "text-primary"
-                          : "text-muted-foreground/80",
-                      )}
+                      size="sm"
+                      className="h-6 px-1.5 text-[10px] text-muted-foreground/80"
+                      iconClassName="size-3"
                       onClick={toggleSceneLoopPlayback}
-                    >
-                      <Play className="size-3" />
-                      {isSceneLooping ? "停止循环" : "循环播放"}
-                    </Button>
+                    />
                   </div>
                   <p className="text-[10px] leading-4 whitespace-nowrap text-muted-foreground/80">
                     {sceneMetaLabel}
@@ -1054,29 +1040,19 @@ export function LessonReader({
                 <>
                   <p className="text-sm text-muted-foreground">{sceneMetaLabel}</p>
                   <div className="flex flex-wrap gap-2">
-                    <Button
-                      size="sm"
+                    <LoopActionButton
+                      active={isSceneLooping}
                       variant="outline"
-                      className={cn(
-                        "cursor-pointer transition-all duration-150 hover:border-primary/40 hover:bg-accent",
-                        isSceneLooping && "text-primary",
-                      )}
+                      className="cursor-pointer transition-all duration-150 hover:border-primary/40 hover:bg-accent"
                       onClick={toggleSceneLoopPlayback}
-                    >
-                      <Play className="size-4" />
-                      {isSceneLooping ? "停止循环" : "循环播放"}
-                    </Button>
-                    <Button
-                      size="sm"
+                    />
+                    <TtsActionButton
                       variant="outline"
                       className="cursor-pointer transition-all duration-150 hover:border-primary/40 hover:bg-accent"
                       onClick={() =>
                         handlePronounce(currentSentence?.text ?? lesson.title)
                       }
-                    >
-                      <Volume2 className="size-4" />
-                      朗读
-                    </Button>
+                    />
                     {headerTools}
                   </div>
                   <p className="text-xs text-muted-foreground">
@@ -1159,22 +1135,22 @@ export function LessonReader({
                                 <Languages className="size-3" />
                                 {translationOpen ? "收起" : "翻译"}
                               </button>
-                              <button
-                                type="button"
+                              <TtsActionButton
+                                active={groupPlaying}
+                                variant="ghost"
+                                size="sm"
                                 className={cn(
-                                  "inline-flex cursor-pointer items-center gap-1 text-[11px] leading-none transition-colors active:opacity-70",
+                                  "h-auto px-0 text-[11px] leading-none",
                                   groupSelected
                                     ? "text-primary/80 hover:text-primary/95"
                                     : "text-muted-foreground/70 hover:text-muted-foreground",
                                 )}
+                                iconClassName="size-3"
                                 onClick={(event) => {
                                   event.stopPropagation();
                                   handleLoopSentence(groupText);
                                 }}
-                              >
-                                <Volume2 className={cn("size-3", groupPlaying && "animate-pulse text-primary")} />
-                                {groupPlaying ? "停止" : "朗读"}
-                              </button>
+                              />
                             </div>
 
                             <div
@@ -1251,9 +1227,10 @@ export function LessonReader({
                           翻译
                         </button>
                         <span className="opacity-40">·</span>
-                        <button
-                          type="button"
-                          className="inline-flex cursor-pointer items-center gap-1 transition-colors hover:text-foreground"
+                        <TtsActionButton
+                          variant="ghost"
+                          size="sm"
+                          className="h-auto px-0 text-inherit hover:text-foreground"
                           onClick={() => handlePronounce(
                             block.tts?.trim() ||
                               block.sentences
@@ -1261,10 +1238,7 @@ export function LessonReader({
                                 .filter(Boolean)
                                 .join(" "),
                           )}
-                        >
-                          <Volume2 className="size-3.5" />
-                          朗读
-                        </button>
+                        />
                       </div>
 
                       {dialogueBlockTranslationOpenMap[block.id] ? (

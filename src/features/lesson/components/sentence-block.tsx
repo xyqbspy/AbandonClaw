@@ -1,8 +1,9 @@
 ﻿"use client";
 
 import { useState } from "react";
-import { Languages, Volume2 } from "lucide-react";
+import { Languages } from "lucide-react";
 import { LessonSentence } from "@/lib/types";
+import { TtsActionButton } from "@/components/audio/tts-action-button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
@@ -82,17 +83,16 @@ export function SentenceBlock({
             <Languages className="size-3.5" />
             {translationOpen ? "收起" : "翻译"}
           </button>
-          <button
-            type="button"
-            className="inline-flex cursor-pointer items-center gap-1 transition-colors hover:text-foreground"
+          <TtsActionButton
+            active={speaking}
+            variant="ghost"
+            size="sm"
+            className="h-auto px-0 text-muted-foreground hover:text-foreground"
             onClick={(event) => {
               event.stopPropagation();
               onPronounce?.(sentence.audioText ?? sentence.text);
             }}
-          >
-            <Volume2 className={cn("size-3.5", speaking && "animate-pulse text-primary")} />
-            {speaking ? "停止" : "朗读"}
-          </button>
+          />
         </div>
       </div>
 

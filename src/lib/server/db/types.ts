@@ -128,6 +128,7 @@ export interface UserPhraseRow {
   ai_enrichment_status: UserPhraseAiEnrichmentStatus | null;
   ai_semantic_focus: string | null;
   ai_typical_scenario: string | null;
+  ai_example_sentences: unknown;
   ai_enrichment_error: string | null;
   learning_item_type: "expression" | "sentence" | null;
   saved_at: string;

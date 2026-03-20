@@ -1,7 +1,8 @@
 "use client";
 
 import type { RefObject } from "react";
-import { BookText, BookmarkPlus, RotateCcw, Volume2 } from "lucide-react";
+import { BookText, BookmarkPlus, RotateCcw } from "lucide-react";
+import { TtsActionButton } from "@/components/audio/tts-action-button";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -52,11 +53,7 @@ export function SelectionToolbar({
         <RotateCcw className="size-3.5" />
         复习
       </Button>
-      <Button size="sm" variant="ghost" className="h-7 px-2" onClick={onPronounce} aria-label="朗读">
-        <Volume2 className="size-3.5" />
-        朗读
-      </Button>
+      <TtsActionButton size="sm" variant="ghost" className="h-7 px-2" onClick={onPronounce} />
     </div>
   );
 }
-

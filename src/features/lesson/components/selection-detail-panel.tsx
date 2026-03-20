@@ -1,6 +1,7 @@
 ﻿import { useState } from "react";
-import { Languages, Volume2 } from "lucide-react";
+import { Languages } from "lucide-react";
 import { LessonSentence, SelectionChunkLayer } from "@/lib/types";
+import { TtsActionButton } from "@/components/audio/tts-action-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -53,7 +54,7 @@ export function SelectionDetailPanel({
   hoveredChunkKey,
   onHoverChunk,
   playingChunkKey,
-  showSpeaker = true,
+  showSpeaker: _showSpeaker = true,
   sentenceSectionLabel = "当前句子",
   onSelectSentence,
 }: {
@@ -77,6 +78,7 @@ export function SelectionDetailPanel({
 }) {
   const [exampleTranslationOpenMap, setExampleTranslationOpenMap] = useState<Record<string, boolean>>({});
   const panelSurfaceClassName = "overflow-hidden border-0 bg-white shadow-none";
+  void _showSpeaker;
 
   return (
     <div className="sticky top-20 hidden space-y-4 lg:block">
@@ -126,18 +128,17 @@ export function SelectionDetailPanel({
                 })}
               </div>
             ) : null}
-            <Button
+            <TtsActionButton
+              active={speakingText === currentSentence.text}
               size="sm"
               variant="ghost"
               className={cn(
-                "w-full cursor-pointer justify-center transition-all duration-150",
+                "w-full justify-center transition-all duration-150",
                 appleButtonClassName,
               )}
+              iconClassName="size-4"
               onClick={() => onPronounce(currentSentence.text)}
-            >
-              <Volume2 className={speakingText === currentSentence.text ? "size-4 animate-pulse" : "size-4"} />
-              朗读
-            </Button>
+            />
           </CardContent>
         ) : (
           <CardContent className="pt-4 text-sm text-muted-foreground">
@@ -215,15 +216,14 @@ export function SelectionDetailPanel({
                 </div>
 
                 <div className="flex gap-2">
-                  <Button
+                  <TtsActionButton
+                    active={speakingText === chunkDetail.text}
                     variant="ghost"
                     size="sm"
-                    className={cn("cursor-pointer", appleButtonClassName)}
+                    className={appleButtonClassName}
+                    iconClassName="size-4"
                     onClick={() => onPronounce(chunkDetail.text)}
-                  >
-                    <Volume2 className={speakingText === chunkDetail.text ? "size-4 animate-pulse" : "size-4"} />
-                    朗读
-                  </Button>
+                  />
                 </div>
 
                 <div>
@@ -272,15 +272,15 @@ export function SelectionDetailPanel({
                               <Languages className="size-3.5" />
                               {translationOpen ? "收起" : "翻译"}
                             </button>
-                            <button
-                              type="button"
-                              className="inline-flex cursor-pointer items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground active:opacity-70"
-                              aria-label="朗读例句"
+                            <TtsActionButton
+                              active={speakingText === exampleText}
+                              variant="ghost"
+                              size="sm"
+                              className="h-auto px-0 text-xs text-muted-foreground hover:text-foreground"
+                              ariaLabel="朗读例句"
+                              iconClassName="size-4"
                               onClick={() => onPronounce(exampleText)}
-                            >
-                              <Volume2 className={speakingText === exampleText ? "size-4 animate-pulse" : "size-4"} />
-                              朗读
-                            </button>
+                            />
                           </div>
                         </div>
                         <p className="mt-1 break-words">{exampleText}</p>

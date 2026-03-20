@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "phrases:enrich-missing": "npx tsx scripts/enrich-missing-phrases.ts",
     "tts:warmup": "node scripts/warmup-tts.mjs",
     "tts:warmup:scene-full": "node scripts/warmup-scene-full-tts.mjs"
   },

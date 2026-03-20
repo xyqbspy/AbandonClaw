@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Languages, Volume2, X } from "lucide-react";
+import { Languages, X } from "lucide-react";
+import { TtsActionButton } from "@/components/audio/tts-action-button";
 import { LessonSentence, SelectionChunkLayer } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -156,14 +157,13 @@ export function SelectionDetailSheet({
                         <Languages className="size-3.5" />
                         {showSentenceTranslation ? "收起" : "翻译"}
                       </button>
-                      <button
-                        type="button"
-                        className="inline-flex cursor-pointer items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground active:opacity-70"
+                      <TtsActionButton
+                        active={speakingText === currentSentence.text}
+                        variant="ghost"
+                        size="sm"
+                        className="h-auto px-0 text-xs text-muted-foreground hover:text-foreground"
                         onClick={() => onLoopSentence(currentSentence.text)}
-                      >
-                        <Volume2 className={cn("size-3.5", speakingText === currentSentence.text && "animate-pulse text-primary")} />
-                        {speakingText === currentSentence.text ? "停止" : "朗读"}
-                      </button>
+                      />
                     </div>
                   ) : null}
                 </div>
@@ -249,14 +249,13 @@ export function SelectionDetailSheet({
                 <div className="flex items-center justify-between gap-3">
                   <h3 className="text-sm font-medium">{topHint}</h3>
                   {chunkDetail ? (
-                    <button
-                      type="button"
-                      className="inline-flex cursor-pointer items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground active:opacity-70"
+                    <TtsActionButton
+                      active={speakingText === chunkDetail.text}
+                      variant="ghost"
+                      size="sm"
+                      className="h-auto px-0 text-xs text-muted-foreground hover:text-foreground"
                       onClick={() => onPronounce(chunkDetail.text)}
-                    >
-                      <Volume2 className={cn("size-3.5", speakingText === chunkDetail.text && "animate-pulse text-primary")} />
-                      朗读
-                    </button>
+                    />
                   ) : null}
                 </div>
                 {chunkDetail ? (
@@ -307,15 +306,15 @@ export function SelectionDetailSheet({
                                 <Languages className="size-3.5" />
                                 {exampleTranslationOpenMap[exampleText] ? "收起" : "翻译"}
                               </button>
-                              <button
-                                type="button"
-                                className="inline-flex cursor-pointer items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground active:opacity-70"
-                                aria-label="朗读例句"
+                              <TtsActionButton
+                                active={speakingText === exampleText}
+                                variant="ghost"
+                                size="sm"
+                                className="h-auto px-0 text-xs text-muted-foreground hover:text-foreground"
+                                ariaLabel="朗读例句"
+                                iconClassName="size-4"
                                 onClick={() => onPronounce(exampleText)}
-                              >
-                                <Volume2 className={cn("size-4", speakingText === exampleText && "animate-pulse")} />
-                                朗读
-                              </button>
+                              />
                             </div>
                           </div>
                           <p className="mt-1 break-words leading-6">{exampleText}</p>

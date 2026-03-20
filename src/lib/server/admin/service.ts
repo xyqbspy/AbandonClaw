@@ -46,6 +46,8 @@ export interface AdminPhraseListItem {
   learningItemType: "expression" | "sentence";
   reviewStatus: string;
   aiEnrichmentStatus: "pending" | "done" | "failed" | null;
+  enrichmentState: "done" | "missing" | "pending" | "na";
+  enrichmentLabel: string;
   createdAt: string;
   savedAt: string;
 }
@@ -71,6 +73,54 @@ const clampPageSize = (value: number | undefined) => {
 const normalizeSearch = (value: string | undefined) => {
   const text = value?.trim();
   return text ? text : undefined;
+};
+
+const hasEnoughExampleSentences = (value: unknown) => Array.isArray(value) && value.length >= 2;
+
+const getAdminPhraseEnrichmentState = (row: {
+  learningItemType: "expression" | "sentence";
+  aiEnrichmentStatus: "pending" | "done" | "failed" | null;
+  translation: string | null;
+  usageNote: string | null;
+  semanticFocus: string | null;
+  typicalScenario: string | null;
+  exampleSentences: unknown;
+}) => {
+  if (row.learningItemType !== "expression") {
+    return {
+      state: "na" as const,
+      label: "-",
+    };
+  }
+  if (row.aiEnrichmentStatus === "pending") {
+    return {
+      state: "pending" as const,
+      label: "补全中",
+    };
+  }
+
+  const hasTranslation = Boolean(row.translation?.trim());
+  const hasUsageNote = Boolean(row.usageNote?.trim());
+  const hasSemanticFocus = Boolean(row.semanticFocus?.trim());
+  const hasTypicalScenario = Boolean(row.typicalScenario?.trim());
+  const hasExamples = hasEnoughExampleSentences(row.exampleSentences);
+  const completed =
+    row.aiEnrichmentStatus === "done" &&
+    hasTranslation &&
+    hasUsageNote &&
+    hasSemanticFocus &&
+    hasTypicalScenario &&
+    hasExamples;
+
+  return completed
+    ? {
+        state: "done" as const,
+        label: "已补全",
+      }
+    : {
+        state: "missing" as const,
+        label: "缺失",
+      };
 };
 
 const isMissingProgressStatusColumn = (error: { code?: string | null; message: string }) =>
@@ -530,7 +580,10 @@ export async function listAdminPhrases(filters: AdminPhraseListFilters) {
 
   let query = admin
     .from("user_phrases")
-    .select("*, phrase:phrases(id,display_text,translation,normalized_text)", { count: "exact" })
+    .select(
+      "*, phrase:phrases(id,display_text,translation,normalized_text,usage_note)",
+      { count: "exact" },
+    )
     .order("saved_at", { ascending: false })
     .range(from, to);
 
@@ -552,21 +605,34 @@ export async function listAdminPhrases(filters: AdminPhraseListFilters) {
     source_sentence_text: string | null;
     source_chunk_text: string | null;
     source_scene_slug: string | null;
-    review_status: string;
-    ai_enrichment_status: "pending" | "done" | "failed" | null;
-    created_at: string;
-    saved_at: string;
-    learning_item_type: string | null;
-    phrase: {
-      id: string;
-      display_text: string | null;
-      translation: string | null;
-      normalized_text: string | null;
-    } | null;
+      review_status: string;
+      ai_enrichment_status: "pending" | "done" | "failed" | null;
+      ai_example_sentences: unknown;
+      ai_semantic_focus: string | null;
+      ai_typical_scenario: string | null;
+      created_at: string;
+      saved_at: string;
+      learning_item_type: string | null;
+      phrase: {
+        id: string;
+        display_text: string | null;
+        translation: string | null;
+        normalized_text: string | null;
+        usage_note: string | null;
+      } | null;
   }>;
 
   const mapped = rows.map<AdminPhraseListItem>((row) => {
     const learningItemType = inferAdminPhraseItemType(row);
+    const enrichmentMeta = getAdminPhraseEnrichmentState({
+      learningItemType,
+      aiEnrichmentStatus: row.ai_enrichment_status ?? null,
+      translation: row.phrase?.translation ?? null,
+      usageNote: row.phrase?.usage_note ?? null,
+      semanticFocus: row.ai_semantic_focus ?? null,
+      typicalScenario: row.ai_typical_scenario ?? null,
+      exampleSentences: row.ai_example_sentences,
+    });
     const text =
       learningItemType === "sentence"
         ? row.source_sentence_text ?? row.phrase?.display_text ?? row.source_chunk_text ?? ""
@@ -584,6 +650,8 @@ export async function listAdminPhrases(filters: AdminPhraseListFilters) {
       learningItemType,
       reviewStatus: row.review_status,
       aiEnrichmentStatus: row.ai_enrichment_status ?? null,
+      enrichmentState: enrichmentMeta.state,
+      enrichmentLabel: enrichmentMeta.label,
       createdAt: row.created_at,
       savedAt: row.saved_at,
     };
@@ -651,6 +719,100 @@ export async function enrichAdminUserPhraseById(userPhraseId: string) {
   return {
     userPhraseId: result.userPhraseId,
     status: "done" as const,
+  };
+}
+
+export async function enrichAdminUserPhrasesByIds(userPhraseIds: string[]) {
+  const admin = createSupabaseAdminClient();
+  const ids = Array.from(new Set(userPhraseIds.map((id) => id.trim()).filter(Boolean))).slice(0, 100);
+  if (ids.length === 0) {
+    return {
+      total: 0,
+      done: 0,
+      skipped: 0,
+      failed: 0,
+      items: [] as Array<{
+        userPhraseId: string;
+        status: "done" | "skipped" | "failed";
+        reason?: string;
+      }>,
+    };
+  }
+
+  const { data, error } = await admin
+    .from("user_phrases")
+    .select("id,user_id,learning_item_type,source_chunk_text,source_sentence_text")
+    .in("id", ids)
+    .returns<
+      Array<{
+        id: string;
+        user_id: string;
+        learning_item_type: "expression" | "sentence" | null;
+        source_chunk_text: string | null;
+        source_sentence_text: string | null;
+      }>
+    >();
+
+  if (error) {
+    throw new Error(`Failed to load user phrases for batch enrichment: ${error.message}`);
+  }
+
+  const byId = new Map((data ?? []).map((row) => [row.id, row]));
+  const items: Array<{
+    userPhraseId: string;
+    status: "done" | "skipped" | "failed";
+    reason?: string;
+  }> = [];
+
+  for (const userPhraseId of ids) {
+    const row = byId.get(userPhraseId);
+    if (!row) {
+      items.push({
+        userPhraseId,
+        status: "failed",
+        reason: "not_found",
+      });
+      continue;
+    }
+
+    const itemType = inferAdminPhraseItemType({
+      learning_item_type: row.learning_item_type,
+      source_chunk_text: row.source_chunk_text,
+      source_sentence_text: row.source_sentence_text,
+    });
+    if (itemType !== "expression") {
+      items.push({
+        userPhraseId,
+        status: "skipped",
+        reason: "non_expression",
+      });
+      continue;
+    }
+
+    try {
+      await enrichAiExpressionLearningInfo({
+        userId: row.user_id,
+        userPhraseId: row.id,
+      });
+      items.push({
+        userPhraseId,
+        status: "done",
+      });
+    } catch (error) {
+      items.push({
+        userPhraseId,
+        status: "failed",
+        reason: error instanceof Error ? error.message : "unknown",
+      });
+    }
+  }
+
+  return {
+    total: items.length,
+    done: items.filter((item) => item.status === "done").length,
+    skipped: items.filter((item) => item.status === "skipped").length,
+    failed: items.filter((item) => item.status === "failed").length,
+    items,
   };
 }
 

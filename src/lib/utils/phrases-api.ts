@@ -43,6 +43,10 @@ export interface UserPhraseItemResponse {
   aiEnrichmentStatus: "pending" | "done" | "failed" | null;
   semanticFocus: string | null;
   typicalScenario: string | null;
+  exampleSentences: Array<{
+    en: string;
+    zh: string;
+  }>;
   aiEnrichmentError: string | null;
   learningItemType: "expression" | "sentence";
   savedAt: string;
@@ -167,6 +171,35 @@ export interface SimilarExpressionCandidateResponse {
   differenceLabel: string;
 }
 
+export interface ManualExpressionAssistResponse {
+  version: "v1";
+  inputItem: {
+    text: string;
+    translation: string;
+    usageNote: string;
+    examples: Array<{
+      en: string;
+      zh: string;
+    }>;
+    semanticFocus: string;
+    typicalScenario: string;
+  };
+  similarExpressions: SimilarExpressionCandidateResponse[];
+  contrastExpressions: SimilarExpressionCandidateResponse[];
+}
+
+export interface ManualSentenceAssistResponse {
+  version: "v1";
+  sentenceItem: {
+    text: string;
+    translation: string;
+    usageNote: string;
+    semanticFocus: string;
+    typicalScenario: string;
+    extractedExpressions: string[];
+  };
+}
+
 export async function enrichSimilarExpressionFromApi(payload: {
   userPhraseId: string;
   baseExpression?: string;
@@ -223,6 +256,42 @@ export async function generateSimilarExpressionsFromApi(payload: {
     version: "v1";
     candidates: SimilarExpressionCandidateResponse[];
   };
+}
+
+export async function generateManualExpressionAssistFromApi(payload: {
+  text: string;
+  existingExpressions?: string[];
+}) {
+  const response = await fetch("/api/phrases/manual-assist", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      mode: "expression",
+      text: payload.text,
+      existingExpressions: payload.existingExpressions ?? [],
+    }),
+  });
+  if (!response.ok) {
+    throw await toApiError(response, "生成表达补全信息失败。");
+  }
+  return (await response.json()) as ManualExpressionAssistResponse;
+}
+
+export async function generateManualSentenceAssistFromApi(payload: {
+  text: string;
+}) {
+  const response = await fetch("/api/phrases/manual-assist", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      mode: "sentence",
+      text: payload.text,
+    }),
+  });
+  if (!response.ok) {
+    throw await toApiError(response, "生成句子补全信息失败。");
+  }
+  return (await response.json()) as ManualSentenceAssistResponse;
 }
 
 export async function getPhraseSummaryFromApi() {

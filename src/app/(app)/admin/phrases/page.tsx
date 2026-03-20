@@ -1,5 +1,9 @@
 ﻿import Link from "next/link";
-import { deleteAdminPhraseAction, enrichAdminPhraseAction } from "@/app/(app)/admin/actions";
+import {
+  deleteAdminPhraseAction,
+  enrichAdminPhraseAction,
+  enrichAdminPhrasesBatchAction,
+} from "@/app/(app)/admin/actions";
 import { PageHeader } from "@/components/shared/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -77,92 +81,129 @@ export default async function AdminPhrasesPage({
         </CardContent>
       </Card>
 
+      <form id="admin-phrases-batch-enrich-form" action={enrichAdminPhrasesBatchAction} />
       <div className={`overflow-x-auto rounded-lg ${APPLE_SURFACE}`}>
-        <table className="min-w-full text-sm">
-          <thead className="bg-muted/40 text-left text-xs text-muted-foreground">
-            <tr>
-              <th className="px-3 py-2">内容</th>
-              <th className="px-3 py-2">类型</th>
-              <th className="px-3 py-2">补全状态</th>
-              <th className="px-3 py-2">翻译</th>
-              <th className="px-3 py-2">来源场景</th>
-              <th className="px-3 py-2">用户</th>
-              <th className="px-3 py-2">保存时间</th>
-              <th className="px-3 py-2">操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            {result.rows.map((row) => (
-              <tr key={row.userPhraseId} className="align-top">
-                <td className="max-w-[360px] px-3 py-2">
-                  <p className="line-clamp-2 font-medium">{row.text}</p>
-                  {row.sourceSentenceText && row.learningItemType === "expression" ? (
-                    <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
-                      例句：{row.sourceSentenceText}
-                    </p>
-                  ) : null}
-                </td>
-                <td className="px-3 py-2">
-                  <Badge variant={row.learningItemType === "sentence" ? "secondary" : "outline"}>
-                    {row.learningItemType === "sentence" ? "句子" : "chunk"}
-                  </Badge>
-                </td>
-                <td className="px-3 py-2">
-                  <Badge variant="outline">{row.aiEnrichmentStatus ?? "-"}</Badge>
-                </td>
-                <td className="max-w-[260px] px-3 py-2 text-muted-foreground">
-                  <p className="line-clamp-2">{row.translation ?? "-"}</p>
-                </td>
-                <td className="px-3 py-2 text-xs text-muted-foreground">
-                  {row.sourceSceneSlug ?? "-"}
-                </td>
-                <td className="px-3 py-2 font-mono text-xs text-muted-foreground">
-                  {row.userId.slice(0, 8)}...
-                </td>
-                <td className="px-3 py-2 whitespace-nowrap text-xs text-muted-foreground">
-                  {row.savedAt}
-                </td>
-                <td className="px-3 py-2">
-                  <div className="flex items-center gap-2">
-                    <form action={enrichAdminPhraseAction}>
-                      <input type="hidden" name="userPhraseId" value={row.userPhraseId} />
-                      <Button
-                        type="submit"
-                        size="sm"
-                        variant="ghost"
-                        className={appleButtonClassName}
-                        disabled={
-                          row.learningItemType !== "expression" ||
-                          row.aiEnrichmentStatus === "pending"
-                        }
-                      >
-                        补全
-                      </Button>
-                    </form>
-                    <form action={deleteAdminPhraseAction}>
-                      <input type="hidden" name="userPhraseId" value={row.userPhraseId} />
-                      <Button
-                        type="submit"
-                        size="sm"
-                        variant="ghost"
-                        className={`${APPLE_BUTTON_DANGER} ${APPLE_BUTTON_TEXT_SM}`}
-                      >
-                        删除
-                      </Button>
-                    </form>
-                  </div>
-                </td>
-              </tr>
-            ))}
-            {result.rows.length === 0 ? (
+          <div className="flex items-center justify-between gap-3 border-b border-border/60 px-3 py-2">
+            <p className="text-xs text-muted-foreground">勾选后可批量补全选中的 chunk。</p>
+            <Button
+              type="submit"
+              form="admin-phrases-batch-enrich-form"
+              size="sm"
+              variant="ghost"
+              className={appleButtonClassName}
+            >
+              批量补全选中项
+            </Button>
+          </div>
+          <table className="min-w-full text-sm">
+            <thead className="bg-muted/40 text-left text-xs text-muted-foreground">
               <tr>
-                <td colSpan={8} className="px-3 py-6 text-center text-muted-foreground">
-                  未找到表达。
-                </td>
+                <th className="w-12 px-3 py-2">选择</th>
+                <th className="px-3 py-2">内容</th>
+                <th className="px-3 py-2">类型</th>
+                <th className="px-3 py-2">补全状态</th>
+                <th className="px-3 py-2">翻译</th>
+                <th className="px-3 py-2">来源场景</th>
+                <th className="px-3 py-2">用户</th>
+                <th className="px-3 py-2">保存时间</th>
+                <th className="px-3 py-2">操作</th>
               </tr>
-            ) : null}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {result.rows.map((row) => (
+                <tr key={row.userPhraseId} className="align-top">
+                  <td className="px-3 py-2">
+                    {row.learningItemType === "expression" ? (
+                      <input
+                        type="checkbox"
+                        name="userPhraseIds"
+                        value={row.userPhraseId}
+                        form="admin-phrases-batch-enrich-form"
+                        className="size-4 rounded border-border/70"
+                      />
+                    ) : null}
+                  </td>
+                  <td className="max-w-[360px] px-3 py-2">
+                    <p className="line-clamp-2 font-medium">{row.text}</p>
+                    {row.sourceSentenceText && row.learningItemType === "expression" ? (
+                      <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
+                        例句：{row.sourceSentenceText}
+                      </p>
+                    ) : null}
+                  </td>
+                  <td className="px-3 py-2">
+                    <Badge variant={row.learningItemType === "sentence" ? "secondary" : "outline"}>
+                      {row.learningItemType === "sentence" ? "句子" : "chunk"}
+                    </Badge>
+                  </td>
+                  <td className="px-3 py-2">
+                    <Badge
+                      variant={
+                        row.enrichmentState === "done"
+                          ? "secondary"
+                          : row.enrichmentState === "pending"
+                            ? "outline"
+                            : row.enrichmentState === "missing"
+                              ? "destructive"
+                              : "outline"
+                      }
+                    >
+                      {row.enrichmentLabel}
+                    </Badge>
+                  </td>
+                  <td className="max-w-[260px] px-3 py-2 text-muted-foreground">
+                    <p className="line-clamp-2">{row.translation ?? "-"}</p>
+                  </td>
+                  <td className="px-3 py-2 text-xs text-muted-foreground">
+                    {row.sourceSceneSlug ?? "-"}
+                  </td>
+                  <td className="px-3 py-2 font-mono text-xs text-muted-foreground">
+                    {row.userId.slice(0, 8)}...
+                  </td>
+                  <td className="px-3 py-2 whitespace-nowrap text-xs text-muted-foreground">
+                    {row.savedAt}
+                  </td>
+                  <td className="px-3 py-2">
+                    <div className="flex items-center gap-2">
+                      <form action={enrichAdminPhraseAction}>
+                        <input type="hidden" name="userPhraseId" value={row.userPhraseId} />
+                        <Button
+                          type="submit"
+                          size="sm"
+                          variant="ghost"
+                          className={appleButtonClassName}
+                          disabled={
+                            row.learningItemType !== "expression" ||
+                            row.enrichmentState === "pending"
+                          }
+                        >
+                          补全
+                        </Button>
+                      </form>
+                      <form action={deleteAdminPhraseAction}>
+                        <input type="hidden" name="userPhraseId" value={row.userPhraseId} />
+                        <Button
+                          type="submit"
+                          size="sm"
+                          variant="ghost"
+                          className={`${APPLE_BUTTON_DANGER} ${APPLE_BUTTON_TEXT_SM}`}
+                        >
+                          删除
+                        </Button>
+                      </form>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {result.rows.length === 0 ? (
+                <tr>
+                  <td colSpan={9} className="px-3 py-6 text-center text-muted-foreground">
+                    未找到表达。
+                  </td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
       </div>
 
       <div className="flex items-center justify-between text-xs text-muted-foreground">

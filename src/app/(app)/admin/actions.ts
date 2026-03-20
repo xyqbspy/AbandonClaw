@@ -6,6 +6,7 @@ import { requireAdmin } from "@/lib/server/auth";
 import {
   deleteAdminUserPhraseById,
   enrichAdminUserPhraseById,
+  enrichAdminUserPhrasesByIds,
   deleteSceneById,
   regenerateSceneVariants,
   updateSceneSentencesById,
@@ -129,6 +130,27 @@ export async function enrichAdminPhraseAction(formData: FormData) {
   } catch (error) {
     console.warn("[admin][phrases] enrich failed", {
       userPhraseId,
+      error: error instanceof Error ? error.message : "unknown",
+    });
+  }
+  revalidatePath("/admin/phrases");
+}
+
+export async function enrichAdminPhrasesBatchAction(formData: FormData) {
+  await requireAdmin();
+  const userPhraseIds = formData
+    .getAll("userPhraseIds")
+    .map((value) => String(value ?? "").trim())
+    .filter(Boolean);
+  if (userPhraseIds.length === 0) {
+    revalidatePath("/admin/phrases");
+    return;
+  }
+  try {
+    await enrichAdminUserPhrasesByIds(userPhraseIds);
+  } catch (error) {
+    console.warn("[admin][phrases] batch enrich failed", {
+      total: userPhraseIds.length,
       error: error instanceof Error ? error.message : "unknown",
     });
   }

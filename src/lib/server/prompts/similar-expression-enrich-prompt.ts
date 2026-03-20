@@ -5,9 +5,9 @@ Task: generate minimal but useful learning info for a short English expression.
 Rules:
 1) Keep Chinese translation natural and concise.
 2) usageNote must be in Chinese, short and practical (1-2 short sentences).
-3) exampleSentence should be a natural, everyday English sentence using the expression.
-4) semanticFocus must be in Chinese and very short (<= 12 Chinese chars), e.g. "更偏直接预测".
-5) typicalScenario must be in Chinese and short (<= 20 Chinese chars), e.g. "健康状态恶化担忧".
+3) examples must contain exactly 2 natural, everyday English sentences using the expression, and each must include a natural Chinese translation.
+4) semanticFocus must be in Chinese and very short (<= 12 Chinese chars), e.g. "更偏直接".
+5) typicalScenario must be in Chinese and short (<= 20 Chinese chars), e.g. "学习恢复节奏".
 6) Be conservative; avoid uncertain claims.
 `;
 
@@ -25,7 +25,10 @@ Return JSON:
   "version": "v1",
   "translation": "string",
   "usageNote": "中文字符串",
-  "exampleSentence": "string",
+  "examples": [
+    { "en": "string", "zh": "string" },
+    { "en": "string", "zh": "string" }
+  ],
   "semanticFocus": "中文字符串",
   "typicalScenario": "中文字符串"
 }`;
