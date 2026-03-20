@@ -1,6 +1,7 @@
 const chunkKeyFallbackPrefix = "chunk";
 const sceneFullKeyPrefix = "scene-full";
 const sceneFullAudioVersion = "v2";
+const sentenceAudioKeyPrefix = "sentence";
 
 const simpleHash = (value: string) => {
   let hash = 0;
@@ -13,6 +14,13 @@ const simpleHash = (value: string) => {
 type SceneFullSegment = {
   text: string;
   speaker?: string;
+};
+
+type SentenceAudioKeyParams = {
+  sentenceId: string;
+  text: string;
+  speaker?: string;
+  mode?: "normal" | "slow";
 };
 
 export const sanitizeAudioPathSegment = (value: string, fallback: string) => {
@@ -35,6 +43,18 @@ export const buildChunkAudioKey = (chunkText: string) => {
     .slice(0, 64);
   if (cleaned) return cleaned;
   return `${chunkKeyFallbackPrefix}-${simpleHash(chunkText.trim().toLowerCase())}`;
+};
+
+export const buildSentenceAudioKey = (params: SentenceAudioKeyParams) => {
+  const normalizedSentenceId = sanitizeAudioPathSegment(params.sentenceId, "sentence");
+  const normalizedSpeaker = params.speaker?.trim().toUpperCase() || "_";
+  const normalizedMode = params.mode === "slow" ? "slow" : "normal";
+  const normalizedText = params.text.trim();
+  const fingerprint = simpleHash(
+    `${normalizedSentenceId}::${normalizedSpeaker}::${normalizedMode}::${normalizedText}`,
+  );
+
+  return `${sentenceAudioKeyPrefix}-${normalizedSentenceId}-${fingerprint}`;
 };
 
 export const mergeSceneFullSegments = (

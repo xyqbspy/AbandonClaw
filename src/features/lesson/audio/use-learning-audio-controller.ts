@@ -107,7 +107,7 @@ export function useLearningAudioController(params: {
 
   const playSentenceInternal = useCallback(
     async (sentence: LessonSentence, mode: SentencePlayMode, runId: number) => {
-      const text = sentence.text.trim();
+      const text = (sentence.tts?.trim() || sentence.audioText?.trim() || sentence.text).trim();
       if (!text) return;
       if (runId !== runIdRef.current) return;
 

@@ -8,7 +8,7 @@ import {
 } from "@/lib/cache/indexeddb";
 
 export type SceneCacheRecord<T> = {
-  schemaVersion: "scene-cache-v2";
+  schemaVersion: "scene-cache-v3";
   key: string;
   type: "scene";
   slug: string;
@@ -32,9 +32,9 @@ type SceneCacheMap = Map<string, SceneCacheRecord<Lesson>>;
 
 const SCENE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const SCENE_MAX_ITEMS = 20;
-const QUEUE_META_KEY = "scene_queue_v2";
+const QUEUE_META_KEY = "scene_queue_v3";
 const EXPIRED_HARD_DELETE_AFTER_MS = 7 * 24 * 60 * 60 * 1000;
-const SCHEMA_VERSION: SceneCacheRecord<Lesson>["schemaVersion"] = "scene-cache-v2";
+const SCHEMA_VERSION: SceneCacheRecord<Lesson>["schemaVersion"] = "scene-cache-v3";
 
 const memorySceneRecords: SceneCacheMap = new Map();
 let memoryQueue: CacheQueueItem[] = [];
@@ -144,6 +144,9 @@ const isRecordSchemaValid = (record: SceneCacheRecord<Lesson>) =>
   typeof record.slug === "string" &&
   record.key === sceneKey(record.slug);
 
+const isRecordPayloadValid = (record: SceneCacheRecord<Lesson>) =>
+  isLessonCacheable(record.data, record.slug);
+
 export async function getSceneCache(slug: string): Promise<{
   found: boolean;
   record: SceneCacheRecord<Lesson> | null;
@@ -167,6 +170,10 @@ export async function getSceneCache(slug: string): Promise<{
   }
 
   if (!isRecordSchemaValid(record)) {
+    await removeRecordByKey(key);
+    return { found: false, record: null, isExpired: false };
+  }
+  if (!isRecordPayloadValid(record)) {
     await removeRecordByKey(key);
     return { found: false, record: null, isExpired: false };
   }
@@ -271,6 +278,10 @@ export async function clearExpiredSceneCaches(): Promise<void> {
       continue;
     }
     if (!isRecordSchemaValid(record)) {
+      staleKeys.push(item.key);
+      continue;
+    }
+    if (!isRecordPayloadValid(record)) {
       staleKeys.push(item.key);
       continue;
     }

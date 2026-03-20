@@ -6,6 +6,8 @@ import { createClient } from "@supabase/supabase-js";
 import { MsEdgeTTS, OUTPUT_FORMAT } from "msedge-tts";
 
 const cwd = process.cwd();
+const chunkKeyFallbackPrefix = "chunk";
+const sentenceAudioKeyPrefix = "sentence";
 
 const loadEnvFile = async (filePath) => {
   try {
@@ -40,6 +42,14 @@ const sanitizeSegment = (value, fallback) => {
   return normalized || fallback;
 };
 
+const simpleHash = (value) => {
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
+  }
+  return hash.toString(36);
+};
+
 const buildChunkAudioKey = (chunkText) => {
   const normalized = String(chunkText ?? "")
     .trim()
@@ -49,7 +59,20 @@ const buildChunkAudioKey = (chunkText) => {
     .replace(/-+/g, "-")
     .replace(/^-|-$/g, "")
     .slice(0, 64);
-  return normalized || "chunk";
+  if (normalized) return normalized;
+  return `${chunkKeyFallbackPrefix}-${simpleHash(String(chunkText ?? "").trim().toLowerCase())}`;
+};
+
+const buildSentenceAudioKey = ({ sentenceId, text, speaker, mode }) => {
+  const normalizedSentenceId = sanitizeSegment(sentenceId, "sentence");
+  const normalizedSpeaker = String(speaker ?? "").trim().toUpperCase() || "_";
+  const normalizedMode = mode === "slow" ? "slow" : "normal";
+  const normalizedText = String(text ?? "").trim();
+  const fingerprint = simpleHash(
+    `${normalizedSentenceId}::${normalizedSpeaker}::${normalizedMode}::${normalizedText}`,
+  );
+
+  return `${sentenceAudioKeyPrefix}-${normalizedSentenceId}-${fingerprint}`;
 };
 
 const exists = async (targetPath) => {
@@ -125,18 +148,33 @@ const collectTasksFromScene = (row) => {
   for (const section of sections) {
     const blocks = Array.isArray(section?.blocks) ? section.blocks : [];
     for (const block of blocks) {
-      const speaker = block?.speaker;
+      const blockSpeaker = block?.speaker;
       const sentences = Array.isArray(block?.sentences) ? block.sentences : [];
       for (const sentence of sentences) {
         const sentenceId = sanitizeSegment(sentence?.id || "sentence", "sentence");
         const sentenceText = String(sentence?.tts || sentence?.text || "").trim();
+        const sentenceSpeaker = sentence?.speaker || blockSpeaker;
         if (sentenceText) {
+          const sentenceAudioKey = buildSentenceAudioKey({
+            sentenceId,
+            text: sentenceText,
+            speaker: sentenceSpeaker,
+            mode: "normal",
+          });
           sentenceTasks.push({
             type: "sentence",
-            key: `${sceneSlug}/${sentenceId}`,
+            key: `${sceneSlug}/${sentenceAudioKey}`,
             text: sentenceText,
-            voice: voiceForSpeaker(speaker),
-            targetPath: path.join(cwd, "public", "audio", sceneSlug, `${sentenceId}.mp3`),
+            voice: voiceForSpeaker(sentenceSpeaker),
+            targetPath: path.join(
+              cwd,
+              "public",
+              "audio",
+              "scenes",
+              sceneSlug,
+              "sentences",
+              `${sentenceAudioKey}.mp3`,
+            ),
           });
         }
 

@@ -8,6 +8,7 @@ import { ValidationError } from "@/lib/server/errors";
 import {
   buildChunkAudioKey,
   buildSceneFullAudioKey,
+  buildSentenceAudioKey,
   mergeSceneFullSegments,
   sanitizeAudioPathSegment,
 } from "@/lib/shared/tts";
@@ -188,6 +189,7 @@ const resolveAudioTarget = (payload: {
   sentenceId?: unknown;
   chunkKey?: unknown;
   sceneFullKey?: string;
+  sentenceAudioKey?: string;
   text: string;
 }) => {
   if (payload.kind === "scene_full") {
@@ -214,7 +216,7 @@ const resolveAudioTarget = (payload: {
       parseRequiredString(payload.sentenceId, "sentenceId"),
       "sentence",
     );
-    const fileName = payload.mode === "slow" ? `${sentenceId}-slow.mp3` : `${sentenceId}.mp3`;
+    const fileName = `${payload.sentenceAudioKey || sentenceId}.mp3`;
     const relativePath = `/audio/scenes/${sceneSlug}/sentences/${fileName}`;
     return {
       relativePath,
@@ -264,6 +266,15 @@ export async function POST(request: Request) {
       chunkKey: payload.chunkKey,
       sceneFullKey:
         kind === "scene_full" ? buildSceneFullAudioKey(mergedSceneFullSegments, sceneType) : undefined,
+      sentenceAudioKey:
+        kind === "sentence"
+          ? buildSentenceAudioKey({
+              sentenceId: parseRequiredString(payload.sentenceId, "sentenceId"),
+              text,
+              speaker,
+              mode,
+            })
+          : undefined,
       text,
     });
 
