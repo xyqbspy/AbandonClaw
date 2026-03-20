@@ -65,7 +65,22 @@ export function PullToRefresh({ children }: { children: ReactNode }) {
     if (!shouldRefresh) return;
     setRefreshing(true);
     window.setTimeout(() => {
-      window.location.reload();
+      const refreshDetail = {
+        pathname,
+        handled: false,
+      };
+      window.dispatchEvent(
+        new CustomEvent("app:pull-refresh", {
+          detail: refreshDetail,
+        }),
+      );
+      if (!refreshDetail.handled) {
+        window.location.reload();
+        return;
+      }
+      window.setTimeout(() => {
+        setRefreshing(false);
+      }, 400);
     }, 120);
   };
 
@@ -91,4 +106,3 @@ export function PullToRefresh({ children }: { children: ReactNode }) {
     </div>
   );
 }
-

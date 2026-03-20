@@ -5,7 +5,12 @@ import { MsEdgeTTS, OUTPUT_FORMAT } from "msedge-tts";
 import { requireCurrentProfile } from "@/lib/server/auth";
 import { toApiErrorResponse } from "@/lib/server/api-error";
 import { ValidationError } from "@/lib/server/errors";
-import { buildChunkAudioKey, sanitizeAudioPathSegment } from "@/lib/shared/tts";
+import {
+  buildChunkAudioKey,
+  buildSceneFullAudioKey,
+  mergeSceneFullSegments,
+  sanitizeAudioPathSegment,
+} from "@/lib/shared/tts";
 
 type TtsKind = "sentence" | "chunk" | "scene_full";
 type TtsMode = "normal" | "slow";
@@ -151,7 +156,7 @@ const synthesizeSceneFullToFile = async (
         });
         activeVoice = voice;
       }
-      const { audioStream } = tts.toStream(segment.text, { rate: "-10%" });
+      const { audioStream } = tts.toStream(segment.text, { rate: "default" });
       const chunkBuffers: Buffer[] = [];
       await new Promise<void>((resolve, reject) => {
         audioStream.on("data", (chunk) => {
@@ -182,6 +187,7 @@ const resolveAudioTarget = (payload: {
   sceneSlug?: unknown;
   sentenceId?: unknown;
   chunkKey?: unknown;
+  sceneFullKey?: string;
   text: string;
 }) => {
   if (payload.kind === "scene_full") {
@@ -189,10 +195,11 @@ const resolveAudioTarget = (payload: {
       parseRequiredString(payload.sceneSlug, "sceneSlug"),
       "scene",
     );
-    const relativePath = `/audio/scenes/${sceneSlug}/full.mp3`;
+    const fileName = `${payload.sceneFullKey || "full"}.mp3`;
+    const relativePath = `/audio/scenes/${sceneSlug}/${fileName}`;
     return {
       relativePath,
-      absolutePath: path.join(process.cwd(), "public", "audio", "scenes", sceneSlug, "full.mp3"),
+      absolutePath: path.join(process.cwd(), "public", "audio", "scenes", sceneSlug, fileName),
       voice: voiceJenny,
       mode: "normal" as TtsMode,
     };
@@ -244,7 +251,9 @@ export async function POST(request: Request) {
       payload.sceneType === "dialogue" || payload.sceneType === "monologue"
         ? payload.sceneType
         : "monologue";
-    const segments = kind === "scene_full" ? parseSceneFullSegments(payload.segments) : [];
+    const sceneFullSegments = kind === "scene_full" ? parseSceneFullSegments(payload.segments) : [];
+    const mergedSceneFullSegments =
+      kind === "scene_full" ? mergeSceneFullSegments(sceneFullSegments, sceneType) : [];
     const text = kind === "scene_full" ? "[scene_full]" : parseRequiredText(payload.text);
     const target = resolveAudioTarget({
       kind,
@@ -253,13 +262,15 @@ export async function POST(request: Request) {
       sceneSlug: payload.sceneSlug,
       sentenceId: payload.sentenceId,
       chunkKey: payload.chunkKey,
+      sceneFullKey:
+        kind === "scene_full" ? buildSceneFullAudioKey(mergedSceneFullSegments, sceneType) : undefined,
       text,
     });
 
     const cached = await exists(target.absolutePath);
     if (!cached) {
       if (kind === "scene_full") {
-        await synthesizeSceneFullToFile(target.absolutePath, segments, sceneType);
+        await synthesizeSceneFullToFile(target.absolutePath, mergedSceneFullSegments, sceneType);
       } else {
         await synthesizeToFile(target.absolutePath, text, target.voice, target.mode);
       }

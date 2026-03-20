@@ -7,6 +7,8 @@ import { MsEdgeTTS, OUTPUT_FORMAT } from "msedge-tts";
 const cwd = process.cwd();
 const voiceJenny = "en-US-JennyNeural";
 const voiceGuy = "en-US-GuyNeural";
+const sceneFullKeyPrefix = "scene-full";
+const sceneFullAudioVersion = "v2";
 
 const loadEnvFile = async (filePath) => {
   try {
@@ -39,6 +41,46 @@ const sanitizeSegment = (value, fallback) => {
     .replace(/-+/g, "-")
     .replace(/^-|-$/g, "");
   return normalized || fallback;
+};
+
+const simpleHash = (value) => {
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
+  }
+  return hash.toString(36);
+};
+
+const mergeSceneFullSegments = (segments, sceneType) => {
+  const merged = [];
+
+  for (const segment of segments) {
+    const text = String(segment?.text ?? "").trim();
+    if (!text) continue;
+
+    const speaker =
+      sceneType === "dialogue"
+        ? String(segment?.speaker ?? "").trim().toUpperCase() || undefined
+        : undefined;
+    const previous = merged[merged.length - 1];
+
+    if (previous && previous.speaker === speaker) {
+      previous.text = `${previous.text} ${text}`.trim();
+      continue;
+    }
+
+    merged.push({ text, speaker });
+  }
+
+  return merged;
+};
+
+const buildSceneFullAudioKey = (segments, sceneType) => {
+  const mergedSegments = mergeSceneFullSegments(segments, sceneType);
+  const fingerprintSource = mergedSegments
+    .map((segment) => `${segment.speaker ?? "_"}:${segment.text}`)
+    .join("||");
+  return `${sceneFullKeyPrefix}-${simpleHash(`${sceneFullAudioVersion}::${sceneType}::${fingerprintSource}`)}`;
 };
 
 const exists = async (targetPath) => {
@@ -88,12 +130,15 @@ const buildSceneTasks = (rows) => {
 
     if (segments.length === 0) continue;
 
+    const mergedSegments = mergeSceneFullSegments(segments, sceneType);
+    const sceneFullKey = buildSceneFullAudioKey(mergedSegments, sceneType);
+
     tasks.push({
       key: sceneSlug,
       sceneSlug,
       sceneType,
-      segments,
-      targetPath: path.join(cwd, "public", "audio", "scenes", sceneSlug, "full.mp3"),
+      segments: mergedSegments,
+      targetPath: path.join(cwd, "public", "audio", "scenes", sceneSlug, `${sceneFullKey}.mp3`),
     });
   }
   return tasks;
@@ -112,7 +157,7 @@ const synthesizeSceneFull = async (task) => {
         });
         activeVoice = voice;
       }
-      const { audioStream } = tts.toStream(segment.text, { rate: "-10%" });
+      const { audioStream } = tts.toStream(segment.text, { rate: "default" });
       const chunkBuffers = [];
       await new Promise((resolve, reject) => {
         audioStream.on("data", (chunk) => {

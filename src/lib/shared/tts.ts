@@ -1,4 +1,6 @@
 const chunkKeyFallbackPrefix = "chunk";
+const sceneFullKeyPrefix = "scene-full";
+const sceneFullAudioVersion = "v2";
 
 const simpleHash = (value: string) => {
   let hash = 0;
@@ -6,6 +8,11 @@ const simpleHash = (value: string) => {
     hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
   }
   return hash.toString(36);
+};
+
+type SceneFullSegment = {
+  text: string;
+  speaker?: string;
 };
 
 export const sanitizeAudioPathSegment = (value: string, fallback: string) => {
@@ -30,3 +37,41 @@ export const buildChunkAudioKey = (chunkText: string) => {
   return `${chunkKeyFallbackPrefix}-${simpleHash(chunkText.trim().toLowerCase())}`;
 };
 
+export const mergeSceneFullSegments = (
+  segments: SceneFullSegment[],
+  sceneType: "dialogue" | "monologue",
+) => {
+  const merged: SceneFullSegment[] = [];
+
+  for (const segment of segments) {
+    const text = segment.text.trim();
+    if (!text) continue;
+
+    const speaker =
+      sceneType === "dialogue"
+        ? segment.speaker?.trim().toUpperCase() || undefined
+        : undefined;
+    const previous = merged[merged.length - 1];
+
+    if (previous && previous.speaker === speaker) {
+      previous.text = `${previous.text} ${text}`.trim();
+      continue;
+    }
+
+    merged.push({ text, speaker });
+  }
+
+  return merged;
+};
+
+export const buildSceneFullAudioKey = (
+  segments: SceneFullSegment[],
+  sceneType: "dialogue" | "monologue",
+) => {
+  const mergedSegments = mergeSceneFullSegments(segments, sceneType);
+  const fingerprintSource = mergedSegments
+    .map((segment) => `${segment.speaker ?? "_"}:${segment.text}`)
+    .join("||");
+
+  return `${sceneFullKeyPrefix}-${simpleHash(`${sceneFullAudioVersion}::${sceneType}::${fingerprintSource}`)}`;
+};

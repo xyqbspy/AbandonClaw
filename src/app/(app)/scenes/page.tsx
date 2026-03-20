@@ -124,6 +124,30 @@ export default function ScenesPage() {
   }, []);
 
   useEffect(() => {
+    const handlePullRefresh = async (event: Event) => {
+      const customEvent = event as CustomEvent<{ pathname?: string; handled?: boolean }>;
+      if (customEvent.detail?.pathname !== "/scenes") return;
+      customEvent.detail.handled = true;
+      setTopTask({ status: "running", message: "正在刷新场景列表..." });
+      try {
+        await clearSceneListCache();
+        await refreshScenes({ preferCache: false, forceNetwork: true });
+        setTopTask({ status: "done", message: "场景列表已刷新。" });
+      } catch (refreshError) {
+        const message =
+          refreshError instanceof Error ? refreshError.message : "刷新场景列表失败。";
+        setTopTask({ status: "failed", message });
+        toast.error(message);
+      }
+    };
+
+    window.addEventListener("app:pull-refresh", handlePullRefresh as EventListener);
+    return () => {
+      window.removeEventListener("app:pull-refresh", handlePullRefresh as EventListener);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!dialogOpen) return;
     const originalOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
