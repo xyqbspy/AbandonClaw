@@ -16,7 +16,6 @@ const canUseIndexedDb = () =>
 
 const debugLog = (...args: unknown[]) => {
   if (process.env.NODE_ENV !== "development") return;
-  // eslint-disable-next-line no-console
   console.debug("[scene-cache][idb]", ...args);
 };
 
@@ -135,4 +134,38 @@ export async function idbSetMeta<T>(key: string, value: T): Promise<boolean> {
     return true;
   });
   return Boolean(result);
+}
+
+export async function clearIndexedDbCache(): Promise<boolean> {
+  if (!canUseIndexedDb()) return false;
+
+  try {
+    const db = await openDb();
+    if (db) {
+      db.close();
+    }
+  } catch {
+    // ignore close errors
+  }
+
+  openDbPromise = null;
+  indexedDbDisabled = false;
+
+  return new Promise<boolean>((resolve) => {
+    try {
+      const request = window.indexedDB.deleteDatabase(DB_NAME);
+      request.onsuccess = () => resolve(true);
+      request.onerror = () => {
+        debugLog("delete failed", request.error?.message ?? "unknown");
+        resolve(false);
+      };
+      request.onblocked = () => {
+        debugLog("delete blocked");
+        resolve(false);
+      };
+    } catch (error) {
+      debugLog("delete exception", error);
+      resolve(false);
+    }
+  });
 }
