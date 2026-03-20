@@ -95,6 +95,71 @@ export const uploadTtsAudioToStorage = async (storagePath: string, buffer: Buffe
   return createTtsStorageSignedUrl(storagePath);
 };
 
+const listStorageFiles = async (prefix: string) => {
+  await ensureTtsStorageBucket();
+  const admin = createSupabaseAdminClient();
+  const pageSize = 100;
+  const files: string[] = [];
+  let offset = 0;
+
+  while (true) {
+    const { data, error } = await admin.storage.from(ttsStorageBucket).list(prefix, {
+      limit: pageSize,
+      offset,
+      sortBy: { column: "name", order: "asc" },
+    });
+
+    if (error) {
+      const message = error.message.toLowerCase();
+      if (message.includes("not found") || message.includes("404")) {
+        return files;
+      }
+      throw new Error(`Failed to list storage files: ${error.message}`);
+    }
+
+    const rows = data ?? [];
+    for (const row of rows) {
+      if (row.id) {
+        files.push(`${prefix}/${row.name}`);
+      }
+    }
+
+    if (rows.length < pageSize) {
+      return files;
+    }
+    offset += rows.length;
+  }
+};
+
+export const deleteSceneTtsAudioBySlug = async (sceneSlug: string) => {
+  const slug = sceneSlug.trim();
+  if (!slug) return { deletedFiles: 0 };
+
+  const admin = createSupabaseAdminClient();
+  const rootPrefix = `scenes/${slug}`;
+  const sentencePrefix = `${rootPrefix}/sentences`;
+  const files = [
+    ...(await listStorageFiles(rootPrefix)).filter((filePath) => !filePath.startsWith(`${sentencePrefix}/`)),
+    ...(await listStorageFiles(sentencePrefix)),
+  ];
+
+  if (files.length === 0) {
+    return { deletedFiles: 0 };
+  }
+
+  const uniqueFiles = Array.from(new Set(files));
+  const chunkSize = 100;
+  for (let index = 0; index < uniqueFiles.length; index += chunkSize) {
+    const batch = uniqueFiles.slice(index, index + chunkSize);
+    const { error } = await admin.storage.from(ttsStorageBucket).remove(batch);
+    if (error) {
+      throw new Error(`Failed to delete scene audio from storage: ${error.message}`);
+    }
+  }
+
+  return { deletedFiles: uniqueFiles.length };
+};
+
 const synthesizeToBuffer = async (text: string, voice: string, mode: "normal" | "slow") => {
   const tempDir = path.join(process.cwd(), ".tmp", "edge-tts");
   await mkdir(tempDir, { recursive: true });

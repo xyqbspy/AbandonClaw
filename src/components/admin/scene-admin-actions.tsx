@@ -29,11 +29,7 @@ export function SceneAdminActions({
         <input type="hidden" name="sceneId" value={sceneId} />
         <input type="hidden" name="nextPublic" value={String(!isPublic)} />
         <Button type="submit" variant="outline" size="sm" disabled={loadingToggle}>
-          {loadingToggle
-            ? "更新中..."
-            : isPublic
-              ? "设为私有"
-              : "设为公开"}
+          {loadingToggle ? "更新中..." : isPublic ? "设为私有" : "设为公开"}
         </Button>
       </form>
 
@@ -45,7 +41,7 @@ export function SceneAdminActions({
         <input type="hidden" name="variantCount" value="3" />
         <input type="hidden" name="retainChunkRatio" value="0.6" />
         <Button type="submit" variant="secondary" size="sm" disabled={loadingGenerate}>
-          {loadingGenerate ? "重新生成中..." : "重新生成变体"}
+          {loadingGenerate ? "生成中..." : "重新生成变体"}
         </Button>
       </form>
 
@@ -53,7 +49,7 @@ export function SceneAdminActions({
         action={regenerateSceneVariantsAction}
         onSubmit={(event) => {
           const confirmed = window.confirm(
-            "强制重新生成会跳过缓存并再次调用模型（会增加成本），是否继续？",
+            "强制重新生成会跳过缓存并再次调用模型，会增加成本，是否继续？",
           );
           if (!confirmed) {
             event.preventDefault();
@@ -79,15 +75,13 @@ export function SceneAdminActions({
       <form
         action={deleteSceneAction}
         onSubmit={(event) => {
-          const warning = `确认删除场景 ${sceneId}？该操作会永久删除场景、变体和学习进度。`;
+          const warning = `确认删除场景 ${sceneId}？该操作会永久删除场景、关联变体和场景音频。`;
           const firstConfirmed = window.confirm(warning);
           if (!firstConfirmed) {
             event.preventDefault();
             return;
           }
-          const finalConfirmed = window.confirm(
-            "最终确认：该操作不可撤销，是否继续删除？",
-          );
+          const finalConfirmed = window.confirm("最终确认：该操作不可撤销，是否继续删除？");
           if (!finalConfirmed) {
             event.preventDefault();
             return;

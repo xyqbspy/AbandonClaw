@@ -5,7 +5,7 @@ import { ParsedScene, SceneParserResponse } from "@/lib/types/scene-parser";
 import { normalizeParsedSceneDialogue } from "@/lib/shared/scene-dialogue";
 import { SceneRow, UserSceneProgressRow } from "@/lib/server/db/types";
 import { getSceneVariantsBySceneId } from "@/lib/server/services/variant-service";
-import { warmLessonTtsAudio } from "@/lib/server/services/tts-storage-service";
+import { deleteSceneTtsAudioBySlug, warmLessonTtsAudio } from "@/lib/server/services/tts-storage-service";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import {
   deleteObsoleteSeedScenes,
@@ -122,6 +122,8 @@ const rowToLesson = (row: SceneRow): Lesson => {
 };
 
 export async function upsertSeedScenesIfNeeded() {
+  const keepSlugs = seedLessons.map((lesson) => lesson.slug);
+
   for (const lesson of seedLessons) {
     const parsed = mapLessonToParsedScene(lesson);
     await upsertSceneBySlug(
@@ -142,7 +144,21 @@ export async function upsertSeedScenesIfNeeded() {
     );
   }
 
-  await deleteObsoleteSeedScenes(seedLessons.map((lesson) => lesson.slug));
+  const { data: obsoleteSeedRows, error: obsoleteSeedError } = await createSupabaseAdminClient()
+    .from("scenes")
+    .select("slug")
+    .eq("origin", "seed")
+    .not("slug", "in", `(${keepSlugs.map((slug) => `"${slug}"`).join(",")})`);
+
+  if (obsoleteSeedError) {
+    throw new Error(`Failed to list obsolete seed scenes: ${obsoleteSeedError.message}`);
+  }
+
+  for (const row of (obsoleteSeedRows ?? []) as Array<Pick<SceneRow, "slug">>) {
+    await deleteSceneTtsAudioBySlug(row.slug);
+  }
+
+  await deleteObsoleteSeedScenes(keepSlugs);
 }
 
 export async function runSeedScenesSync() {

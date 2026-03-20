@@ -8,6 +8,7 @@ import {
   enrichAdminUserPhraseById,
   deleteSceneById,
   regenerateSceneVariants,
+  updateSceneSentencesById,
   updateSceneVisibility,
 } from "@/lib/server/admin/service";
 import { runSeedScenesSync } from "@/lib/server/services/scene-service";
@@ -36,6 +37,40 @@ export async function deleteSceneAction(formData: FormData) {
   await deleteSceneById(sceneId);
   refreshAdminPages(sceneId);
   redirect("/admin/scenes");
+}
+
+export async function updateSceneSentencesAction(input: {
+  sceneId: string;
+  sentences: Array<{
+    sentenceId: string;
+    text: string;
+    translation: string;
+    tts: string;
+    chunks: string[];
+  }>;
+}) {
+  await requireAdmin();
+  const sceneId = parseRequiredIdFromForm(input.sceneId, "sceneId");
+  const sentences = Array.isArray(input.sentences)
+    ? input.sentences
+        .filter((item) => item && typeof item === "object")
+        .map((item) => ({
+          sentenceId: parseRequiredIdFromForm(item.sentenceId, "sentenceId"),
+          text: String(item.text ?? ""),
+          translation: String(item.translation ?? ""),
+          tts: String(item.tts ?? ""),
+          chunks: Array.isArray(item.chunks) ? item.chunks.map((chunk) => String(chunk ?? "")) : [],
+        }))
+    : [];
+
+  const result = await updateSceneSentencesById({
+    sceneId,
+    sentences,
+  });
+  refreshAdminPages(sceneId);
+  revalidatePath("/scenes");
+  revalidatePath(`/scene/${result.slug}`);
+  return result;
 }
 
 export async function toggleSceneVisibilityAction(formData: FormData) {

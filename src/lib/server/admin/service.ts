@@ -6,6 +6,10 @@ import { runSeedScenesSync } from "@/lib/server/services/scene-service";
 import { listRecentAiCacheStats } from "@/lib/server/services/ai-cache-service";
 import { NotFoundError } from "@/lib/server/errors";
 import { enrichAiExpressionLearningInfo } from "@/lib/server/phrases/service";
+import { deleteSceneTtsAudioBySlug } from "@/lib/server/services/tts-storage-service";
+import { mapLessonToParsedScene, mapParsedSceneToLesson } from "@/lib/adapters/scene-parser-adapter";
+import { normalizeParsedSceneDialogue } from "@/lib/shared/scene-dialogue";
+import { ParsedScene } from "@/lib/types/scene-parser";
 
 export interface AdminSceneListFilters {
   page?: number;
@@ -44,6 +48,14 @@ export interface AdminPhraseListItem {
   aiEnrichmentStatus: "pending" | "done" | "failed" | null;
   createdAt: string;
   savedAt: string;
+}
+
+export interface AdminSceneSentenceUpdate {
+  sentenceId: string;
+  text: string;
+  translation: string;
+  tts: string;
+  chunks: string[];
 }
 
 const clampPage = (value: number | undefined) => {
@@ -221,10 +233,127 @@ export async function getAdminSceneDetail(sceneId: string) {
 
 export async function deleteSceneById(sceneId: string) {
   const admin = createSupabaseAdminClient();
+  const { data: scene, error: sceneError } = await admin
+    .from("scenes")
+    .select("id,slug")
+    .eq("id", sceneId)
+    .maybeSingle<Pick<SceneRow, "id" | "slug">>();
+
+  if (sceneError) {
+    throw new Error(`Failed to load scene before delete: ${sceneError.message}`);
+  }
+  if (!scene) {
+    throw new NotFoundError("Scene not found.");
+  }
+
+  await deleteSceneTtsAudioBySlug(scene.slug);
+
   const { error } = await admin.from("scenes").delete().eq("id", sceneId);
   if (error) {
     throw new Error(`Failed to delete scene: ${error.message}`);
   }
+}
+
+export async function updateSceneSentencesById(params: {
+  sceneId: string;
+  sentences: AdminSceneSentenceUpdate[];
+}) {
+  const admin = createSupabaseAdminClient();
+  const { data: scene, error: sceneError } = await admin
+    .from("scenes")
+    .select("*")
+    .eq("id", params.sceneId)
+    .maybeSingle<SceneRow>();
+
+  if (sceneError) {
+    throw new Error(`Failed to load scene before update: ${sceneError.message}`);
+  }
+  if (!scene) {
+    throw new NotFoundError("Scene not found.");
+  }
+
+  const normalizedScene = normalizeParsedSceneDialogue(scene.scene_json as ParsedScene);
+  const lesson = mapParsedSceneToLesson({
+    version: "v1",
+    scene: normalizedScene,
+  });
+  const updates = new Map(
+    params.sentences.map((item) => [
+      item.sentenceId,
+      {
+        ...item,
+        text: item.text.trim(),
+        translation: item.translation.trim(),
+        tts: item.tts.trim(),
+        chunks: Array.from(new Set(item.chunks.map((chunk) => chunk.trim()).filter(Boolean))),
+      },
+    ]),
+  );
+
+  let updatedCount = 0;
+  const nextLesson = {
+    ...lesson,
+    sections: lesson.sections.map((section) => ({
+      ...section,
+      blocks: section.blocks.map((block) => {
+        let blockChanged = false;
+        const nextSentences = block.sentences.map((sentence) => {
+          const next = updates.get(sentence.id);
+          if (!next) return sentence;
+          blockChanged = true;
+          updatedCount += 1;
+          return {
+            ...sentence,
+            text: next.text,
+            translation: next.translation,
+            tts: next.tts || next.text,
+            chunks: next.chunks,
+            chunkDetails: undefined,
+          };
+        });
+
+        if (!blockChanged) return block;
+
+        return {
+          ...block,
+          translation: nextSentences
+            .map((sentence) => sentence.translation.trim())
+            .filter(Boolean)
+            .join(" "),
+          tts: nextSentences
+            .map((sentence) => sentence.tts?.trim() || sentence.text)
+            .filter(Boolean)
+            .join(" "),
+          sentences: nextSentences,
+        };
+      }),
+    })),
+  };
+
+  if (updatedCount === 0) {
+    throw new NotFoundError("No matching sentences found.");
+  }
+
+  const nextScene = normalizeParsedSceneDialogue(mapLessonToParsedScene(nextLesson));
+  const { error: updateError } = await admin
+    .from("scenes")
+    .update({
+      scene_json: nextScene,
+      translation: nextScene.subtitle ?? scene.translation,
+    } as never)
+    .eq("id", scene.id);
+
+  if (updateError) {
+    throw new Error(`Failed to update scene sentences: ${updateError.message}`);
+  }
+
+  await deleteSceneTtsAudioBySlug(scene.slug);
+
+  return {
+    sceneId: scene.id,
+    slug: scene.slug,
+    updatedCount,
+  };
 }
 
 export async function updateSceneVisibility(params: {
