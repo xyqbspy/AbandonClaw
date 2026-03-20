@@ -297,7 +297,7 @@ export function LessonReader({
         ),
       ) ?? null
     );
-  }, [lesson, lesson.sections, state.activeSentenceId]);
+  }, [lesson, state.activeSentenceId]);
 
   const relatedChunks = isMobile && !isDialogueScene
     ? (mobileActiveGroup?.relatedChunks ?? currentSentence?.chunks ?? [])
@@ -356,12 +356,6 @@ export function LessonReader({
       return (playbackState.mode ?? "normal") === mode;
     },
     [playbackState.kind, playbackState.mode, playbackState.sentenceId],
-  );
-  const isChunkPlaying = useCallback(
-    (chunk: string) =>
-      playbackState.kind === "chunk" &&
-      playbackState.chunkKey === buildChunkAudioKey(chunk),
-    [playbackState.chunkKey, playbackState.kind],
   );
   const stopAudio = useCallback(() => {
     stopTtsPlayback();
@@ -672,15 +666,16 @@ export function LessonReader({
         : null) ?? firstSentence;
     if (!activeSentence?.id) return;
 
-    if (isMobile && !state.activeChunkKey) {
+    if (isMobile) {
+      if (state.activeChunkKey) return;
       const firstChunk = activeSentence.chunks[0];
       if (firstChunk) {
         dispatchAction({
           type: "CHUNK_ACTIVATED",
           payload: { sentenceId: activeSentence.id, chunkKey: firstChunk },
         });
-        return;
       }
+      return;
     }
 
     dispatchAction({
@@ -804,7 +799,7 @@ export function LessonReader({
   }, [dispatchAction, extractSelectionInReader, isMobile]);
 
   const renderDialogueBlock = useCallback(
-    (block: LessonBlock, blockIndex: number) => {
+    (block: LessonBlock) => {
       const speaker = block.speaker ?? "A";
       const primarySpeaker = isPrimarySpeaker(speaker);
       const translationOpen = Boolean(dialogueBlockTranslationOpenMap[block.id]);
@@ -916,6 +911,7 @@ export function LessonReader({
       );
     },
     [
+      handleSentenceTap,
       playBlockTts,
       isSentencePlaying,
       playbackState.kind,
@@ -1094,7 +1090,7 @@ export function LessonReader({
 
         {isDialogueScene ? (
           <div className={cn("space-y-2", isMobile && "space-y-1.5")}>
-            {blockOrder.map((block, index) => renderDialogueBlock(block, index))}
+            {blockOrder.map((block) => renderDialogueBlock(block))}
           </div>
         ) : isMobile ? (
           <div className="overflow-hidden bg-transparent">
