@@ -35,6 +35,25 @@ export async function setExpressionClusterMainFromApi(payload: {
   };
 }
 
+export async function ensureExpressionClusterForPhraseFromApi(payload: {
+  userPhraseId: string;
+  title?: string;
+}) {
+  const response = await fetch("/api/expression-clusters/ensure", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    throw await toApiError(response, "创建表达簇失败。");
+  }
+  return (await response.json()) as {
+    clusterId: string;
+    mainUserPhraseId: string;
+    created: boolean;
+  };
+}
+
 export async function mergeExpressionClustersFromApi(payload: {
   targetClusterId: string;
   sourceClusterId: string;

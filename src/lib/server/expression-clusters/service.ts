@@ -136,6 +136,41 @@ async function createSingletonCluster(params: {
   return clusterRow;
 }
 
+export async function ensureExpressionClusterForPhrase(params: {
+  userId: string;
+  userPhraseId: string;
+  title?: string | null;
+}) {
+  await assertOwnedExpressionPhrase({
+    userId: params.userId,
+    userPhraseId: params.userPhraseId,
+  });
+
+  const existingMembership = await getPhraseClusterMembership({
+    userId: params.userId,
+    userPhraseId: params.userPhraseId,
+  });
+  if (existingMembership?.clusterId) {
+    return {
+      clusterId: existingMembership.clusterId,
+      mainUserPhraseId: existingMembership.mainUserPhraseId ?? params.userPhraseId,
+      created: false,
+    };
+  }
+
+  const singleton = await createSingletonCluster({
+    userId: params.userId,
+    userPhraseId: params.userPhraseId,
+    title: params.title ?? null,
+  });
+
+  return {
+    clusterId: singleton.id,
+    mainUserPhraseId: singleton.main_user_phrase_id ?? params.userPhraseId,
+    created: true,
+  };
+}
+
 async function writeClusterRoles(params: {
   clusterId: string;
   mainUserPhraseId: string;

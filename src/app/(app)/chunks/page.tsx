@@ -12,6 +12,7 @@ import { playChunkAudio, stopTtsPlayback } from "@/lib/utils/tts-api";
 import { generateExpressionMapFromApi } from "@/lib/utils/expression-map-api";
 import {
   detachExpressionClusterMemberFromApi,
+  ensureExpressionClusterForPhraseFromApi,
   moveExpressionClusterMemberFromApi,
   setExpressionClusterMainFromApi,
 } from "@/lib/utils/expression-clusters-api";
@@ -646,6 +647,7 @@ export default function ChunksPage() {
   const [detailConfirmAction, setDetailConfirmAction] = useState<FocusDetailConfirmAction | null>(null);
   const [moveIntoClusterOpen, setMoveIntoClusterOpen] = useState(false);
   const [movingIntoCluster, setMovingIntoCluster] = useState(false);
+  const [ensuringMoveTargetCluster, setEnsuringMoveTargetCluster] = useState(false);
   const [moveIntoClusterQuery, setMoveIntoClusterQuery] = useState("");
   const [selectedMoveIntoClusterMap, setSelectedMoveIntoClusterMap] = useState<Record<string, boolean>>({});
   const [focusDetailOpen, setFocusDetailOpen] = useState(false);
@@ -1067,13 +1069,13 @@ export default function ChunksPage() {
 
   const moveIntoClusterCandidates = useMemo(() => {
     const targetClusterId = focusExpression?.expressionClusterId ?? null;
-    if (!focusExpression || !targetClusterId) return [] as MoveIntoClusterCandidate[];
+    if (!focusExpression) return [] as MoveIntoClusterCandidate[];
 
     const rowById = new Map(expressionRows.map((row) => [row.userPhraseId, row]));
     return expressionRows
       .filter((row) => {
         if (row.userPhraseId === focusExpression.userPhraseId) return false;
-        if (row.expressionClusterId && row.expressionClusterId === targetClusterId) return false;
+        if (targetClusterId && row.expressionClusterId && row.expressionClusterId === targetClusterId) return false;
         return true;
       })
       .map((row) => {
@@ -1468,6 +1470,34 @@ export default function ChunksPage() {
     } finally {
       setMovingIntoCluster(false);
     }
+  };
+
+  const openMoveIntoCurrentCluster = async () => {
+    if (!focusExpression || moveIntoClusterCandidates.length === 0) return;
+
+    setFocusDetailActionsOpen(false);
+    setMoveIntoClusterQuery("");
+    setSelectedMoveIntoClusterMap({});
+
+    if (!focusExpression.expressionClusterId) {
+      setEnsuringMoveTargetCluster(true);
+      try {
+        await ensureExpressionClusterForPhraseFromApi({
+          userPhraseId: focusExpression.userPhraseId,
+          title: focusExpression.text,
+        });
+        await loadPhrases(query, reviewFilter, contentFilter, expressionClusterFilterId, {
+          preferCache: false,
+        });
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : zh.loadFailed);
+        return;
+      } finally {
+        setEnsuringMoveTargetCluster(false);
+      }
+    }
+
+    setMoveIntoClusterOpen(true);
   };
 
   const openFocusDetail = async (params: {
@@ -3629,22 +3659,21 @@ export default function ChunksPage() {
                       <button
                         type="button"
                         className="flex w-full items-center rounded-xl px-3 py-2.5 text-left text-sm text-foreground transition hover:bg-[rgb(246,246,246)] disabled:text-muted-foreground"
-                        disabled={!focusExpression?.expressionClusterId || moveIntoClusterCandidates.length === 0 || movingIntoCluster}
+                        disabled={!focusExpression || moveIntoClusterCandidates.length === 0 || movingIntoCluster || ensuringMoveTargetCluster}
                         title={
-                          !focusExpression?.expressionClusterId || moveIntoClusterCandidates.length === 0
+                          moveIntoClusterCandidates.length === 0
                             ? zh.moveIntoClusterDisabledHint
                             : undefined
                         }
                         onClick={() => {
-                          setFocusDetailActionsOpen(false);
-                          setMoveIntoClusterQuery("");
-                          setSelectedMoveIntoClusterMap({});
-                          setMoveIntoClusterOpen(true);
+                          void openMoveIntoCurrentCluster();
                         }}
                       >
-                        {movingIntoCluster ? `${zh.moveIntoCluster}...` : zh.moveIntoCluster}
+                        {movingIntoCluster || ensuringMoveTargetCluster
+                          ? `${zh.moveIntoCluster}...`
+                          : zh.moveIntoCluster}
                       </button>
-                      {!focusExpression?.expressionClusterId || moveIntoClusterCandidates.length === 0 ? (
+                      {moveIntoClusterCandidates.length === 0 ? (
                         <p className="px-3 pb-2 text-xs text-muted-foreground">
                           {zh.moveIntoClusterDisabledHint}
                         </p>

@@ -1,4 +1,5 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { ensureExpressionClusterForPhrase } from "@/lib/server/expression-clusters/service";
 import {
   PhraseRow,
   UserPhraseAiEnrichmentStatus,
@@ -909,6 +910,14 @@ export async function savePhraseForUser(userId: string, input: SavePhraseInput) 
       relationSourceUserPhraseId: input.relationSourceUserPhraseId ?? null,
       relationType,
       phraseText: phraseDisplayText,
+    });
+  }
+
+  if (learningItemType === "expression") {
+    await ensureExpressionClusterForPhrase({
+      userId,
+      userPhraseId: finalSavedRow.id,
+      title: phraseDisplayText,
     });
   }
 
