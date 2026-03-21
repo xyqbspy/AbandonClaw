@@ -39,7 +39,7 @@ export interface UserPhraseItemResponse {
   sourceSentenceIndex: number | null;
   sourceSentenceText: string | null;
   sourceChunkText: string | null;
-  expressionFamilyId: string | null;
+  expressionClusterId: string | null;
   aiEnrichmentStatus: "pending" | "done" | "failed" | null;
   semanticFocus: string | null;
   typicalScenario: string | null;
@@ -60,6 +60,14 @@ export interface UserPhraseItemResponse {
   masteredAt: string | null;
 }
 
+export type UserPhraseRelationType = "similar" | "contrast";
+
+export interface UserPhraseRelationItemResponse {
+  sourceUserPhraseId: string;
+  relationType: UserPhraseRelationType;
+  item: UserPhraseItemResponse;
+}
+
 export async function savePhraseFromApi(payload: {
   text?: string;
   learningItemType?: "expression" | "sentence";
@@ -74,7 +82,9 @@ export async function savePhraseFromApi(payload: {
   sourceSentenceIndex?: number;
   sourceSentenceText?: string;
   sourceChunkText?: string;
-  expressionFamilyId?: string;
+  expressionClusterId?: string;
+  relationSourceUserPhraseId?: string;
+  relationType?: UserPhraseRelationType;
 }) {
   const response = await fetch("/api/phrases/save", {
     method: "POST",
@@ -88,6 +98,7 @@ export async function savePhraseFromApi(payload: {
     created: boolean;
     phrase: { id: string; normalized_text: string; display_text: string };
     userPhrase: { id: string };
+    expressionClusterId: string | null;
   };
   void clearLearningDashboardCache().catch(() => {
     // Non-blocking.
@@ -110,7 +121,9 @@ export async function savePhrasesBatchFromApi(payload: {
     sourceSentenceIndex?: number;
     sourceSentenceText?: string;
     sourceChunkText?: string;
-    expressionFamilyId?: string;
+    expressionClusterId?: string;
+    relationSourceUserPhraseId?: string;
+    relationType?: UserPhraseRelationType;
   }>;
 }) {
   const response = await fetch("/api/phrases/save-all", {
@@ -126,12 +139,43 @@ export async function savePhrasesBatchFromApi(payload: {
       created: boolean;
       phrase: { id: string; normalized_text: string; display_text: string };
       userPhrase: { id: string };
+      expressionClusterId: string | null;
     }>;
   };
   void clearLearningDashboardCache().catch(() => {
     // Non-blocking.
   });
   return data;
+}
+
+export async function getPhraseRelationsFromApi(userPhraseId: string) {
+  const search = new URLSearchParams({ userPhraseId });
+  const response = await fetch(`/api/phrases/relations?${search.toString()}`, {
+    method: "GET",
+  });
+  if (!response.ok) {
+    throw await toApiError(response, "加载表达关系失败。");
+  }
+  return (await response.json()) as {
+    rows: UserPhraseRelationItemResponse[];
+  };
+}
+
+export async function getPhraseRelationsBatchFromApi(userPhraseIds: string[]) {
+  const uniqueIds = Array.from(new Set(userPhraseIds.map((item) => item.trim()).filter(Boolean)));
+  if (uniqueIds.length === 0) {
+    return { rows: [] as UserPhraseRelationItemResponse[] };
+  }
+  const search = new URLSearchParams({ userPhraseIds: uniqueIds.join(",") });
+  const response = await fetch(`/api/phrases/relations?${search.toString()}`, {
+    method: "GET",
+  });
+  if (!response.ok) {
+    throw await toApiError(response, "加载表达关系失败。");
+  }
+  return (await response.json()) as {
+    rows: UserPhraseRelationItemResponse[];
+  };
 }
 
 export async function getMyPhrasesFromApi(params?: {
@@ -141,7 +185,7 @@ export async function getMyPhrasesFromApi(params?: {
   status?: "saved" | "archived";
   reviewStatus?: PhraseReviewStatus | "all";
   learningItemType?: "expression" | "sentence" | "all";
-  expressionFamilyId?: string;
+  expressionClusterId?: string;
 }) {
   const search = new URLSearchParams();
   if (params?.query) search.set("query", params.query);
@@ -150,7 +194,7 @@ export async function getMyPhrasesFromApi(params?: {
   if (params?.status) search.set("status", params.status);
   if (params?.reviewStatus) search.set("reviewStatus", params.reviewStatus);
   if (params?.learningItemType) search.set("learningItemType", params.learningItemType);
-  if (params?.expressionFamilyId) search.set("expressionFamilyId", params.expressionFamilyId);
+  if (params?.expressionClusterId) search.set("expressionClusterId", params.expressionClusterId);
   const suffix = search.toString();
   const response = await fetch(`/api/phrases/mine${suffix ? `?${suffix}` : ""}`, {
     method: "GET",

@@ -8,7 +8,7 @@ export interface DueReviewItemResponse {
   usageNote: string | null;
   sourceSceneSlug: string | null;
   sourceSentenceText: string | null;
-  expressionFamilyId: string | null;
+  expressionClusterId: string | null;
   reviewStatus: "saved" | "reviewing" | "mastered" | "archived";
   reviewCount: number;
   correctCount: number;

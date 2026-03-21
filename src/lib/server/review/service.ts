@@ -25,7 +25,7 @@ export interface DueReviewItem {
   usageNote: string | null;
   sourceSceneSlug: string | null;
   sourceSentenceText: string | null;
-  expressionFamilyId: string | null;
+  expressionClusterId: string | null;
   reviewStatus: UserPhraseReviewStatus;
   reviewCount: number;
   correctCount: number;
@@ -39,7 +39,40 @@ export interface SubmitPhraseReviewInput {
   source?: string;
 }
 
-const mapDueItem = (row: UserPhraseRow & { phrase: PhraseRow | null }): DueReviewItem => ({
+async function loadClusterIdByUserPhraseId(userId: string, userPhraseIds: string[]) {
+  const uniqueIds = Array.from(new Set(userPhraseIds.map((item) => item.trim()).filter(Boolean)));
+  if (uniqueIds.length === 0) return new Map<string, string>();
+
+  const admin = createSupabaseAdminClient();
+  const { data, error } = await admin
+    .from("user_expression_cluster_members")
+    .select("user_phrase_id, cluster:user_expression_clusters!inner(id,user_id)")
+    .in("user_phrase_id", uniqueIds);
+
+  if (error) {
+    throw new Error(`Failed to load review expression clusters: ${error.message}`);
+  }
+
+  const map = new Map<string, string>();
+  for (const row of (data ?? []) as Array<{
+    user_phrase_id: string;
+    cluster:
+      | { id: string; user_id: string }
+      | Array<{ id: string; user_id: string }>
+      | null;
+  }>) {
+    const cluster = Array.isArray(row.cluster) ? (row.cluster[0] ?? null) : row.cluster;
+    if (!cluster || cluster.user_id !== userId) continue;
+    map.set(row.user_phrase_id, cluster.id);
+  }
+
+  return map;
+}
+
+const mapDueItem = (
+  row: UserPhraseRow & { phrase: PhraseRow | null },
+  expressionClusterId: string | null,
+): DueReviewItem => ({
   userPhraseId: row.id,
   phraseId: row.phrase_id,
   text: row.phrase?.display_text ?? row.source_chunk_text ?? "",
@@ -47,7 +80,7 @@ const mapDueItem = (row: UserPhraseRow & { phrase: PhraseRow | null }): DueRevie
   usageNote: row.phrase?.usage_note ?? null,
   sourceSceneSlug: row.source_scene_slug,
   sourceSentenceText: row.source_sentence_text,
-  expressionFamilyId: row.expression_family_id,
+  expressionClusterId,
   reviewStatus: row.review_status,
   reviewCount: row.review_count,
   correctCount: row.correct_count,
@@ -110,7 +143,11 @@ export async function getDueReviewItems(userId: string, params?: { limit?: numbe
   }
 
   const rows = (data ?? []) as Array<UserPhraseRow & { phrase: PhraseRow | null }>;
-  return rows.map(mapDueItem);
+  const clusterIdByPhraseId = await loadClusterIdByUserPhraseId(
+    userId,
+    rows.map((row) => row.id),
+  );
+  return rows.map((row) => mapDueItem(row, clusterIdByPhraseId.get(row.id) ?? null));
 }
 
 export async function getUserPhraseReviewBuckets(userId: string) {
@@ -242,7 +279,8 @@ export async function submitPhraseReview(userId: string, input: SubmitPhraseRevi
 
   await addDailyReviewCompleted(userId);
 
-  return mapDueItem(updated);
+  const clusterIdByPhraseId = await loadClusterIdByUserPhraseId(userId, [updated.id]);
+  return mapDueItem(updated, clusterIdByPhraseId.get(updated.id) ?? null);
 }
 
 export async function getReviewSummary(userId: string) {

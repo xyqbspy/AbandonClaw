@@ -23,7 +23,9 @@ interface SavePhrasePayload {
   sourceSentenceIndex?: unknown;
   sourceSentenceText?: unknown;
   sourceChunkText?: unknown;
-  expressionFamilyId?: unknown;
+  expressionClusterId?: unknown;
+  relationSourceUserPhraseId?: unknown;
+  relationType?: unknown;
 }
 
 interface SaveAllPayload {
@@ -84,11 +86,22 @@ const normalizeSavePayload = (payload: SavePhrasePayload): SavePhraseInput => {
       "sourceChunkText",
       500,
     ),
-    expressionFamilyId: parseOptionalTrimmedString(
-      payload.expressionFamilyId,
-      "expressionFamilyId",
+    expressionClusterId: parseOptionalTrimmedString(
+      payload.expressionClusterId,
+      "expressionClusterId",
       120,
     ),
+    relationSourceUserPhraseId: parseOptionalTrimmedString(
+      payload.relationSourceUserPhraseId,
+      "relationSourceUserPhraseId",
+      120,
+    ),
+    relationType:
+      parseOptionalTrimmedString(payload.relationType, "relationType", 20) === "contrast"
+        ? "contrast"
+        : parseOptionalTrimmedString(payload.relationType, "relationType", 20) === "similar"
+          ? "similar"
+          : undefined,
   };
 };
 
@@ -129,6 +142,7 @@ export async function POST(request: Request) {
       created: boolean;
       phrase: { id: string; normalized_text: string; display_text: string };
       userPhrase: { id: string };
+      expressionClusterId: string | null;
     }> = [];
     for (const raw of items) {
       const normalized = normalizeSavePayload((raw ?? {}) as SavePhrasePayload);
@@ -155,6 +169,7 @@ export async function POST(request: Request) {
           display_text: result.phrase.display_text,
         },
         userPhrase: { id: result.userPhrase.id },
+        expressionClusterId: result.expressionClusterId,
       });
     }
     return NextResponse.json({ items: results }, { status: 200 });

@@ -7,7 +7,7 @@ export interface ExpressionNode {
   sourceType: ExpressionSourceType;
 }
 
-export interface ExpressionFamily {
+export interface ExpressionCluster {
   id: string;
   anchor: string;
   meaning: string;
@@ -29,5 +29,5 @@ export interface ExpressionMapGenerateRequest {
 export interface ExpressionMapResponse {
   version: "v1";
   sourceSceneId: string;
-  families: ExpressionFamily[];
+  clusters: ExpressionCluster[];
 }

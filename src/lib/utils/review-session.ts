@@ -1,7 +1,7 @@
 export interface ReviewSessionExpression {
   userPhraseId: string;
   text?: string;
-  expressionFamilyId?: string | null;
+  expressionClusterId?: string | null;
 }
 
 export type ReviewSessionPayload = {

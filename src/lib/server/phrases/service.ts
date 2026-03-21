@@ -2,6 +2,9 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import {
   PhraseRow,
   UserPhraseAiEnrichmentStatus,
+  UserExpressionClusterRow,
+  UserPhraseRelationRow,
+  UserPhraseRelationType,
   UserDailyLearningStatsRow,
   UserPhraseRow,
   UserPhraseReviewStatus,
@@ -19,50 +22,6 @@ import {
 
 const nowIso = () => new Date().toISOString();
 const todayDate = () => new Date().toISOString().slice(0, 10);
-const FAMILY_STOP_WORDS = new Set([
-  "a",
-  "an",
-  "the",
-  "to",
-  "of",
-  "and",
-  "or",
-  "for",
-  "in",
-  "on",
-  "at",
-  "is",
-  "are",
-  "was",
-  "were",
-  "be",
-  "been",
-  "being",
-  "it",
-  "this",
-  "that",
-  "i",
-  "you",
-  "he",
-  "she",
-  "we",
-  "they",
-  "do",
-  "does",
-  "did",
-  "have",
-  "has",
-  "had",
-  "with",
-  "from",
-  "as",
-  "my",
-  "your",
-  "his",
-  "her",
-  "our",
-  "their",
-]);
 
 export interface SavePhraseInput {
   text?: string;
@@ -78,7 +37,9 @@ export interface SavePhraseInput {
   sourceSentenceIndex?: number;
   sourceSentenceText?: string;
   sourceChunkText?: string;
-  expressionFamilyId?: string;
+  expressionClusterId?: string;
+  relationSourceUserPhraseId?: string;
+  relationType?: UserPhraseRelationType;
 }
 
 export interface UserSavedPhraseItem {
@@ -96,7 +57,7 @@ export interface UserSavedPhraseItem {
   sourceSentenceIndex: number | null;
   sourceSentenceText: string | null;
   sourceChunkText: string | null;
-  expressionFamilyId: string | null;
+  expressionClusterId: string | null;
   aiEnrichmentStatus: UserPhraseAiEnrichmentStatus | null;
   semanticFocus: string | null;
   typicalScenario: string | null;
@@ -112,6 +73,18 @@ export interface UserSavedPhraseItem {
   lastReviewedAt: string | null;
   nextReviewAt: string | null;
   masteredAt: string | null;
+}
+
+export interface UserSavedPhraseRelationItem {
+  sourceUserPhraseId: string;
+  relationType: UserPhraseRelationType;
+  item: UserSavedPhraseItem;
+}
+
+interface ExpressionClusterContext {
+  clusterId: string;
+  role: "main" | "variant";
+  mainUserPhraseId: string | null;
 }
 
 const parseOptionalTrimmed = (value: unknown, maxLength = 500) => {
@@ -184,6 +157,26 @@ const parseWithDiagnostics = (rawText: string) => {
   }
 };
 
+const isContrastSourceNote = (value: string | null | undefined) => {
+  const normalized = (value ?? "").trim().toLowerCase();
+  return normalized === "manual-contrast-ai" || normalized === "focus-contrast-ai";
+};
+
+const isSimilarSourceNote = (value: string | null | undefined) => {
+  const normalized = (value ?? "").trim().toLowerCase();
+  return (
+    normalized === "manual-similar-ai" ||
+    normalized === "focus-similar-ai" ||
+    normalized === "similar-ai-mvp"
+  );
+};
+
+const getOppositeRelationType = (relationType: UserPhraseRelationType): UserPhraseRelationType =>
+  relationType === "similar" ? "contrast" : "similar";
+
+const isUuidLike = (value: string | null | undefined) =>
+  Boolean(value && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value));
+
 const inferLearningItemType = (row: Pick<
   UserPhraseRow,
   "learning_item_type" | "source_sentence_text" | "source_chunk_text"
@@ -196,6 +189,280 @@ const inferLearningItemType = (row: Pick<
   return "expression";
 };
 
+async function loadExpressionClusterContextMap(
+  userId: string,
+  userPhraseIds: string[],
+) {
+  const uniqueIds = Array.from(new Set(userPhraseIds.map((item) => item.trim()).filter(Boolean)));
+  if (uniqueIds.length === 0) return new Map<string, ExpressionClusterContext>();
+
+  const admin = createSupabaseAdminClient();
+  const { data, error } = await admin
+    .from("user_expression_cluster_members")
+    .select("user_phrase_id,role, cluster:user_expression_clusters!inner(id,user_id,main_user_phrase_id)")
+    .in("user_phrase_id", uniqueIds);
+
+  if (error) {
+    throw new Error(`Failed to load expression cluster memberships: ${error.message}`);
+  }
+
+  const map = new Map<string, ExpressionClusterContext>();
+  for (const row of (data ?? []) as Array<{
+    user_phrase_id: string;
+    role: "main" | "variant";
+    cluster:
+      | {
+          id: string;
+          user_id: string;
+          main_user_phrase_id: string | null;
+        }
+      | Array<{
+          id: string;
+          user_id: string;
+          main_user_phrase_id: string | null;
+        }>
+      | null;
+  }>) {
+    const cluster = Array.isArray(row.cluster) ? (row.cluster[0] ?? null) : row.cluster;
+    if (!cluster || cluster.user_id !== userId) continue;
+    map.set(row.user_phrase_id, {
+      clusterId: cluster.id,
+      role: row.role,
+      mainUserPhraseId: cluster.main_user_phrase_id,
+    });
+  }
+
+  return map;
+}
+
+async function findExpressionClusterById(userId: string, clusterId: string) {
+  const admin = createSupabaseAdminClient();
+  const { data, error } = await admin
+    .from("user_expression_clusters")
+    .select("*")
+    .eq("id", clusterId)
+    .eq("user_id", userId)
+    .maybeSingle<UserExpressionClusterRow>();
+
+  if (error) {
+    throw new Error(`Failed to read expression cluster: ${error.message}`);
+  }
+  return data ?? null;
+}
+
+async function findExpressionClusterForPhrase(userId: string, userPhraseId: string) {
+  const contextMap = await loadExpressionClusterContextMap(userId, [userPhraseId]);
+  const context = contextMap.get(userPhraseId);
+  if (!context) return null;
+  return findExpressionClusterById(userId, context.clusterId);
+}
+
+async function createExpressionCluster(params: {
+  userId: string;
+  mainUserPhraseId: string;
+  title?: string | null;
+}) {
+  const admin = createSupabaseAdminClient();
+  const payload = {
+    user_id: params.userId,
+    main_user_phrase_id: params.mainUserPhraseId,
+    title: parseOptionalTrimmed(params.title, 120),
+  };
+  const { data, error } = await admin
+    .from("user_expression_clusters")
+    .insert(payload as never)
+    .select("*")
+    .single<UserExpressionClusterRow>();
+
+  if (error || !data) {
+    throw new Error(`Failed to create expression cluster: ${error?.message ?? "unknown error"}`);
+  }
+  return data;
+}
+
+async function assignPhraseToExpressionCluster(params: {
+  userId: string;
+  clusterId: string;
+  userPhraseId: string;
+  role: "main" | "variant";
+}) {
+  const admin = createSupabaseAdminClient();
+  const { error: membershipError } = await admin
+    .from("user_expression_cluster_members")
+    .upsert(
+      {
+        cluster_id: params.clusterId,
+        user_phrase_id: params.userPhraseId,
+        role: params.role,
+      } as never,
+      { onConflict: "user_phrase_id" },
+    );
+
+  if (membershipError) {
+    throw new Error(`Failed to save expression cluster member: ${membershipError.message}`);
+  }
+
+  if (params.role === "main") {
+    const { error: clusterError } = await admin
+      .from("user_expression_clusters")
+      .update({ main_user_phrase_id: params.userPhraseId } as never)
+      .eq("id", params.clusterId)
+      .eq("user_id", params.userId);
+    if (clusterError) {
+      throw new Error(`Failed to promote expression cluster main item: ${clusterError.message}`);
+    }
+  }
+}
+
+async function mergeExpressionClusters(params: {
+  userId: string;
+  targetClusterId: string;
+  sourceClusterId: string;
+  mainUserPhraseId: string;
+}) {
+  if (params.targetClusterId === params.sourceClusterId) return;
+
+  const admin = createSupabaseAdminClient();
+  const { data: sourceMembers, error: sourceMembersError } = await admin
+    .from("user_expression_cluster_members")
+    .select("user_phrase_id")
+    .eq("cluster_id", params.sourceClusterId);
+  if (sourceMembersError) {
+    throw new Error(`Failed to read source expression cluster members: ${sourceMembersError.message}`);
+  }
+
+  const membershipPayload = ((sourceMembers ?? []) as Array<{ user_phrase_id: string }>).map((row) => ({
+    cluster_id: params.targetClusterId,
+    user_phrase_id: row.user_phrase_id,
+    role: row.user_phrase_id === params.mainUserPhraseId ? ("main" as const) : ("variant" as const),
+  }));
+  if (membershipPayload.length > 0) {
+    const { error: upsertError } = await admin
+      .from("user_expression_cluster_members")
+      .upsert(membershipPayload as never, { onConflict: "user_phrase_id" });
+    if (upsertError) {
+      throw new Error(`Failed to merge expression cluster members: ${upsertError.message}`);
+    }
+  }
+
+  const { error: updateTargetError } = await admin
+    .from("user_expression_clusters")
+    .update({ main_user_phrase_id: params.mainUserPhraseId } as never)
+    .eq("id", params.targetClusterId)
+    .eq("user_id", params.userId);
+  if (updateTargetError) {
+    throw new Error(`Failed to update merged expression cluster main item: ${updateTargetError.message}`);
+  }
+
+  const { error: deleteSourceError } = await admin
+    .from("user_expression_clusters")
+    .delete()
+    .eq("id", params.sourceClusterId)
+    .eq("user_id", params.userId);
+  if (deleteSourceError) {
+    throw new Error(`Failed to delete merged source expression cluster: ${deleteSourceError.message}`);
+  }
+}
+
+async function resolveOrCreateExpressionCluster(params: {
+  userId: string;
+  userPhraseId: string;
+  requestedClusterId?: string | null;
+  relationSourceUserPhraseId?: string | null;
+  phraseText?: string | null;
+}) {
+  const requestedClusterId = isUuidLike(params.requestedClusterId ?? null)
+    ? (params.requestedClusterId as string)
+    : null;
+  if (requestedClusterId) {
+    const existingRequested = await findExpressionClusterById(params.userId, requestedClusterId);
+    if (existingRequested) return existingRequested;
+  }
+
+  if (params.relationSourceUserPhraseId) {
+    const sourceCluster = await findExpressionClusterForPhrase(params.userId, params.relationSourceUserPhraseId);
+    if (sourceCluster) return sourceCluster;
+
+    return createExpressionCluster({
+      userId: params.userId,
+      mainUserPhraseId: params.relationSourceUserPhraseId,
+      title: params.phraseText ?? null,
+    });
+  }
+
+  return createExpressionCluster({
+    userId: params.userId,
+    mainUserPhraseId: params.userPhraseId,
+    title: params.phraseText ?? null,
+  });
+}
+
+async function syncExpressionClusterMembership(params: {
+  userId: string;
+  userPhraseId: string;
+  requestedClusterId?: string | null;
+  relationSourceUserPhraseId?: string | null;
+  relationType?: UserPhraseRelationType;
+  phraseText?: string | null;
+}) {
+  if (params.relationType === "contrast") return null;
+
+  const cluster = await resolveOrCreateExpressionCluster({
+    userId: params.userId,
+    userPhraseId: params.userPhraseId,
+    requestedClusterId: params.requestedClusterId,
+    relationSourceUserPhraseId: params.relationSourceUserPhraseId,
+    phraseText: params.phraseText,
+  });
+
+  const sourcePhraseId = params.relationSourceUserPhraseId?.trim() ?? "";
+  const currentContextMap = await loadExpressionClusterContextMap(params.userId, [
+    params.userPhraseId,
+    sourcePhraseId,
+  ]);
+  const targetExistingClusterId = currentContextMap.get(params.userPhraseId)?.clusterId ?? null;
+  const sourceExistingClusterId = currentContextMap.get(sourcePhraseId)?.clusterId ?? null;
+
+  if (targetExistingClusterId && targetExistingClusterId !== cluster.id) {
+    await mergeExpressionClusters({
+      userId: params.userId,
+      targetClusterId: cluster.id,
+      sourceClusterId: targetExistingClusterId,
+      mainUserPhraseId: cluster.main_user_phrase_id ?? params.userPhraseId,
+    });
+  }
+  if (
+    sourceExistingClusterId &&
+    sourceExistingClusterId !== cluster.id &&
+    sourceExistingClusterId !== targetExistingClusterId
+  ) {
+    await mergeExpressionClusters({
+      userId: params.userId,
+      targetClusterId: cluster.id,
+      sourceClusterId: sourceExistingClusterId,
+      mainUserPhraseId: sourcePhraseId || cluster.main_user_phrase_id || params.userPhraseId,
+    });
+  }
+
+  if (sourcePhraseId) {
+    await assignPhraseToExpressionCluster({
+      userId: params.userId,
+      clusterId: cluster.id,
+      userPhraseId: sourcePhraseId,
+      role: cluster.main_user_phrase_id === sourcePhraseId ? "main" : "variant",
+    });
+  }
+
+  const role = cluster.main_user_phrase_id === params.userPhraseId ? "main" : "variant";
+  await assignPhraseToExpressionCluster({
+    userId: params.userId,
+    clusterId: cluster.id,
+    userPhraseId: params.userPhraseId,
+    role,
+  });
+  return cluster.id;
+}
+
 const toStableSentenceSyntheticText = (sentence: string) => {
   let hash = 0;
   for (let index = 0; index < sentence.length; index += 1) {
@@ -204,111 +471,10 @@ const toStableSentenceSyntheticText = (sentence: string) => {
   return `sentence-${hash.toString(16).padStart(8, "0")}`;
 };
 
-const normalizeSceneLineage = (sceneSlug: string | null) => {
-  if (!sceneSlug) return "global";
-  return sceneSlug
-    .trim()
-    .toLowerCase()
-    .replace(/-variant-\d+$/i, "")
-    .replace(/[^a-z0-9-]+/g, "-")
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "") || "global";
-};
-
-const extractCoreTokens = (normalizedText: string) =>
-  normalizedText
-    .split(" ")
-    .map((token) => token.trim())
-    .filter((token) => token.length >= 3 && !FAMILY_STOP_WORDS.has(token))
-    .slice(0, 6);
-
-const computeTokenJaccard = (a: string[], b: string[]) => {
-  if (a.length === 0 || b.length === 0) return 0;
-  const setA = new Set(a);
-  const setB = new Set(b);
-  let intersection = 0;
-  for (const token of setA) {
-    if (setB.has(token)) intersection += 1;
-  }
-  const union = new Set([...setA, ...setB]).size;
-  return union === 0 ? 0 : intersection / union;
-};
-
-const buildFamilyIdByRule = (params: {
-  sourceSceneSlug: string | null;
-  normalizedText: string;
-}) => {
-  const lineage = normalizeSceneLineage(params.sourceSceneSlug);
-  const tokens = extractCoreTokens(params.normalizedText);
-  const key = tokens.slice(0, 2).join("-") || params.normalizedText.split(" ").slice(0, 2).join("-");
-  const safeKey = key.replace(/[^a-z0-9-]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
-  return `fam:${lineage}:${safeKey || "expression"}`.slice(0, 120);
-};
-
-async function inferExpressionFamilyId(params: {
-  userId: string;
-  sourceSceneSlug: string | null;
-  normalizedText: string;
-  providedFamilyId: string | null;
-  existingFamilyId: string | null;
-}) {
-  if (params.providedFamilyId) return params.providedFamilyId;
-  if (params.existingFamilyId) return params.existingFamilyId;
-
-  const candidateByRule = buildFamilyIdByRule({
-    sourceSceneSlug: params.sourceSceneSlug,
-    normalizedText: params.normalizedText,
-  });
-
-  const admin = createSupabaseAdminClient();
-  const lineage = normalizeSceneLineage(params.sourceSceneSlug);
-  const sceneSlugPrefix = lineage === "global" ? null : lineage;
-
-  let query = admin
-    .from("user_phrases")
-    .select("expression_family_id,source_scene_slug,source_chunk_text")
-    .eq("user_id", params.userId)
-    .eq("status", "saved")
-    .limit(80);
-
-  if (sceneSlugPrefix) {
-    query = query.or(
-      `source_scene_slug.eq.${sceneSlugPrefix},source_scene_slug.like.${sceneSlugPrefix}-variant-%`,
-    );
-  }
-
-  const { data, error } = await query;
-  if (error) {
-    return candidateByRule;
-  }
-
-  const currentTokens = extractCoreTokens(params.normalizedText);
-  let bestMatch: { score: number; familyId: string | null } | null = null;
-  for (const row of (data ?? []) as Array<{
-    expression_family_id: string | null;
-    source_scene_slug: string | null;
-    source_chunk_text: string | null;
-  }>) {
-    const candidateText = normalizePhraseText(row.source_chunk_text ?? "");
-    if (!candidateText) continue;
-    const candidateTokens = extractCoreTokens(candidateText);
-    const jaccard = computeTokenJaccard(currentTokens, candidateTokens);
-    const includeScore =
-      params.normalizedText.includes(candidateText) || candidateText.includes(params.normalizedText)
-        ? 0.4
-        : 0;
-    const score = jaccard + includeScore;
-    if (score < 0.55) continue;
-    if (!bestMatch || score > bestMatch.score) {
-      bestMatch = { score, familyId: row.expression_family_id };
-    }
-  }
-
-  if (bestMatch?.familyId) return bestMatch.familyId;
-  return candidateByRule;
-}
-
-const mapSavedPhraseRow = (row: UserPhraseRow & { phrase: PhraseRow | null }): UserSavedPhraseItem => {
+const mapSavedPhraseRow = (
+  row: UserPhraseRow & { phrase: PhraseRow | null },
+  clusterContext?: ExpressionClusterContext | null,
+): UserSavedPhraseItem => {
   const learningItemType = inferLearningItemType(row);
   return {
   learningItemType,
@@ -345,7 +511,7 @@ const mapSavedPhraseRow = (row: UserPhraseRow & { phrase: PhraseRow | null }): U
   sourceSentenceIndex: row.source_sentence_index,
   sourceSentenceText: row.source_sentence_text,
   sourceChunkText: row.source_chunk_text,
-  expressionFamilyId: row.expression_family_id,
+  expressionClusterId: clusterContext?.clusterId ?? null,
   aiEnrichmentStatus: row.ai_enrichment_status ?? null,
   semanticFocus: row.ai_semantic_focus ?? null,
   typicalScenario: row.ai_typical_scenario ?? null,
@@ -362,6 +528,70 @@ const mapSavedPhraseRow = (row: UserPhraseRow & { phrase: PhraseRow | null }): U
   masteredAt: row.mastered_at,
   };
 };
+
+async function upsertUserPhraseRelation(params: {
+  userId: string;
+  sourceUserPhraseId: string;
+  targetUserPhraseId: string;
+  relationType: UserPhraseRelationType;
+}) {
+  if (params.sourceUserPhraseId === params.targetUserPhraseId) return;
+  const admin = createSupabaseAdminClient();
+
+  const { data: ownedRows, error: ownershipError } = await admin
+    .from("user_phrases")
+    .select("id")
+    .eq("user_id", params.userId)
+    .in("id", [params.sourceUserPhraseId, params.targetUserPhraseId]);
+
+  if (ownershipError) {
+    throw new Error(`Failed to verify phrase relation ownership: ${ownershipError.message}`);
+  }
+
+  const ownedIds = new Set(((ownedRows ?? []) as Array<{ id: string }>).map((row) => row.id));
+  if (!ownedIds.has(params.sourceUserPhraseId) || !ownedIds.has(params.targetUserPhraseId)) {
+    throw new ValidationError("Related expressions must belong to the current user.");
+  }
+
+  const payload = [
+    {
+      user_id: params.userId,
+      source_user_phrase_id: params.sourceUserPhraseId,
+      target_user_phrase_id: params.targetUserPhraseId,
+      relation_type: params.relationType,
+    },
+    {
+      user_id: params.userId,
+      source_user_phrase_id: params.targetUserPhraseId,
+      target_user_phrase_id: params.sourceUserPhraseId,
+      relation_type: params.relationType,
+    },
+  ];
+
+  const oppositeRelationType = getOppositeRelationType(params.relationType);
+  const { error: deleteOppositeError } = await admin
+    .from("user_phrase_relations")
+    .delete()
+    .eq("user_id", params.userId)
+    .eq("relation_type", oppositeRelationType)
+    .or(
+      `and(source_user_phrase_id.eq.${params.sourceUserPhraseId},target_user_phrase_id.eq.${params.targetUserPhraseId}),and(source_user_phrase_id.eq.${params.targetUserPhraseId},target_user_phrase_id.eq.${params.sourceUserPhraseId})`,
+    );
+
+  if (deleteOppositeError) {
+    throw new Error(`Failed to normalize opposite phrase relation: ${deleteOppositeError.message}`);
+  }
+
+  const { error } = await admin
+    .from("user_phrase_relations")
+    .upsert(payload as never, {
+      onConflict: "user_id,source_user_phrase_id,target_user_phrase_id,relation_type",
+    });
+
+  if (error) {
+    throw new Error(`Failed to save phrase relation: ${error.message}`);
+  }
+}
 
 async function ensurePhraseEntity(input: {
   normalizedText: string;
@@ -543,17 +773,13 @@ export async function savePhraseForUser(userId: string, input: SavePhraseInput) 
   }
 
   const now = nowIso();
-  const providedFamilyId = parseOptionalTrimmed(input.expressionFamilyId, 120);
-  const inferredFamilyId =
-    learningItemType === "sentence" && !expressionText
-      ? existing?.expression_family_id ?? providedFamilyId ?? null
-      : await inferExpressionFamilyId({
-          userId,
-          sourceSceneSlug,
-          normalizedText,
-          providedFamilyId,
-          existingFamilyId: existing?.expression_family_id ?? null,
-        });
+  const relationType = input.relationType;
+  const shouldTreatAsContrastOnly =
+    learningItemType === "expression" &&
+    (relationType === "contrast" || isContrastSourceNote(input.sourceNote));
+  const requestedClusterId = shouldTreatAsContrastOnly
+    ? null
+    : parseOptionalTrimmed(input.expressionClusterId, 120);
   const nextPayload = {
     user_id: userId,
     phrase_id: phrase.id,
@@ -603,8 +829,6 @@ export async function savePhraseForUser(userId: string, input: SavePhraseInput) 
         : parseOptionalTrimmed(input.sourceChunkText, 500) ?? parseOptionalTrimmed(input.text, 500)) ??
       existing?.source_chunk_text ??
       phraseDisplayText,
-    expression_family_id:
-      inferredFamilyId ?? null,
     learning_item_type:
       learningItemType ??
       existing?.learning_item_type ??
@@ -623,14 +847,12 @@ export async function savePhraseForUser(userId: string, input: SavePhraseInput) 
   if (upsertError) {
     const shouldFallbackWithoutFamilyColumn =
       upsertError.code === "42703" ||
-      upsertError.message.toLowerCase().includes("expression_family_id") ||
       upsertError.message.toLowerCase().includes("source_type") ||
       upsertError.message.toLowerCase().includes("source_note") ||
       upsertError.message.toLowerCase().includes("learning_item_type");
 
     if (shouldFallbackWithoutFamilyColumn) {
       const fallbackPayload = { ...nextPayload };
-      delete (fallbackPayload as Record<string, unknown>).expression_family_id;
       delete (fallbackPayload as Record<string, unknown>).source_type;
       delete (fallbackPayload as Record<string, unknown>).source_note;
       delete (fallbackPayload as Record<string, unknown>).learning_item_type;
@@ -662,9 +884,41 @@ export async function savePhraseForUser(userId: string, input: SavePhraseInput) 
     }
   }
 
+  if (
+    learningItemType === "expression" &&
+    input.relationSourceUserPhraseId &&
+    relationType
+  ) {
+    await upsertUserPhraseRelation({
+      userId,
+      sourceUserPhraseId: input.relationSourceUserPhraseId,
+      targetUserPhraseId: finalSavedRow.id,
+      relationType,
+    });
+  }
+
+  if (
+    learningItemType === "expression" &&
+    !shouldTreatAsContrastOnly &&
+    (requestedClusterId || relationType === "similar" || isSimilarSourceNote(input.sourceNote))
+  ) {
+    await syncExpressionClusterMembership({
+      userId,
+      userPhraseId: finalSavedRow.id,
+      requestedClusterId,
+      relationSourceUserPhraseId: input.relationSourceUserPhraseId ?? null,
+      relationType,
+      phraseText: phraseDisplayText,
+    });
+  }
+
+  const clusterContextMap = await loadExpressionClusterContextMap(userId, [finalSavedRow.id]);
+  const expressionClusterId = clusterContextMap.get(finalSavedRow.id)?.clusterId ?? null;
+
   return {
     phrase,
     userPhrase: finalSavedRow,
+    expressionClusterId,
     created,
   };
 }
@@ -823,7 +1077,7 @@ export async function listUserSavedPhrases(params: {
   status?: "saved" | "archived";
   reviewStatus?: UserPhraseReviewStatus | "all";
   learningItemType?: "expression" | "sentence" | "all";
-  expressionFamilyId?: string;
+  expressionClusterId?: string;
   page?: number;
   limit?: number;
 }) {
@@ -832,43 +1086,94 @@ export async function listUserSavedPhrases(params: {
   const limit = Math.min(100, Math.max(1, Math.floor(params.limit ?? 20)));
   const from = (page - 1) * limit;
   const to = from + limit - 1;
+  const textQuery = params.query?.trim().toLowerCase() ?? "";
+  let clusterMemberIds: string[] | null = null;
+
+  if (params.expressionClusterId) {
+    const { data: membershipRows, error: membershipError } = await admin
+      .from("user_expression_cluster_members")
+      .select("user_phrase_id, cluster:user_expression_clusters!inner(id,user_id)")
+      .eq("cluster_id", params.expressionClusterId);
+    if (membershipError) {
+      throw new Error(`Failed to read expression cluster filter: ${membershipError.message}`);
+    }
+    clusterMemberIds = ((membershipRows ?? []) as Array<{
+      user_phrase_id: string;
+      cluster:
+        | {
+            id: string;
+            user_id: string;
+          }
+        | Array<{
+            id: string;
+            user_id: string;
+          }>
+        | null;
+    }>)
+      .filter((row) => {
+        const cluster = Array.isArray(row.cluster) ? (row.cluster[0] ?? null) : row.cluster;
+        return cluster?.user_id === params.userId;
+      })
+      .map((row) => row.user_phrase_id);
+
+    if (clusterMemberIds.length === 0) {
+      return {
+        rows: [] as UserSavedPhraseItem[],
+        total: 0,
+        page,
+        limit,
+      };
+    }
+  }
 
   let query = admin
     .from("user_phrases")
     .select("*, phrase:phrases(*)", { count: "exact" })
     .eq("user_id", params.userId)
-    .order("saved_at", { ascending: false })
-    .range(from, to);
+    .order("saved_at", { ascending: false });
+
+  if (!textQuery) {
+    query = query.range(from, to);
+  }
 
   query = query.eq("status", params.status ?? "saved");
-  if (params.expressionFamilyId) {
-    query = query.eq("expression_family_id", params.expressionFamilyId);
+  if (clusterMemberIds) {
+    query = query.in("id", clusterMemberIds);
   }
   if (params.reviewStatus && params.reviewStatus !== "all") {
     query = query.eq("review_status", params.reviewStatus);
   }
-  const textQuery = params.query?.trim();
-  if (textQuery) {
-    query = query.or(
-      `source_chunk_text.ilike.%${textQuery}%,source_sentence_text.ilike.%${textQuery}%,phrase.display_text.ilike.%${textQuery}%,phrase.translation.ilike.%${textQuery}%`,
-    );
-  }
-
   const { data, error, count } = await query;
   if (error) {
     throw new Error(`Failed to list user phrases: ${error.message}`);
   }
 
   const rows = (data ?? []) as Array<UserPhraseRow & { phrase: PhraseRow | null }>;
-  const mappedRows = rows.map(mapSavedPhraseRow);
+  const clusterContextMap = await loadExpressionClusterContextMap(
+    params.userId,
+    rows.map((row) => row.id),
+  );
+  const mappedRows = rows.map((row) => mapSavedPhraseRow(row, clusterContextMap.get(row.id)));
+  const textFilteredRows = textQuery
+    ? mappedRows.filter((row) =>
+        [
+          row.text,
+          row.translation,
+          row.sourceSentenceText,
+          row.sourceChunkText,
+          row.usageNote,
+        ].some((value) => value?.toLowerCase().includes(textQuery)),
+      )
+    : mappedRows;
   const filteredRows =
     params.learningItemType && params.learningItemType !== "all"
-      ? mappedRows.filter((row) => row.learningItemType === params.learningItemType)
-      : mappedRows;
+      ? textFilteredRows.filter((row) => row.learningItemType === params.learningItemType)
+      : textFilteredRows;
   return {
-    rows: filteredRows,
-    total:
-      params.learningItemType && params.learningItemType !== "all"
+    rows: textQuery ? filteredRows.slice(from, to + 1) : filteredRows,
+    total: textQuery
+      ? filteredRows.length
+      : params.learningItemType && params.learningItemType !== "all"
         ? filteredRows.length
         : (count ?? 0),
     page,
@@ -919,6 +1224,69 @@ export async function listUserSavedPhraseTextsByNormalized(
     if (!phraseId) return false;
     return savedPhraseIds.has(phraseId);
   });
+}
+
+export async function listUserPhraseRelations(params: {
+  userId: string;
+  userPhraseId: string;
+}) {
+  return listUserPhraseRelationsBatch({
+    userId: params.userId,
+    userPhraseIds: [params.userPhraseId],
+  });
+}
+
+export async function listUserPhraseRelationsBatch(params: {
+  userId: string;
+  userPhraseIds: string[];
+}) {
+  const admin = createSupabaseAdminClient();
+  const userPhraseIds = Array.from(new Set(params.userPhraseIds.map((item) => item.trim()).filter(Boolean))).slice(0, 100);
+  if (userPhraseIds.length === 0) return [] as UserSavedPhraseRelationItem[];
+
+  const { data: relationRows, error: relationError } = await admin
+    .from("user_phrase_relations")
+    .select("*")
+    .eq("user_id", params.userId)
+    .in("source_user_phrase_id", userPhraseIds);
+
+  if (relationError) {
+    throw new Error(`Failed to read phrase relations: ${relationError.message}`);
+  }
+
+  const rows = (relationRows ?? []) as UserPhraseRelationRow[];
+  const targetIds = Array.from(new Set(rows.map((row) => row.target_user_phrase_id))).slice(0, 100);
+  if (targetIds.length === 0) return [] as UserSavedPhraseRelationItem[];
+
+  const { data: targetRows, error: targetError } = await admin
+    .from("user_phrases")
+    .select("*, phrase:phrases(*)")
+    .eq("user_id", params.userId)
+    .in("id", targetIds);
+
+  if (targetError) {
+    throw new Error(`Failed to read related phrases: ${targetError.message}`);
+  }
+
+  const clusterContextMap = await loadExpressionClusterContextMap(params.userId, targetIds);
+  const targetById = new Map(
+    ((targetRows ?? []) as Array<UserPhraseRow & { phrase: PhraseRow | null }>).map((row) => [
+      row.id,
+      mapSavedPhraseRow(row, clusterContextMap.get(row.id)),
+    ]),
+  );
+
+  return rows
+    .map((row) => {
+      const item = targetById.get(row.target_user_phrase_id);
+      if (!item) return null;
+      return {
+        sourceUserPhraseId: row.source_user_phrase_id,
+        relationType: row.relation_type,
+        item,
+      } satisfies UserSavedPhraseRelationItem;
+    })
+    .filter((row): row is UserSavedPhraseRelationItem => Boolean(row));
 }
 
 export async function getUserPhraseSummary(userId: string) {

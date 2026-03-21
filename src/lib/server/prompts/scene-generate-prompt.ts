@@ -45,7 +45,7 @@ Constraints:
 9) If reuseKnownChunks is true, naturally reuse some suitable known chunks, but never force.
 10) If a known chunk does not fit the context, skip it.
 11) Prioritize known chunks first for familiarity.
-12) You may optionally introduce 1-2 related chunk variants from the same expression family to support contrast learning.
+12) You may optionally introduce 1-2 related chunk variants from the same expression cluster to support familiar-expression transfer.
 13) Do not replace all known chunks with new variants.
 14) Keep dialogue natural and realistic; variant use should feel organic.
 15) Block-splitting intent (for downstream parser):
@@ -80,4 +80,3 @@ Rules for dialogue:
 
 Return pure JSON only.`;
 }
-

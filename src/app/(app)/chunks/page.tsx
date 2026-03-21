@@ -10,12 +10,19 @@ import { useTtsPlaybackState } from "@/hooks/use-tts-playback-state";
 import { normalizePhraseText } from "@/lib/shared/phrases";
 import { playChunkAudio, stopTtsPlayback } from "@/lib/utils/tts-api";
 import { generateExpressionMapFromApi } from "@/lib/utils/expression-map-api";
-import { ExpressionFamily, ExpressionMapResponse } from "@/lib/types/expression-map";
+import {
+  detachExpressionClusterMemberFromApi,
+  mergeExpressionClustersFromApi,
+  setExpressionClusterMainFromApi,
+} from "@/lib/utils/expression-clusters-api";
+import { ExpressionCluster, ExpressionMapResponse } from "@/lib/types/expression-map";
 import {
   enrichSimilarExpressionFromApi,
   enrichSimilarExpressionsBatchFromApi,
   generateManualExpressionAssistFromApi,
   generateManualSentenceAssistFromApi,
+  getPhraseRelationsBatchFromApi,
+  getPhraseRelationsFromApi,
   generateSimilarExpressionsFromApi,
   getMyPhrasesFromApi,
   ManualExpressionAssistResponse,
@@ -23,6 +30,7 @@ import {
   savePhrasesBatchFromApi,
   SimilarExpressionCandidateResponse,
   savePhraseFromApi,
+  UserPhraseRelationItemResponse,
   UserPhraseItemResponse,
 } from "@/lib/utils/phrases-api";
 import { startReviewSession } from "@/lib/utils/review-session";
@@ -89,7 +97,7 @@ const zh = {
     "\u9700\u8981\u65f6\u518d\u4e3b\u52a8\u67e5\u627e\uff0c\u67e5\u627e\u540e\u4f1a\u65b0\u589e AI \u540c\u7c7b \u548c AI \u5bf9\u7167 \u6807\u7b7e\u9875\u3002",
   openCurrentDetail: "\u6253\u5f00\u4e3b\u8868\u8fbe\u8be6\u60c5",
   detailTabInfo: "\u8be6\u60c5",
-  detailTabSavedSimilar: "\u5df2\u5728\u5e93\u540c\u7c7b",
+  detailTabSavedSimilar: "\u5df2\u5728\u5e93\u76f8\u5173\u8868\u8fbe",
   detailTabSuggested: "AI \u540c\u7c7b",
   detailTabContrast: "AI \u5bf9\u7167",
   detailPrev: "\u4e0a\u4e00\u6761",
@@ -208,11 +216,11 @@ const zh = {
   mapEmpty: "\u6682\u65e0\u53ef\u7528\u8868\u8fbe\u7ec4\u3002",
   centerExpression: "\u4e2d\u5fc3\u8868\u8fbe",
   relatedExpressions: "\u76f8\u5173\u8868\u8fbe",
-  familyMeaning: "\u7ec4\u542b\u4e49",
-  practiceFamily: "\u7ec3\u8fd9\u4e00\u7ec4",
-  addFamily: "\u52a0\u5165\u590d\u4e60",
-  addFamilySuccess: "\u8be5\u7ec4\u8868\u8fbe\u5df2\u52a0\u5165\u590d\u4e60\u6c60\u3002",
-  familyEmpty: "\u8be5\u7ec4\u6682\u65e0\u8868\u8fbe\u3002",
+  clusterMeaning: "\u7c07\u542b\u4e49",
+  practiceCluster: "\u7ec3\u8fd9\u4e2a\u8868\u8fbe\u7c07",
+  addCluster: "\u5c06\u8fd9\u4e2a\u7c07\u52a0\u5165\u590d\u4e60",
+  addClusterSuccess: "\u8be5\u8868\u8fbe\u7c07\u5df2\u52a0\u5165\u590d\u4e60\u6c60\u3002",
+  clusterEmpty: "\u8be5\u8868\u8fbe\u7c07\u6682\u65e0\u8868\u8fbe\u3002",
   statusUnknown: "\u672a\u52a0\u5165\u590d\u4e60",
   diffSame: "\u4e2d\u5fc3\u8868\u8fbe",
   diffRelated: "\u76f8\u5173\u8868\u8fbe",
@@ -237,10 +245,14 @@ const zh = {
   addSelectedSimilar: "\u52a0\u5165\u8868\u8fbe\u5e93\u5e76\u5efa\u7acb\u540c\u7c7b\u5173\u8054",
   addSelectedSimilarSuccess: "\u5df2\u52a0\u5165\u9009\u4e2d\u5019\u9009\u5e76\u5efa\u7acb\u540c\u7c7b\u5173\u8054\u3002",
   selectAtLeastOne: "\u8bf7\u81f3\u5c11\u9009\u62e9 1 \u4e2a\u5019\u9009\u3002",
-  viewingFamilyFilter: "\u6b63\u5728\u67e5\u770b\u8fd9\u4e00\u7ec4\u540c\u7c7b\u8868\u8fbe",
-  filteredFamilyPrefix: "\u5df2\u7b5b\u9009\uff1a",
-  filteredFamilySuffix: "\u8fd9\u4e00\u7ec4",
-  clearFamilyFilter: "\u8fd4\u56de\u5168\u90e8\u8868\u8fbe",
+  viewingClusterFilter: "\u6b63\u5728\u67e5\u770b\u8fd9\u4e00\u7ec4\u540c\u7c7b\u8868\u8fbe",
+  filteredClusterPrefix: "\u5df2\u7b5b\u9009\uff1a",
+  filteredClusterSuffix: "\u8fd9\u4e2a\u8868\u8fbe\u7c07",
+  mergeCluster: "\u5408\u5e76\u5230\u5f53\u524d\u4e3b\u7c07",
+  mergeClusterSuccess: "\u5df2\u5408\u5e76\u8868\u8fbe\u7c07",
+  detachClusterMember: "\u79fb\u51fa\u5f53\u524d\u8868\u8fbe\u7c07",
+  detachClusterMemberSuccess: "\u5df2\u5c06\u8be5\u8868\u8fbe\u79fb\u51fa\u5f53\u524d\u7c07",
+  clearClusterFilter: "\u8fd4\u56de\u5168\u90e8\u8868\u8fbe",
   diffGentle: "\u66f4\u6e29\u548c",
   diffOverdoReminder: "\u66f4\u504f\u63d0\u9192\u522b\u505a\u8fc7\u5934",
   diffIntense: "\u66f4\u5f3a\u70c8",
@@ -257,25 +269,41 @@ const reviewStatusLabel: Record<PhraseReviewStatus, string> = {
   archived: "\u5df2\u5f52\u6863",
 };
 
+const isDerivedRelatedExpression = (sourceNote: string | null | undefined) => {
+  const normalized = (sourceNote ?? "").trim().toLowerCase();
+  return (
+    normalized === "manual-similar-ai" ||
+    normalized === "focus-similar-ai" ||
+    normalized === "similar-ai-mvp" ||
+    normalized === "manual-contrast-ai" ||
+    normalized === "focus-contrast-ai"
+  );
+};
+
+const isContrastDerivedExpression = (sourceNote: string | null | undefined) => {
+  const normalized = (sourceNote ?? "").trim().toLowerCase();
+  return normalized === "manual-contrast-ai" || normalized === "focus-contrast-ai";
+};
+
 const asReviewSessionExpressions = (rows: UserPhraseItemResponse[]) =>
   rows.map((row) => ({
     userPhraseId: row.userPhraseId,
     text: row.text,
-    expressionFamilyId: row.expressionFamilyId,
+    expressionClusterId: row.expressionClusterId,
   }));
 
-const filterRowsByFamilyExpressions = (
+const filterRowsByClusterExpressions = (
   rows: UserPhraseItemResponse[],
-  family: ExpressionFamily,
+  cluster: ExpressionCluster,
   selected: UserPhraseItemResponse | null,
 ) => {
-  const familyTextSet = new Set(family.expressions.map((text) => normalizePhraseText(text)));
-  const selectedFamilyId = selected?.expressionFamilyId ?? null;
+  const clusterTextSet = new Set(cluster.expressions.map((text) => normalizePhraseText(text)));
+  const selectedClusterId = selected?.expressionClusterId ?? null;
   return rows.filter((row) => {
-    if (selectedFamilyId && row.expressionFamilyId && row.expressionFamilyId === selectedFamilyId) {
+    if (selectedClusterId && row.expressionClusterId && row.expressionClusterId === selectedClusterId) {
       return true;
     }
-    return familyTextSet.has(normalizePhraseText(row.text));
+    return clusterTextSet.has(normalizePhraseText(row.text));
   });
 };
 
@@ -456,6 +484,16 @@ type FocusDetailState = {
 
 type FocusDetailTabValue = "info" | "saved-similar" | "suggested" | "contrast";
 
+type SavedRelatedExpressionItem = {
+  row: UserPhraseItemResponse;
+  relationType: "similar" | "contrast";
+};
+
+type SavedRelationCacheEntry = {
+  loaded: boolean;
+  rows: UserPhraseRelationItemResponse[];
+};
+
 type FocusDetailTrailItem = {
   userPhraseId: string | null;
   text: string;
@@ -486,7 +524,7 @@ export default function ChunksPage() {
   const ttsPlaybackState = useTtsPlaybackState();
   const [playingText, setPlayingText] = useState<string | null>(null);
   const searchParams = useSearchParams();
-  const familyFromQuery = searchParams.get("family")?.trim() ?? "";
+  const clusterFromQuery = searchParams.get("cluster")?.trim() ?? "";
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [phrases, setPhrases] = useState<UserPhraseItemResponse[]>([]);
@@ -494,7 +532,7 @@ export default function ChunksPage() {
   const [reviewFilter, setReviewFilter] = useState<PhraseReviewStatus | "all">("all");
   const [contentFilter, setContentFilter] = useState<"expression" | "sentence">("expression");
   const [expressionViewMode, setExpressionViewMode] = useState<"list" | "focus">("focus");
-  const [expressionFamilyFilterId, setExpressionFamilyFilterId] = useState<string>(familyFromQuery);
+  const [expressionClusterFilterId, setExpressionClusterFilterId] = useState<string>(clusterFromQuery);
   const [listDataSource, setListDataSource] = useState<"none" | "cache" | "network">("none");
 
   const [mapOpen, setMapOpen] = useState(false);
@@ -504,8 +542,8 @@ export default function ChunksPage() {
   const [mapSourceExpression, setMapSourceExpression] = useState<UserPhraseItemResponse | null>(
     null,
   );
-  const [activeFamilyId, setActiveFamilyId] = useState<string | null>(null);
-  const [addingFamily, setAddingFamily] = useState(false);
+  const [activeClusterId, setActiveClusterId] = useState<string | null>(null);
+  const [addingCluster, setAddingCluster] = useState(false);
   const [mapOpeningForId, setMapOpeningForId] = useState<string | null>(null);
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
   const [expandedCardIds, setExpandedCardIds] = useState<Record<string, boolean>>({});
@@ -537,14 +575,22 @@ export default function ChunksPage() {
   const [focusAssistLoading, setFocusAssistLoading] = useState(false);
   const [focusAssistData, setFocusAssistData] = useState<ManualExpressionAssistResponse | null>(null);
   const [focusRelationTab, setFocusRelationTab] = useState<"similar" | "contrast">("similar");
-  const [focusMainExpanded, setFocusMainExpanded] = useState(false);
+  const [expandedFocusMainId, setExpandedFocusMainId] = useState<string | null>(null);
   const [focusRelationActiveText, setFocusRelationActiveText] = useState("");
   const [savingFocusCandidateKey, setSavingFocusCandidateKey] = useState<string | null>(null);
+  const [mergingCluster, setMergingCluster] = useState(false);
+  const [detachingClusterMember, setDetachingClusterMember] = useState(false);
   const [focusDetailOpen, setFocusDetailOpen] = useState(false);
   const [focusDetailLoading, setFocusDetailLoading] = useState(false);
   const [focusDetail, setFocusDetail] = useState<FocusDetailState | null>(null);
   const [focusDetailTab, setFocusDetailTab] = useState<FocusDetailTabValue>("info");
   const [focusDetailTrail, setFocusDetailTrail] = useState<FocusDetailTrailItem[]>([]);
+  const [focusMainOverrideByClusterId, setFocusMainOverrideByClusterId] = useState<Record<string, string>>({});
+  const [focusRelationMainOverrideBySourceId, setFocusRelationMainOverrideBySourceId] = useState<Record<string, string>>({});
+  const [savedRelationCache, setSavedRelationCache] = useState<Record<string, SavedRelationCacheEntry>>({});
+  const [savedRelationLoadingKey, setSavedRelationLoadingKey] = useState<string | null>(null);
+  const [focusRelationsBootstrapDone, setFocusRelationsBootstrapDone] = useState(false);
+  const pendingRelationRequestIdsRef = useRef<Set<string>>(new Set());
 
   const activeLoadTokenRef = useRef(0);
 
@@ -559,7 +605,7 @@ export default function ChunksPage() {
     nextQuery: string,
     nextFilter: PhraseReviewStatus | "all",
     nextContentFilter: "expression" | "sentence",
-    nextExpressionFamilyFilterId: string,
+    nextExpressionClusterFilterId: string,
     options?: { preferCache?: boolean },
   ) => {
     const token = activeLoadTokenRef.current + 1;
@@ -578,7 +624,7 @@ export default function ChunksPage() {
       status: "saved" as const,
       reviewStatus: nextFilter,
       learningItemType: nextContentFilter,
-      expressionFamilyId: nextExpressionFamilyFilterId || undefined,
+      expressionClusterId: nextExpressionClusterFilterId || undefined,
     };
 
     if (preferCache) {
@@ -588,7 +634,7 @@ export default function ChunksPage() {
           status: requestParams.status,
           reviewStatus: requestParams.reviewStatus,
           learningItemType: requestParams.learningItemType,
-          expressionFamilyId: requestParams.expressionFamilyId,
+          expressionClusterId: requestParams.expressionClusterId,
           page: requestParams.page,
           limit: requestParams.limit,
         });
@@ -617,7 +663,7 @@ export default function ChunksPage() {
           status: requestParams.status,
           reviewStatus: requestParams.reviewStatus,
           learningItemType: requestParams.learningItemType,
-          expressionFamilyId: requestParams.expressionFamilyId,
+          expressionClusterId: requestParams.expressionClusterId,
           page: requestParams.page,
           limit: requestParams.limit,
         },
@@ -638,16 +684,16 @@ export default function ChunksPage() {
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      void loadPhrases(query, reviewFilter, contentFilter, expressionFamilyFilterId, {
+      void loadPhrases(query, reviewFilter, contentFilter, expressionClusterFilterId, {
         preferCache: true,
       });
     }, 180);
     return () => window.clearTimeout(timer);
-  }, [query, reviewFilter, contentFilter, expressionFamilyFilterId]);
+  }, [query, reviewFilter, contentFilter, expressionClusterFilterId]);
 
   useEffect(() => {
-    setExpressionFamilyFilterId(familyFromQuery);
-  }, [familyFromQuery]);
+    setExpressionClusterFilterId(clusterFromQuery);
+  }, [clusterFromQuery]);
 
   useEffect(() => {
     if (process.env.NODE_ENV !== "development") return;
@@ -656,19 +702,19 @@ export default function ChunksPage() {
       count: phrases.length,
       filter: reviewFilter,
       contentFilter,
-      expressionFamilyFilterId,
+      expressionClusterFilterId,
     });
-  }, [listDataSource, phrases.length, reviewFilter, contentFilter, expressionFamilyFilterId]);
+  }, [listDataSource, phrases.length, reviewFilter, contentFilter, expressionClusterFilterId]);
 
   const summary = useMemo(() => {
     if (loading) return zh.loading;
     return `${zh.total} ${total} ${zh.items}`;
   }, [loading, total]);
 
-  const activeFamily = useMemo(() => {
-    if (!mapData || !activeFamilyId) return null;
-    return mapData.families.find((family) => family.id === activeFamilyId) ?? null;
-  }, [activeFamilyId, mapData]);
+  const activeCluster = useMemo(() => {
+    if (!mapData || !activeClusterId) return null;
+    return mapData.clusters.find((cluster) => cluster.id === activeClusterId) ?? null;
+  }, [activeClusterId, mapData]);
 
   const expressionStatusByNormalized = useMemo(() => {
     const map = new Map<string, PhraseReviewStatus>();
@@ -686,13 +732,13 @@ export default function ChunksPage() {
     return map;
   }, [phrases]);
 
-  const familyMembersByFamilyId = useMemo(() => {
+  const clusterMembersByClusterId = useMemo(() => {
     const map = new Map<string, UserPhraseItemResponse[]>();
     for (const row of phrases) {
-      if (row.learningItemType !== "expression" || !row.expressionFamilyId) continue;
-      const bucket = map.get(row.expressionFamilyId) ?? [];
+      if (row.learningItemType !== "expression" || !row.expressionClusterId) continue;
+      const bucket = map.get(row.expressionClusterId) ?? [];
       bucket.push(row);
-      map.set(row.expressionFamilyId, bucket);
+      map.set(row.expressionClusterId, bucket);
     }
     return map;
   }, [phrases]);
@@ -702,54 +748,168 @@ export default function ChunksPage() {
     [phrases],
   );
 
+  const clusterMainExpressionIdByClusterId = useMemo(() => {
+    const relationCountByUserPhraseId = new Map<string, number>();
+    for (const [sourceId, entry] of Object.entries(savedRelationCache)) {
+      if (!entry.loaded) continue;
+      relationCountByUserPhraseId.set(sourceId, entry.rows.length);
+    }
+
+    const map = new Map<string, string>();
+    for (const [clusterId, rows] of clusterMembersByClusterId.entries()) {
+      const overriddenId = focusMainOverrideByClusterId[clusterId];
+      const overriddenRow = overriddenId
+        ? rows.find((row) => row.userPhraseId === overriddenId)
+        : null;
+      const sortedRows = [...rows].sort((a, b) => {
+        const relationDelta =
+          (relationCountByUserPhraseId.get(b.userPhraseId) ?? 0) -
+          (relationCountByUserPhraseId.get(a.userPhraseId) ?? 0);
+        if (relationDelta !== 0) return relationDelta;
+        const sourceNoteDelta =
+          Number(Boolean(a.sourceNote?.trim())) - Number(Boolean(b.sourceNote?.trim()));
+        if (sourceNoteDelta !== 0) return sourceNoteDelta;
+        return a.savedAt.localeCompare(b.savedAt);
+      });
+      const mainRow = overriddenRow ?? sortedRows[0];
+      if (mainRow) {
+        map.set(clusterId, mainRow.userPhraseId);
+      }
+    }
+    return map;
+  }, [clusterMembersByClusterId, focusMainOverrideByClusterId, savedRelationCache]);
+
+  const focusMainExpressionRows = useMemo(
+    () => {
+      return expressionRows.filter((row) => {
+        const replacementTargetId = focusRelationMainOverrideBySourceId[row.userPhraseId];
+        if (replacementTargetId && replacementTargetId !== row.userPhraseId) {
+          return false;
+        }
+        const isPromotedByRelationOverride = Object.values(focusRelationMainOverrideBySourceId).includes(
+          row.userPhraseId,
+        );
+
+        if (row.expressionClusterId) {
+          const isFamilyMain = clusterMainExpressionIdByClusterId.get(row.expressionClusterId) === row.userPhraseId;
+          if (!isFamilyMain) return false;
+          if (isDerivedRelatedExpression(row.sourceNote) && !isPromotedByRelationOverride) return false;
+          return true;
+        }
+
+        if (isDerivedRelatedExpression(row.sourceNote)) {
+          return isPromotedByRelationOverride || row.userPhraseId === focusExpressionId;
+        }
+
+        return true;
+      });
+    },
+    [
+      expressionRows,
+      clusterMainExpressionIdByClusterId,
+      focusExpressionId,
+      focusRelationMainOverrideBySourceId,
+    ],
+  );
+
+  const resolveFocusMainExpressionId = useCallback(
+    (userPhraseId: string) => {
+      const row = expressionRows.find((item) => item.userPhraseId === userPhraseId);
+      if (!row?.expressionClusterId) return row?.userPhraseId ?? userPhraseId;
+      return clusterMainExpressionIdByClusterId.get(row.expressionClusterId) ?? row.userPhraseId;
+    },
+    [expressionRows, clusterMainExpressionIdByClusterId],
+  );
+
+  const switchFocusMainExpression = useCallback(
+    (userPhraseId: string) => {
+      setFocusExpressionId(resolveFocusMainExpressionId(userPhraseId));
+    },
+    [resolveFocusMainExpressionId],
+  );
+
+  const assignFocusMainExpression = useCallback(
+    (item: UserPhraseItemResponse) => {
+      if (item.expressionClusterId) {
+        setFocusMainOverrideByClusterId((current) => ({
+          ...current,
+          [item.expressionClusterId as string]: item.userPhraseId,
+        }));
+      }
+      const incomingSourceIds = Object.entries(savedRelationCache)
+        .filter(([, entry]) => entry.loaded)
+        .flatMap(([, entry]) =>
+          entry.rows
+            .filter((relation) => relation.item.userPhraseId === item.userPhraseId)
+            .map((relation) => relation.sourceUserPhraseId),
+        );
+      if (incomingSourceIds.length > 0) {
+        setFocusRelationMainOverrideBySourceId((current) => {
+          const next = { ...current };
+          for (const sourceId of incomingSourceIds) {
+            next[sourceId] = item.userPhraseId;
+          }
+          return next;
+        });
+      }
+      setFocusExpressionId(item.userPhraseId);
+    },
+    [savedRelationCache],
+  );
+
   const focusExpression = useMemo(() => {
-    if (expressionRows.length === 0) return null;
+    if (focusMainExpressionRows.length === 0) return null;
+    const resolvedId = focusExpressionId ? resolveFocusMainExpressionId(focusExpressionId) : "";
     return (
-      expressionRows.find((row) => row.userPhraseId === focusExpressionId) ??
-      expressionRows[0]
+      focusMainExpressionRows.find((row) => row.userPhraseId === resolvedId) ??
+      focusMainExpressionRows[0]
     );
-  }, [expressionRows, focusExpressionId]);
+  }, [focusExpressionId, focusMainExpressionRows, resolveFocusMainExpressionId]);
 
   useEffect(() => {
     if (contentFilter !== "expression") return;
-    if (expressionRows.length === 0) {
+    if (focusMainExpressionRows.length === 0) {
       setFocusExpressionId("");
       setFocusAssistData(null);
       return;
     }
-    if (!focusExpressionId || !expressionRows.some((row) => row.userPhraseId === focusExpressionId)) {
-      setFocusExpressionId(expressionRows[0].userPhraseId);
+    const resolvedId = focusExpressionId ? resolveFocusMainExpressionId(focusExpressionId) : "";
+    if (!resolvedId || !focusMainExpressionRows.some((row) => row.userPhraseId === resolvedId)) {
+      setFocusExpressionId(focusMainExpressionRows[0].userPhraseId);
+      return;
     }
-  }, [contentFilter, expressionRows, focusExpressionId]);
+    if (resolvedId !== focusExpressionId) {
+      setFocusExpressionId(resolvedId);
+    }
+  }, [contentFilter, focusExpressionId, focusMainExpressionRows, resolveFocusMainExpressionId]);
 
   useEffect(() => {
     setFocusAssistData(null);
-    setFocusMainExpanded(false);
     setFocusRelationTab("similar");
   }, [focusExpressionId]);
 
-  const familyFilterExpressionLabel = useMemo(() => {
-    if (!expressionFamilyFilterId) return "";
+  const clusterFilterExpressionLabel = useMemo(() => {
+    if (!expressionClusterFilterId) return "";
     const row = phrases.find(
       (item) =>
         item.learningItemType === "expression" &&
-        item.expressionFamilyId === expressionFamilyFilterId,
+        item.expressionClusterId === expressionClusterFilterId,
     );
     return row?.text ?? "";
-  }, [expressionFamilyFilterId, phrases]);
+  }, [expressionClusterFilterId, phrases]);
 
   const centerExpressionText = useMemo(() => {
-    if (!activeFamily) return mapSourceExpression?.text ?? "";
+    if (!activeCluster) return mapSourceExpression?.text ?? "";
     const sourceSceneId = mapData?.sourceSceneId ?? null;
     const candidates = Array.from(
-      new Set(activeFamily.expressions.map((text) => text.trim()).filter(Boolean)),
+      new Set(activeCluster.expressions.map((text) => text.trim()).filter(Boolean)),
     );
-    if (candidates.length === 0) return mapSourceExpression?.text ?? activeFamily.anchor;
+    if (candidates.length === 0) return mapSourceExpression?.text ?? activeCluster.anchor;
 
     const scored = candidates.map((text) => {
       const normalized = normalizePhraseText(text);
       const userRow = phraseByNormalized.get(normalized) ?? null;
-      const nodes = activeFamily.nodes.filter(
+      const nodes = activeCluster.nodes.filter(
         (node) => normalizePhraseText(node.text) === normalized,
       );
       let score = 0;
@@ -770,21 +930,21 @@ export default function ChunksPage() {
     });
 
     scored.sort((a, b) => b.score - a.score || a.normalized.localeCompare(b.normalized));
-    return scored[0]?.text ?? mapSourceExpression?.text ?? activeFamily.anchor;
-  }, [activeFamily, mapData?.sourceSceneId, mapSourceExpression, phraseByNormalized]);
+    return scored[0]?.text ?? mapSourceExpression?.text ?? activeCluster.anchor;
+  }, [activeCluster, mapData?.sourceSceneId, mapSourceExpression, phraseByNormalized]);
 
-  const displayedFamilyExpressions = useMemo(() => {
-    if (!activeFamily) return [] as string[];
-    const center = centerExpressionText || activeFamily.anchor;
+  const displayedClusterExpressions = useMemo(() => {
+    if (!activeCluster) return [] as string[];
+    const center = centerExpressionText || activeCluster.anchor;
     const uniqueExpressions = Array.from(
-      new Set(activeFamily.expressions.map((text) => text.trim()).filter(Boolean)),
+      new Set(activeCluster.expressions.map((text) => text.trim()).filter(Boolean)),
     );
     const sourceSceneId = mapData?.sourceSceneId ?? null;
 
     const scored = uniqueExpressions.map((text) => {
       const normalized = normalizePhraseText(text);
       const row = phraseByNormalized.get(normalized) ?? null;
-      const nodes = activeFamily.nodes.filter(
+      const nodes = activeCluster.nodes.filter(
         (node) => normalizePhraseText(node.text) === normalized,
       );
       let score = 0;
@@ -801,13 +961,13 @@ export default function ChunksPage() {
 
     scored.sort((a, b) => b.score - a.score || a.normalized.localeCompare(b.normalized));
     return scored.slice(0, 8).map((item) => item.text);
-  }, [activeFamily, centerExpressionText, mapData?.sourceSceneId, phraseByNormalized]);
+  }, [activeCluster, centerExpressionText, mapData?.sourceSceneId, phraseByNormalized]);
 
   const getPrimaryActionLabel = (item: UserPhraseItemResponse) => {
     if (item.learningItemType === "sentence") return zh.sentenceReviewPending;
     if (item.reviewStatus === "reviewing") return zh.continueReview;
     if (item.reviewStatus === "mastered") {
-      return item.expressionFamilyId ? zh.reviewFamily : zh.revisitOne;
+      return item.expressionClusterId ? zh.reviewFamily : zh.revisitOne;
     }
     return zh.startReview;
   };
@@ -830,11 +990,11 @@ export default function ChunksPage() {
   }, [expressionRows]);
 
   const focusSavedSimilarRows = useMemo(() => {
-    if (!focusExpression?.expressionFamilyId) return [] as UserPhraseItemResponse[];
-    return (familyMembersByFamilyId.get(focusExpression.expressionFamilyId) ?? []).filter(
+    if (!focusExpression?.expressionClusterId) return [] as UserPhraseItemResponse[];
+    return (clusterMembersByClusterId.get(focusExpression.expressionClusterId) ?? []).filter(
       (row) => row.userPhraseId !== focusExpression.userPhraseId,
     );
-  }, [familyMembersByFamilyId, focusExpression]);
+  }, [clusterMembersByClusterId, focusExpression]);
 
   const focusSimilarItems = useMemo(() => {
     const items: Array<{
@@ -910,14 +1070,14 @@ export default function ChunksPage() {
       toast.message(zh.sentenceReviewPending);
       return;
     }
-    if (item.reviewStatus === "mastered" && item.expressionFamilyId) {
-      const familyRows = phrases.filter((row) => row.expressionFamilyId === item.expressionFamilyId);
-      if (familyRows.length > 0) {
+    if (item.reviewStatus === "mastered" && item.expressionClusterId) {
+      const clusterRows = phrases.filter((row) => row.expressionClusterId === item.expressionClusterId);
+      if (clusterRows.length > 0) {
         toast.success(zh.reviewFamilyFeedback);
         startReviewSession({
           router,
           source: "expression-library-card",
-          expressions: asReviewSessionExpressions(familyRows),
+          expressions: asReviewSessionExpressions(clusterRows),
         });
         return;
       }
@@ -972,12 +1132,6 @@ export default function ChunksPage() {
     if (savingFocusCandidateKey === key) return;
     setSavingFocusCandidateKey(key);
     try {
-      const familyId =
-        kind === "similar"
-          ? focusItem.expressionFamilyId ??
-            `fam:manual:${normalizePhraseText(focusItem.text).replace(/\s+/g, "-").slice(0, 30) || focusItem.userPhraseId.slice(0, 8)}`
-          : undefined;
-
       const response = await savePhraseFromApi({
         text: candidate.text,
         learningItemType: "expression",
@@ -985,22 +1139,93 @@ export default function ChunksPage() {
         sourceNote: kind === "similar" ? "focus-similar-ai" : "focus-contrast-ai",
         sourceSentenceText: focusItem.sourceSentenceText ?? undefined,
         sourceChunkText: candidate.text,
-        expressionFamilyId: familyId,
+        expressionClusterId: kind === "similar" ? focusItem.expressionClusterId ?? undefined : undefined,
+        relationSourceUserPhraseId: focusItem.userPhraseId,
+        relationType: kind,
       });
       await enrichSimilarExpressionFromApi({
         userPhraseId: response.userPhrase.id,
         baseExpression: focusItem.text,
         differenceLabel: candidate.differenceLabel,
       });
-      await loadPhrases(query, reviewFilter, contentFilter, expressionFamilyFilterId, {
+      await loadPhrases(query, reviewFilter, contentFilter, expressionClusterFilterId, {
         preferCache: false,
       });
-      await loadFocusAssist(focusItem);
+      setSavedRelationCache((current) => {
+        const next = { ...current };
+        delete next[focusItem.userPhraseId];
+        return next;
+      });
       toast.success(zh.addSelectedSimilarSuccess);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : zh.loadFailed);
     } finally {
       setSavingFocusCandidateKey(null);
+    }
+  };
+
+  const mergeFocusDetailClusterIntoCurrent = async () => {
+    if (!focusExpression?.expressionClusterId || !focusDetail?.savedItem?.expressionClusterId) return;
+    const targetClusterId = focusExpression.expressionClusterId;
+    const sourceClusterId = focusDetail.savedItem.expressionClusterId;
+    if (!targetClusterId || !sourceClusterId || targetClusterId === sourceClusterId) return;
+
+    setMergingCluster(true);
+    try {
+      await mergeExpressionClustersFromApi({
+        targetClusterId,
+        sourceClusterId,
+        mainUserPhraseId: focusExpression.userPhraseId,
+      });
+      await loadPhrases(query, reviewFilter, contentFilter, expressionClusterFilterId, {
+        preferCache: false,
+      });
+      setSavedRelationCache((current) => {
+        const next = { ...current };
+        if (focusDetail.savedItem) {
+          delete next[focusDetail.savedItem.userPhraseId];
+        }
+        delete next[focusExpression.userPhraseId];
+        return next;
+      });
+      toast.success(zh.mergeClusterSuccess);
+      setFocusDetailOpen(false);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : zh.loadFailed);
+    } finally {
+      setMergingCluster(false);
+    }
+  };
+
+  const detachFocusDetailFromCluster = async () => {
+    const savedItem = focusDetail?.savedItem;
+    const clusterId = savedItem?.expressionClusterId ?? "";
+    if (!savedItem || !clusterId) return;
+
+    setDetachingClusterMember(true);
+    try {
+      await detachExpressionClusterMemberFromApi({
+        clusterId,
+        userPhraseId: savedItem.userPhraseId,
+        createNewCluster: true,
+      });
+      await loadPhrases(query, reviewFilter, contentFilter, expressionClusterFilterId, {
+        preferCache: false,
+      });
+      setSavedRelationCache((current) => {
+        const next = { ...current };
+        delete next[savedItem.userPhraseId];
+        if (focusExpression?.userPhraseId) {
+          delete next[focusExpression.userPhraseId];
+        }
+        return next;
+      });
+      toast.success(zh.detachClusterMemberSuccess);
+      setFocusDetailOpen(false);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : zh.loadFailed);
+    } finally {
+      setDetachingClusterMember(false);
     }
   };
 
@@ -1096,7 +1321,7 @@ export default function ChunksPage() {
       const target = focusDetailTrail[index];
       if (!target) return;
       if (target.userPhraseId) {
-        setFocusExpressionId(target.userPhraseId);
+        setFocusExpressionId(resolveFocusMainExpressionId(target.userPhraseId));
       }
       setFocusDetailTab(target.tab);
       setFocusDetailTrail((current) => current.slice(0, index + 1));
@@ -1110,8 +1335,142 @@ export default function ChunksPage() {
         assistItem: null,
       });
     },
-    [focusDetailTrail, phraseByNormalized],
+    [focusDetailTrail, phraseByNormalized, resolveFocusMainExpressionId],
   );
+
+  useEffect(() => {
+    if (contentFilter !== "expression" || expressionRows.length === 0) return;
+    const pendingIds = expressionRows
+      .map((row) => row.userPhraseId)
+      .filter(
+        (userPhraseId) =>
+          !savedRelationCache[userPhraseId]?.loaded &&
+          !pendingRelationRequestIdsRef.current.has(userPhraseId),
+      );
+    if (pendingIds.length === 0) return;
+
+    for (const userPhraseId of pendingIds) {
+      pendingRelationRequestIdsRef.current.add(userPhraseId);
+    }
+
+    let cancelled = false;
+    void getPhraseRelationsBatchFromApi(pendingIds)
+      .then((response) => {
+        if (cancelled) return;
+        const grouped = new Map<string, UserPhraseRelationItemResponse[]>();
+        for (const row of response.rows) {
+          const bucket = grouped.get(row.sourceUserPhraseId) ?? [];
+          bucket.push(row);
+          grouped.set(row.sourceUserPhraseId, bucket);
+        }
+        setSavedRelationCache((current) => {
+          const next = { ...current };
+          for (const userPhraseId of pendingIds) {
+            next[userPhraseId] = {
+              loaded: true,
+              rows: grouped.get(userPhraseId) ?? [],
+            };
+          }
+          return next;
+        });
+        setFocusRelationsBootstrapDone(true);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        toast.error(error instanceof Error ? error.message : zh.loadFailed);
+        setSavedRelationCache((current) => {
+          const next = { ...current };
+          for (const userPhraseId of pendingIds) {
+            next[userPhraseId] = {
+              loaded: true,
+              rows: [],
+            };
+          }
+          return next;
+        });
+        setFocusRelationsBootstrapDone(true);
+      })
+      .finally(() => {
+        for (const userPhraseId of pendingIds) {
+          pendingRelationRequestIdsRef.current.delete(userPhraseId);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [contentFilter, expressionRows, savedRelationCache]);
+
+  useEffect(() => {
+    if (contentFilter !== "expression") {
+      setFocusRelationsBootstrapDone(false);
+      return;
+    }
+    if (expressionRows.length === 0) {
+      setFocusRelationsBootstrapDone(true);
+      return;
+    }
+    const hasPending = expressionRows.some(
+      (row) =>
+        !savedRelationCache[row.userPhraseId]?.loaded ||
+        pendingRelationRequestIdsRef.current.has(row.userPhraseId),
+    );
+    if (!hasPending) {
+      setFocusRelationsBootstrapDone(true);
+    }
+  }, [contentFilter, expressionRows, savedRelationCache]);
+
+  useEffect(() => {
+    const userPhraseId = focusDetail?.savedItem?.userPhraseId ?? "";
+    if (!userPhraseId) return;
+    if (savedRelationCache[userPhraseId]?.loaded) return;
+    if (pendingRelationRequestIdsRef.current.has(userPhraseId)) return;
+    if (contentFilter === "expression" && expressionViewMode === "focus") {
+      return;
+    }
+
+    let cancelled = false;
+    pendingRelationRequestIdsRef.current.add(userPhraseId);
+    setSavedRelationLoadingKey(userPhraseId);
+
+    void getPhraseRelationsFromApi(userPhraseId)
+      .then((response) => {
+        if (cancelled) return;
+        setSavedRelationCache((current) => ({
+          ...current,
+          [userPhraseId]: {
+            loaded: true,
+            rows: response.rows,
+          },
+        }));
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        toast.error(error instanceof Error ? error.message : zh.loadFailed);
+        setSavedRelationCache((current) => ({
+          ...current,
+          [userPhraseId]: {
+            loaded: true,
+            rows: [],
+          },
+        }));
+      })
+      .finally(() => {
+        pendingRelationRequestIdsRef.current.delete(userPhraseId);
+        if (cancelled) return;
+        setSavedRelationLoadingKey((current) => (current === userPhraseId ? null : current));
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    contentFilter,
+    expressionViewMode,
+    focusDetail?.savedItem?.userPhraseId,
+    focusRelationsBootstrapDone,
+    savedRelationCache,
+  ]);
 
   const openExpressionMap = async (expression: UserPhraseItemResponse) => {
     if (expression.learningItemType === "sentence") return;
@@ -1121,10 +1480,10 @@ export default function ChunksPage() {
     setMapError(null);
     setMapData(null);
     setMapSourceExpression(expression);
-    setActiveFamilyId(null);
+    setActiveClusterId(null);
     try {
-      const grouped = expression.expressionFamilyId
-        ? phrases.filter((row) => row.expressionFamilyId === expression.expressionFamilyId)
+      const grouped = expression.expressionClusterId
+        ? phrases.filter((row) => row.expressionClusterId === expression.expressionClusterId)
         : [expression];
       const baseExpressions = Array.from(
         new Set(grouped.map((row) => row.text).filter((text) => text.trim().length > 0)),
@@ -1137,7 +1496,7 @@ export default function ChunksPage() {
       });
 
       setMapData(response);
-      setActiveFamilyId(response.families[0]?.id ?? null);
+      setActiveClusterId(response.clusters[0]?.id ?? null);
       toast.success(zh.openMapFeedback);
     } catch (error) {
       setMapError(error instanceof Error ? error.message : zh.mapFailed);
@@ -1159,25 +1518,25 @@ export default function ChunksPage() {
     setExpandedSimilarIds((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
-  const applyFamilyFilter = (familyId: string, sourceExpressionText?: string) => {
-    const normalized = familyId.trim();
+  const applyClusterFilter = (clusterId: string, sourceExpressionText?: string) => {
+    const normalized = clusterId.trim();
     if (!normalized) return;
-    setExpressionFamilyFilterId(normalized);
+    setExpressionClusterFilterId(normalized);
     setQuery("");
     setContentFilter("expression");
     setReviewFilter("all");
     const params = new URLSearchParams(searchParams.toString());
-    params.set("family", normalized);
+    params.set("cluster", normalized);
     router.replace(`/chunks?${params.toString()}`);
     if (sourceExpressionText) {
-      toast.message(`${zh.filteredFamilyPrefix} ${sourceExpressionText} ${zh.filteredFamilySuffix}`);
+      toast.message(`${zh.filteredClusterPrefix} ${sourceExpressionText} ${zh.filteredClusterSuffix}`);
     }
   };
 
-  const clearFamilyFilter = () => {
-    setExpressionFamilyFilterId("");
+  const clearClusterFilter = () => {
+    setExpressionClusterFilterId("");
     const params = new URLSearchParams(searchParams.toString());
-    params.delete("family");
+    params.delete("cluster");
     const suffix = params.toString();
     router.replace(`/chunks${suffix ? `?${suffix}` : ""}`);
   };
@@ -1226,28 +1585,32 @@ export default function ChunksPage() {
     }
     setSavingSelectedSimilar(true);
     try {
-      const familyId =
-        similarSeedExpression.expressionFamilyId ??
-        `fam:manual:${normalizePhraseText(similarSeedExpression.text).replace(/\s+/g, "-").slice(0, 30) || similarSeedExpression.userPhraseId.slice(0, 8)}`;
-
-      await savePhraseFromApi({
+      const baseSaveResult = await savePhraseFromApi({
         text: similarSeedExpression.text,
-        expressionFamilyId: familyId,
+        expressionClusterId:
+          similarSeedExpression.expressionClusterId ??
+          `create-cluster:${similarSeedExpression.userPhraseId}`,
         sourceType: similarSeedExpression.sourceType,
         sourceSceneSlug: similarSeedExpression.sourceSceneSlug ?? undefined,
         sourceSentenceText: similarSeedExpression.sourceSentenceText ?? undefined,
         sourceChunkText: similarSeedExpression.text,
         translation: similarSeedExpression.translation ?? undefined,
       });
+      const clusterId = baseSaveResult.expressionClusterId;
+      if (!clusterId) {
+        throw new Error("未能为主表达创建同类表达组。");
+      }
 
       const batchResult = await savePhrasesBatchFromApi({
         items: selectedSimilarCandidates.map((candidate) => ({
           text: candidate.text,
-          expressionFamilyId: familyId,
+          expressionClusterId: clusterId,
           sourceType: "manual" as const,
           sourceNote: "similar-ai-mvp",
           sourceSentenceText: similarSeedExpression.sourceSentenceText ?? undefined,
           sourceChunkText: candidate.text,
+          relationSourceUserPhraseId: similarSeedExpression.userPhraseId,
+          relationType: "similar" as const,
         })),
       });
       const savedResponses = batchResult.items;
@@ -1263,12 +1626,12 @@ export default function ChunksPage() {
         }),
       }).finally(() => {
         window.setTimeout(() => {
-          void loadPhrases(query, reviewFilter, contentFilter, familyId, { preferCache: false });
+          void loadPhrases(query, reviewFilter, contentFilter, clusterId, { preferCache: false });
         }, 600);
       });
 
-      await loadPhrases(query, reviewFilter, contentFilter, familyId, { preferCache: false });
-      applyFamilyFilter(familyId, similarSeedExpression.text);
+      await loadPhrases(query, reviewFilter, contentFilter, clusterId, { preferCache: false });
+      applyClusterFilter(clusterId, similarSeedExpression.text);
       setSimilarSheetOpen(false);
       toast.success(zh.addSelectedSimilarSuccess);
     } catch (error) {
@@ -1304,7 +1667,7 @@ export default function ChunksPage() {
       toast.error(error instanceof Error ? error.message : zh.retryEnrichmentFailed);
     } finally {
       setRetryingEnrichmentIds((prev) => ({ ...prev, [item.userPhraseId]: false }));
-      void loadPhrases(query, reviewFilter, contentFilter, expressionFamilyFilterId, {
+      void loadPhrases(query, reviewFilter, contentFilter, expressionClusterFilterId, {
         preferCache: false,
       });
     }
@@ -1346,13 +1709,13 @@ export default function ChunksPage() {
     return zh.reviewActionSavedHint;
   };
 
-  const handlePracticeFamily = () => {
-    if (!activeFamily) return;
-    const selectedRows = filterRowsByFamilyExpressions(phrases, activeFamily, mapSourceExpression);
+  const handlePracticeCluster = () => {
+    if (!activeCluster) return;
+    const selectedRows = filterRowsByClusterExpressions(phrases, activeCluster, mapSourceExpression);
     if (selectedRows.length > 0) {
       startReviewSession({
         router,
-        source: "expression-map-family",
+        source: "expression-map-cluster",
         expressions: asReviewSessionExpressions(selectedRows),
       });
       return;
@@ -1366,14 +1729,27 @@ export default function ChunksPage() {
     }
   };
 
-  const handleAddFamilyToReview = async () => {
-    if (!activeFamily || !mapSourceExpression || addingFamily) return;
-    setAddingFamily(true);
+  const handleAddClusterToReview = async () => {
+    if (!activeCluster || !mapSourceExpression || addingCluster) return;
+    setAddingCluster(true);
     try {
-      const familyId = mapSourceExpression.expressionFamilyId ?? activeFamily.id;
+      const sourceSaveResult = mapSourceExpression.expressionClusterId
+        ? null
+        : await savePhraseFromApi({
+            text: mapSourceExpression.text,
+            expressionClusterId: `create-cluster:${activeCluster.id}`,
+            sourceSceneSlug: mapSourceExpression.sourceSceneSlug ?? undefined,
+            sourceSentenceText: mapSourceExpression.sourceSentenceText ?? undefined,
+            sourceChunkText: mapSourceExpression.text,
+            translation: mapSourceExpression.translation ?? undefined,
+          });
+      const clusterId = mapSourceExpression.expressionClusterId ?? sourceSaveResult?.expressionClusterId ?? null;
+      if (!clusterId) {
+        throw new Error("未能创建表达组。");
+      }
       const existingNormalized = new Set(phrases.map((row) => normalizePhraseText(row.text)));
       const newTexts = Array.from(
-        new Set(activeFamily.expressions.map((text) => text.trim()).filter(Boolean)),
+        new Set(activeCluster.expressions.map((text) => text.trim()).filter(Boolean)),
       )
         .slice(0, 20)
         .filter((text) => !existingNormalized.has(normalizePhraseText(text)));
@@ -1385,18 +1761,18 @@ export default function ChunksPage() {
             sourceSceneSlug: mapSourceExpression.sourceSceneSlug ?? undefined,
             sourceSentenceText: mapSourceExpression.sourceSentenceText ?? undefined,
             sourceChunkText: text,
-            expressionFamilyId: familyId,
+            expressionClusterId: clusterId,
           })),
         });
-        await loadPhrases(query, reviewFilter, contentFilter, expressionFamilyFilterId, {
+        await loadPhrases(query, reviewFilter, contentFilter, expressionClusterFilterId, {
           preferCache: false,
         });
       }
-      toast.success(zh.addFamilySuccess);
+      toast.success(zh.addClusterSuccess);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : zh.loadFailed);
     } finally {
-      setAddingFamily(false);
+      setAddingCluster(false);
     }
   };
 
@@ -1512,8 +1888,9 @@ export default function ChunksPage() {
           return;
         }
 
-        const familyId = `fam:manual:${normalizePhraseText(manualExpressionAssist.inputItem.text).replace(/\s+/g, "-").slice(0, 30) || "expression"}`;
         const savedForEnrich: Array<{ userPhraseId: string; text: string; differenceLabel?: string }> = [];
+        let baseUserPhraseId: string | null = null;
+        let familyId: string | null = null;
 
         if (selectedBase) {
           const baseResponse = await savePhraseFromApi({
@@ -1521,15 +1898,18 @@ export default function ChunksPage() {
             learningItemType: "expression",
             translation: manualExpressionAssist.inputItem.translation || undefined,
             usageNote: manualExpressionAssist.inputItem.usageNote || undefined,
+            expressionClusterId:
+              selectedSimilar.length > 0 ? `create-cluster:${baseKey}` : undefined,
             sourceType: "manual",
             sourceSentenceText: manualExpressionAssist.inputItem.examples[0]?.en || undefined,
             sourceChunkText: manualExpressionAssist.inputItem.text,
-            expressionFamilyId: familyId,
           });
+          familyId = baseResponse.expressionClusterId;
           await enrichSimilarExpressionFromApi({
             userPhraseId: baseResponse.userPhrase.id,
             baseExpression: manualExpressionAssist.inputItem.text,
           });
+          baseUserPhraseId = baseResponse.userPhrase.id;
           reviewSessionExpressions.push({
             userPhraseId: baseResponse.userPhrase.id,
             text: manualExpressionAssist.inputItem.text,
@@ -1537,29 +1917,63 @@ export default function ChunksPage() {
         }
 
         if (selectedSimilar.length > 0) {
-          const batchResult = await savePhrasesBatchFromApi({
-            items: selectedSimilar.map((candidate) => ({
-              text: candidate.text,
-              expressionFamilyId: familyId,
-              sourceType: "manual" as const,
+          let remainingSimilar = selectedSimilar;
+          if (!familyId) {
+            const seedCandidate = selectedSimilar[0];
+            const seedResponse = await savePhraseFromApi({
+              text: seedCandidate.text,
+              sourceType: "manual",
               sourceNote: "manual-similar-ai",
               sourceSentenceText: manualExpressionAssist.inputItem.examples[0]?.en || undefined,
-              sourceChunkText: candidate.text,
-            })),
+              sourceChunkText: seedCandidate.text,
+            });
+            familyId = seedResponse.expressionClusterId;
+            savedForEnrich.push({
+              userPhraseId: seedResponse.userPhrase.id,
+              text: seedCandidate.text,
+              differenceLabel: seedCandidate.differenceLabel,
+            });
+            reviewSessionExpressions.push({
+              userPhraseId: seedResponse.userPhrase.id,
+              text: seedCandidate.text,
+            });
+            remainingSimilar = selectedSimilar.slice(1);
+          }
+
+          if (!familyId) {
+            throw new Error("未能创建同类表达组。");
+          }
+
+          const batchItems = remainingSimilar.map((candidate) => ({
+            text: candidate.text,
+            expressionClusterId: familyId as string,
+            sourceType: "manual" as const,
+            sourceNote: "manual-similar-ai",
+            sourceSentenceText: manualExpressionAssist.inputItem.examples[0]?.en || undefined,
+            sourceChunkText: candidate.text,
+            relationSourceUserPhraseId: baseUserPhraseId ?? undefined,
+            relationType: baseUserPhraseId ? ("similar" as const) : undefined,
+          }));
+          if (batchItems.length === 0) {
+            // Seed candidate already handled above.
+          } else {
+          const batchResult = await savePhrasesBatchFromApi({
+            items: batchItems,
           });
           savedForEnrich.push(
             ...batchResult.items.map((response, index) => ({
               userPhraseId: response.userPhrase.id,
-              text: selectedSimilar[index].text,
-              differenceLabel: selectedSimilar[index].differenceLabel,
+              text: remainingSimilar[index].text,
+              differenceLabel: remainingSimilar[index].differenceLabel,
             })),
           );
           reviewSessionExpressions.push(
             ...batchResult.items.map((response, index) => ({
               userPhraseId: response.userPhrase.id,
-              text: selectedSimilar[index].text,
+              text: remainingSimilar[index].text,
             })),
           );
+          }
         }
 
         if (selectedContrast.length > 0) {
@@ -1570,6 +1984,8 @@ export default function ChunksPage() {
               sourceNote: "manual-contrast-ai",
               sourceSentenceText: manualExpressionAssist.inputItem.examples[0]?.en || undefined,
               sourceChunkText: candidate.text,
+              relationSourceUserPhraseId: baseUserPhraseId ?? undefined,
+              relationType: baseUserPhraseId ? ("contrast" as const) : undefined,
             })),
           });
           savedForEnrich.push(
@@ -1603,7 +2019,7 @@ export default function ChunksPage() {
       if (nextContentFilter !== contentFilter) {
         setContentFilter(nextContentFilter);
       }
-      await loadPhrases(query, reviewFilter, nextContentFilter, expressionFamilyFilterId, {
+      await loadPhrases(query, reviewFilter, nextContentFilter, expressionClusterFilterId, {
         preferCache: false,
       });
       if (mode === "save_and_review" && manualItemType === "expression") {
@@ -1750,18 +2166,18 @@ export default function ChunksPage() {
         </div>
       ) : null}
 
-      {expressionFamilyFilterId ? (
+      {expressionClusterFilterId ? (
         <div className="flex flex-wrap items-center gap-2 rounded-lg bg-[rgb(246,246,246)] px-3 py-2">
-          <p className="text-xs text-muted-foreground">{zh.viewingFamilyFilter}</p>
-          {familyFilterExpressionLabel ? (
+          <p className="text-xs text-muted-foreground">{zh.viewingClusterFilter}</p>
+          {clusterFilterExpressionLabel ? (
             <p className="text-xs text-foreground/90">
-              {zh.filteredFamilyPrefix}
-              <span className="font-medium"> {familyFilterExpressionLabel} </span>
-              {zh.filteredFamilySuffix}
+              {zh.filteredClusterPrefix}
+              <span className="font-medium"> {clusterFilterExpressionLabel} </span>
+              {zh.filteredClusterSuffix}
             </p>
           ) : null}
-          <Button type="button" size="sm" variant="ghost" className={appleButtonClassName} onClick={clearFamilyFilter}>
-            {zh.clearFamilyFilter}
+          <Button type="button" size="sm" variant="ghost" className={appleButtonClassName} onClick={clearClusterFilter}>
+            {zh.clearClusterFilter}
           </Button>
         </div>
       ) : null}
@@ -1772,132 +2188,195 @@ export default function ChunksPage() {
         <EmptyState title={zh.emptyTitle} description={zh.emptyDesc} />
       ) : contentFilter === "expression" && expressionViewMode === "focus" && focusExpression ? (
         <div className="space-y-4">
-          <Card className={`${APPLE_SURFACE} gap-0 overflow-hidden`}>
-            <CardHeader className="px-3 pb-3 pt-2.5">
-              <button
-                type="button"
-                className="flex w-full items-center justify-between gap-2 text-left"
-                onClick={() => setFocusMainExpanded((prev) => !prev)}
-                aria-expanded={focusMainExpanded}
-                aria-label={focusMainExpanded ? zh.focusCollapse : zh.focusExpand}
-              >
-                <p className="text-[11px] text-muted-foreground">{zh.focusModeTitle}</p>
-                <ChevronDown
-                  className={`size-4 shrink-0 text-muted-foreground transition-transform duration-200 ${
-                    focusMainExpanded ? "rotate-180" : "rotate-0"
+          {!focusRelationsBootstrapDone ? (
+            <p className="text-sm text-muted-foreground">{zh.detailLoading}</p>
+          ) : (
+            focusMainExpressionRows.map((row) => {
+            const isCurrentMain = row.userPhraseId === focusExpression.userPhraseId;
+            const isExpanded = expandedFocusMainId === row.userPhraseId;
+            const savedSimilarItems = row.expressionClusterId
+              ? (clusterMembersByClusterId.get(row.expressionClusterId) ?? [])
+                  .filter((member) => member.userPhraseId !== row.userPhraseId)
+                  .map((member) => ({
+                    key: `cluster:${member.userPhraseId}`,
+                    text: member.text,
+                    differenceLabel: undefined,
+                    kind: "library-similar" as const,
+                    savedItem: member,
+                  }))
+              : [];
+            const relationRows = savedRelationCache[row.userPhraseId]?.rows ?? [];
+            const persistedSimilarItems = relationRows
+              .filter((item) => item.relationType === "similar")
+              .map((item) => ({
+                key: `relation-similar:${item.item.userPhraseId}`,
+                text: item.item.text,
+                differenceLabel: undefined,
+                kind: "library-similar" as const,
+                savedItem: item.item,
+              }));
+            const persistedContrastItems = relationRows
+              .filter((item) => item.relationType === "contrast")
+              .map((item) => ({
+                key: `relation-contrast:${item.item.userPhraseId}`,
+                text: item.item.text,
+                differenceLabel: undefined,
+                kind: "contrast" as const,
+                savedItem: item.item,
+              }));
+            const similarItems = isCurrentMain
+              ? focusSimilarItems
+              : [...savedSimilarItems, ...persistedSimilarItems].filter(
+                  (item, index, array) =>
+                    array.findIndex(
+                      (candidate) =>
+                        normalizePhraseText(candidate.text) === normalizePhraseText(item.text),
+                    ) === index,
+                );
+            const contrastItems = isCurrentMain ? focusContrastItems : persistedContrastItems;
+            return (
+              <Card key={row.userPhraseId} className={`${APPLE_SURFACE} gap-0 overflow-hidden`}>
+                <CardHeader className="px-3 pb-3 pt-2.5">
+                  <button
+                    type="button"
+                    className="flex w-full items-center justify-between gap-2 text-left"
+                    onClick={() => {
+                      switchFocusMainExpression(row.userPhraseId);
+                      setExpandedFocusMainId((current) =>
+                        current === row.userPhraseId ? null : row.userPhraseId,
+                      );
+                    }}
+                    aria-expanded={isExpanded}
+                    aria-label={isExpanded ? zh.focusCollapse : zh.focusExpand}
+                  >
+                    <p className="text-[11px] text-muted-foreground">{zh.focusModeTitle}</p>
+                    <ChevronDown
+                      className={`size-4 shrink-0 text-muted-foreground transition-transform duration-200 ${
+                        isExpanded ? "rotate-180" : "rotate-0"
+                      }`}
+                    />
+                  </button>
+                  <button
+                    type="button"
+                    className="mt-0.5 min-w-0 text-left"
+                    onClick={() => {
+                      switchFocusMainExpression(row.userPhraseId);
+                      void openFocusDetail({
+                        text: row.text,
+                        kind: "current",
+                        chainMode: "reset",
+                      });
+                    }}
+                  >
+                    <p className="text-[15px] font-semibold leading-snug">{row.text}</p>
+                    <p className="mt-0.5 line-clamp-1 text-xs leading-5 text-muted-foreground">
+                      {row.translation ?? zh.noTranslation}
+                    </p>
+                  </button>
+                </CardHeader>
+                <div
+                  className={`overflow-hidden transition-all duration-200 ${
+                    isExpanded ? "max-h-[420px] opacity-100" : "max-h-0 opacity-0"
                   }`}
-                />
-              </button>
-              <button
-                type="button"
-                className="mt-0.5 min-w-0 text-left"
-                onClick={() =>
-                  void openFocusDetail({
-                    text: focusExpression.text,
-                    kind: "current",
-                    chainMode: "reset",
-                  })
-                }
-              >
-                <p className="text-[15px] font-semibold leading-snug">{focusExpression.text}</p>
-                <p className="mt-0.5 line-clamp-1 text-xs leading-5 text-muted-foreground">
-                  {focusExpression.translation ?? zh.noTranslation}
-                </p>
-              </button>
-            </CardHeader>
-            <div
-              className={`overflow-hidden transition-all duration-200 ${
-                focusMainExpanded ? "max-h-[420px] opacity-100" : "max-h-0 opacity-0"
-              }`}
-            >
-              <CardContent className="px-3 pb-3 pt-0">
-                <Tabs
-                  value={focusRelationTab}
-                  onValueChange={(value) => setFocusRelationTab(value as "similar" | "contrast")}
-                  className="min-h-0 min-w-0"
                 >
-                  <TabsList className="w-full min-w-0 justify-start overflow-x-auto">
-                    <TabsTrigger value="similar">{zh.focusTabSimilar}</TabsTrigger>
-                    <TabsTrigger value="contrast">{zh.focusTabContrast}</TabsTrigger>
-                  </TabsList>
+                  <CardContent className="px-3 pb-3 pt-0">
+                    <Tabs
+                      value={focusRelationTab}
+                      onValueChange={(value) => {
+                        switchFocusMainExpression(row.userPhraseId);
+                        setFocusRelationTab(value as "similar" | "contrast");
+                      }}
+                      className="min-h-0 min-w-0"
+                    >
+                      <TabsList className="w-full min-w-0 justify-start overflow-x-auto">
+                        <TabsTrigger value="similar">{zh.focusTabSimilar}</TabsTrigger>
+                        <TabsTrigger value="contrast">{zh.focusTabContrast}</TabsTrigger>
+                      </TabsList>
 
-                  <TabsContent value="similar" className="mt-3">
-                    {focusSimilarItems.length > 0 ? (
-                      <div className="flex flex-wrap gap-2">
-                        {focusSimilarItems.map((item) => {
-                          const isActive =
-                            normalizePhraseText(item.text) === normalizePhraseText(focusRelationActiveText);
-                          return (
-                            <button
-                              key={item.key}
-                              type="button"
-                              className={`rounded-full border px-3 py-2 text-left text-sm font-medium transition-colors ${
-                                isActive
-                                  ? "border-[rgb(32,44,60)] bg-[rgb(32,44,60)] text-white"
-                                  : "border-[rgb(230,230,230)] bg-[rgb(246,246,246)] text-foreground hover:bg-[rgb(240,240,240)]"
-                              }`}
-                              onClick={() => {
-                                setFocusRelationActiveText(item.text);
-                                void openFocusDetail({
-                                  text: item.text,
-                                  differenceLabel: item.differenceLabel,
-                                  kind: item.kind,
-                                  chainMode: "reset",
-                                });
-                              }}
-                            >
-                              {item.text}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <div className="rounded-xl bg-[rgb(246,246,246)] px-4 py-6 text-sm text-muted-foreground">
-                        {zh.focusRelatedEmpty}
-                      </div>
-                    )}
-                  </TabsContent>
+                      <TabsContent value="similar" className="mt-3">
+                        {similarItems.length > 0 ? (
+                          <div className="flex flex-wrap gap-2">
+                            {similarItems.map((item) => {
+                              const isActive =
+                                isCurrentMain &&
+                                normalizePhraseText(item.text) === normalizePhraseText(focusRelationActiveText);
+                              return (
+                                <button
+                                  key={item.key}
+                                  type="button"
+                                  className={`rounded-full border px-3 py-2 text-left text-sm font-medium transition-colors ${
+                                    isActive
+                                      ? "border-[rgb(32,44,60)] bg-[rgb(32,44,60)] text-white"
+                                      : "border-[rgb(230,230,230)] bg-[rgb(246,246,246)] text-foreground hover:bg-[rgb(240,240,240)]"
+                                  }`}
+                                  onClick={() => {
+                                    switchFocusMainExpression(row.userPhraseId);
+                                    setFocusRelationActiveText(item.text);
+                                    void openFocusDetail({
+                                      text: item.text,
+                                      differenceLabel: item.differenceLabel,
+                                      kind: item.kind,
+                                      chainMode: "reset",
+                                    });
+                                  }}
+                                >
+                                  {item.text}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div className="rounded-xl bg-[rgb(246,246,246)] px-4 py-6 text-sm text-muted-foreground">
+                            {zh.focusRelatedEmpty}
+                          </div>
+                        )}
+                      </TabsContent>
 
-                  <TabsContent value="contrast" className="mt-3">
-                    {focusContrastItems.length > 0 ? (
-                      <div className="flex flex-wrap gap-2">
-                        {focusContrastItems.map((item) => {
-                          const isActive =
-                            normalizePhraseText(item.text) === normalizePhraseText(focusRelationActiveText);
-                          return (
-                            <button
-                              key={item.key}
-                              type="button"
-                              className={`rounded-full border px-3 py-2 text-left text-sm font-medium transition-colors ${
-                                isActive
-                                  ? "border-[rgb(32,44,60)] bg-[rgb(32,44,60)] text-white"
-                                  : "border-[rgb(230,230,230)] bg-[rgb(246,246,246)] text-foreground hover:bg-[rgb(240,240,240)]"
-                              }`}
-                              onClick={() => {
-                                setFocusRelationActiveText(item.text);
-                                void openFocusDetail({
-                                  text: item.text,
-                                  differenceLabel: item.differenceLabel,
-                                  kind: item.kind,
-                                  chainMode: "reset",
-                                });
-                              }}
-                            >
-                              {item.text}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <div className="rounded-xl bg-[rgb(246,246,246)] px-4 py-6 text-sm text-muted-foreground">
-                        {zh.noContrastExpressions}
-                      </div>
-                    )}
-                  </TabsContent>
-                </Tabs>
-              </CardContent>
-            </div>
-          </Card>
+                      <TabsContent value="contrast" className="mt-3">
+                        {contrastItems.length > 0 ? (
+                          <div className="flex flex-wrap gap-2">
+                            {contrastItems.map((item) => {
+                              const isActive =
+                                isCurrentMain &&
+                                normalizePhraseText(item.text) === normalizePhraseText(focusRelationActiveText);
+                              return (
+                                <button
+                                  key={item.key}
+                                  type="button"
+                                  className={`rounded-full border px-3 py-2 text-left text-sm font-medium transition-colors ${
+                                    isActive
+                                      ? "border-[rgb(32,44,60)] bg-[rgb(32,44,60)] text-white"
+                                      : "border-[rgb(230,230,230)] bg-[rgb(246,246,246)] text-foreground hover:bg-[rgb(240,240,240)]"
+                                  }`}
+                                  onClick={() => {
+                                    switchFocusMainExpression(row.userPhraseId);
+                                    setFocusRelationActiveText(item.text);
+                                    void openFocusDetail({
+                                      text: item.text,
+                                      differenceLabel: item.differenceLabel,
+                                      kind: item.kind,
+                                      chainMode: "reset",
+                                    });
+                                  }}
+                                >
+                                  {item.text}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div className="rounded-xl bg-[rgb(246,246,246)] px-4 py-6 text-sm text-muted-foreground">
+                            {zh.noContrastExpressions}
+                          </div>
+                        )}
+                      </TabsContent>
+                    </Tabs>
+                  </CardContent>
+                </div>
+              </Card>
+            );
+            })
+          )}
 
         </div>
       ) : (
@@ -1906,8 +2385,8 @@ export default function ChunksPage() {
             const sentenceExpressions =
               item.learningItemType === "sentence" ? extractExpressionsFromSentenceItem(item) : [];
             const familyMembers =
-              item.learningItemType === "expression" && item.expressionFamilyId
-                ? (familyMembersByFamilyId.get(item.expressionFamilyId) ?? []).filter(
+              item.learningItemType === "expression" && item.expressionClusterId
+                ? (clusterMembersByClusterId.get(item.expressionClusterId) ?? []).filter(
                     (row) => row.userPhraseId !== item.userPhraseId,
                   )
                 : [];
@@ -2130,8 +2609,8 @@ export default function ChunksPage() {
                                 variant="ghost"
                                 className="h-7 px-0 text-xs"
                                 onClick={() =>
-                                  item.expressionFamilyId
-                                    ? applyFamilyFilter(item.expressionFamilyId, item.text)
+                                  item.expressionClusterId
+                                    ? applyClusterFilter(item.expressionClusterId, item.text)
                                     : void openGenerateSimilarSheet(item)
                                 }
                               >
@@ -2227,10 +2706,10 @@ export default function ChunksPage() {
                         size="sm"
                         variant="ghost"
                         className={appleButtonClassName}
-                        disabled={!item.expressionFamilyId}
+                        disabled={!item.expressionClusterId}
                         onClick={() => void openExpressionMap(item)}
                       >
-                        {!item.expressionFamilyId
+                        {!item.expressionClusterId
                           ? zh.mapUnavailable
                           : mapOpeningForId === item.userPhraseId
                             ? zh.mapPending
@@ -2648,12 +3127,6 @@ export default function ChunksPage() {
                   isCurrentFocusMainDetail
                     ? focusAssistData?.inputItem ?? focusDetail.assistItem
                     : focusDetail.assistItem;
-                const canShowSavedSimilar = !!focusDetail.savedItem?.expressionFamilyId;
-                const savedSimilarRows = canShowSavedSimilar
-                  ? (familyMembersByFamilyId.get(focusDetail.savedItem!.expressionFamilyId!) ?? []).filter(
-                      (row) => row.userPhraseId !== focusDetail.savedItem?.userPhraseId,
-                    )
-                  : [];
                 const hasLoadedFocusAssist =
                   isCurrentFocusMainDetail &&
                   focusAssistData !== null;
@@ -2665,6 +3138,38 @@ export default function ChunksPage() {
                   isCurrentFocusMainDetail
                     ? focusAssistData?.contrastExpressions ?? []
                     : [];
+                const persistedRelations = focusDetail.savedItem
+                  ? savedRelationCache[focusDetail.savedItem.userPhraseId]?.rows ?? []
+                  : [];
+                const savedRelatedRows = (() => {
+                  const items: SavedRelatedExpressionItem[] = [];
+                  const seen = new Set<string>();
+
+                  const pushItem = (row: UserPhraseItemResponse, relationType: "similar" | "contrast") => {
+                    const normalized = normalizePhraseText(row.text);
+                    if (!normalized || seen.has(normalized)) return;
+                    seen.add(normalized);
+                    items.push({ row, relationType });
+                  };
+
+                  for (const relation of persistedRelations) {
+                    pushItem(relation.item, relation.relationType);
+                  }
+
+                  if (focusDetail.savedItem?.expressionClusterId) {
+                    for (const row of clusterMembersByClusterId.get(focusDetail.savedItem.expressionClusterId) ?? []) {
+                      if (row.userPhraseId === focusDetail.savedItem.userPhraseId) continue;
+                      if (isContrastDerivedExpression(row.sourceNote)) continue;
+                      pushItem(row, "similar");
+                    }
+                  }
+
+                  return items;
+                })();
+                const canShowSavedRelated = savedRelatedRows.length > 0;
+                const isSavedRelatedLoading =
+                  Boolean(focusDetail.savedItem?.userPhraseId) &&
+                  savedRelationLoadingKey === focusDetail.savedItem?.userPhraseId;
                 const detailSpeakText = focusDetail.text.trim();
                 const isDetailSpeaking =
                   Boolean(detailSpeakText) &&
@@ -2712,7 +3217,7 @@ export default function ChunksPage() {
                 >
                   <TabsList className="mb-3 w-full min-w-0 shrink-0 justify-start overflow-x-auto">
                     <TabsTrigger value="info">{zh.detailTabInfo}</TabsTrigger>
-                    {canShowSavedSimilar ? (
+                    {canShowSavedRelated ? (
                       <TabsTrigger value="saved-similar">{zh.detailTabSavedSimilar}</TabsTrigger>
                     ) : null}
                     {focusDetail.kind === "current" && hasLoadedFocusAssist ? (
@@ -2775,14 +3280,14 @@ export default function ChunksPage() {
                     </div>
                   </TabsContent>
 
-                    {canShowSavedSimilar ? (
+                    {canShowSavedRelated ? (
                       <TabsContent
                         value="saved-similar"
                         className="mt-0 min-h-0 w-full flex-1 overflow-y-auto overflow-x-hidden overscroll-contain pr-1"
                       >
                       <div className="space-y-2 pb-6">
-                      {savedSimilarRows.length > 0 ? (
-                        savedSimilarRows.slice(0, 8).map((row) => (
+                      {savedRelatedRows.length > 0 ? (
+                        savedRelatedRows.slice(0, 8).map(({ row, relationType }) => (
                           <button
                             key={row.userPhraseId}
                             type="button"
@@ -2790,17 +3295,20 @@ export default function ChunksPage() {
                             onClick={() =>
                               void openFocusDetail({
                                 text: row.text,
-                                kind: "library-similar",
+                                kind: relationType === "contrast" ? "contrast" : "library-similar",
                                 chainMode: "append",
                               })
                             }
                           >
                             <p className="text-sm font-medium">{row.text}</p>
                             <p className="mt-1 text-xs text-muted-foreground">
-                              {buildDifferenceNote(focusDetail.text, row.text)}
+                              {relationType === "contrast" ? "(对照)" : "(同类)"}{" "}
+                              {row.translation ?? buildDifferenceNote(focusDetail.text, row.text)}
                             </p>
                           </button>
                         ))
+                      ) : isSavedRelatedLoading ? (
+                        <p className="text-sm text-muted-foreground">{zh.detailLoading}</p>
                       ) : (
                         <p className="text-sm text-muted-foreground">{zh.focusEmptySimilar}</p>
                       )}
@@ -2955,23 +3463,76 @@ export default function ChunksPage() {
           </div>
 
           <SheetFooter className="shrink-0 border-t border-[rgb(236,238,240)] px-4 pb-safe pt-3">
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <div
+              className={`grid grid-cols-1 gap-2 ${
+                focusDetail?.savedItem
+                  ? focusExpression?.expressionClusterId &&
+                    focusDetail.savedItem.expressionClusterId &&
+                    focusExpression.expressionClusterId !== focusDetail.savedItem.expressionClusterId
+                    ? "sm:grid-cols-4"
+                    : "sm:grid-cols-3"
+                  : "sm:grid-cols-2"
+              }`}
+            >
               <Button
                 type="button"
                 variant="ghost"
                 className={appleButtonClassName}
                 disabled={!focusDetail?.text}
-                onClick={() => {
+                onClick={async () => {
                   if (!focusDetail?.text) return;
                   const saved = phraseByNormalized.get(normalizePhraseText(focusDetail.text));
                   if (saved) {
-                    setFocusExpressionId(saved.userPhraseId);
+                    if (saved.expressionClusterId) {
+                      try {
+                        await setExpressionClusterMainFromApi({
+                          clusterId: saved.expressionClusterId,
+                          mainUserPhraseId: saved.userPhraseId,
+                        });
+                      } catch (error) {
+                        toast.error(error instanceof Error ? error.message : zh.loadFailed);
+                        return;
+                      }
+                    }
+                    assignFocusMainExpression(saved);
                   }
                   setFocusDetailOpen(false);
                 }}
               >
                 {zh.detailOpenAsMain}
               </Button>
+              {focusDetail?.savedItem &&
+              focusExpression?.expressionClusterId &&
+              focusDetail.savedItem.expressionClusterId &&
+              focusExpression.expressionClusterId !== focusDetail.savedItem.expressionClusterId ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className={appleButtonClassName}
+                  disabled={mergingCluster}
+                  onClick={() => {
+                    void mergeFocusDetailClusterIntoCurrent();
+                  }}
+                >
+                  {mergingCluster ? `${zh.mergeCluster}...` : zh.mergeCluster}
+                </Button>
+              ) : null}
+              {focusDetail?.savedItem?.expressionClusterId &&
+              focusDetail.savedItem.userPhraseId !== focusExpression?.userPhraseId ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className={appleButtonClassName}
+                  disabled={detachingClusterMember}
+                  onClick={() => {
+                    void detachFocusDetailFromCluster();
+                  }}
+                >
+                  {detachingClusterMember
+                    ? `${zh.detachClusterMember}...`
+                    : zh.detachClusterMember}
+                </Button>
+              ) : null}
               {focusDetail?.savedItem ? (
                 <Button
                   type="button"
@@ -3025,52 +3586,52 @@ export default function ChunksPage() {
           <div className="space-y-4 px-4 pb-2">
             {mapLoading ? <p className="text-sm text-muted-foreground">{zh.mapLoading}</p> : null}
             {!mapLoading && mapError ? <p className="text-sm text-destructive">{mapError}</p> : null}
-            {!mapLoading && !mapError && mapData?.families.length === 0 ? (
+            {!mapLoading && !mapError && mapData?.clusters.length === 0 ? (
               <p className="text-sm text-muted-foreground">{zh.mapEmpty}</p>
             ) : null}
 
-            {!mapLoading && !mapError && mapData?.families.length ? (
+            {!mapLoading && !mapError && mapData?.clusters.length ? (
               <div className="space-y-4">
                 <div className="flex flex-wrap gap-2">
-                  {mapData.families.map((family) => (
+                  {mapData.clusters.map((cluster) => (
                     <Button
-                      key={family.id}
+                      key={cluster.id}
                       type="button"
                       size="sm"
                       variant="ghost"
                       className={`${appleButtonClassName} ${
-                        activeFamilyId === family.id
+                        activeClusterId === cluster.id
                           ? "bg-[rgb(32,44,60)] text-white hover:bg-[rgb(25,36,50)]"
                           : ""
                       }`}
-                      onClick={() => setActiveFamilyId(family.id)}
+                      onClick={() => setActiveClusterId(cluster.id)}
                     >
-                      {family.anchor}
+                      {cluster.anchor}
                     </Button>
                   ))}
                 </div>
 
-                {activeFamily ? (
+                {activeCluster ? (
                   <div className="space-y-3 rounded-xl bg-[rgb(246,246,246)] p-3">
                     <div className="space-y-1">
                       <p className="text-xs text-muted-foreground">{zh.centerExpression}</p>
-                      <p className="text-sm font-medium">{centerExpressionText || activeFamily.anchor}</p>
+                      <p className="text-sm font-medium">{centerExpressionText || activeCluster.anchor}</p>
                       <p className="text-xs text-muted-foreground">
-                        {zh.familyMeaning}\uff1a{activeFamily.meaning}
+                        {zh.clusterMeaning}\uff1a{activeCluster.meaning}
                       </p>
                     </div>
 
                     <p className="text-xs text-muted-foreground">{zh.relatedExpressions}</p>
                     <div className="space-y-2">
-                      {displayedFamilyExpressions.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">{zh.familyEmpty}</p>
+                      {displayedClusterExpressions.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">{zh.clusterEmpty}</p>
                       ) : (
-                        displayedFamilyExpressions.map((text) => {
+                        displayedClusterExpressions.map((text) => {
                           const normalized = normalizePhraseText(text);
                           const status = expressionStatusByNormalized.get(normalized);
                           const statusText = status ? reviewStatusLabel[status] : zh.statusUnknown;
                           const note = buildDifferenceNote(
-                            centerExpressionText || activeFamily.anchor,
+                            centerExpressionText || activeCluster.anchor,
                             text,
                           );
                           return (
@@ -3085,9 +3646,9 @@ export default function ChunksPage() {
                         })
                       )}
                     </div>
-                    {activeFamily.expressions.length > displayedFamilyExpressions.length ? (
+                    {activeCluster.expressions.length > displayedClusterExpressions.length ? (
                       <p className="text-xs text-muted-foreground">
-                        {zh.mapLimitedPrefix} {displayedFamilyExpressions.length} {zh.mapLimitedSuffix}
+                        {zh.mapLimitedPrefix} {displayedClusterExpressions.length} {zh.mapLimitedSuffix}
                       </p>
                     ) : null}
                   </div>
@@ -3101,11 +3662,11 @@ export default function ChunksPage() {
               <Button type="button" variant="ghost" className={appleButtonClassName} onClick={() => setMapOpen(false)}>
                 {zh.close}
               </Button>
-              <Button type="button" variant="ghost" className={appleButtonClassName} onClick={handlePracticeFamily}>
-                {zh.practiceFamily}
+              <Button type="button" variant="ghost" className={appleButtonClassName} onClick={handlePracticeCluster}>
+                {zh.practiceCluster}
               </Button>
-              <Button type="button" variant="ghost" className={appleButtonClassName} disabled={addingFamily} onClick={() => void handleAddFamilyToReview()}>
-                {addingFamily ? `${zh.addFamily}...` : zh.addFamily}
+              <Button type="button" variant="ghost" className={appleButtonClassName} disabled={addingCluster} onClick={() => void handleAddClusterToReview()}>
+                {addingCluster ? `${zh.addCluster}...` : zh.addCluster}
               </Button>
             </div>
           </SheetFooter>

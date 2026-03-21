@@ -77,7 +77,7 @@ const toDueItemFromSavedPhrase = (
     usageNote: row.usageNote,
     sourceSceneSlug: row.sourceSceneSlug,
     sourceSentenceText: row.sourceSentenceText,
-    expressionFamilyId: row.expressionFamilyId,
+    expressionClusterId: row.expressionClusterId,
     reviewStatus: row.reviewStatus,
     reviewCount: row.reviewCount,
     correctCount: row.correctCount,
@@ -231,7 +231,7 @@ export default function ReviewPage() {
     if (!isSessionReview) return null;
     if (sessionSource === "expression-library-manual-add") return zh.fromExpressionLibrary;
     if (sessionSource === "expression-library-card") return zh.fromExpressionLibrary;
-    if (sessionSource === "expression-map-family" || sessionSource === "expression-map-single") {
+    if (sessionSource === "expression-map-cluster" || sessionSource === "expression-map-single") {
       return zh.fromExpressionMap;
     }
     if (sessionSource === "today-task") return zh.fromTodayTask;

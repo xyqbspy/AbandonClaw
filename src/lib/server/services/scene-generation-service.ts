@@ -100,6 +100,11 @@ const toShortDifferenceLabel = (value: unknown) => {
   return trimmed.slice(0, 36);
 };
 
+const isContrastDerivedExpression = (sourceNote: string | null | undefined) => {
+  const normalized = (sourceNote ?? "").trim().toLowerCase();
+  return normalized === "manual-contrast-ai" || normalized === "focus-contrast-ai";
+};
+
 const sceneTextContainsExpression = (sceneText: string, expressionText: string) => {
   const normalizedScene = normalizePhraseText(sceneText);
   const normalizedExpression = normalizePhraseText(expressionText);
@@ -227,10 +232,11 @@ async function getRelatedChunkVariantsForSceneGeneration(
   const admin = createSupabaseAdminClient();
   const { data, error } = await admin
     .from("user_phrases")
-    .select("id, expression_family_id, source_chunk_text, ai_semantic_focus, phrase:phrases(display_text, normalized_text)")
+    .select(
+      "id, source_chunk_text, source_note, learning_item_type, ai_semantic_focus, phrase:phrases(display_text, normalized_text)",
+    )
     .eq("user_id", userId)
     .eq("status", "saved")
-    .not("expression_family_id", "is", null)
     .order("last_seen_at", { ascending: false })
     .limit(320);
   if (error) {
@@ -244,46 +250,67 @@ async function getRelatedChunkVariantsForSceneGeneration(
   type PhraseShape = { display_text: string | null; normalized_text: string | null };
   type FamilyRow = {
     id: string;
-    expression_family_id: string | null;
     source_chunk_text: string | null;
+    source_note: string | null;
+    learning_item_type: "expression" | "sentence" | null;
     ai_semantic_focus: string | null;
     phrase: PhraseShape | PhraseShape[] | null;
   };
-  const rows = (data ?? []) as FamilyRow[];
+  const rows = ((data ?? []) as FamilyRow[]).filter(
+    (row) => row.learning_item_type !== "sentence" && !isContrastDerivedExpression(row.source_note),
+  );
   if (rows.length === 0) return [];
 
   const toPhrase = (value: FamilyRow["phrase"]): PhraseShape | null =>
     Array.isArray(value) ? (value[0] ?? null) : value;
 
-  const candidateFamilyIds = new Set<string>();
-  const knownChunksByFamilyId = new Map<string, string[]>();
-  for (const row of rows) {
-    const familyId = row.expression_family_id?.trim();
-    if (!familyId) continue;
+  const rowById = new Map(rows.map((row) => [row.id, row]));
+  const knownSourceRows = rows.filter((row) => {
     const phrase = toPhrase(row.phrase);
     const normalized = normalizePhraseText(
       phrase?.normalized_text ?? phrase?.display_text ?? row.source_chunk_text ?? "",
     );
-    if (!normalized) continue;
-    if (knownNormalized.includes(normalized)) {
-      candidateFamilyIds.add(familyId);
-      const knownInFamily = knownChunksByFamilyId.get(familyId) ?? [];
-      const knownText = (phrase?.display_text ?? row.source_chunk_text ?? "").trim();
-      if (knownText && !knownInFamily.includes(knownText)) {
-        knownInFamily.push(knownText);
-      }
-      knownChunksByFamilyId.set(familyId, knownInFamily);
-    }
+    return Boolean(normalized) && knownNormalized.includes(normalized);
+  });
+  if (knownSourceRows.length === 0) return [];
+
+  const { data: relationRows, error: relationError } = await admin
+    .from("user_phrase_relations")
+    .select("source_user_phrase_id,target_user_phrase_id")
+    .eq("user_id", userId)
+    .eq("relation_type", "similar")
+    .in("source_user_phrase_id", knownSourceRows.map((row) => row.id))
+    .limit(320);
+  if (relationError) {
+    console.warn("[scene.generate] related similar relations lookup failed", {
+      userId,
+      message: relationError.message,
+    });
+    return [];
   }
-  if (candidateFamilyIds.size === 0) return [];
 
   const knownSet = new Set(knownNormalized);
+  const knownChunksByTargetId = new Map<string, string>();
+  for (const relation of (relationRows ?? []) as Array<{
+    source_user_phrase_id: string;
+    target_user_phrase_id: string;
+  }>) {
+    const sourceRow = rowById.get(relation.source_user_phrase_id);
+    const targetRow = rowById.get(relation.target_user_phrase_id);
+    if (!sourceRow || !targetRow) continue;
+    const sourcePhrase = toPhrase(sourceRow.phrase);
+    const knownText = (sourcePhrase?.display_text ?? sourceRow.source_chunk_text ?? "").trim();
+    if (!knownText || knownChunksByTargetId.has(targetRow.id)) continue;
+    knownChunksByTargetId.set(targetRow.id, knownText);
+  }
+  if (knownChunksByTargetId.size === 0) return [];
+
   const variants: RelatedChunkVariant[] = [];
   const used = new Set<string>();
   for (const row of rows) {
     if (variants.length >= MAX_RELATED_VARIANTS) break;
-    const familyId = row.expression_family_id?.trim();
-    if (!familyId || !candidateFamilyIds.has(familyId)) continue;
+    const knownChunkText = knownChunksByTargetId.get(row.id) ?? null;
+    if (!knownChunkText) continue;
 
     const phrase = toPhrase(row.phrase);
     const text = (phrase?.display_text ?? row.source_chunk_text ?? "").trim();
@@ -294,7 +321,7 @@ async function getRelatedChunkVariantsForSceneGeneration(
     variants.push({
       text,
       differenceLabel: toShortDifferenceLabel(row.ai_semantic_focus),
-      knownChunkText: (knownChunksByFamilyId.get(familyId)?.[0] ?? null),
+      knownChunkText,
     });
     used.add(normalized);
   }

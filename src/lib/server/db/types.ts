@@ -104,6 +104,7 @@ export interface PhraseRow {
 export type UserPhraseStatus = "saved" | "archived";
 export type UserPhraseReviewStatus = "saved" | "reviewing" | "mastered" | "archived";
 export type UserPhraseAiEnrichmentStatus = "pending" | "done" | "failed";
+export type UserPhraseRelationType = "similar" | "contrast";
 
 export interface UserPhraseRow {
   id: string;
@@ -124,7 +125,6 @@ export interface UserPhraseRow {
   source_sentence_index: number | null;
   source_sentence_text: string | null;
   source_chunk_text: string | null;
-  expression_family_id: string | null;
   ai_enrichment_status: UserPhraseAiEnrichmentStatus | null;
   ai_semantic_focus: string | null;
   ai_typical_scenario: string | null;
@@ -133,6 +133,37 @@ export interface UserPhraseRow {
   learning_item_type: "expression" | "sentence" | null;
   saved_at: string;
   last_seen_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UserPhraseRelationRow {
+  id: string;
+  user_id: string;
+  source_user_phrase_id: string;
+  target_user_phrase_id: string;
+  relation_type: UserPhraseRelationType;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UserExpressionClusterRow {
+  id: string;
+  user_id: string;
+  main_user_phrase_id: string | null;
+  title: string | null;
+  semantic_focus: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type UserExpressionClusterMemberRole = "main" | "variant";
+
+export interface UserExpressionClusterMemberRow {
+  id: string;
+  cluster_id: string;
+  user_phrase_id: string;
+  role: UserExpressionClusterMemberRole;
   created_at: string;
   updated_at: string;
 }

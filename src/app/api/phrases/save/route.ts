@@ -22,7 +22,9 @@ interface SavePhrasePayload {
   sourceSentenceIndex?: unknown;
   sourceSentenceText?: unknown;
   sourceChunkText?: unknown;
-  expressionFamilyId?: unknown;
+  expressionClusterId?: unknown;
+  relationSourceUserPhraseId?: unknown;
+  relationType?: unknown;
 }
 
 export async function POST(request: Request) {
@@ -83,11 +85,22 @@ export async function POST(request: Request) {
         "sourceChunkText",
         500,
       ),
-      expressionFamilyId: parseOptionalTrimmedString(
-        payload.expressionFamilyId,
-        "expressionFamilyId",
+      expressionClusterId: parseOptionalTrimmedString(
+        payload.expressionClusterId,
+        "expressionClusterId",
         120,
       ),
+      relationSourceUserPhraseId: parseOptionalTrimmedString(
+        payload.relationSourceUserPhraseId,
+        "relationSourceUserPhraseId",
+        120,
+      ),
+      relationType:
+        parseOptionalTrimmedString(payload.relationType, "relationType", 20) === "contrast"
+          ? "contrast"
+          : parseOptionalTrimmedString(payload.relationType, "relationType", 20) === "similar"
+            ? "similar"
+            : undefined,
     });
 
     const favoriteChunkText =

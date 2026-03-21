@@ -8,7 +8,7 @@ const isExpressionMapResponse = (
 ): value is ExpressionMapResponse => {
   if (!value || typeof value !== "object") return false;
   const response = value as ExpressionMapResponse;
-  return response.version === "v1" && Array.isArray(response.families);
+  return response.version === "v1" && Array.isArray(response.clusters);
 };
 
 export async function generateExpressionMapFromApi(

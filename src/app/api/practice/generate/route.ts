@@ -41,7 +41,7 @@ const normalizeExpression = (value: string) =>
     .replace(/[.,!?;:()[\]{}"']/g, "")
     .replace(/\s+/g, " ");
 
-const EXPRESSION_FAMILY_HINTS = [
+const EXPRESSION_CLUSTER_HINTS = [
   {
     anchor: "running on empty",
     meaning: "表示精力见底、非常疲惫",
@@ -59,7 +59,7 @@ const EXPRESSION_FAMILY_HINTS = [
   },
 ] as const;
 
-const buildExpressionFamiliesForPrompt = (
+const buildExpressionClustersForPrompt = (
   scene: PracticeGenerateRequest["scene"],
 ): string => {
   const sceneExpressions = new Set<string>();
@@ -74,7 +74,7 @@ const buildExpressionFamiliesForPrompt = (
     }
   }
 
-  const families = EXPRESSION_FAMILY_HINTS.map((hint) => {
+  const clusters = EXPRESSION_CLUSTER_HINTS.map((hint) => {
     const presentInScene = hint.expressions.filter((item) =>
       sceneExpressions.has(normalizeExpression(item)),
     );
@@ -84,9 +84,9 @@ const buildExpressionFamiliesForPrompt = (
       expressions: hint.expressions,
       presentInScene,
     };
-  }).filter((family) => family.presentInScene.length > 0);
+  }).filter((cluster) => cluster.presentInScene.length > 0);
 
-  return JSON.stringify(families, null, 2);
+  return JSON.stringify(clusters, null, 2);
 };
 
 const parseWithDiagnostics = (rawText: string) => {
@@ -235,7 +235,7 @@ export async function POST(request: Request) {
       systemPrompt: PRACTICE_GENERATE_SYSTEM_PROMPT,
       userPrompt: buildPracticeGenerateUserPrompt({
         sceneJson: JSON.stringify(scene),
-        expressionFamilies: buildExpressionFamiliesForPrompt(scene),
+        expressionFamilies: buildExpressionClustersForPrompt(scene),
         exerciseCount,
       }),
       temperature: 0.3,

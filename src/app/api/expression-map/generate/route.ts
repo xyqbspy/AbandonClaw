@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
+import { requireCurrentProfile } from "@/lib/server/auth";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import {
-  ExpressionFamily,
+  ExpressionCluster,
   ExpressionMapGenerateRequest,
   ExpressionMapResponse,
   ExpressionNode,
@@ -16,7 +18,7 @@ const normalizeExpression = (value: string) =>
     .replace(/[.,!?;:()[\]{}"']/g, "")
     .replace(/\s+/g, " ");
 
-const FAMILY_HINTS: Array<{
+const CLUSTER_HINTS: Array<{
   key: string;
   meaning: string;
   members: string[];
@@ -38,8 +40,8 @@ const FAMILY_HINTS: Array<{
   },
 ];
 
-const familyKeyByExpression = (normalizedExpression: string) => {
-  for (const hint of FAMILY_HINTS) {
+const clusterKeyByExpression = (normalizedExpression: string) => {
+  for (const hint of CLUSTER_HINTS) {
     if (hint.members.some((item) => normalizeExpression(item) === normalizedExpression)) {
       return hint.key;
     }
@@ -47,8 +49,16 @@ const familyKeyByExpression = (normalizedExpression: string) => {
   return normalizedExpression;
 };
 
-const familyMeaningByKey = (key: string) =>
-  FAMILY_HINTS.find((hint) => hint.key === key)?.meaning ?? "相关表达变体";
+const clusterMeaningByKey = (key: string) =>
+  CLUSTER_HINTS.find((hint) => hint.key === key)?.meaning ?? "相关表达变体";
+
+const normalizePhraseText = (value: string) =>
+  value
+    .trim()
+    .toLowerCase()
+    .replace(/[’‘]/g, "'")
+    .replace(/[“”]/g, '"')
+    .replace(/\s+/g, " ");
 
 const parsePayload = (
   value: unknown,
@@ -77,7 +87,7 @@ const parsePayload = (
   return { ok: true, value: value as unknown as ExpressionMapGenerateRequest };
 };
 
-const buildFamilies = (payload: ExpressionMapGenerateRequest): ExpressionFamily[] => {
+const buildFallbackClusters = (payload: ExpressionMapGenerateRequest): ExpressionCluster[] => {
   const allNodes: ExpressionNode[] = [];
   const seenNode = new Set<string>();
 
@@ -114,16 +124,16 @@ const buildFamilies = (payload: ExpressionMapGenerateRequest): ExpressionFamily[
     });
   });
 
-  const familyMap = new Map<string, ExpressionFamily>();
+  const clusterMap = new Map<string, ExpressionCluster>();
   for (const node of allNodes) {
     const normalized = normalizeExpression(node.text);
-    const familyKey = familyKeyByExpression(normalized);
-    const existing = familyMap.get(familyKey);
+    const clusterKey = clusterKeyByExpression(normalized);
+    const existing = clusterMap.get(clusterKey);
     if (!existing) {
-      familyMap.set(familyKey, {
-        id: `family-${familyMap.size + 1}`,
+      clusterMap.set(clusterKey, {
+        id: `cluster-${clusterMap.size + 1}`,
         anchor: node.text,
-        meaning: familyMeaningByKey(familyKey),
+        meaning: clusterMeaningByKey(clusterKey),
         expressions: [node.text],
         sourceSceneIds: [node.sourceSceneId],
         nodes: [node],
@@ -140,24 +150,172 @@ const buildFamilies = (payload: ExpressionMapGenerateRequest): ExpressionFamily[
     existing.nodes.push(node);
   }
 
-  return Array.from(familyMap.values()).sort(
+  return Array.from(clusterMap.values()).sort(
     (a, b) => b.expressions.length - a.expressions.length,
   );
 };
 
+async function buildRealUserClusters(params: {
+  userId: string;
+  payload: ExpressionMapGenerateRequest;
+}) {
+  const allTexts = Array.from(
+    new Set([
+      ...params.payload.baseExpressions,
+      ...(params.payload.variantExpressionSources ?? []).flatMap((source) => source.expressions ?? []),
+    ]),
+  )
+    .map((text) => text.trim())
+    .filter(Boolean);
+  if (allTexts.length === 0) return [] as ExpressionCluster[];
+
+  const normalizedTexts = Array.from(new Set(allTexts.map((text) => normalizePhraseText(text)).filter(Boolean)));
+  const admin = createSupabaseAdminClient();
+  const { data: phraseRows, error: phraseError } = await admin
+    .from("user_phrases")
+    .select("id,source_scene_slug,phrase:phrases(display_text,normalized_text)")
+    .eq("user_id", params.userId)
+    .eq("status", "saved");
+  if (phraseError) {
+    throw new Error(`Failed to load user expressions for map: ${phraseError.message}`);
+  }
+
+  const matchingPhraseRows = ((phraseRows ?? []) as Array<{
+    id: string;
+    source_scene_slug: string | null;
+    phrase:
+      | { display_text: string | null; normalized_text: string | null }
+      | Array<{ display_text: string | null; normalized_text: string | null }>
+      | null;
+  }>).filter((row) => {
+    const phrase = Array.isArray(row.phrase) ? (row.phrase[0] ?? null) : row.phrase;
+    const normalized = normalizePhraseText(
+      phrase?.normalized_text ?? phrase?.display_text ?? "",
+    );
+    return normalizedTexts.includes(normalized);
+  });
+  if (matchingPhraseRows.length === 0) return [] as ExpressionCluster[];
+
+  const { data: membershipRows, error: membershipError } = await admin
+    .from("user_expression_cluster_members")
+    .select(
+      "cluster_id,role,user_phrase_id,cluster:user_expression_clusters!inner(id,user_id,main_user_phrase_id), user_phrase:user_phrases!inner(id,source_scene_slug,phrase:phrases(display_text,normalized_text))",
+    )
+    .in("user_phrase_id", matchingPhraseRows.map((row) => row.id));
+  if (membershipError) {
+    throw new Error(`Failed to load expression cluster memberships for map: ${membershipError.message}`);
+  }
+
+  const targetClusterIds = Array.from(
+    new Set(
+      ((membershipRows ?? []) as Array<{
+        cluster_id: string;
+        cluster:
+          | { id: string; user_id: string; main_user_phrase_id: string | null }
+          | Array<{ id: string; user_id: string; main_user_phrase_id: string | null }>
+          | null;
+      }>)
+        .map((row) => {
+          const cluster = Array.isArray(row.cluster) ? (row.cluster[0] ?? null) : row.cluster;
+          return cluster?.user_id === params.userId ? row.cluster_id : null;
+        })
+        .filter((item): item is string => Boolean(item)),
+    ),
+  );
+  if (targetClusterIds.length === 0) return [] as ExpressionCluster[];
+
+  const { data: fullMembershipRows, error: fullMembershipError } = await admin
+    .from("user_expression_cluster_members")
+    .select(
+      "cluster_id,role,user_phrase_id,cluster:user_expression_clusters!inner(id,user_id,main_user_phrase_id,title,semantic_focus), user_phrase:user_phrases!inner(id,source_scene_slug,phrase:phrases(display_text,normalized_text))",
+    )
+    .in("cluster_id", targetClusterIds);
+  if (fullMembershipError) {
+    throw new Error(`Failed to load full expression cluster map data: ${fullMembershipError.message}`);
+  }
+
+  const clusterMap = new Map<string, ExpressionCluster>();
+  for (const row of (fullMembershipRows ?? []) as Array<{
+    cluster_id: string;
+    role: "main" | "variant";
+    user_phrase_id: string;
+    cluster:
+      | { id: string; user_id: string; main_user_phrase_id: string | null; title: string | null; semantic_focus: string | null }
+      | Array<{ id: string; user_id: string; main_user_phrase_id: string | null; title: string | null; semantic_focus: string | null }>
+      | null;
+    user_phrase:
+      | { id: string; source_scene_slug: string | null; phrase: { display_text: string | null; normalized_text: string | null } | Array<{ display_text: string | null; normalized_text: string | null }> | null }
+      | Array<{ id: string; source_scene_slug: string | null; phrase: { display_text: string | null; normalized_text: string | null } | Array<{ display_text: string | null; normalized_text: string | null }> | null }>
+      | null;
+  }>) {
+    const cluster = Array.isArray(row.cluster) ? (row.cluster[0] ?? null) : row.cluster;
+    const userPhrase = Array.isArray(row.user_phrase) ? (row.user_phrase[0] ?? null) : row.user_phrase;
+    const phrase = userPhrase
+      ? Array.isArray(userPhrase.phrase)
+        ? (userPhrase.phrase[0] ?? null)
+        : userPhrase.phrase
+      : null;
+    if (!cluster || cluster.user_id !== params.userId || !userPhrase) continue;
+    const text = (phrase?.display_text ?? "").trim();
+    if (!text) continue;
+
+    const existing = clusterMap.get(cluster.id) ?? {
+      id: cluster.id,
+      anchor: text,
+      meaning: cluster.semantic_focus?.trim() || cluster.title?.trim() || "相关表达变体",
+      expressions: [] as string[],
+      sourceSceneIds: [] as string[],
+      nodes: [] as ExpressionNode[],
+    };
+    if (row.user_phrase_id === cluster.main_user_phrase_id && text) {
+      existing.anchor = text;
+    }
+    if (!existing.expressions.some((item) => normalizePhraseText(item) === normalizePhraseText(text))) {
+      existing.expressions.push(text);
+    }
+    if (userPhrase.source_scene_slug && !existing.sourceSceneIds.includes(userPhrase.source_scene_slug)) {
+      existing.sourceSceneIds.push(userPhrase.source_scene_slug);
+    }
+    existing.nodes.push({
+      id: row.user_phrase_id,
+      text,
+      sourceSceneId: userPhrase.source_scene_slug ?? params.payload.sourceSceneId,
+      sourceType:
+        row.user_phrase_id === cluster.main_user_phrase_id || row.role === "main" ? "original" : "variant",
+    });
+    clusterMap.set(cluster.id, existing);
+  }
+
+  return Array.from(clusterMap.values()).sort((a, b) => b.expressions.length - a.expressions.length);
+}
+
 export async function POST(request: Request) {
   try {
+    const { user } = await requireCurrentProfile();
     const payloadRaw = (await request.json()) as unknown;
     const parsed = parsePayload(payloadRaw);
     if (!parsed.ok) {
       return NextResponse.json({ error: parsed.error }, { status: 400 });
     }
 
-    const families = buildFamilies(parsed.value);
+    const realClusters = await buildRealUserClusters({
+      userId: user.id,
+      payload: parsed.value,
+    });
+    const fallbackClusters = buildFallbackClusters(parsed.value);
+    const usedTextSet = new Set(
+      realClusters.flatMap((cluster) => cluster.expressions.map((text) => normalizePhraseText(text))),
+    );
+    const clusters = [
+      ...realClusters,
+      ...fallbackClusters.filter((cluster) =>
+        cluster.expressions.some((text) => !usedTextSet.has(normalizePhraseText(text))),
+      ),
+    ];
     const response: ExpressionMapResponse = {
       version: "v1",
       sourceSceneId: parsed.value.sourceSceneId,
-      families,
+      clusters,
     };
 
     return NextResponse.json(response, { status: 200 });

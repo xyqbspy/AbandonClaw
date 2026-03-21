@@ -1205,7 +1205,7 @@ export default function SceneDetailPage() {
   }
 
   if (viewMode === "expression-map") {
-    const families = expressionMap?.families ?? [];
+    const clusters = expressionMap?.clusters ?? [];
 
     return (
       <div className="space-y-4">
@@ -1220,7 +1220,7 @@ export default function SceneDetailPage() {
             </button>
           </div>
           <p className="text-sm text-muted-foreground">
-            表达家族会把当前场景与变体中的相关说法归在一起，帮助你快速看到同一意思的不同表达。
+            表达簇会把当前场景与变体中的相关说法归在一起，帮助你快速看到同一意思的不同表达。
           </p>
           {expressionMapError ? (
             <p className="text-sm text-destructive">{expressionMapError}</p>
@@ -1228,27 +1228,27 @@ export default function SceneDetailPage() {
         </section>
 
         <section className={`space-y-2 rounded-lg p-4 ${APPLE_SURFACE}`}>
-          {families.length === 0 ? (
+          {clusters.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              暂无表达家族。先生成变体后再查看表达地图。
+              暂无表达簇。先生成变体后再查看表达地图。
             </p>
           ) : (
             <ul className="space-y-2">
-              {families.map((family) => (
-                <li key={family.id} className="space-y-2 rounded-md bg-[rgb(240,240,240)] p-3 text-sm">
-                  <p className="font-medium">{family.anchor}</p>
-                  <p className="text-xs text-muted-foreground">{family.meaning}</p>
+              {clusters.map((cluster) => (
+                <li key={cluster.id} className="space-y-2 rounded-md bg-[rgb(240,240,240)] p-3 text-sm">
+                  <p className="font-medium">{cluster.anchor}</p>
+                  <p className="text-xs text-muted-foreground">{cluster.meaning}</p>
                   <p className="text-xs text-muted-foreground">
-                    出现场景数：{family.sourceSceneIds.length}
+                    出现场景数：{cluster.sourceSceneIds.length}
                   </p>
                   <div className="flex flex-wrap gap-2">
-                    {family.expressions.map((expression) => (
+                    {cluster.expressions.map((expression) => (
                       <button
-                        key={`${family.id}-${expression}`}
+                        key={`${cluster.id}-${expression}`}
                         type="button"
                         className={`${APPLE_BUTTON_BASE} px-2 py-1 text-xs`}
                         onClick={() =>
-                          handleOpenExpressionDetail(expression, family.expressions)
+                          handleOpenExpressionDetail(expression, cluster.expressions)
                         }
                       >
                         {expression}
