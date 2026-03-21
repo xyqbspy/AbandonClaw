@@ -52,6 +52,11 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import {
+  MoveIntoClusterCandidate,
+  MoveIntoClusterGroup,
+  MoveIntoClusterSheet,
+} from "@/features/chunks/components/move-into-cluster-sheet";
+import {
   APPLE_BUTTON_BASE,
   APPLE_BUTTON_TEXT_SM,
   APPLE_SURFACE,
@@ -550,22 +555,6 @@ type FocusDetailTrailItem = {
   tab: FocusDetailTabValue;
 };
 
-type MoveIntoClusterCandidate = {
-  row: UserPhraseItemResponse;
-  sourceClusterId: string | null;
-  sourceClusterMainText: string;
-  sourceClusterMemberCount: number;
-  isSourceMain: boolean;
-};
-
-type MoveIntoClusterGroup = {
-  key: string;
-  title: string;
-  description: string;
-  candidates: MoveIntoClusterCandidate[];
-  isCluster: boolean;
-};
-
 type FocusDetailConfirmAction = "set-cluster-main" | "set-standalone-main";
 
 const extractExpressionsFromSentenceItem = (item: UserPhraseItemResponse) => {
@@ -657,8 +646,6 @@ export default function ChunksPage() {
   const [focusDetailTab, setFocusDetailTab] = useState<FocusDetailTabValue>("info");
   const [focusDetailActionsOpen, setFocusDetailActionsOpen] = useState(false);
   const [focusDetailTrail, setFocusDetailTrail] = useState<FocusDetailTrailItem[]>([]);
-  const [focusMainOverrideByClusterId, setFocusMainOverrideByClusterId] = useState<Record<string, string>>({});
-  const [focusRelationMainOverrideBySourceId, setFocusRelationMainOverrideBySourceId] = useState<Record<string, string>>({});
   const [savedRelationCache, setSavedRelationCache] = useState<Record<string, SavedRelationCacheEntry>>({});
   const [savedRelationLoadingKey, setSavedRelationLoadingKey] = useState<string | null>(null);
   const [focusRelationsBootstrapDone, setFocusRelationsBootstrapDone] = useState(false);
@@ -820,77 +807,33 @@ export default function ChunksPage() {
     [phrases],
   );
 
-  const clusterMainExpressionIdByClusterId = useMemo(() => {
-    const relationCountByUserPhraseId = new Map<string, number>();
-    for (const [sourceId, entry] of Object.entries(savedRelationCache)) {
-      if (!entry.loaded) continue;
-      relationCountByUserPhraseId.set(sourceId, entry.rows.length);
-    }
-
-    const map = new Map<string, string>();
-    for (const [clusterId, rows] of clusterMembersByClusterId.entries()) {
-      const overriddenId = focusMainOverrideByClusterId[clusterId];
-      const overriddenRow = overriddenId
-        ? rows.find((row) => row.userPhraseId === overriddenId)
-        : null;
-      const sortedRows = [...rows].sort((a, b) => {
-        const relationDelta =
-          (relationCountByUserPhraseId.get(b.userPhraseId) ?? 0) -
-          (relationCountByUserPhraseId.get(a.userPhraseId) ?? 0);
-        if (relationDelta !== 0) return relationDelta;
-        const sourceNoteDelta =
-          Number(Boolean(a.sourceNote?.trim())) - Number(Boolean(b.sourceNote?.trim()));
-        if (sourceNoteDelta !== 0) return sourceNoteDelta;
-        return a.savedAt.localeCompare(b.savedAt);
-      });
-      const mainRow = overriddenRow ?? sortedRows[0];
-      if (mainRow) {
-        map.set(clusterId, mainRow.userPhraseId);
-      }
-    }
-    return map;
-  }, [clusterMembersByClusterId, focusMainOverrideByClusterId, savedRelationCache]);
-
   const focusMainExpressionRows = useMemo(
     () => {
       return expressionRows.filter((row) => {
-        const replacementTargetId = focusRelationMainOverrideBySourceId[row.userPhraseId];
-        if (replacementTargetId && replacementTargetId !== row.userPhraseId) {
-          return false;
-        }
-        const isPromotedByRelationOverride = Object.values(focusRelationMainOverrideBySourceId).includes(
-          row.userPhraseId,
-        );
-
         if (row.expressionClusterId) {
-          const isFamilyMain = clusterMainExpressionIdByClusterId.get(row.expressionClusterId) === row.userPhraseId;
+          const isFamilyMain = row.expressionClusterMainUserPhraseId === row.userPhraseId;
           if (!isFamilyMain) return false;
-          if (isDerivedRelatedExpression(row.sourceNote) && !isPromotedByRelationOverride) return false;
+          if (isDerivedRelatedExpression(row.sourceNote)) return false;
           return true;
         }
 
         if (isDerivedRelatedExpression(row.sourceNote)) {
-          return isPromotedByRelationOverride || row.userPhraseId === focusExpressionId;
+          return row.userPhraseId === focusExpressionId;
         }
 
         return true;
       });
     },
-    [
-      expressionRows,
-      clusterMainExpressionIdByClusterId,
-      focusExpressionId,
-      focusRelationMainOverrideBySourceId,
-    ],
+    [expressionRows, focusExpressionId],
   );
 
   const resolveFocusMainExpressionId = useCallback(
     (userPhraseId: string) => {
       const row = expressionRows.find((item) => item.userPhraseId === userPhraseId);
       if (!row?.expressionClusterId) return row?.userPhraseId ?? userPhraseId;
-      return clusterMainExpressionIdByClusterId.get(row.expressionClusterId) ?? row.userPhraseId;
+      return row.expressionClusterMainUserPhraseId ?? row.userPhraseId;
     },
-    [expressionRows, clusterMainExpressionIdByClusterId],
+    [expressionRows],
   );
 
   const switchFocusMainExpression = useCallback(
@@ -902,31 +845,9 @@ export default function ChunksPage() {
 
   const assignFocusMainExpression = useCallback(
     (item: UserPhraseItemResponse) => {
-      if (item.expressionClusterId) {
-        setFocusMainOverrideByClusterId((current) => ({
-          ...current,
-          [item.expressionClusterId as string]: item.userPhraseId,
-        }));
-      }
-      const incomingSourceIds = Object.entries(savedRelationCache)
-        .filter(([, entry]) => entry.loaded)
-        .flatMap(([, entry]) =>
-          entry.rows
-            .filter((relation) => relation.item.userPhraseId === item.userPhraseId)
-            .map((relation) => relation.sourceUserPhraseId),
-        );
-      if (incomingSourceIds.length > 0) {
-        setFocusRelationMainOverrideBySourceId((current) => {
-          const next = { ...current };
-          for (const sourceId of incomingSourceIds) {
-            next[sourceId] = item.userPhraseId;
-          }
-          return next;
-        });
-      }
       setFocusExpressionId(item.userPhraseId);
     },
-    [savedRelationCache],
+    [],
   );
 
   const focusExpression = useMemo(() => {
@@ -1082,7 +1003,7 @@ export default function ChunksPage() {
       .map((row) => {
         const sourceClusterId = row.expressionClusterId ?? null;
         const sourceClusterMainId = sourceClusterId
-          ? clusterMainExpressionIdByClusterId.get(sourceClusterId) ?? null
+          ? row.expressionClusterMainUserPhraseId ?? null
           : null;
         const sourceClusterMainText =
           (sourceClusterMainId ? rowById.get(sourceClusterMainId)?.text : null) ?? row.text;
@@ -1104,7 +1025,6 @@ export default function ChunksPage() {
         return a.row.text.localeCompare(b.row.text);
       });
   }, [
-    clusterMainExpressionIdByClusterId,
     clusterMembersByClusterId,
     expressionRows,
     focusExpression,
@@ -1491,6 +1411,64 @@ export default function ChunksPage() {
 
     setMoveIntoClusterOpen(true);
   };
+
+  const focusDetailClusterMemberCount = useMemo(() => {
+    const clusterId = focusDetail?.savedItem?.expressionClusterId ?? null;
+    if (!clusterId) return 0;
+    return clusterMembersByClusterId.get(clusterId)?.length ?? 0;
+  }, [clusterMembersByClusterId, focusDetail?.savedItem?.expressionClusterId]);
+
+  const canMoveIntoCurrentCluster = Boolean(focusExpression) && moveIntoClusterCandidates.length > 0;
+  const toggleMoveIntoClusterGroupExpand = useCallback((groupKey: string) => {
+    setExpandedMoveIntoClusterGroups((current) => ({
+      ...current,
+      [groupKey]: !current[groupKey],
+    }));
+  }, []);
+  const toggleMoveIntoClusterGroupSelect = useCallback((group: MoveIntoClusterGroup, groupSelected: boolean) => {
+    setSelectedMoveIntoClusterMap((current) => {
+      const next = { ...current };
+      if (groupSelected) {
+        for (const candidate of group.candidates) {
+          delete next[candidate.row.userPhraseId];
+        }
+      } else {
+        for (const candidate of group.candidates) {
+          next[candidate.row.userPhraseId] = true;
+        }
+      }
+      return next;
+    });
+  }, []);
+  const toggleMoveIntoClusterCandidate = useCallback((
+    group: MoveIntoClusterGroup,
+    candidate: MoveIntoClusterCandidate,
+    selected: boolean,
+  ) => {
+    setSelectedMoveIntoClusterMap((current) => {
+      const next = { ...current };
+      const nextSelected = !selected;
+      next[candidate.row.userPhraseId] = nextSelected;
+
+      if (group.isCluster && candidate.isSourceMain && nextSelected) {
+        for (const item of group.candidates) {
+          if (!item.isSourceMain) {
+            delete next[item.row.userPhraseId];
+          }
+        }
+      }
+
+      return next;
+    });
+  }, []);
+  const canSetCurrentClusterMain = Boolean(
+    focusDetail?.savedItem?.expressionClusterId &&
+      focusDetail.savedItem.userPhraseId !== focusDetail.savedItem.expressionClusterMainUserPhraseId,
+  );
+  const canSetStandaloneMain = Boolean(
+    focusDetail?.savedItem?.expressionClusterId && focusDetailClusterMemberCount > 1,
+  );
+  const showFocusDetailActions = canMoveIntoCurrentCluster || canSetCurrentClusterMain || canSetStandaloneMain;
 
   const openFocusDetail = async (params: {
     text: string;
@@ -3614,7 +3592,7 @@ export default function ChunksPage() {
 
           <SheetFooter className="shrink-0 border-t border-[rgb(236,238,240)] px-4 pb-safe pt-3">
             <div className="flex items-center justify-between gap-2">
-              {focusDetail ? (
+              {focusDetail && showFocusDetailActions ? (
                 <div className="relative">
                   <Button
                     type="button"
@@ -3633,9 +3611,7 @@ export default function ChunksPage() {
 
                   {focusDetailActionsOpen ? (
                     <div className="absolute bottom-full left-0 z-10 mb-2 min-w-[200px] overflow-hidden rounded-2xl border border-[rgb(228,232,236)] bg-white p-1 shadow-lg">
-                      {focusDetail.savedItem &&
-                      Boolean(focusDetail.savedItem.expressionClusterId) &&
-                      focusDetail.savedItem.userPhraseId !== focusExpression?.userPhraseId ? (
+                      {canSetCurrentClusterMain ? (
                         <button
                           type="button"
                           className="flex w-full items-center rounded-xl px-3 py-2.5 text-left text-sm text-foreground transition hover:bg-[rgb(246,246,246)]"
@@ -3648,30 +3624,21 @@ export default function ChunksPage() {
                           {zh.detailOpenAsMain}
                         </button>
                       ) : null}
-                      <button
-                        type="button"
-                        className="flex w-full items-center rounded-xl px-3 py-2.5 text-left text-sm text-foreground transition hover:bg-[rgb(246,246,246)] disabled:text-muted-foreground"
-                        disabled={!focusExpression || moveIntoClusterCandidates.length === 0 || movingIntoCluster || ensuringMoveTargetCluster}
-                        title={
-                          moveIntoClusterCandidates.length === 0
-                            ? zh.moveIntoClusterDisabledHint
-                            : undefined
-                        }
-                        onClick={() => {
-                          void openMoveIntoCurrentCluster();
-                        }}
-                      >
-                        {movingIntoCluster || ensuringMoveTargetCluster
-                          ? `${zh.moveIntoCluster}...`
-                          : zh.moveIntoCluster}
-                      </button>
-                      {moveIntoClusterCandidates.length === 0 ? (
-                        <p className="px-3 pb-2 text-xs text-muted-foreground">
-                          {zh.moveIntoClusterDisabledHint}
-                        </p>
+                      {canMoveIntoCurrentCluster ? (
+                        <button
+                          type="button"
+                          className="flex w-full items-center rounded-xl px-3 py-2.5 text-left text-sm text-foreground transition hover:bg-[rgb(246,246,246)] disabled:text-muted-foreground"
+                          disabled={movingIntoCluster || ensuringMoveTargetCluster}
+                          onClick={() => {
+                            void openMoveIntoCurrentCluster();
+                          }}
+                        >
+                          {movingIntoCluster || ensuringMoveTargetCluster
+                            ? `${zh.moveIntoCluster}...`
+                            : zh.moveIntoCluster}
+                        </button>
                       ) : null}
-                      {focusDetail.savedItem &&
-                      Boolean(focusDetail.savedItem.expressionClusterId) ? (
+                      {canSetStandaloneMain ? (
                         <button
                           type="button"
                           className="flex w-full items-center rounded-xl px-3 py-2.5 text-left text-sm text-foreground transition hover:bg-[rgb(246,246,246)] disabled:text-muted-foreground"
@@ -3737,8 +3704,30 @@ export default function ChunksPage() {
         </SheetContent>
       </Sheet>
 
-      <Sheet
+      <MoveIntoClusterSheet
         open={moveIntoClusterOpen}
+        focusExpression={focusExpression}
+        groups={moveIntoClusterGroups}
+        expandedGroups={expandedMoveIntoClusterGroups}
+        selectedMap={selectedMoveIntoClusterMap}
+        submitting={movingIntoCluster}
+        appleButtonClassName={appleButtonClassName}
+        labels={{
+          close: zh.close,
+          title: zh.moveIntoClusterTitle,
+          description: zh.moveIntoClusterDesc,
+          currentMain: zh.moveIntoClusterCurrentMain,
+          empty: zh.moveIntoClusterEmpty,
+          selectGroup: zh.moveIntoClusterSelectGroup,
+          selectedGroup: zh.moveIntoClusterSelectedGroup,
+          coveredByMain: zh.moveIntoClusterCoveredByMain,
+          submit: zh.moveIntoClusterSubmit,
+          mainExpression: zh.moveIntoClusterMainExpression,
+          subExpression: zh.moveIntoClusterSubExpression,
+          selected: "已选",
+          unselected: "未选",
+          covered: "已覆盖",
+        }}
         onOpenChange={(open) => {
           setMoveIntoClusterOpen(open);
           if (!open) {
@@ -3746,242 +3735,11 @@ export default function ChunksPage() {
             setSelectedMoveIntoClusterMap({});
           }
         }}
-      >
-        <SheetContent side="bottom" className="flex h-[85vh] max-h-[85vh] flex-col rounded-t-2xl border-0 bg-white">
-          <SheetHeader className="shrink-0 border-b border-[rgb(236,238,240)] bg-[rgb(250,250,250)] px-4 pb-4 pt-4">
-            <SheetTitle>{zh.moveIntoClusterTitle}</SheetTitle>
-            <SheetDescription>{zh.moveIntoClusterDesc}</SheetDescription>
-          </SheetHeader>
-
-          <div className="shrink-0 border-b border-[rgb(236,238,240)] bg-[rgb(250,250,250)] px-4 py-4">
-            {focusExpression ? (
-              <div className="rounded-xl bg-[rgb(246,246,246)] p-4">
-                <p className="text-xl font-semibold tracking-tight">
-                  {zh.moveIntoClusterCurrentMain}：{focusExpression.text}
-                </p>
-              </div>
-            ) : null}
-          </div>
-
-          <div className="min-h-0 flex-1 overflow-y-auto bg-white px-4 py-3">
-            {moveIntoClusterGroups.length === 0 ? (
-              <p className="text-sm text-muted-foreground">{zh.moveIntoClusterEmpty}</p>
-            ) : (
-              <div className="space-y-3">
-                {moveIntoClusterGroups.map((group) => (
-                  <div
-                    key={group.key}
-                    className="rounded-2xl bg-[rgb(246,246,246)] p-3"
-                  >
-                    {group.isCluster ? (() => {
-                      const mainCandidate = group.candidates.find((candidate) => candidate.isSourceMain) ?? null;
-                      const groupSelected = group.candidates.every((candidate) => {
-                        if (selectedMoveIntoClusterMap[candidate.row.userPhraseId]) return true;
-                        return Boolean(
-                          !candidate.isSourceMain &&
-                            mainCandidate &&
-                            selectedMoveIntoClusterMap[mainCandidate.row.userPhraseId],
-                        );
-                      });
-                      return (
-                        <>
-                        <div className="flex items-start justify-between gap-3 px-3">
-                          <button
-                            type="button"
-                            className="min-w-0 flex-1 text-left"
-                            onClick={() =>
-                              setExpandedMoveIntoClusterGroups((current) => ({
-                                ...current,
-                                [group.key]: !current[group.key],
-                              }))
-                            }
-                          >
-                            <p className="text-base font-semibold">{group.title}</p>
-                            {mainCandidate?.row.translation ? (
-                              <p className="mt-1 text-xs text-muted-foreground">
-                                {mainCandidate.row.translation}
-                              </p>
-                            ) : null}
-                            {groupSelected ? (
-                              <p className="mt-1 text-xs text-muted-foreground">
-                                {zh.moveIntoClusterCoveredByMain}
-                              </p>
-                            ) : null}
-                          </button>
-                          <div className="flex shrink-0 items-center gap-2">
-                            <button
-                              type="button"
-                              className="inline-flex items-center rounded-full border border-[rgb(220,224,228)] p-2 text-xs text-muted-foreground transition hover:bg-[rgb(240,240,240)]"
-                              onClick={() =>
-                                setExpandedMoveIntoClusterGroups((current) => ({
-                                  ...current,
-                                  [group.key]: !current[group.key],
-                                }))
-                              }
-                            >
-                              <ChevronDown
-                                className={`size-4 transition-transform ${
-                                  expandedMoveIntoClusterGroups[group.key] ? "rotate-180" : ""
-                                }`}
-                              />
-                            </button>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              className={`h-auto px-2 py-1 text-xs ${
-                                groupSelected
-                                  ? "bg-[rgb(32,44,60)] text-white hover:bg-[rgb(25,36,50)]"
-                                  : ""
-                              }`}
-                              onClick={() =>
-                                setSelectedMoveIntoClusterMap((current) => {
-                                  const next = { ...current };
-                                  if (groupSelected) {
-                                    for (const candidate of group.candidates) {
-                                      delete next[candidate.row.userPhraseId];
-                                    }
-                                  } else {
-                                    for (const candidate of group.candidates) {
-                                      next[candidate.row.userPhraseId] = true;
-                                    }
-                                  }
-                                  return next;
-                                })
-                              }
-                            >
-                              {groupSelected ? zh.moveIntoClusterSelectedGroup : zh.moveIntoClusterSelectGroup}
-                            </Button>
-                          </div>
-                        </div>
-
-                        {expandedMoveIntoClusterGroups[group.key] ? (
-                          <div className="mt-3 space-y-2">
-                            {group.candidates.map((candidate) => {
-                              const selected = Boolean(selectedMoveIntoClusterMap[candidate.row.userPhraseId]);
-                              const isCoveredByMainSelected = Boolean(
-                                candidate.sourceClusterId &&
-                                  !candidate.isSourceMain &&
-                                  mainCandidate &&
-                                  selectedMoveIntoClusterMap[mainCandidate.row.userPhraseId],
-                              );
-                              return (
-                                <button
-                                  key={candidate.row.userPhraseId}
-                                  type="button"
-                                  className={`w-full rounded-xl border border-transparent bg-[rgb(246,246,246)] text-left transition ${
-                                    isCoveredByMainSelected
-                                      ? "text-muted-foreground"
-                                      : "hover:bg-[rgb(240,240,240)]"
-                                  }`}
-                                  disabled={isCoveredByMainSelected}
-                                  onClick={() =>
-                                    setSelectedMoveIntoClusterMap((current) => {
-                                      const next = { ...current };
-                                      const nextSelected = !current[candidate.row.userPhraseId];
-                                      next[candidate.row.userPhraseId] = nextSelected;
-
-                                      if (candidate.isSourceMain && nextSelected) {
-                                        for (const item of group.candidates) {
-                                          if (!item.isSourceMain) {
-                                            delete next[item.row.userPhraseId];
-                                          }
-                                        }
-                                      }
-
-                                      return next;
-                                    })
-                                  }
-                                >
-                                  <div className="flex items-start justify-between gap-3 px-3">
-                                    <div className="min-w-0 flex-1">
-                                      <p className="text-sm font-medium">{candidate.row.text}</p>
-                                      {candidate.row.translation ? (
-                                        <p className="mt-1 text-xs text-muted-foreground">
-                                          {candidate.row.translation}
-                                        </p>
-                                      ) : null}
-                                    </div>
-                                    <div className="flex shrink-0 items-center gap-2">
-                                      <Badge variant="outline">
-                                        {candidate.isSourceMain ? zh.moveIntoClusterMainExpression : zh.moveIntoClusterSubExpression}
-                                      </Badge>
-                                      <Badge
-                                        variant={
-                                          isCoveredByMainSelected ? "outline" : selected ? "default" : "secondary"
-                                        }
-                                      >
-                                        {isCoveredByMainSelected
-                                          ? "\u5df2\u8986\u76d6"
-                                          : selected
-                                            ? "\u5df2\u9009"
-                                            : "\u672a\u9009"}
-                                      </Badge>
-                                    </div>
-                                  </div>
-                                </button>
-                              );
-                            })}
-                          </div>
-                        ) : null}
-                        </>
-                      );
-                    })() : (() => {
-                      const candidate = group.candidates[0];
-                      const selected = candidate
-                        ? Boolean(selectedMoveIntoClusterMap[candidate.row.userPhraseId])
-                        : false;
-                      if (!candidate) return null;
-                      return (
-                        <button
-                          type="button"
-                          className="w-full rounded-xl border border-transparent bg-[rgb(246,246,246)] text-left transition hover:bg-[rgb(240,240,240)]"
-                          onClick={() =>
-                            setSelectedMoveIntoClusterMap((current) => ({
-                              ...current,
-                              [candidate.row.userPhraseId]: !current[candidate.row.userPhraseId],
-                            }))
-                          }
-                        >
-                          <div className="flex items-start justify-between gap-3 px-3">
-                            <div className="min-w-0 flex-1">
-                              <p className="text-base font-semibold">{candidate.row.text}</p>
-                              {candidate.row.translation ? (
-                                <p className="mt-1 text-xs text-muted-foreground">
-                                  {candidate.row.translation}
-                                </p>
-                              ) : null}
-                            </div>
-                            <Badge variant={selected ? "default" : "secondary"}>
-                              {selected ? "\u5df2\u9009" : "\u672a\u9009"}
-                            </Badge>
-                          </div>
-                        </button>
-                      );
-                    })()}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <SheetFooter className="shrink-0 border-t border-[rgb(236,238,240)] bg-[rgb(250,250,250)] px-4 pb-safe pt-3">
-            <div className="grid grid-cols-2 gap-2">
-              <Button type="button" variant="ghost" className={appleButtonClassName} onClick={() => setMoveIntoClusterOpen(false)}>
-                {zh.close}
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                className={appleButtonClassName}
-                disabled={movingIntoCluster}
-                onClick={() => void handleMoveSelectedIntoCurrentCluster()}
-              >
-                {movingIntoCluster ? `${zh.moveIntoClusterSubmit}...` : zh.moveIntoClusterSubmit}
-              </Button>
-            </div>
-          </SheetFooter>
-        </SheetContent>
-      </Sheet>
+        onToggleGroupExpand={toggleMoveIntoClusterGroupExpand}
+        onToggleGroupSelect={toggleMoveIntoClusterGroupSelect}
+        onToggleCandidate={toggleMoveIntoClusterCandidate}
+        onSubmit={() => void handleMoveSelectedIntoCurrentCluster()}
+      />
 
       {detailConfirmAction && focusDetail?.savedItem ? (
         <div className="fixed inset-0 z-[70] flex items-end bg-black/25 p-3 animate-in fade-in-0 duration-200 sm:items-center sm:justify-center sm:p-6">

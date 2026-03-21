@@ -29,7 +29,8 @@ async function getClusterMembers(clusterId: string) {
   const { data, error } = await admin
     .from("user_expression_cluster_members")
     .select("*")
-    .eq("cluster_id", clusterId);
+    .eq("cluster_id", clusterId)
+    .order("created_at", { ascending: true });
 
   if (error) {
     throw new Error(`Failed to read expression cluster members: ${error.message}`);

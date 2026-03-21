@@ -40,6 +40,8 @@ export interface UserPhraseItemResponse {
   sourceSentenceText: string | null;
   sourceChunkText: string | null;
   expressionClusterId: string | null;
+  expressionClusterRole: "main" | "variant" | null;
+  expressionClusterMainUserPhraseId: string | null;
   aiEnrichmentStatus: "pending" | "done" | "failed" | null;
   semanticFocus: string | null;
   typicalScenario: string | null;

@@ -59,6 +59,8 @@ export interface UserSavedPhraseItem {
   sourceSentenceText: string | null;
   sourceChunkText: string | null;
   expressionClusterId: string | null;
+  expressionClusterRole: "main" | "variant" | null;
+  expressionClusterMainUserPhraseId: string | null;
   aiEnrichmentStatus: UserPhraseAiEnrichmentStatus | null;
   semanticFocus: string | null;
   typicalScenario: string | null;
@@ -513,6 +515,8 @@ const mapSavedPhraseRow = (
   sourceSentenceText: row.source_sentence_text,
   sourceChunkText: row.source_chunk_text,
   expressionClusterId: clusterContext?.clusterId ?? null,
+  expressionClusterRole: clusterContext?.role ?? null,
+  expressionClusterMainUserPhraseId: clusterContext?.mainUserPhraseId ?? null,
   aiEnrichmentStatus: row.ai_enrichment_status ?? null,
   semanticFocus: row.ai_semantic_focus ?? null,
   typicalScenario: row.ai_typical_scenario ?? null,
