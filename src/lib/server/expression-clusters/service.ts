@@ -5,6 +5,12 @@ import {
   UserExpressionClusterRow,
 } from "@/lib/server/db/types";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import {
+  resolveMergedClusterMainUserPhraseId,
+  resolveMoveExpressionClusterAction,
+  resolveRemainingClusterMainUserPhraseId,
+  resolveTargetClusterMainUserPhraseId,
+} from "./logic";
 
 async function getClusterById(userId: string, clusterId: string) {
   const admin = createSupabaseAdminClient();
@@ -256,12 +262,12 @@ export async function mergeExpressionClusters(params: {
     throw new ValidationError("Cannot merge empty expression clusters.");
   }
 
-  const requestedMainId = params.mainUserPhraseId?.trim() || "";
-  const nextMainId =
-    (requestedMainId && mergedMemberIds.includes(requestedMainId) ? requestedMainId : "") ||
-    targetCluster.main_user_phrase_id ||
-    sourceCluster.main_user_phrase_id ||
-    mergedMemberIds[0];
+  const nextMainId = resolveMergedClusterMainUserPhraseId({
+    mergedMemberIds,
+    requestedMainUserPhraseId: params.mainUserPhraseId,
+    targetClusterMainUserPhraseId: targetCluster.main_user_phrase_id,
+    sourceClusterMainUserPhraseId: sourceCluster.main_user_phrase_id,
+  });
 
   await writeClusterRoles({
     clusterId: targetCluster.id,
@@ -316,10 +322,10 @@ export async function detachExpressionClusterMember(params: {
   const remainingMemberIds = members
     .map((member) => member.user_phrase_id)
     .filter((userPhraseId) => userPhraseId !== params.userPhraseId);
-  const requestedNextMainId = params.nextMainUserPhraseId?.trim() || "";
-  const nextMainId =
-    (requestedNextMainId && remainingMemberIds.includes(requestedNextMainId) ? requestedNextMainId : "") ||
-    remainingMemberIds[0];
+  const nextMainId = resolveRemainingClusterMainUserPhraseId({
+    remainingMemberIds,
+    requestedMainUserPhraseId: params.nextMainUserPhraseId,
+  });
 
   await writeClusterRoles({
     clusterId: cluster.id,
@@ -387,12 +393,12 @@ export async function moveExpressionClusterMember(params: {
 
   const targetMembers = await getClusterMembers(targetCluster.id);
   const targetMemberIds = targetMembers.map((member) => member.user_phrase_id);
-  const requestedTargetMainId = params.targetMainUserPhraseId?.trim() || "";
-  const targetMainUserPhraseId =
-    (requestedTargetMainId && targetMemberIds.includes(requestedTargetMainId) ? requestedTargetMainId : "") ||
-    targetCluster.main_user_phrase_id ||
-    targetMemberIds[0] ||
-    params.userPhraseId;
+  const targetMainUserPhraseId = resolveTargetClusterMainUserPhraseId({
+    targetMemberIds,
+    requestedMainUserPhraseId: params.targetMainUserPhraseId,
+    targetClusterMainUserPhraseId: targetCluster.main_user_phrase_id,
+    movedUserPhraseId: params.userPhraseId,
+  });
 
   if (sourceMembership?.role === "main" && sourceMembership.clusterId) {
     const merged = await mergeExpressionClusters({
@@ -427,10 +433,10 @@ export async function moveExpressionClusterMember(params: {
         throw new Error(`Failed to delete emptied source cluster: ${deleteSourceError.message}`);
       }
     } else {
-      const nextSourceMainId =
-        remainingMemberIds.includes(sourceCluster.main_user_phrase_id ?? "")
-          ? (sourceCluster.main_user_phrase_id as string)
-          : remainingMemberIds[0];
+      const nextSourceMainId = resolveRemainingClusterMainUserPhraseId({
+        remainingMemberIds,
+        currentMainUserPhraseId: sourceCluster.main_user_phrase_id,
+      });
 
       await writeClusterRoles({
         clusterId: sourceCluster.id,
@@ -473,8 +479,9 @@ export async function moveExpressionClusterMember(params: {
     sourceClusterId: sourceMembership?.clusterId ?? null,
     mainUserPhraseId: targetMainUserPhraseId,
     memberCount: nextTargetMemberIds.length,
-    action: (sourceMembership?.clusterId ? "moved_member" : "attached_member") as
-      | "moved_member"
-      | "attached_member",
+    action: resolveMoveExpressionClusterAction({
+      sourceClusterId: sourceMembership?.clusterId,
+      sourceRole: sourceMembership?.role,
+    }),
   };
 }

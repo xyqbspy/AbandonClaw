@@ -42,7 +42,6 @@ import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { TabsContent } from "@/components/ui/tabs";
 import {
   Sheet,
   SheetContent,
@@ -52,10 +51,23 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import {
-  MoveIntoClusterCandidate,
-  MoveIntoClusterGroup,
   MoveIntoClusterSheet,
 } from "@/features/chunks/components/move-into-cluster-sheet";
+import { FocusDetailActions } from "@/features/chunks/components/focus-detail-actions";
+import { FocusDetailConfirm } from "@/features/chunks/components/focus-detail-confirm";
+import { FocusDetailContent } from "@/features/chunks/components/focus-detail-content";
+import { ClusterFocusList } from "@/features/chunks/components/cluster-focus-list";
+import {
+  MoveIntoClusterCandidate,
+  MoveIntoClusterGroup,
+  SavedRelationRowsBySourceId,
+} from "@/features/chunks/components/types";
+import {
+  getFocusMainExpressionRows,
+  resolveFocusMainExpressionId,
+  toggleMoveIntoClusterCandidateSelection,
+  toggleMoveIntoClusterGroupSelection,
+} from "@/features/chunks/expression-clusters/ui-logic";
 import {
   APPLE_BUTTON_BASE,
   APPLE_BUTTON_TEXT_SM,
@@ -305,17 +317,6 @@ const reviewStatusLabel: Record<PhraseReviewStatus, string> = {
   reviewing: zh.tabs.reviewing,
   mastered: zh.tabs.mastered,
   archived: "\u5df2\u5f52\u6863",
-};
-
-const isDerivedRelatedExpression = (sourceNote: string | null | undefined) => {
-  const normalized = (sourceNote ?? "").trim().toLowerCase();
-  return (
-    normalized === "manual-similar-ai" ||
-    normalized === "focus-similar-ai" ||
-    normalized === "similar-ai-mvp" ||
-    normalized === "manual-contrast-ai" ||
-    normalized === "focus-contrast-ai"
-  );
 };
 
 const isContrastDerivedExpression = (sourceNote: string | null | undefined) => {
@@ -808,39 +809,23 @@ export default function ChunksPage() {
   );
 
   const focusMainExpressionRows = useMemo(
-    () => {
-      return expressionRows.filter((row) => {
-        if (row.expressionClusterId) {
-          const isFamilyMain = row.expressionClusterMainUserPhraseId === row.userPhraseId;
-          if (!isFamilyMain) return false;
-          if (isDerivedRelatedExpression(row.sourceNote)) return false;
-          return true;
-        }
-
-        if (isDerivedRelatedExpression(row.sourceNote)) {
-          return row.userPhraseId === focusExpressionId;
-        }
-
-        return true;
-      });
-    },
+    () => getFocusMainExpressionRows(expressionRows, focusExpressionId),
     [expressionRows, focusExpressionId],
   );
 
-  const resolveFocusMainExpressionId = useCallback(
+  const resolveFocusMainExpressionIdForRow = useCallback(
     (userPhraseId: string) => {
-      const row = expressionRows.find((item) => item.userPhraseId === userPhraseId);
-      if (!row?.expressionClusterId) return row?.userPhraseId ?? userPhraseId;
-      return row.expressionClusterMainUserPhraseId ?? row.userPhraseId;
+      return resolveFocusMainExpressionId(expressionRows, userPhraseId);
     },
     [expressionRows],
   );
 
+  // Focus 主表达切换
   const switchFocusMainExpression = useCallback(
     (userPhraseId: string) => {
-      setFocusExpressionId(resolveFocusMainExpressionId(userPhraseId));
+      setFocusExpressionId(resolveFocusMainExpressionIdForRow(userPhraseId));
     },
-    [resolveFocusMainExpressionId],
+    [resolveFocusMainExpressionIdForRow],
   );
 
   const assignFocusMainExpression = useCallback(
@@ -852,12 +837,12 @@ export default function ChunksPage() {
 
   const focusExpression = useMemo(() => {
     if (focusMainExpressionRows.length === 0) return null;
-    const resolvedId = focusExpressionId ? resolveFocusMainExpressionId(focusExpressionId) : "";
+    const resolvedId = focusExpressionId ? resolveFocusMainExpressionIdForRow(focusExpressionId) : "";
     return (
       focusMainExpressionRows.find((row) => row.userPhraseId === resolvedId) ??
       focusMainExpressionRows[0]
     );
-  }, [focusExpressionId, focusMainExpressionRows, resolveFocusMainExpressionId]);
+  }, [focusExpressionId, focusMainExpressionRows, resolveFocusMainExpressionIdForRow]);
 
   useEffect(() => {
     if (contentFilter !== "expression") return;
@@ -866,7 +851,7 @@ export default function ChunksPage() {
       setFocusAssistData(null);
       return;
     }
-    const resolvedId = focusExpressionId ? resolveFocusMainExpressionId(focusExpressionId) : "";
+    const resolvedId = focusExpressionId ? resolveFocusMainExpressionIdForRow(focusExpressionId) : "";
     if (!resolvedId || !focusMainExpressionRows.some((row) => row.userPhraseId === resolvedId)) {
       setFocusExpressionId(focusMainExpressionRows[0].userPhraseId);
       return;
@@ -874,7 +859,7 @@ export default function ChunksPage() {
     if (resolvedId !== focusExpressionId) {
       setFocusExpressionId(resolvedId);
     }
-  }, [contentFilter, focusExpressionId, focusMainExpressionRows, resolveFocusMainExpressionId]);
+  }, [contentFilter, focusExpressionId, focusMainExpressionRows, resolveFocusMainExpressionIdForRow]);
 
   useEffect(() => {
     setFocusAssistData(null);
@@ -1237,6 +1222,12 @@ export default function ChunksPage() {
     }
   };
 
+  // 表达簇动作
+  const resetMoveIntoClusterSelection = useCallback(() => {
+    setExpandedMoveIntoClusterGroups({});
+    setSelectedMoveIntoClusterMap({});
+  }, []);
+
   const detachFocusDetailFromCluster = async () => {
     const savedItem = focusDetail?.savedItem;
     const clusterId = savedItem?.expressionClusterId ?? "";
@@ -1372,8 +1363,7 @@ export default function ChunksPage() {
           `${zh.moveIntoClusterSuccess} ${successCount} \u9879${summary ? `\uff08${summary}\uff09` : ""}`,
         );
         setMoveIntoClusterOpen(false);
-        setExpandedMoveIntoClusterGroups({});
-        setSelectedMoveIntoClusterMap({});
+        resetMoveIntoClusterSelection();
       }
 
       if (failedMessages.length > 0) {
@@ -1388,8 +1378,7 @@ export default function ChunksPage() {
     if (!focusExpression || moveIntoClusterCandidates.length === 0) return;
 
     setFocusDetailActionsOpen(false);
-    setExpandedMoveIntoClusterGroups({});
-    setSelectedMoveIntoClusterMap({});
+    resetMoveIntoClusterSelection();
 
     if (!focusExpression.expressionClusterId) {
       setEnsuringMoveTargetCluster(true);
@@ -1419,6 +1408,10 @@ export default function ChunksPage() {
   }, [clusterMembersByClusterId, focusDetail?.savedItem?.expressionClusterId]);
 
   const canMoveIntoCurrentCluster = Boolean(focusExpression) && moveIntoClusterCandidates.length > 0;
+  const savedRelationRowsBySourceId: SavedRelationRowsBySourceId = useMemo(
+    () => Object.fromEntries(Object.entries(savedRelationCache).map(([key, value]) => [key, value.rows])),
+    [savedRelationCache],
+  );
   const toggleMoveIntoClusterGroupExpand = useCallback((groupKey: string) => {
     setExpandedMoveIntoClusterGroups((current) => ({
       ...current,
@@ -1426,40 +1419,16 @@ export default function ChunksPage() {
     }));
   }, []);
   const toggleMoveIntoClusterGroupSelect = useCallback((group: MoveIntoClusterGroup, groupSelected: boolean) => {
-    setSelectedMoveIntoClusterMap((current) => {
-      const next = { ...current };
-      if (groupSelected) {
-        for (const candidate of group.candidates) {
-          delete next[candidate.row.userPhraseId];
-        }
-      } else {
-        for (const candidate of group.candidates) {
-          next[candidate.row.userPhraseId] = true;
-        }
-      }
-      return next;
-    });
+    setSelectedMoveIntoClusterMap((current) => toggleMoveIntoClusterGroupSelection(current, group, groupSelected));
   }, []);
   const toggleMoveIntoClusterCandidate = useCallback((
     group: MoveIntoClusterGroup,
     candidate: MoveIntoClusterCandidate,
     selected: boolean,
   ) => {
-    setSelectedMoveIntoClusterMap((current) => {
-      const next = { ...current };
-      const nextSelected = !selected;
-      next[candidate.row.userPhraseId] = nextSelected;
-
-      if (group.isCluster && candidate.isSourceMain && nextSelected) {
-        for (const item of group.candidates) {
-          if (!item.isSourceMain) {
-            delete next[item.row.userPhraseId];
-          }
-        }
-      }
-
-      return next;
-    });
+    setSelectedMoveIntoClusterMap((current) =>
+      toggleMoveIntoClusterCandidateSelection(current, group, candidate, selected),
+    );
   }, []);
   const canSetCurrentClusterMain = Boolean(
     focusDetail?.savedItem?.expressionClusterId &&
@@ -1470,6 +1439,7 @@ export default function ChunksPage() {
   );
   const showFocusDetailActions = canMoveIntoCurrentCluster || canSetCurrentClusterMain || canSetStandaloneMain;
 
+  // Focus 详情打开与链路切换
   const openFocusDetail = async (params: {
     text: string;
     differenceLabel?: string;
@@ -1564,7 +1534,7 @@ export default function ChunksPage() {
       const target = focusDetailTrail[index];
       if (!target) return;
       if (target.userPhraseId) {
-        setFocusExpressionId(resolveFocusMainExpressionId(target.userPhraseId));
+        setFocusExpressionId(resolveFocusMainExpressionIdForRow(target.userPhraseId));
       }
       setFocusDetailTab(target.tab);
       setFocusDetailTrail((current) => current.slice(0, index + 1));
@@ -1578,7 +1548,7 @@ export default function ChunksPage() {
         assistItem: null,
       });
     },
-    [focusDetailTrail, phraseByNormalized, resolveFocusMainExpressionId],
+    [focusDetailTrail, phraseByNormalized, resolveFocusMainExpressionIdForRow],
   );
 
   useEffect(() => {
@@ -2431,147 +2401,57 @@ export default function ChunksPage() {
         <EmptyState title={zh.emptyTitle} description={zh.emptyDesc} />
       ) : contentFilter === "expression" && expressionViewMode === "focus" && focusExpression ? (
         <div className="space-y-4">
-          {!focusRelationsBootstrapDone ? (
-            <p className="text-sm text-muted-foreground">{zh.detailLoading}</p>
-          ) : (
-            focusMainExpressionRows.map((row) => {
-            const isCurrentMain = row.userPhraseId === focusExpression.userPhraseId;
-            const isExpanded = expandedFocusMainId === row.userPhraseId;
-            const savedSimilarItems = row.expressionClusterId
-              ? (clusterMembersByClusterId.get(row.expressionClusterId) ?? [])
-                  .filter((member) => member.userPhraseId !== row.userPhraseId)
-                  .map((member) => ({
-                    key: `cluster:${member.userPhraseId}`,
-                    text: member.text,
-                    differenceLabel: undefined,
-                    kind: "library-similar" as const,
-                    savedItem: member,
-                  }))
-              : [];
-            const relationRows = savedRelationCache[row.userPhraseId]?.rows ?? [];
-            const persistedSimilarItems = relationRows
-              .filter((item) => item.relationType === "similar")
-              .map((item) => ({
-                key: `relation-similar:${item.item.userPhraseId}`,
-                text: item.item.text,
-                differenceLabel: undefined,
-                kind: "library-similar" as const,
-                savedItem: item.item,
-              }));
-            const similarItems = isCurrentMain
-              ? focusSimilarItems
-              : [...savedSimilarItems, ...persistedSimilarItems].filter(
-                  (item, index, array) =>
-                    array.findIndex(
-                      (candidate) =>
-                        normalizePhraseText(candidate.text) === normalizePhraseText(item.text),
-                    ) === index,
-                );
-            const previewSimilarItems = similarItems.slice(0, 6);
-            return (
-              <Card key={row.userPhraseId} className={`${APPLE_SURFACE} gap-0 overflow-hidden`}>
-                <CardHeader className="px-3 pb-3 pt-2.5">
-                  <button
-                    type="button"
-                    className="flex w-full items-center justify-between gap-2 text-left"
-                    onClick={() => {
-                      switchFocusMainExpression(row.userPhraseId);
-                      setExpandedFocusMainId((current) =>
-                        current === row.userPhraseId ? null : row.userPhraseId,
-                      );
-                    }}
-                    aria-expanded={isExpanded}
-                    aria-label={isExpanded ? zh.focusCollapse : zh.focusExpand}
-                  >
-                    <p className="text-[11px] text-muted-foreground">{zh.focusModeTitle}</p>
-                    <ChevronDown
-                      className={`size-4 shrink-0 text-muted-foreground transition-transform duration-200 ${
-                        isExpanded ? "rotate-180" : "rotate-0"
-                      }`}
-                    />
-                  </button>
-                  <button
-                    type="button"
-                    className="mt-0.5 min-w-0 text-left"
-                    onClick={() => {
-                      switchFocusMainExpression(row.userPhraseId);
-                      void openFocusDetail({
-                        text: row.text,
-                        kind: "current",
-                        chainMode: "reset",
-                      });
-                    }}
-                  >
-                    <p className="text-[15px] font-semibold leading-snug">{row.text}</p>
-                    <p className="mt-0.5 line-clamp-1 text-xs leading-5 text-muted-foreground">
-                      {row.translation ?? zh.noTranslation}
-                    </p>
-                  </button>
-                </CardHeader>
-                <div
-                  className={`overflow-hidden transition-all duration-200 ${
-                    isExpanded ? "max-h-[420px] opacity-100" : "max-h-0 opacity-0"
-                  }`}
-                >
-                  <CardContent className="px-3 pb-3 pt-0">
-                    {previewSimilarItems.length > 0 ? (
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between gap-3">
-                          <p className="text-sm font-medium text-foreground/85">{zh.focusTabSimilar}</p>
-                          <button
-                            type="button"
-                            className="text-xs font-medium text-muted-foreground transition hover:text-foreground"
-                            onClick={() => {
-                              switchFocusMainExpression(row.userPhraseId);
-                              void openFocusDetail({
-                                text: row.text,
-                                kind: "current",
-                                initialTab: "similar",
-                                chainMode: "reset",
-                              });
-                            }}
-                          >
-                            {zh.openCurrentDetail}
-                          </button>
-                        </div>
-                        <div className="space-y-2">
-                          {previewSimilarItems.map((item, index) => {
-                            const isLast = index === previewSimilarItems.length - 1;
-                            return (
-                              <button
-                                key={item.key}
-                                type="button"
-                                className={`block w-full text-left ${isLast ? "" : "border-b border-[rgb(236,238,240)] pb-2"}`}
-                                onClick={() => {
-                                  switchFocusMainExpression(row.userPhraseId);
-                                  setFocusRelationTab("similar");
-                                  setFocusRelationActiveText(item.text);
-                                  void openFocusDetail({
-                                    text: item.text,
-                                    differenceLabel: item.differenceLabel,
-                                    kind: item.kind,
-                                    chainMode: "reset",
-                                  });
-                                }}
-                              >
-                                <p className="text-sm font-medium text-foreground">{item.text}</p>
-                                {item.savedItem?.translation ? (
-                                  <p className="mt-0.5 text-xs text-muted-foreground">
-                                    {item.savedItem.translation}
-                                  </p>
-                                ) : null}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    ) : null}
-                  </CardContent>
-                </div>
-              </Card>
-            );
-            })
-          )}
+          <ClusterFocusList
+            ready={focusRelationsBootstrapDone}
+            rows={focusMainExpressionRows}
+            currentFocusExpressionId={focusExpression.userPhraseId}
+            expandedFocusMainId={expandedFocusMainId}
+            clusterMembersByClusterId={clusterMembersByClusterId}
+            savedRelationRowsBySourceId={savedRelationRowsBySourceId}
+            currentFocusSimilarItems={focusSimilarItems}
+            labels={{
+              loading: zh.detailLoading,
+              title: zh.focusModeTitle,
+              expand: zh.focusExpand,
+              collapse: zh.focusCollapse,
+              noTranslation: zh.noTranslation,
+              similarTab: zh.focusTabSimilar,
+              openCurrentDetail: zh.openCurrentDetail,
+            }}
+            appleSurfaceClassName={APPLE_SURFACE}
+            onToggleMain={switchFocusMainExpression}
+            onToggleExpanded={(userPhraseId) =>
+              setExpandedFocusMainId((current) => (current === userPhraseId ? null : userPhraseId))
+            }
+            onOpenMainDetail={(row) => {
+              switchFocusMainExpression(row.userPhraseId);
+              void openFocusDetail({
+                text: row.text,
+                kind: "current",
+                chainMode: "reset",
+              });
+            }}
+            onOpenMainSimilarTab={(row) => {
+              switchFocusMainExpression(row.userPhraseId);
+              void openFocusDetail({
+                text: row.text,
+                kind: "current",
+                initialTab: "similar",
+                chainMode: "reset",
+              });
+            }}
+            onOpenPreviewItem={(row, item) => {
+              switchFocusMainExpression(row.userPhraseId);
+              setFocusRelationTab("similar");
+              setFocusRelationActiveText(item.text);
+              void openFocusDetail({
+                text: item.text,
+                differenceLabel: item.differenceLabel,
+                kind: item.kind,
+                chainMode: "reset",
+              });
+            }}
+          />
 
         </div>
       ) : (
@@ -3401,190 +3281,97 @@ export default function ChunksPage() {
                   (playingText === detailSpeakText || ttsPlaybackState.text === detailSpeakText);
 
                 return (
-                  <div className="flex h-full min-h-0 min-w-0 flex-col space-y-4">
-                <div className="shrink-0 rounded-2xl bg-[linear-gradient(135deg,rgb(245,247,250),rgb(234,239,244))] p-4">
-                  <div className="space-y-1">
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="min-w-0 text-lg font-semibold">{focusDetail.text}</p>
-                      <div className="flex shrink-0 items-center gap-2">
-                        {focusDetail.savedItem || activeAssistItem ? (
-                          <TtsActionButton
-                            active={isDetailSpeaking}
-                            onClick={() => handlePronounceSentence(detailSpeakText)}
-                            className="h-auto px-0 text-xs text-muted-foreground hover:text-foreground"
-                            iconClassName="size-4"
-                            label={zh.speakSentence}
-                          />
-                        ) : null}
-                        {!focusDetail.savedItem ? (
-                          <Badge variant="outline">{zh.detailCandidateBadge}</Badge>
-                        ) : null}
-                      </div>
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      {focusDetail.savedItem?.translation ??
-                        activeAssistItem?.translation ??
-                        zh.noTranslation}
-                    </p>
-                  </div>
-                  {focusDetail.differenceLabel ? (
-                    <p className="mt-2 text-xs text-muted-foreground">{focusDetail.differenceLabel}</p>
-                  ) : null}
-                </div>
-
-                {focusDetailLoading ? (
-                  <p className="text-sm text-muted-foreground">{zh.detailLoading}</p>
-                ) : null}
-                <Tabs
-                  value={focusDetailTab}
-                  onValueChange={(value) => {
-                    const nextTab = value as FocusDetailTabValue;
-                    setFocusDetailTab(nextTab);
-                    if (nextTab === "similar" || nextTab === "contrast") {
-                      setFocusRelationTab(nextTab);
+                  <FocusDetailContent
+                    detail={focusDetail}
+                    activeAssistItem={activeAssistItem}
+                    focusDetailTab={focusDetailTab}
+                    focusDetailLoading={focusDetailLoading}
+                    isDetailSpeaking={isDetailSpeaking}
+                    detailSpeakText={detailSpeakText}
+                    similarRows={similarDetailRows.map(({ row }) => row)}
+                    contrastRows={contrastDetailRows.map(({ row }) => row)}
+                    isSavedRelatedLoading={isSavedRelatedLoading}
+                    usageHint={
+                      focusDetail.savedItem
+                        ? getUsageHint(focusDetail.savedItem)
+                        : activeAssistItem?.usageNote || zh.usageHintFallback
                     }
-                  }}
-                  className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
-                >
-                  <TabsList className="mb-3 w-full min-w-0 shrink-0 justify-start overflow-x-auto overflow-y-hidden">
-                    <TabsTrigger value="info">{zh.detailTabInfo}</TabsTrigger>
-                    <TabsTrigger value="similar">{zh.detailTabSavedSimilar}</TabsTrigger>
-                    <TabsTrigger value="contrast">{zh.detailTabContrast}</TabsTrigger>
-                  </TabsList>
-
-                  <TabsContent
-                    value="info"
-                    className="mt-0 min-h-0 w-full flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-1"
-                  >
-                    <div className="space-y-4 pb-6">
-                      <div className="grid gap-3 sm:grid-cols-2">
-                        <div className="space-y-1 rounded-xl bg-[rgb(246,246,246)] p-3">
-                          <p className="text-xs text-muted-foreground">{zh.commonUsage}</p>
-                          <p className="text-sm text-foreground/90">
-                            {focusDetail.savedItem
-                              ? getUsageHint(focusDetail.savedItem)
-                              : activeAssistItem?.usageNote || zh.usageHintFallback}
-                          </p>
-                        </div>
-                        <div className="space-y-1 rounded-xl bg-[rgb(246,246,246)] p-3">
-                          <p className="text-xs text-muted-foreground">{zh.typicalScenarioLabel}</p>
-                          <p className="text-sm text-foreground/90">
-                            {focusDetail.savedItem?.typicalScenario ??
-                              activeAssistItem?.typicalScenario ??
-                              zh.typicalScenarioPending}
-                          </p>
-                        </div>
-                        <div className="space-y-1 rounded-xl bg-[rgb(246,246,246)] p-3">
-                          <p className="text-xs text-muted-foreground">{zh.semanticFocusLabel}</p>
-                          <p className="text-sm text-foreground/90">
-                            {focusDetail.savedItem?.semanticFocus ??
-                              activeAssistItem?.semanticFocus ??
-                              zh.semanticFocusPending}
-                          </p>
-                        </div>
-                        <div className="space-y-1 rounded-xl bg-[rgb(246,246,246)] p-3">
-                          <p className="text-xs text-muted-foreground">{zh.reviewStage}</p>
-                          <p className="text-sm text-foreground/90">
-                            {focusDetail.savedItem
-                              ? getReviewActionHint(focusDetail.savedItem.reviewStatus)
-                              : "可先加入表达库，再决定是否加入复习。"}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <p className="text-xs text-muted-foreground">{zh.sourceSentence}</p>
-                        {renderExampleSentenceCards(
-                          focusDetail.savedItem?.exampleSentences ??
-                            activeAssistItem?.examples ??
-                            [],
-                          focusDetail.text,
-                          {
-                            onSpeak: handlePronounceSentence,
-                            isSpeakingText: (text) =>
-                              Boolean(text) &&
-                              (playingText === text.trim() || ttsPlaybackState.text === text.trim()),
-                          },
-                        ) ?? <p className="text-sm text-muted-foreground">{zh.noSourceSentence}</p>}
-                      </div>
-                    </div>
-                  </TabsContent>
-
-                  <TabsContent
-                    value="similar"
-                    className="mt-0 min-h-0 w-full flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-1"
-                  >
-                    <div className="space-y-2 pb-6">
-                      <p className="text-xs text-muted-foreground">{zh.detailSimilarHint}</p>
-                      {similarDetailRows.length > 0 ? (
-                        similarDetailRows.slice(0, 12).map(({ row }) => (
-                          <button
-                            key={row.userPhraseId}
-                            type="button"
-                            className="w-full rounded-xl bg-[rgb(246,246,246)] p-3 text-left transition hover:bg-[rgb(238,238,238)]"
-                            onClick={() => {
-                              setFocusRelationTab("similar");
-                              void openFocusDetail({
-                                text: row.text,
-                                kind: "library-similar",
-                                chainMode: "append",
-                              });
-                            }}
-                          >
-                            <p className="text-sm font-medium">{row.text}</p>
-                            {row.translation ? (
-                              <p className="mt-1 text-xs text-muted-foreground">
-                                （同类）{row.translation}
-                              </p>
-                            ) : null}
-                          </button>
-                        ))
-                      ) : isSavedRelatedLoading ? (
-                        <p className="text-sm text-muted-foreground">{zh.detailLoading}</p>
-                      ) : (
-                        <p className="text-sm text-muted-foreground">{zh.focusEmptySimilar}</p>
-                      )}
-                    </div>
-                  </TabsContent>
-
-                  <TabsContent
-                    value="contrast"
-                    className="mt-0 min-h-0 w-full flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-1"
-                  >
-                      <div className="space-y-2 pb-6">
-                        <p className="text-xs text-muted-foreground">{zh.detailContrastHint}</p>
-                      {contrastDetailRows.length > 0 ? (
-                        contrastDetailRows.slice(0, 12).map(({ row }) => (
-                          <button
-                            key={row.userPhraseId}
-                            type="button"
-                            className="w-full rounded-xl bg-[rgb(246,246,246)] p-3 text-left transition hover:bg-[rgb(238,238,238)]"
-                            onClick={() => {
-                              setFocusRelationTab("contrast");
-                              void openFocusDetail({
-                                text: row.text,
-                                kind: "contrast",
-                                chainMode: "append",
-                              });
-                            }}
-                          >
-                            <p className="text-sm font-medium">{row.text}</p>
-                            {row.translation ? (
-                              <p className="mt-1 text-xs text-muted-foreground">
-                                （对照）{row.translation}
-                              </p>
-                            ) : null}
-                          </button>
-                        ))
-                      ) : isSavedRelatedLoading ? (
-                        <p className="text-sm text-muted-foreground">{zh.detailLoading}</p>
-                      ) : (
-                        <p className="text-sm text-muted-foreground">{zh.noContrastExpressions}</p>
-                      )}
-                      </div>
-                    </TabsContent>
-                </Tabs>
-                  </div>
+                    typicalScenario={
+                      focusDetail.savedItem?.typicalScenario ??
+                      activeAssistItem?.typicalScenario ??
+                      zh.typicalScenarioPending
+                    }
+                    semanticFocus={
+                      focusDetail.savedItem?.semanticFocus ??
+                      activeAssistItem?.semanticFocus ??
+                      zh.semanticFocusPending
+                    }
+                    reviewHint={
+                      focusDetail.savedItem
+                        ? getReviewActionHint(focusDetail.savedItem.reviewStatus)
+                        : "可先加入表达库，再决定是否加入复习。"
+                    }
+                    exampleCards={
+                      renderExampleSentenceCards(
+                        focusDetail.savedItem?.exampleSentences ??
+                          activeAssistItem?.examples ??
+                          [],
+                        focusDetail.text,
+                        {
+                          onSpeak: handlePronounceSentence,
+                          isSpeakingText: (text) =>
+                            Boolean(text) &&
+                            (playingText === text.trim() || ttsPlaybackState.text === text.trim()),
+                        },
+                      ) ?? null
+                    }
+                    labels={{
+                      speakSentence: zh.speakSentence,
+                      candidateBadge: zh.detailCandidateBadge,
+                      noTranslation: zh.noTranslation,
+                      loading: zh.detailLoading,
+                      tabInfo: zh.detailTabInfo,
+                      tabSimilar: zh.detailTabSavedSimilar,
+                      tabContrast: zh.detailTabContrast,
+                      commonUsage: zh.commonUsage,
+                      typicalScenario: zh.typicalScenarioLabel,
+                      semanticFocus: zh.semanticFocusLabel,
+                      reviewStage: zh.reviewStage,
+                      usageHintFallback: zh.usageHintFallback,
+                      typicalScenarioPending: zh.typicalScenarioPending,
+                      semanticFocusPending: zh.semanticFocusPending,
+                      reviewHintFallback: "可先加入表达库，再决定是否加入复习。",
+                      sourceSentence: zh.sourceSentence,
+                      noSourceSentence: zh.noSourceSentence,
+                      similarHint: zh.detailSimilarHint,
+                      emptySimilar: zh.focusEmptySimilar,
+                      contrastHint: zh.detailContrastHint,
+                      emptyContrast: zh.noContrastExpressions,
+                    }}
+                    onSpeak={handlePronounceSentence}
+                    onTabChange={(nextTab) => {
+                      setFocusDetailTab(nextTab);
+                      if (nextTab === "similar" || nextTab === "contrast") {
+                        setFocusRelationTab(nextTab);
+                      }
+                    }}
+                    onOpenSimilarRow={(row) => {
+                      setFocusRelationTab("similar");
+                      void openFocusDetail({
+                        text: row.text,
+                        kind: "library-similar",
+                        chainMode: "append",
+                      });
+                    }}
+                    onOpenContrastRow={(row) => {
+                      setFocusRelationTab("contrast");
+                      void openFocusDetail({
+                        text: row.text,
+                        kind: "contrast",
+                        chainMode: "append",
+                      });
+                    }}
+                  />
                 );
               })()
             ) : null}
@@ -3592,74 +3379,37 @@ export default function ChunksPage() {
 
           <SheetFooter className="shrink-0 border-t border-[rgb(236,238,240)] px-4 pb-safe pt-3">
             <div className="flex items-center justify-between gap-2">
-              {focusDetail && showFocusDetailActions ? (
-                <div className="relative">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    className={appleButtonClassName}
-                    onClick={() => setFocusDetailActionsOpen((current) => !current)}
-                    aria-expanded={focusDetailActionsOpen}
-                  >
-                    {zh.detailMoreActions}
-                    <ChevronDown
-                      className={`size-4 transition-transform ${
-                        focusDetailActionsOpen ? "rotate-180" : ""
-                      }`}
-                    />
-                  </Button>
-
-                  {focusDetailActionsOpen ? (
-                    <div className="absolute bottom-full left-0 z-10 mb-2 min-w-[200px] overflow-hidden rounded-2xl border border-[rgb(228,232,236)] bg-white p-1 shadow-lg">
-                      {canSetCurrentClusterMain ? (
-                        <button
-                          type="button"
-                          className="flex w-full items-center rounded-xl px-3 py-2.5 text-left text-sm text-foreground transition hover:bg-[rgb(246,246,246)]"
-                          disabled={!focusDetail.text}
-                          onClick={() => {
-                            setFocusDetailActionsOpen(false);
-                            setDetailConfirmAction("set-cluster-main");
-                          }}
-                        >
-                          {zh.detailOpenAsMain}
-                        </button>
-                      ) : null}
-                      {canMoveIntoCurrentCluster ? (
-                        <button
-                          type="button"
-                          className="flex w-full items-center rounded-xl px-3 py-2.5 text-left text-sm text-foreground transition hover:bg-[rgb(246,246,246)] disabled:text-muted-foreground"
-                          disabled={movingIntoCluster || ensuringMoveTargetCluster}
-                          onClick={() => {
-                            void openMoveIntoCurrentCluster();
-                          }}
-                        >
-                          {movingIntoCluster || ensuringMoveTargetCluster
-                            ? `${zh.moveIntoCluster}...`
-                            : zh.moveIntoCluster}
-                        </button>
-                      ) : null}
-                      {canSetStandaloneMain ? (
-                        <button
-                          type="button"
-                          className="flex w-full items-center rounded-xl px-3 py-2.5 text-left text-sm text-foreground transition hover:bg-[rgb(246,246,246)] disabled:text-muted-foreground"
-                          disabled={detachingClusterMember}
-                          onClick={() => {
-                            if (!focusDetail.savedItem?.expressionClusterId) return;
-                            setFocusDetailActionsOpen(false);
-                            setDetailConfirmAction("set-standalone-main");
-                          }}
-                        >
-                          {detachingClusterMember
-                            ? `${zh.detachClusterMember}...`
-                            : zh.detachClusterMember}
-                        </button>
-                      ) : null}
-                    </div>
-                  ) : null}
-                </div>
-              ) : (
-                <div />
-              )}
+              <FocusDetailActions
+                open={focusDetailActionsOpen}
+                show={Boolean(focusDetail && showFocusDetailActions)}
+                canSetCurrentClusterMain={canSetCurrentClusterMain}
+                canMoveIntoCurrentCluster={canMoveIntoCurrentCluster}
+                canSetStandaloneMain={canSetStandaloneMain}
+                movingIntoCluster={movingIntoCluster}
+                ensuringMoveTargetCluster={ensuringMoveTargetCluster}
+                detachingClusterMember={detachingClusterMember}
+                hasFocusDetailText={Boolean(focusDetail?.text)}
+                appleButtonClassName={appleButtonClassName}
+                labels={{
+                  moreActions: zh.detailMoreActions,
+                  openAsMain: zh.detailOpenAsMain,
+                  moveIntoCluster: zh.moveIntoCluster,
+                  detachClusterMember: zh.detachClusterMember,
+                }}
+                onToggleOpen={() => setFocusDetailActionsOpen((current) => !current)}
+                onRequestSetCurrentClusterMain={() => {
+                  setFocusDetailActionsOpen(false);
+                  setDetailConfirmAction("set-cluster-main");
+                }}
+                onRequestMoveIntoCluster={() => {
+                  void openMoveIntoCurrentCluster();
+                }}
+                onRequestSetStandaloneMain={() => {
+                  if (!focusDetail?.savedItem?.expressionClusterId) return;
+                  setFocusDetailActionsOpen(false);
+                  setDetailConfirmAction("set-standalone-main");
+                }}
+              />
 
               {focusDetail?.savedItem ? (
                 <Button
@@ -3731,8 +3481,7 @@ export default function ChunksPage() {
         onOpenChange={(open) => {
           setMoveIntoClusterOpen(open);
           if (!open) {
-            setExpandedMoveIntoClusterGroups({});
-            setSelectedMoveIntoClusterMap({});
+            resetMoveIntoClusterSelection();
           }
         }}
         onToggleGroupExpand={toggleMoveIntoClusterGroupExpand}
@@ -3741,67 +3490,33 @@ export default function ChunksPage() {
         onSubmit={() => void handleMoveSelectedIntoCurrentCluster()}
       />
 
-      {detailConfirmAction && focusDetail?.savedItem ? (
-        <div className="fixed inset-0 z-[70] flex items-end bg-black/25 p-3 animate-in fade-in-0 duration-200 sm:items-center sm:justify-center sm:p-6">
-          <button
-            type="button"
-            aria-label="关闭确认弹窗"
-            className="absolute inset-0"
-            onClick={() => setDetailConfirmAction(null)}
-          />
-          <Card className="relative z-10 w-full max-w-md border-0 bg-white shadow-[0_16px_40px_rgba(0,0,0,0.12)] animate-in slide-in-from-bottom-6 fade-in-0 duration-200 sm:slide-in-from-bottom-0 sm:zoom-in-95">
-            <CardHeader className="space-y-2">
-              <div>
-                <p className="text-base font-semibold">
-                  {detailConfirmAction === "set-cluster-main"
-                    ? zh.detailOpenAsMainConfirmTitle
-                    : zh.detachClusterMemberConfirmTitle}
-                </p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {detailConfirmAction === "set-cluster-main"
-                    ? zh.detailOpenAsMainConfirmDesc
-                    : zh.detachClusterMemberConfirmDesc}
-                </p>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <div className="rounded-xl bg-[rgb(246,246,246)] p-3">
-                <p className="text-sm font-medium">{focusDetail.savedItem.text}</p>
-                {focusDetail.savedItem.translation ? (
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {focusDetail.savedItem.translation}
-                  </p>
-                ) : null}
-              </div>
-            </CardContent>
-            <CardFooter className="flex justify-end gap-2">
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => setDetailConfirmAction(null)}
-                className={appleButtonClassName}
-              >
-                {zh.confirmCancel}
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => {
-                  if (detailConfirmAction === "set-cluster-main") {
-                    void setFocusDetailAsClusterMain();
-                    return;
-                  }
-                  void detachFocusDetailFromCluster();
-                }}
-                disabled={detachingClusterMember}
-                className={appleButtonClassName}
-              >
-                {detachingClusterMember ? `${zh.confirmContinue}...` : zh.confirmContinue}
-              </Button>
-            </CardFooter>
-          </Card>
-        </div>
-      ) : null}
+      <FocusDetailConfirm
+        open={Boolean(detailConfirmAction && focusDetail?.savedItem)}
+        title={
+          detailConfirmAction === "set-cluster-main"
+            ? zh.detailOpenAsMainConfirmTitle
+            : zh.detachClusterMemberConfirmTitle
+        }
+        description={
+          detailConfirmAction === "set-cluster-main"
+            ? zh.detailOpenAsMainConfirmDesc
+            : zh.detachClusterMemberConfirmDesc
+        }
+        text={focusDetail?.savedItem?.text ?? ""}
+        translation={focusDetail?.savedItem?.translation ?? null}
+        confirmLabel={zh.confirmContinue}
+        cancelLabel={zh.confirmCancel}
+        submitting={detachingClusterMember}
+        appleButtonClassName={appleButtonClassName}
+        onClose={() => setDetailConfirmAction(null)}
+        onConfirm={() => {
+          if (detailConfirmAction === "set-cluster-main") {
+            void setFocusDetailAsClusterMain();
+            return;
+          }
+          void detachFocusDetailFromCluster();
+        }}
+      />
 
       <Sheet open={mapOpen} onOpenChange={setMapOpen}>
         <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto rounded-t-2xl border-0 bg-white">

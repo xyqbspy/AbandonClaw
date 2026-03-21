@@ -12,22 +12,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { UserPhraseItemResponse } from "@/lib/utils/phrases-api";
-
-export type MoveIntoClusterCandidate = {
-  row: UserPhraseItemResponse;
-  sourceClusterId: string | null;
-  sourceClusterMainText: string;
-  sourceClusterMemberCount: number;
-  isSourceMain: boolean;
-};
-
-export type MoveIntoClusterGroup = {
-  key: string;
-  title: string;
-  description: string;
-  candidates: MoveIntoClusterCandidate[];
-  isCluster: boolean;
-};
+import { MoveIntoClusterCandidate, MoveIntoClusterGroup } from "./types";
 
 type MoveIntoClusterSheetLabels = {
   close: string;
