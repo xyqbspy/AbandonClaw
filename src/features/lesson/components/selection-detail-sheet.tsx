@@ -1,14 +1,14 @@
 ﻿"use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
-import { Languages, X } from "lucide-react";
+import { useCallback, useMemo, useState } from "react";
+import { Languages } from "lucide-react";
 import { TtsActionButton } from "@/components/audio/tts-action-button";
 import { LessonSentence, SelectionChunkLayer } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { DetailSheetShell } from "@/components/shared/detail-sheet-shell";
 import {
   APPLE_BUTTON_BASE,
   APPLE_BUTTON_TEXT_SM,
@@ -70,7 +70,6 @@ export function SelectionDetailSheet({
   sentenceSectionLabel?: string;
   onSelectSentence?: (sentenceId: string) => void;
 }) {
-  const panelRef = useRef<HTMLDivElement | null>(null);
   const [showSentenceTranslation, setShowSentenceTranslation] = useState(false);
   const [exampleTranslationOpenMap, setExampleTranslationOpenMap] = useState<Record<string, boolean>>({});
   const hasChunk = Boolean(chunkDetail);
@@ -86,50 +85,27 @@ export function SelectionDetailSheet({
     }));
   }, []);
 
-  useEffect(() => {
-    if (!open) return;
-    const originalOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = originalOverflow;
-    };
-  }, [open]);
-
-  if (!open || typeof document === "undefined") return null;
-
-  return createPortal(
-    <div className="fixed inset-0 z-[70] lg:hidden" aria-hidden={!open}>
-      <button
-        type="button"
-        aria-label="关闭学习详情"
-        className="absolute inset-0 bg-black/20 backdrop-blur-[1px] animate-in fade-in-0 duration-200"
-        onClick={() => {
-          onOpenChange(false);
-        }}
-      />
-      <section
-        ref={panelRef}
-        role="dialog"
-        aria-modal="true"
-        aria-label="学习详情"
-        className="absolute inset-x-0 bottom-0 z-[71] h-[78vh] max-h-[78vh] rounded-t-2xl bg-white shadow-xl animate-in slide-in-from-bottom-6 fade-in-0 duration-200"
-      >
-        <header className="flex items-start justify-between px-4 pb-3 pt-3">
-          <div>
-            <h2 className="text-sm font-semibold">学习详情</h2>
-          </div>
-          <Button
-            size="icon-sm"
-            variant="ghost"
-            className={cn("cursor-pointer", appleButtonClassName)}
-            aria-label="关闭学习详情"
-            onClick={() => onOpenChange(false)}
-          >
-            <X className="size-4" />
+  return (
+    <DetailSheetShell
+      open={open}
+      onOpenChange={onOpenChange}
+      ariaLabel="学习详情"
+      closeLabel="关闭学习详情"
+      containerClassName="lg:hidden"
+      panelClassName="h-[78vh] max-h-[78vh]"
+      bodyClassName="h-[calc(78vh-124px)]"
+      header={<h2 className="text-sm font-semibold">学习详情</h2>}
+      footer={
+        <div className="grid grid-cols-2 gap-2">
+          <Button variant="ghost" className={cn("cursor-pointer", appleButtonClassName)} onClick={onSave} disabled={!chunkDetail}>
+            {saved ? "已收藏" : "收藏短语"}
           </Button>
-        </header>
-
-        <div className="h-[calc(78vh-124px)] overflow-y-auto px-4 py-4">
+          <Button variant="ghost" className={cn("cursor-pointer", appleButtonClassName)} onClick={onReview} disabled={!chunkDetail}>
+            加入复习
+          </Button>
+        </div>
+      }
+    >
           {loading ? (
             <div className="space-y-3">
               <Skeleton className="h-8 w-2/3" />
@@ -340,21 +316,7 @@ export function SelectionDetailSheet({
               </section>
             </div>
           )}
-        </div>
-
-        <footer className="bg-background/95 p-3">
-          <div className="grid grid-cols-2 gap-2">
-            <Button variant="ghost" className={cn("cursor-pointer", appleButtonClassName)} onClick={onSave} disabled={!chunkDetail}>
-              {saved ? "已收藏" : "收藏短语"}
-            </Button>
-            <Button variant="ghost" className={cn("cursor-pointer", appleButtonClassName)} onClick={onReview} disabled={!chunkDetail}>
-              加入复习
-            </Button>
-          </div>
-        </footer>
-      </section>
-    </div>,
-    document.body,
+    </DetailSheetShell>
   );
 }
 
