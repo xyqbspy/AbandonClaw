@@ -7,6 +7,11 @@ import { ArrowRight, BookOpenCheck, Flame } from "lucide-react";
 import { toast } from "sonner";
 import { TodayTaskList } from "@/features/today/components/today-task-list";
 import {
+  buildTodayTasks,
+  getRecommendedScenes,
+  resolveContinueLearning,
+} from "@/features/today/components/today-page-selectors";
+import {
   getLearningDashboardCache,
   setLearningDashboardCache,
 } from "@/lib/cache/learning-dashboard-cache";
@@ -167,54 +172,25 @@ export function TodayPageClient({ displayName }: { displayName: string }) {
     });
   }, [dashboardDataSource, sceneDataSource, sceneList.length]);
 
-  const continueLearning =
-    dashboard.continueLearning ??
-    (sceneList[0]
-      ? {
-          sceneSlug: sceneList[0].slug,
-          title: sceneList[0].title,
-          subtitle: sceneList[0].subtitle,
-          progressPercent: sceneList[0].progressPercent,
-          lastViewedAt: sceneList[0].lastViewedAt,
-          lastSentenceIndex: null,
-          estimatedMinutes: sceneList[0].estimatedMinutes,
-          savedPhraseCount: 0,
-        }
-      : null);
-
-  const dailyTasks: DailyTask[] = [
-    {
-      id: "task-scene",
-      title: zh.taskSceneTitle,
-      description: continueLearning
-        ? `\u7ee7\u7eed ${continueLearning.title}\uff0c\u63a8\u8fdb\u5230 100%\u3002`
-        : zh.taskSceneDesc,
-      durationMinutes: continueLearning?.estimatedMinutes ?? 12,
-      done: dashboard.todayTasks.sceneTask.done,
-      actionHref: continueLearning ? `/scene/${continueLearning.sceneSlug}` : "/scenes",
-    },
-    {
-      id: "task-review",
-      title: zh.taskReviewTitle,
-      description:
-        dashboard.todayTasks.reviewTask.dueReviewCount > 0
-          ? `\u5f53\u524d\u5f85\u590d\u4e60 ${dashboard.todayTasks.reviewTask.dueReviewCount} \u6761\uff0c\u4eca\u5929\u5df2\u5b8c\u6210 ${dashboard.todayTasks.reviewTask.reviewItemsCompleted} \u6761\u3002`
-          : `\u4eca\u5929\u5df2\u5b8c\u6210 ${dashboard.todayTasks.reviewTask.reviewItemsCompleted} \u6761\u590d\u4e60\u3002`,
-      durationMinutes: 8,
-      done: dashboard.todayTasks.reviewTask.done,
-      actionHref: "/review",
-    },
-    {
-      id: "task-output",
-      title: zh.taskOutputTitle,
-      description: `\u4eca\u65e5\u5df2\u7d2f\u8ba1\u4fdd\u5b58 ${dashboard.todayTasks.outputTask.phrasesSavedToday} \u6761\u8868\u8fbe\u3002`,
-      durationMinutes: 4,
-      done: dashboard.todayTasks.outputTask.done,
-      actionHref: "/chunks",
-    },
-  ];
-
-  const recommendedScenes = useMemo(() => sceneList.slice(0, 2), [sceneList]);
+  const continueLearning = useMemo(
+    () => resolveContinueLearning(dashboard, sceneList),
+    [dashboard, sceneList],
+  );
+  const dailyTasks: DailyTask[] = useMemo(
+    () =>
+      buildTodayTasks({
+        dashboard,
+        continueLearning,
+        labels: {
+          taskSceneTitle: zh.taskSceneTitle,
+          taskSceneDesc: zh.taskSceneDesc,
+          taskReviewTitle: zh.taskReviewTitle,
+          taskOutputTitle: zh.taskOutputTitle,
+        },
+      }),
+    [continueLearning, dashboard],
+  );
+  const recommendedScenes = useMemo(() => getRecommendedScenes(sceneList), [sceneList]);
   const finalDisplayName = displayName || zh.userFallback;
 
   return (

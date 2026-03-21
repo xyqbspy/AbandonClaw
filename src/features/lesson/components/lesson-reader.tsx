@@ -52,122 +52,21 @@ import {
   LESSON_DIALOGUE_A_BG_CLASS,
   LESSON_DIALOGUE_B_BG_CLASS,
 } from "@/features/lesson/styles/dialogue-theme";
-
-type SelectionState = {
-  text: string;
-  sentenceId: string;
-  top: number;
-  left: number;
-};
-
-type InteractionState = {
-  activeSentenceId: string | null;
-  activeChunkKey: string | null;
-  hoveredChunkKey: string | null;
-  selectionState: SelectionState | null;
-};
-
-type InteractionAction =
-  | { type: "SENTENCE_SELECTED_FROM_SELECTION"; payload: SelectionState }
-  | { type: "SENTENCE_CONTEXT_SET"; payload: { sentenceId: string } }
-  | { type: "SELECTION_CLEARED" }
-  | {
-      type: "CHUNK_ACTIVATED";
-      payload: { sentenceId: string; chunkKey: string };
-    }
-  | { type: "CHUNK_HOVERED"; payload: { chunkKey: string | null } };
-
-type MobileSentenceGroup = {
-  key: string;
-  sentenceIds: string[];
-  text: string;
-  translation: string;
-  relatedChunks: string[];
-  speaker?: string;
-};
+import {
+  groupSentencesForMobile,
+  interactionReducer,
+  InteractionAction,
+  MobileSentenceGroup,
+  SelectionState,
+} from "./lesson-reader-logic";
 
 const normalizeSpeaker = (speaker?: string) => (speaker ?? "").trim().toUpperCase();
 const isPrimarySpeaker = (speaker?: string) => normalizeSpeaker(speaker) === "A";
 const speakerLabel = (speaker?: string) => normalizeSpeaker(speaker);
 
-function groupSentencesForMobile(
-  sentences: LessonSentence[],
-) {
-  const groups: Array<typeof sentences> = [];
-  let index = 0;
-
-  while (index < sentences.length) {
-    const current = sentences[index];
-    const next = sentences[index + 1];
-    const isCurrentLong = current.text.length > 95;
-    const hasSpeaker = Boolean(current.speaker || next?.speaker);
-
-    if (isCurrentLong || !next || hasSpeaker) {
-      groups.push([current]);
-      index += 1;
-      continue;
-    }
-
-    const looksLikeQuestion = /[?？！]\s*$/.test(current.text.trim());
-    const areBothShort = current.text.length <= 80 && next.text.length <= 80;
-
-    if (looksLikeQuestion || areBothShort) {
-      groups.push([current, next]);
-      index += 2;
-      continue;
-    }
-
-    groups.push([current]);
-    index += 1;
-  }
-
-  return groups;
-}
-
 const TOOLBAR_WIDTH = 256;
 const appleButtonLgClassName = `${APPLE_BUTTON_BASE} ${APPLE_BUTTON_TEXT_LG}`;
 const hasSpeakerTag = (speaker?: string) => /^[A-Z]$/.test((speaker ?? "").trim().toUpperCase());
-
-function interactionReducer(
-  state: InteractionState,
-  action: InteractionAction,
-): InteractionState {
-  switch (action.type) {
-    case "SENTENCE_SELECTED_FROM_SELECTION":
-      return {
-        activeSentenceId: action.payload.sentenceId,
-        activeChunkKey: null,
-        hoveredChunkKey: null,
-        selectionState: action.payload,
-      };
-    case "SENTENCE_CONTEXT_SET":
-      return {
-        ...state,
-        activeSentenceId: action.payload.sentenceId,
-        activeChunkKey: null,
-        hoveredChunkKey: null,
-      };
-    case "SELECTION_CLEARED":
-      return {
-        ...state,
-        selectionState: null,
-      };
-    case "CHUNK_ACTIVATED":
-      return {
-        activeSentenceId: action.payload.sentenceId,
-        activeChunkKey: action.payload.chunkKey,
-        hoveredChunkKey: null,
-        selectionState: null,
-      };
-    case "CHUNK_HOVERED":
-      return {
-        ...state,
-        hoveredChunkKey: action.payload.chunkKey,
-      };
-    default:
-      return state;
-  }
-}
 
 export function LessonReader({
   lesson,

@@ -54,6 +54,7 @@ import { MoveIntoClusterSheet } from "@/features/chunks/components/move-into-clu
 import { buildFocusDetailLabels } from "@/features/chunks/components/focus-detail-labels";
 import { FocusDetailSheet } from "@/features/chunks/components/focus-detail-sheet";
 import { ExpressionMapSheet } from "@/features/chunks/components/expression-map-sheet";
+import { buildExpressionMapViewModel } from "@/features/chunks/components/expression-map-selectors";
 import { ClusterFocusList } from "@/features/chunks/components/cluster-focus-list";
 import { buildFocusDetailViewModel } from "@/features/chunks/components/focus-detail-selectors";
 import {
@@ -438,20 +439,6 @@ const buildDifferenceNote = (centerExpression: string, targetExpression: string)
   return zh.diffRelated;
 };
 
-const overlapScore = (a: string, b: string) => {
-  const aTokens = tokenize(a);
-  const bTokens = tokenize(b);
-  if (aTokens.length === 0 || bTokens.length === 0) return 0;
-  const setA = new Set(aTokens);
-  const setB = new Set(bTokens);
-  let intersection = 0;
-  for (const token of setA) {
-    if (setB.has(token)) intersection += 1;
-  }
-  const union = new Set([...setA, ...setB]).size;
-  return union === 0 ? 0 : intersection / union;
-};
-
 const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 const renderSentenceWithExpressionHighlight = (sentence: string, expression: string) => {
@@ -769,19 +756,6 @@ export default function ChunksPage() {
     return `${zh.total} ${total} ${zh.items}`;
   }, [loading, total]);
 
-  const activeCluster = useMemo(() => {
-    if (!mapData || !activeClusterId) return null;
-    return mapData.clusters.find((cluster) => cluster.id === activeClusterId) ?? null;
-  }, [activeClusterId, mapData]);
-
-  const expressionStatusByNormalized = useMemo(() => {
-    const map = new Map<string, PhraseReviewStatus>();
-    for (const row of phrases) {
-      map.set(normalizePhraseText(row.text), row.reviewStatus);
-    }
-    return map;
-  }, [phrases]);
-
   const phraseByNormalized = useMemo(() => {
     const map = new Map<string, UserPhraseItemResponse>();
     for (const row of phrases) {
@@ -875,70 +849,23 @@ export default function ChunksPage() {
     return row?.text ?? "";
   }, [expressionClusterFilterId, phrases]);
 
-  const centerExpressionText = useMemo(() => {
-    if (!activeCluster) return mapSourceExpression?.text ?? "";
-    const sourceSceneId = mapData?.sourceSceneId ?? null;
-    const candidates = Array.from(
-      new Set(activeCluster.expressions.map((text) => text.trim()).filter(Boolean)),
-    );
-    if (candidates.length === 0) return mapSourceExpression?.text ?? activeCluster.anchor;
+  const expressionMapViewModel = useMemo(
+    () =>
+      buildExpressionMapViewModel({
+        mapData,
+        activeClusterId,
+        mapSourceExpression,
+        phrases,
+      }),
+    [activeClusterId, mapData, mapSourceExpression, phrases],
+  );
 
-    const scored = candidates.map((text) => {
-      const normalized = normalizePhraseText(text);
-      const userRow = phraseByNormalized.get(normalized) ?? null;
-      const nodes = activeCluster.nodes.filter(
-        (node) => normalizePhraseText(node.text) === normalized,
-      );
-      let score = 0;
-      if (nodes.some((node) => node.sourceType === "original" && node.sourceSceneId === sourceSceneId)) {
-        score += 600;
-      }
-      if (userRow) {
-        score += 260;
-        score += Math.min(80, userRow.reviewCount * 10);
-      }
-      if (userRow?.sourceSceneSlug && mapSourceExpression?.sourceSceneSlug) {
-        if (userRow.sourceSceneSlug === mapSourceExpression.sourceSceneSlug) score += 80;
-      }
-      const tokenCount = Math.max(1, tokenize(text).length);
-      score += Math.max(0, 40 - tokenCount * 6);
-      score += Math.max(0, 40 - text.length);
-      return { text, normalized, score };
-    });
-
-    scored.sort((a, b) => b.score - a.score || a.normalized.localeCompare(b.normalized));
-    return scored[0]?.text ?? mapSourceExpression?.text ?? activeCluster.anchor;
-  }, [activeCluster, mapData?.sourceSceneId, mapSourceExpression, phraseByNormalized]);
-
-  const displayedClusterExpressions = useMemo(() => {
-    if (!activeCluster) return [] as string[];
-    const center = centerExpressionText || activeCluster.anchor;
-    const uniqueExpressions = Array.from(
-      new Set(activeCluster.expressions.map((text) => text.trim()).filter(Boolean)),
-    );
-    const sourceSceneId = mapData?.sourceSceneId ?? null;
-
-    const scored = uniqueExpressions.map((text) => {
-      const normalized = normalizePhraseText(text);
-      const row = phraseByNormalized.get(normalized) ?? null;
-      const nodes = activeCluster.nodes.filter(
-        (node) => normalizePhraseText(node.text) === normalized,
-      );
-      let score = 0;
-      if (normalized === normalizePhraseText(center)) score += 1000;
-      score += overlapScore(center, text) * 120;
-      if (row) score += 100;
-      if (row?.reviewCount) score += Math.min(20, row.reviewCount);
-      if (nodes.some((node) => node.sourceType === "original" && node.sourceSceneId === sourceSceneId)) {
-        score += 50;
-      }
-      score += Math.max(0, 18 - Math.abs(text.length - center.length));
-      return { text, normalized, score };
-    });
-
-    scored.sort((a, b) => b.score - a.score || a.normalized.localeCompare(b.normalized));
-    return scored.slice(0, 8).map((item) => item.text);
-  }, [activeCluster, centerExpressionText, mapData?.sourceSceneId, phraseByNormalized]);
+  const {
+    activeCluster,
+    expressionStatusByNormalized,
+    centerExpressionText,
+    displayedClusterExpressions,
+  } = expressionMapViewModel;
 
   const getPrimaryActionLabel = (item: UserPhraseItemResponse) => {
     if (item.learningItemType === "sentence") return zh.sentenceReviewPending;

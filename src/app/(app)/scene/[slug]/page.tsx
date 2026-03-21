@@ -5,9 +5,12 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { LessonReader } from "@/features/lesson/components/lesson-reader";
 import { SelectionDetailSheet } from "@/features/lesson/components/selection-detail-sheet";
+import { SceneExpressionMapView } from "@/features/scene/components/scene-expression-map-view";
+import { ScenePracticeView } from "@/features/scene/components/scene-practice-view";
+import { SceneVariantsView } from "@/features/scene/components/scene-variants-view";
+import { sceneViewLabels } from "@/features/scene/components/scene-view-labels";
 import {
   getChunkLayerFromLesson,
-  getFirstSentence,
 } from "@/lib/data/mock-lessons";
 import { Lesson, LessonSentence, SelectionChunkLayer } from "@/lib/types";
 import { mapLessonToParsedScene } from "@/lib/adapters/scene-parser-adapter";
@@ -53,7 +56,6 @@ import {
 import { normalizePhraseText } from "@/lib/shared/phrases";
 import { buildChunkAudioKey } from "@/lib/shared/tts";
 import { useTtsPlaybackState } from "@/hooks/use-tts-playback-state";
-import { getLessonSentences } from "@/lib/shared/lesson-content";
 import {
   playChunkAudio,
   playSentenceAudio,
@@ -65,8 +67,23 @@ import {
   APPLE_BUTTON_DANGER,
   APPLE_BUTTON_TEXT_LG,
   APPLE_BUTTON_TEXT_SM,
-  APPLE_SURFACE,
 } from "@/lib/ui/apple-style";
+import {
+  buildReusedChunks,
+  collectLessonChunkTexts,
+  extractSlugFromSceneCacheKey,
+  findChunkContext,
+  isSceneViewMode,
+  toVariantStatusLabel,
+  toVariantTitle,
+} from "./scene-detail-logic";
+import { buildPracticeSet, buildVariantSet, createGeneratedId } from "./scene-detail-actions";
+import {
+  resolveSceneToolIntent,
+  resolveVariantDeleteOutcome,
+  sceneDetailConfirmMessages,
+  shouldReuseExpressionMapCache,
+} from "./scene-detail-controller";
 
 type SceneViewMode =
   | "scene"
@@ -75,111 +92,9 @@ type SceneViewMode =
   | "variant-study"
   | "expression-map";
 
-const buildReusedChunks = (lesson: Lesson, limit = 12) => {
-  const seen = new Set<string>();
-  const chunks: string[] = [];
-
-  for (const section of lesson.sections) {
-    for (const sentence of section.blocks.flatMap((block) => block.sentences)) {
-      const source = sentence.chunkDetails?.map((item) => item.text) ?? sentence.chunks;
-      for (const chunk of source) {
-        const normalized = chunk.trim();
-        if (!normalized) continue;
-        const key = normalized.toLowerCase();
-        if (seen.has(key)) continue;
-        seen.add(key);
-        chunks.push(normalized);
-        if (chunks.length >= limit) return chunks;
-      }
-    }
-  }
-
-  return chunks;
-};
-
-const makeGeneratedId = (prefix: string) =>
-  `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-
-const isSceneViewMode = (value: string): value is SceneViewMode =>
-  value === "scene" ||
-  value === "practice" ||
-  value === "variants" ||
-  value === "variant-study" ||
-  value === "expression-map";
-
-const findSentenceForChunk = (
-  lesson: Lesson,
-  chunkText: string,
-): LessonSentence | null => {
-  const lower = chunkText.trim().toLowerCase();
-  if (!lower) return null;
-  for (const section of lesson.sections) {
-    for (const sentence of section.blocks.flatMap((block) => block.sentences)) {
-      const inChunks = sentence.chunks.some((chunk) => chunk.toLowerCase() === lower);
-      const inChunkDetails = sentence.chunkDetails?.some(
-        (chunk) => chunk.text.toLowerCase() === lower,
-      );
-      if (inChunks || inChunkDetails) return sentence;
-    }
-  }
-  return getFirstSentence(lesson) ?? null;
-};
-
-const toVariantStatusLabel = (status: "unviewed" | "viewed" | "completed") => {
-  if (status === "viewed") return "已查看";
-  if (status === "completed") return "已完成";
-  return "未查看";
-};
-
-const toVariantTitle = (title: string) =>
-  title
-    .replace(/\s*\(Variant\s*\d+\)/gi, "")
-    .replace(/\s*[（(]变体\s*\d+[）)]/gi, "")
-    .trim();
-
-const findChunkContext = (
-  chunkText: string,
-  baseLesson: Lesson,
-  variantLessons: Lesson[],
-): { lesson: Lesson; sentence: LessonSentence } | null => {
-  const allLessons = [baseLesson, ...variantLessons];
-  for (const lesson of allLessons) {
-    const sentence = findSentenceForChunk(lesson, chunkText);
-    if (!sentence) continue;
-    const hasChunk =
-      sentence.chunks.some((item) => item.toLowerCase() === chunkText.toLowerCase()) ||
-      sentence.chunkDetails?.some(
-        (item) => item.text.toLowerCase() === chunkText.toLowerCase(),
-      );
-    if (hasChunk) return { lesson, sentence };
-  }
-  return null;
-};
-
-const collectLessonChunkTexts = (lesson: Lesson) => {
-  const texts = new Set<string>();
-  for (const section of lesson.sections) {
-    for (const sentence of section.blocks.flatMap((block) => block.sentences)) {
-      for (const chunk of sentence.chunks) {
-        const normalized = normalizePhraseText(chunk);
-        if (!normalized) continue;
-        texts.add(normalized);
-      }
-      for (const detail of sentence.chunkDetails ?? []) {
-        const normalized = normalizePhraseText(detail.text);
-        if (!normalized) continue;
-        texts.add(normalized);
-      }
-    }
-  }
-  return Array.from(texts);
-};
-
-const extractSlugFromSceneCacheKey = (key: string) =>
-  key.startsWith("scene:") ? key.slice("scene:".length) : "";
-
 const appleButtonSmClassName = `${APPLE_BUTTON_BASE} ${APPLE_BUTTON_TEXT_SM}`;
 const appleButtonLgClassName = `${APPLE_BUTTON_BASE} ${APPLE_BUTTON_TEXT_LG}`;
+const appleDangerButtonSmClassName = `${APPLE_BUTTON_DANGER} ${APPLE_BUTTON_TEXT_SM}`;
 
 export default function SceneDetailPage() {
   const params = useParams<{ slug: string }>();
@@ -532,19 +447,13 @@ export default function SceneDetailPage() {
         const current = getSceneGeneratedState(baseLesson.id).latestVariantSet;
         if (current) return;
 
-        const variantSet = {
-          id: `db-variant-${baseLesson.id}`,
-          sourceSceneId: baseLesson.id,
-          sourceSceneTitle: baseLesson.title,
+        const variantSet = buildVariantSet({
+          baseLesson,
+          variants,
           reusedChunks: buildReusedChunks(baseLesson),
-          variants: variants.map((lesson, index) => ({
-            id: `${lesson.id}-${index + 1}`,
-            lesson,
-            status: "unviewed" as const,
-          })),
-          status: "generated" as const,
-          createdAt: new Date().toISOString(),
-        };
+          nowIso: new Date().toISOString(),
+          createId: () => `db-variant-${baseLesson.id}`,
+        });
         saveVariantSet(variantSet);
         refreshGeneratedState(baseLesson.id);
       } catch {
@@ -649,18 +558,13 @@ export default function SceneDetailPage() {
         exerciseCount: 8,
       });
 
-      const isVariantSource = sourceLesson.sourceType === "variant";
-      const practiceSet = {
-        id: makeGeneratedId("practice"),
-        sourceSceneId: baseLesson.id,
-        sourceSceneTitle: baseLesson.title,
-        sourceType: isVariantSource ? ("variant" as const) : ("original" as const),
-        sourceVariantId: isVariantSource ? sourceLesson.id : undefined,
-        sourceVariantTitle: isVariantSource ? sourceLesson.title : undefined,
+      const practiceSet = buildPracticeSet({
+        baseLesson,
+        sourceLesson,
         exercises,
-        status: "generated" as const,
-        createdAt: new Date().toISOString(),
-      };
+        nowIso: new Date().toISOString(),
+        createId: createGeneratedId,
+      });
 
       savePracticeSet(practiceSet);
       refreshGeneratedState(baseLesson.id);
@@ -687,24 +591,13 @@ export default function SceneDetailPage() {
         retainChunkRatio: 0.6,
       });
 
-      const variantItems = variants.map((lesson, index) => {
-        const variantId = `${lesson.id}-${index + 1}`;
-        return {
-          id: variantId,
-          lesson,
-          status: "unviewed" as const,
-        };
-      });
-
-      const variantSet = {
-        id: makeGeneratedId("variant"),
-        sourceSceneId: baseLesson.id,
-        sourceSceneTitle: baseLesson.title,
+      const variantSet = buildVariantSet({
+        baseLesson,
+        variants,
         reusedChunks: buildReusedChunks(baseLesson),
-        variants: variantItems,
-        status: "generated" as const,
-        createdAt: new Date().toISOString(),
-      };
+        nowIso: new Date().toISOString(),
+        createId: createGeneratedId,
+      });
 
       saveVariantSet(variantSet);
       refreshGeneratedState(baseLesson.id);
@@ -747,7 +640,7 @@ export default function SceneDetailPage() {
 
   const handleDeletePracticeSet = () => {
     if (!baseLesson || !latestPracticeSet) return;
-    const confirmed = window.confirm("确认删除当前练习吗？删除后将无法查看，需重新生成。");
+    const confirmed = window.confirm(sceneDetailConfirmMessages.deletePracticeSet);
     if (!confirmed) return;
     deletePracticeSet(baseLesson.id, latestPracticeSet.id);
     refreshGeneratedState(baseLesson.id);
@@ -757,7 +650,7 @@ export default function SceneDetailPage() {
 
   const handleDeleteVariantSet = () => {
     if (!baseLesson || !latestVariantSet) return;
-    const confirmed = window.confirm("确认删除当前场景下全部变体吗？删除后变体1/2/3都会消失，需重新生成。");
+    const confirmed = window.confirm(sceneDetailConfirmMessages.deleteVariantSet);
     if (!confirmed) return;
     deleteAllVariantSets(baseLesson.id);
     refreshGeneratedState(baseLesson.id);
@@ -769,21 +662,32 @@ export default function SceneDetailPage() {
 
   const handleDeleteVariantItem = (variantId: string) => {
     if (!baseLesson || !latestVariantSet) return;
-    const confirmed = window.confirm("确认删除当前变体吗？删除后将无法恢复。");
+    const confirmed = window.confirm(sceneDetailConfirmMessages.deleteVariantItem);
     if (!confirmed) return;
     deleteVariantItem(baseLesson.id, latestVariantSet.id, variantId);
     refreshGeneratedState(baseLesson.id);
     setExpressionMap(null);
     setExpressionMapVariantSetId(null);
-    if (activeVariantId === variantId) {
+    const deleteOutcome = resolveVariantDeleteOutcome({
+      activeVariantId,
+      deletingVariantId: variantId,
+    });
+    if (deleteOutcome.shouldClearActiveVariant) {
       setActiveVariantId(null);
-      setViewModeWithRoute("variants");
+    }
+    if (deleteOutcome.nextViewMode) {
+      setViewModeWithRoute(deleteOutcome.nextViewMode);
     }
   };
 
   const handlePracticeToolClick = () => {
-    if (!baseLesson || practiceLoading) return;
-    if (generatedState.practiceStatus === "idle") {
+    const intent = resolveSceneToolIntent({
+      hasBaseLesson: Boolean(baseLesson),
+      loading: practiceLoading,
+      status: generatedState.practiceStatus,
+    });
+    if (intent === "ignore" || !baseLesson) return;
+    if (intent === "generate") {
       void handleGeneratePractice(baseLesson);
       return;
     }
@@ -791,8 +695,13 @@ export default function SceneDetailPage() {
   };
 
   const handleVariantToolClick = () => {
-    if (!baseLesson || variantsLoading) return;
-    if (generatedState.variantStatus === "idle") {
+    const intent = resolveSceneToolIntent({
+      hasBaseLesson: Boolean(baseLesson),
+      loading: variantsLoading,
+      status: generatedState.variantStatus,
+    });
+    if (intent === "ignore" || !baseLesson) return;
+    if (intent === "generate") {
       void handleGenerateVariants();
       return;
     }
@@ -824,7 +733,6 @@ export default function SceneDetailPage() {
     const sentence = variantChunkSentence;
     const selectedChunkText = variantChunkDetail?.text?.trim();
     if (selectedChunkText && clean.toLowerCase() === selectedChunkText.toLowerCase()) {
-      const chunkPlaybackKey = `chunk:${buildChunkAudioKey(clean)}`;
       if (playbackState.kind === "chunk" && playbackState.chunkKey === buildChunkAudioKey(clean)) {
         stopGeneratedAudio();
         return;
@@ -845,7 +753,6 @@ export default function SceneDetailPage() {
     }
 
     if (sentence && clean === sentence.text.trim()) {
-      const sentencePlaybackKey = `sentence:${sentence.id}:normal`;
       if (
         playbackState.kind === "sentence" &&
         playbackState.sentenceId === sentence.id &&
@@ -923,7 +830,13 @@ export default function SceneDetailPage() {
 
   const ensureExpressionMap = async () => {
     if (!baseLesson || !latestVariantSet) return null;
-    if (expressionMap && expressionMapVariantSetId === latestVariantSet.id) {
+    if (
+      expressionMap &&
+      shouldReuseExpressionMapCache({
+        currentVariantSetId: latestVariantSet.id,
+        cachedVariantSetId: expressionMapVariantSetId,
+      })
+    ) {
       return expressionMap;
     }
 
@@ -981,7 +894,6 @@ export default function SceneDetailPage() {
 
   const isDialogueScene = baseLesson.sceneType === "dialogue";
   const practiceButtonLabel = isDialogueScene ? "对话" : "表达";
-  const viewPracticeButtonLabel = isDialogueScene ? "查看对话" : "查看表达";
 
   const chunkDetailSheet = (
     <SelectionDetailSheet
@@ -1011,257 +923,59 @@ export default function SceneDetailPage() {
 
   if (viewMode === "practice") {
     return (
-      <div className="space-y-4">
-        <section className={`space-y-3 rounded-lg p-4 ${APPLE_SURFACE}`}>
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              className={`${appleButtonSmClassName} px-3 py-1.5 text-sm`}
-              onClick={() => setViewModeWithRoute("scene")}
-            >
-              返回原场景
-            </button>
-            <button
-              type="button"
-              className={`${APPLE_BUTTON_DANGER} px-3 py-1.5 text-sm disabled:opacity-60`}
-              onClick={handleDeletePracticeSet}
-              disabled={!latestPracticeSet}
-            >
-              删除当前练习
-            </button>
-            <button
-              type="button"
-              className={`${appleButtonSmClassName} px-3 py-1.5 text-sm disabled:opacity-60`}
-              onClick={handleMarkPracticeComplete}
-              disabled={!latestPracticeSet || latestPracticeSet.status === "completed"}
-            >
-              标记为已完成
-            </button>
-          </div>
-
-          <div className="text-sm text-muted-foreground">
-            {latestPracticeSet?.sourceType === "variant" ? (
-              <p>
-                当前练习基于：{latestPracticeSet.sourceVariantTitle ?? "Variant"}；来源场景：
-                {latestPracticeSet.sourceSceneTitle}
-              </p>
-            ) : (
-              <p>当前练习基于：{baseLesson.title}</p>
-            )}
-            <p className="mt-1">
-              这组练习基于当前场景生成，用来帮助你回忆、填空和改写核心表达。
-            </p>
-          </div>
-        </section>
-
-        {!latestPracticeSet ? (
-          <p className="text-sm text-muted-foreground">还没有可查看的练习集。</p>
-        ) : (
-          <section className={`space-y-3 rounded-lg p-4 ${APPLE_SURFACE}`}>
-            <ul className="space-y-2">
-              {latestPracticeSet.exercises.map((exercise, index) => {
-                const visible = Boolean(showAnswerMap[exercise.id]);
-                return (
-                  <li key={`${exercise.id}-${index}`} className="rounded-md bg-[rgb(240,240,240)] p-3 text-sm">
-                    <p className="text-xs text-muted-foreground">{exercise.type}</p>
-                    <p className="mt-1">{exercise.prompt}</p>
-                    {exercise.chunkId ? (
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        chunk: {exercise.chunkId}
-                      </p>
-                    ) : null}
-                    <button
-                      type="button"
-                      className={`${appleButtonSmClassName} mt-2 px-2 py-1 text-xs`}
-                      onClick={() =>
-                        setShowAnswerMap((prev) => ({
-                          ...prev,
-                          [exercise.id]: !prev[exercise.id],
-                        }))
-                      }
-                    >
-                      {visible ? "Hide Answer" : "Show Answer"}
-                    </button>
-                    {visible ? (
-                      <p className="mt-2 rounded bg-[rgb(240,240,240)] p-2 text-sm">{exercise.answer.text}</p>
-                    ) : null}
-                  </li>
-                );
-              })}
-            </ul>
-          </section>
-        )}
-      </div>
+      <ScenePracticeView
+        practiceSet={latestPracticeSet}
+        showAnswerMap={showAnswerMap}
+        appleButtonSmClassName={appleButtonSmClassName}
+        appleDangerButtonSmClassName={appleDangerButtonSmClassName}
+        labels={sceneViewLabels.practice}
+        onBack={() => setViewModeWithRoute("scene")}
+        onDelete={handleDeletePracticeSet}
+        onComplete={handleMarkPracticeComplete}
+        onToggleAnswer={(exerciseId) =>
+          setShowAnswerMap((prev) => ({
+            ...prev,
+            [exerciseId]: !prev[exerciseId],
+          }))
+        }
+      />
     );
   }
 
   if (viewMode === "variants") {
     return (
-      <div className="space-y-5">
-        <section className="space-y-4 rounded-xl border-0 bg-[rgb(246,246,246)] p-4 sm:p-5">
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            <button
-              type="button"
-              className={`h-8 whitespace-nowrap ${appleButtonSmClassName}`}
-              onClick={() => setViewModeWithRoute("scene")}
-            >
-              返回
-            </button>
-            <button
-              type="button"
-              className={`h-8 whitespace-nowrap ${appleButtonSmClassName} disabled:opacity-60`}
-              onClick={handleMarkVariantSetComplete}
-              disabled={!latestVariantSet || latestVariantSet.status === "completed"}
-            >
-              完成学习
-            </button>
-            <button
-              type="button"
-              className={`h-8 whitespace-nowrap px-3 ${APPLE_BUTTON_DANGER} ${APPLE_BUTTON_TEXT_SM} disabled:opacity-60`}
-              onClick={handleDeleteVariantSet}
-              disabled={!latestVariantSet}
-            >
-              删除变体
-            </button>
-          </div>
-
-          <div className="space-y-0.5 text-sm text-muted-foreground">
-            <p>来源场景：{baseLesson.title}</p>
-            <p>把这些核心表达迁移到相似语境里继续练习。</p>
-          </div>
-
-          <div className="space-y-2">
-            <div className="flex items-center justify-between gap-2">
-              <h3 className="text-sm font-medium">核心表达</h3>
-              <button
-                type="button"
-                className={`h-8 whitespace-nowrap ${APPLE_BUTTON_BASE} px-3 text-[11px] font-semibold text-muted-foreground disabled:opacity-60`}
-                onClick={handleOpenExpressionMap}
-                disabled={!latestVariantSet || expressionMapLoading}
-              >
-                {expressionMapLoading ? "生成中…" : "查看表达地图"}
-              </button>
-            </div>
-            {latestVariantSet?.reusedChunks?.length ? (
-              <div className="flex flex-wrap gap-1.5">
-                {latestVariantSet.reusedChunks.map((chunk) => (
-                  <button
-                    key={chunk}
-                    type="button"
-                    className={`${APPLE_BUTTON_BASE} px-2.5 py-1 text-[11px] font-medium`}
-                    onClick={() => handleOpenVariantChunk(chunk)}
-                  >
-                    {chunk}
-                  </button>
-                ))}
-              </div>
-            ) : null}
-          </div>
-        </section>
-
-        {!latestVariantSet ? (
-          <p className="text-sm text-muted-foreground">还没有可查看的变体集。</p>
-        ) : (
-          <section className={`space-y-2 rounded-xl p-4 sm:p-5 ${APPLE_SURFACE}`}>
-            <ul className="space-y-2">
-              {latestVariantSet.variants.map((variant) => (
-                <li
-                  key={variant.id}
-                  className="flex items-center justify-between gap-3 rounded-lg bg-[rgb(246,246,246)] p-3 text-sm"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium">{toVariantTitle(variant.lesson.title)}</p>
-                    <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
-                      {variant.lesson.sections[0]?.summary ?? variant.lesson.subtitle}
-                    </p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      状态：{toVariantStatusLabel(variant.status)}
-                    </p>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-1">
-                    <button
-                      type="button"
-                      className={`h-8 whitespace-nowrap ${appleButtonSmClassName}`}
-                      onClick={() => handleOpenVariant(variant.id)}
-                    >
-                      打开
-                    </button>
-                    <button
-                      type="button"
-                      className={`h-8 whitespace-nowrap px-2.5 ${APPLE_BUTTON_DANGER} ${APPLE_BUTTON_TEXT_SM}`}
-                      onClick={() => handleDeleteVariantItem(variant.id)}
-                    >
-                      删除
-                    </button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </section>
-        )}
-        {chunkDetailSheet}
-      </div>
+      <SceneVariantsView
+        baseLesson={baseLesson}
+        variantSet={latestVariantSet}
+        expressionMapLoading={expressionMapLoading}
+        appleButtonSmClassName={appleButtonSmClassName}
+        appleDangerButtonSmClassName={appleDangerButtonSmClassName}
+        labels={sceneViewLabels.variants}
+        onBack={() => setViewModeWithRoute("scene")}
+        onComplete={handleMarkVariantSetComplete}
+        onDeleteSet={handleDeleteVariantSet}
+        onOpenExpressionMap={() => void handleOpenExpressionMap()}
+        onOpenChunk={handleOpenVariantChunk}
+        onOpenVariant={handleOpenVariant}
+        onDeleteVariant={handleDeleteVariantItem}
+        toVariantTitle={toVariantTitle}
+        toVariantStatusLabel={toVariantStatusLabel}
+        chunkDetailSheet={chunkDetailSheet}
+      />
     );
   }
 
   if (viewMode === "expression-map") {
-    const clusters = expressionMap?.clusters ?? [];
-
     return (
-      <div className="space-y-4">
-        <section className={`space-y-3 rounded-lg p-4 ${APPLE_SURFACE}`}>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              className={`${appleButtonSmClassName} px-3 py-1.5 text-sm`}
-              onClick={() => setViewModeWithRoute("variants")}
-            >
-              返回变体页
-            </button>
-          </div>
-          <p className="text-sm text-muted-foreground">
-            表达簇会把当前场景与变体中的相关说法归在一起，帮助你快速看到同一意思的不同表达。
-          </p>
-          {expressionMapError ? (
-            <p className="text-sm text-destructive">{expressionMapError}</p>
-          ) : null}
-        </section>
-
-        <section className={`space-y-2 rounded-lg p-4 ${APPLE_SURFACE}`}>
-          {clusters.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              暂无表达簇。先生成变体后再查看表达地图。
-            </p>
-          ) : (
-            <ul className="space-y-2">
-              {clusters.map((cluster) => (
-                <li key={cluster.id} className="space-y-2 rounded-md bg-[rgb(240,240,240)] p-3 text-sm">
-                  <p className="font-medium">{cluster.anchor}</p>
-                  <p className="text-xs text-muted-foreground">{cluster.meaning}</p>
-                  <p className="text-xs text-muted-foreground">
-                    出现场景数：{cluster.sourceSceneIds.length}
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    {cluster.expressions.map((expression) => (
-                      <button
-                        key={`${cluster.id}-${expression}`}
-                        type="button"
-                        className={`${APPLE_BUTTON_BASE} px-2 py-1 text-xs`}
-                        onClick={() =>
-                          handleOpenExpressionDetail(expression, cluster.expressions)
-                        }
-                      >
-                        {expression}
-                      </button>
-                    ))}
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-        {chunkDetailSheet}
-      </div>
+      <SceneExpressionMapView
+        clusters={expressionMap?.clusters ?? []}
+        error={expressionMapError}
+        appleButtonSmClassName={appleButtonSmClassName}
+        labels={sceneViewLabels.expressionMap}
+        onBack={() => setViewModeWithRoute("variants")}
+        onOpenExpressionDetail={handleOpenExpressionDetail}
+        chunkDetailSheet={chunkDetailSheet}
+      />
     );
   }
 
