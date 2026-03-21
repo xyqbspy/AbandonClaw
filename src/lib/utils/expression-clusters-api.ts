@@ -84,3 +84,27 @@ export async function detachExpressionClusterMemberFromApi(payload: {
     memberCount: number;
   };
 }
+
+export async function moveExpressionClusterMemberFromApi(payload: {
+  targetClusterId: string;
+  userPhraseId: string;
+  targetMainUserPhraseId?: string;
+}) {
+  const response = await fetch("/api/expression-clusters/move", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    throw await toApiError(response, "移入表达簇失败。");
+  }
+  return (await response.json()) as {
+    clusterId: string;
+    movedUserPhraseId: string;
+    sourceClusterId?: string | null;
+    mergedClusterId?: string;
+    mainUserPhraseId: string;
+    memberCount: number;
+    action: "merged_cluster" | "moved_member" | "attached_member";
+  };
+}

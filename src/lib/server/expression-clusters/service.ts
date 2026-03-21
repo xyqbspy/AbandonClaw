@@ -37,6 +37,72 @@ async function getClusterMembers(clusterId: string) {
   return (data ?? []) as UserExpressionClusterMemberRow[];
 }
 
+async function getPhraseClusterMembership(params: {
+  userId: string;
+  userPhraseId: string;
+}) {
+  const admin = createSupabaseAdminClient();
+  const { data, error } = await admin
+    .from("user_expression_cluster_members")
+    .select("cluster_id,user_phrase_id,role, cluster:user_expression_clusters!inner(id,user_id,main_user_phrase_id)")
+    .eq("user_phrase_id", params.userPhraseId)
+    .maybeSingle<{
+      cluster_id: string;
+      user_phrase_id: string;
+      role: UserExpressionClusterMemberRole;
+      cluster:
+        | {
+            id: string;
+            user_id: string;
+            main_user_phrase_id: string | null;
+          }
+        | Array<{
+            id: string;
+            user_id: string;
+            main_user_phrase_id: string | null;
+          }>
+        | null;
+    }>();
+
+  if (error) {
+    throw new Error(`Failed to read expression cluster membership: ${error.message}`);
+  }
+
+  const cluster = Array.isArray(data?.cluster) ? (data?.cluster[0] ?? null) : (data?.cluster ?? null);
+  if (!data || !cluster || cluster.user_id !== params.userId) {
+    return null;
+  }
+
+  return {
+    clusterId: data.cluster_id,
+    role: data.role,
+    mainUserPhraseId: cluster.main_user_phrase_id,
+  };
+}
+
+async function assertOwnedExpressionPhrase(params: {
+  userId: string;
+  userPhraseId: string;
+}) {
+  const admin = createSupabaseAdminClient();
+  const { data, error } = await admin
+    .from("user_phrases")
+    .select("id,learning_item_type")
+    .eq("id", params.userPhraseId)
+    .eq("user_id", params.userId)
+    .maybeSingle<{ id: string; learning_item_type: "expression" | "sentence" | null }>();
+
+  if (error) {
+    throw new Error(`Failed to verify expression ownership: ${error.message}`);
+  }
+  if (!data) {
+    throw new ValidationError("Expression not found.");
+  }
+  if (data.learning_item_type === "sentence") {
+    throw new ValidationError("Only expression items can be moved between expression clusters.");
+  }
+}
+
 async function createSingletonCluster(params: {
   userId: string;
   userPhraseId: string;
@@ -259,5 +325,120 @@ export async function detachExpressionClusterMember(params: {
     nextMainUserPhraseId: nextMainId,
     newClusterId,
     memberCount: remainingMemberIds.length,
+  };
+}
+
+export async function moveExpressionClusterMember(params: {
+  userId: string;
+  targetClusterId: string;
+  userPhraseId: string;
+  targetMainUserPhraseId?: string;
+}) {
+  const targetCluster = await getClusterById(params.userId, params.targetClusterId);
+  const sourceMembership = await getPhraseClusterMembership({
+    userId: params.userId,
+    userPhraseId: params.userPhraseId,
+  });
+
+  if (sourceMembership?.clusterId === targetCluster.id) {
+    throw new ValidationError("Expression already belongs to the target cluster.");
+  }
+
+  await assertOwnedExpressionPhrase({
+    userId: params.userId,
+    userPhraseId: params.userPhraseId,
+  });
+
+  const targetMembers = await getClusterMembers(targetCluster.id);
+  const targetMemberIds = targetMembers.map((member) => member.user_phrase_id);
+  const requestedTargetMainId = params.targetMainUserPhraseId?.trim() || "";
+  const targetMainUserPhraseId =
+    (requestedTargetMainId && targetMemberIds.includes(requestedTargetMainId) ? requestedTargetMainId : "") ||
+    targetCluster.main_user_phrase_id ||
+    targetMemberIds[0] ||
+    params.userPhraseId;
+
+  if (sourceMembership?.role === "main" && sourceMembership.clusterId) {
+    const merged = await mergeExpressionClusters({
+      userId: params.userId,
+      targetClusterId: targetCluster.id,
+      sourceClusterId: sourceMembership.clusterId,
+      mainUserPhraseId: targetMainUserPhraseId,
+    });
+
+    return {
+      ...merged,
+      movedUserPhraseId: params.userPhraseId,
+      action: "merged_cluster" as const,
+    };
+  }
+
+  if (sourceMembership?.clusterId) {
+    const sourceCluster = await getClusterById(params.userId, sourceMembership.clusterId);
+    const sourceMembers = await getClusterMembers(sourceCluster.id);
+    const remainingMemberIds = sourceMembers
+      .map((member) => member.user_phrase_id)
+      .filter((userPhraseId) => userPhraseId !== params.userPhraseId);
+
+    if (remainingMemberIds.length === 0) {
+      const admin = createSupabaseAdminClient();
+      const { error: deleteSourceError } = await admin
+        .from("user_expression_clusters")
+        .delete()
+        .eq("id", sourceCluster.id)
+        .eq("user_id", params.userId);
+      if (deleteSourceError) {
+        throw new Error(`Failed to delete emptied source cluster: ${deleteSourceError.message}`);
+      }
+    } else {
+      const nextSourceMainId =
+        remainingMemberIds.includes(sourceCluster.main_user_phrase_id ?? "")
+          ? (sourceCluster.main_user_phrase_id as string)
+          : remainingMemberIds[0];
+
+      await writeClusterRoles({
+        clusterId: sourceCluster.id,
+        mainUserPhraseId: nextSourceMainId,
+        userPhraseIds: remainingMemberIds,
+      });
+
+      const admin = createSupabaseAdminClient();
+      const { error: updateSourceError } = await admin
+        .from("user_expression_clusters")
+        .update({ main_user_phrase_id: nextSourceMainId } as never)
+        .eq("id", sourceCluster.id)
+        .eq("user_id", params.userId);
+      if (updateSourceError) {
+        throw new Error(`Failed to update source cluster after move: ${updateSourceError.message}`);
+      }
+    }
+  }
+
+  const nextTargetMemberIds = Array.from(new Set([...targetMemberIds, params.userPhraseId]));
+  await writeClusterRoles({
+    clusterId: targetCluster.id,
+    mainUserPhraseId: targetMainUserPhraseId,
+    userPhraseIds: nextTargetMemberIds,
+  });
+
+  const admin = createSupabaseAdminClient();
+  const { error: updateTargetError } = await admin
+    .from("user_expression_clusters")
+    .update({ main_user_phrase_id: targetMainUserPhraseId } as never)
+    .eq("id", targetCluster.id)
+    .eq("user_id", params.userId);
+  if (updateTargetError) {
+    throw new Error(`Failed to update target cluster after move: ${updateTargetError.message}`);
+  }
+
+  return {
+    clusterId: targetCluster.id,
+    movedUserPhraseId: params.userPhraseId,
+    sourceClusterId: sourceMembership?.clusterId ?? null,
+    mainUserPhraseId: targetMainUserPhraseId,
+    memberCount: nextTargetMemberIds.length,
+    action: (sourceMembership?.clusterId ? "moved_member" : "attached_member") as
+      | "moved_member"
+      | "attached_member",
   };
 }
