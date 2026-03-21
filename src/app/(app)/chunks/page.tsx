@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -73,6 +73,13 @@ import {
   APPLE_BUTTON_TEXT_SM,
   APPLE_SURFACE,
 } from "@/lib/ui/apple-style";
+import {
+  buildClusterFilterChange,
+  buildChunksSummary,
+  getClusterIdFromSearchParams,
+  resolveClusterFilterExpressionLabel,
+  resolveFocusExpressionId,
+} from "./chunks-page-logic";
 
 const zh = {
   loadFailed: "\u52a0\u8f7d\u8868\u8fbe\u5931\u8d25\u3002",
@@ -561,7 +568,7 @@ export default function ChunksPage() {
   const ttsPlaybackState = useTtsPlaybackState();
   const [playingText, setPlayingText] = useState<string | null>(null);
   const searchParams = useSearchParams();
-  const clusterFromQuery = searchParams.get("cluster")?.trim() ?? "";
+  const clusterFromQuery = getClusterIdFromSearchParams(searchParams);
   // 页面基础状态
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
@@ -752,8 +759,15 @@ export default function ChunksPage() {
   }, [listDataSource, phrases.length, reviewFilter, contentFilter, expressionClusterFilterId]);
 
   const summary = useMemo(() => {
-    if (loading) return zh.loading;
-    return `${zh.total} ${total} ${zh.items}`;
+    return buildChunksSummary({
+      loading,
+      total,
+      labels: {
+        loading: zh.loading,
+        total: zh.total,
+        items: zh.items,
+      },
+    });
   }, [loading, total]);
 
   const phraseByNormalized = useMemo(() => {
@@ -810,12 +824,22 @@ export default function ChunksPage() {
 
   const focusExpression = useMemo(() => {
     if (focusMainExpressionRows.length === 0) return null;
-    const resolvedId = focusExpressionId ? resolveFocusMainExpressionIdForRow(focusExpressionId) : "";
+    const resolvedId = resolveFocusExpressionId({
+      contentFilter,
+      focusExpressionId,
+      focusMainExpressionIds: focusMainExpressionRows.map((row) => row.userPhraseId),
+      resolveFocusMainExpressionId: resolveFocusMainExpressionIdForRow,
+    });
     return (
       focusMainExpressionRows.find((row) => row.userPhraseId === resolvedId) ??
       focusMainExpressionRows[0]
     );
-  }, [focusExpressionId, focusMainExpressionRows, resolveFocusMainExpressionIdForRow]);
+  }, [
+    contentFilter,
+    focusExpressionId,
+    focusMainExpressionRows,
+    resolveFocusMainExpressionIdForRow,
+  ]);
 
   useEffect(() => {
     if (contentFilter !== "expression") return;
@@ -824,8 +848,17 @@ export default function ChunksPage() {
       setFocusAssistData(null);
       return;
     }
-    const resolvedId = focusExpressionId ? resolveFocusMainExpressionIdForRow(focusExpressionId) : "";
-    if (!resolvedId || !focusMainExpressionRows.some((row) => row.userPhraseId === resolvedId)) {
+    const resolvedId = resolveFocusExpressionId({
+      contentFilter,
+      focusExpressionId,
+      focusMainExpressionIds: focusMainExpressionRows.map((row) => row.userPhraseId),
+      resolveFocusMainExpressionId: resolveFocusMainExpressionIdForRow,
+    });
+    if (!resolvedId) {
+      setFocusExpressionId("");
+      return;
+    }
+    if (!focusMainExpressionRows.some((row) => row.userPhraseId === resolvedId)) {
       setFocusExpressionId(focusMainExpressionRows[0].userPhraseId);
       return;
     }
@@ -840,13 +873,10 @@ export default function ChunksPage() {
   }, [focusExpressionId]);
 
   const clusterFilterExpressionLabel = useMemo(() => {
-    if (!expressionClusterFilterId) return "";
-    const row = phrases.find(
-      (item) =>
-        item.learningItemType === "expression" &&
-        item.expressionClusterId === expressionClusterFilterId,
-    );
-    return row?.text ?? "";
+    return resolveClusterFilterExpressionLabel({
+      expressionClusterFilterId,
+      phrases,
+    });
   }, [expressionClusterFilterId, phrases]);
 
   const expressionMapViewModel = useMemo(
@@ -1657,26 +1687,30 @@ export default function ChunksPage() {
   };
 
   const applyClusterFilter = (clusterId: string, sourceExpressionText?: string) => {
-    const normalized = clusterId.trim();
-    if (!normalized) return;
-    setExpressionClusterFilterId(normalized);
+    const next = buildClusterFilterChange({
+      searchParams,
+      clusterId,
+    });
+    if (!next.nextClusterId) return;
+    setExpressionClusterFilterId(next.nextClusterId);
     setQuery("");
-    setContentFilter("expression");
-    setReviewFilter("all");
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("cluster", normalized);
-    router.replace(`/chunks?${params.toString()}`);
+    if (next.shouldResetFilters) {
+      setContentFilter("expression");
+      setReviewFilter("all");
+    }
+    router.replace(next.nextHref);
     if (sourceExpressionText) {
       toast.message(`${zh.filteredClusterPrefix} ${sourceExpressionText} ${zh.filteredClusterSuffix}`);
     }
   };
 
   const clearClusterFilter = () => {
-    setExpressionClusterFilterId("");
-    const params = new URLSearchParams(searchParams.toString());
-    params.delete("cluster");
-    const suffix = params.toString();
-    router.replace(`/chunks${suffix ? `?${suffix}` : ""}`);
+    const next = buildClusterFilterChange({
+      searchParams,
+      clusterId: "",
+    });
+    setExpressionClusterFilterId(next.nextClusterId);
+    router.replace(next.nextHref);
   };
 
   const openGenerateSimilarSheet = async (item: UserPhraseItemResponse) => {
@@ -3321,3 +3355,4 @@ export default function ChunksPage() {
     </div>
   );
 }
+

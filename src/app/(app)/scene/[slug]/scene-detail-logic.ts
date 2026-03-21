@@ -1,6 +1,5 @@
 import { normalizePhraseText } from "@/lib/shared/phrases";
 import { Lesson, LessonSentence } from "@/lib/types";
-import { getFirstSentence } from "@/lib/data/mock-lessons";
 
 export const buildReusedChunks = (lesson: Lesson, limit = 12) => {
   const seen = new Set<string>();
@@ -46,7 +45,7 @@ export const findSentenceForChunk = (
       if (inChunks || inChunkDetails) return sentence;
     }
   }
-  return getFirstSentence(lesson) ?? null;
+  return null;
 };
 
 export const toVariantStatusLabel = (status: "unviewed" | "viewed" | "completed") => {

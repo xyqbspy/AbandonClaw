@@ -1,4 +1,4 @@
-import assert from "node:assert/strict";
+﻿import assert from "node:assert/strict";
 import test from "node:test";
 import {
   buildReusedChunks,
@@ -119,11 +119,12 @@ test("findSentenceForChunk 和 findChunkContext 能在基础场景与变体中�
 
   assert.equal(findSentenceForChunk(baseLesson, "call it a day")?.id, "s1");
   assert.equal(findSentenceForChunk(baseLesson, "at least")?.id, "s2");
-  assert.equal(findSentenceForChunk(baseLesson, "missing")?.id, "s1");
+  assert.equal(findSentenceForChunk(baseLesson, "missing"), null);
 
   const context = findChunkContext("barely slept", baseLesson, [variantLesson]);
   assert.equal(context?.lesson.id, "variant-1");
   assert.equal(context?.sentence.id, "v1");
+  assert.equal(findChunkContext("missing", baseLesson, [variantLesson]), null);
 });
 
 test("场景辅助文案 helper 会返回稳定结果", () => {

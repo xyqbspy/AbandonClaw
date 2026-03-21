@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
@@ -9,9 +9,7 @@ import { SceneExpressionMapView } from "@/features/scene/components/scene-expres
 import { ScenePracticeView } from "@/features/scene/components/scene-practice-view";
 import { SceneVariantsView } from "@/features/scene/components/scene-variants-view";
 import { sceneViewLabels } from "@/features/scene/components/scene-view-labels";
-import {
-  getChunkLayerFromLesson,
-} from "@/lib/data/mock-lessons";
+import { getChunkLayerFromLesson } from "@/lib/data/mock-lessons";
 import { Lesson, LessonSentence, SelectionChunkLayer } from "@/lib/types";
 import { mapLessonToParsedScene } from "@/lib/adapters/scene-parser-adapter";
 import { practiceGenerateFromApi } from "@/lib/utils/practice-generate-api";
@@ -73,7 +71,6 @@ import {
   collectLessonChunkTexts,
   extractSlugFromSceneCacheKey,
   findChunkContext,
-  isSceneViewMode,
   toVariantStatusLabel,
   toVariantTitle,
 } from "./scene-detail-logic";
@@ -84,13 +81,21 @@ import {
   sceneDetailConfirmMessages,
   shouldReuseExpressionMapCache,
 } from "./scene-detail-controller";
-
-type SceneViewMode =
-  | "scene"
-  | "practice"
-  | "variants"
-  | "variant-study"
-  | "expression-map";
+import {
+  buildSceneLearningUpdatePayload,
+  shouldFlushSceneLearningDelta,
+} from "./scene-detail-learning-logic";
+import {
+  buildScenePrefetchPlan,
+  resolveSceneCachePresentation,
+  resolveSceneNetworkFailure,
+} from "./scene-detail-load-logic";
+import {
+  buildSceneDetailHref,
+  buildScenePrefetchCandidates,
+  parseSceneDetailRouteState,
+  SceneViewMode,
+} from "./scene-detail-page-logic";
 
 const appleButtonSmClassName = `${APPLE_BUTTON_BASE} ${APPLE_BUTTON_TEXT_SM}`;
 const appleButtonLgClassName = `${APPLE_BUTTON_BASE} ${APPLE_BUTTON_TEXT_LG}`;
@@ -206,11 +211,19 @@ export default function SceneDetailPage() {
       lastVariantIndex?: number;
       withPause?: boolean;
     }) => {
-      if (!baseLesson || !learningStartedRef.current) return Promise.resolve();
       const studySecondsDelta = computeElapsedSecondsSinceLastSync();
-      if (studySecondsDelta <= 0 && !payload.withPause) {
+      if (
+        !shouldFlushSceneLearningDelta({
+          hasBaseLesson: Boolean(baseLesson),
+          learningStarted: learningStartedRef.current,
+          studySecondsDelta,
+          withPause: Boolean(payload.withPause),
+        })
+      ) {
         return Promise.resolve();
       }
+
+      if (!baseLesson) return Promise.resolve();
 
       return updateSceneLearningProgressFromApi(baseLesson.slug, {
         progressPercent: payload.progressPercent,
@@ -230,14 +243,6 @@ export default function SceneDetailPage() {
     [baseLesson],
   );
 
-  const estimateProgressPercent = (mode: SceneViewMode) => {
-    if (mode === "practice") return 90;
-    if (mode === "variants" || mode === "variant-study" || mode === "expression-map") {
-      return 65;
-    }
-    return 20;
-  };
-
   const computeElapsedSecondsSinceLastSync = () => {
     const now = Date.now();
     const elapsed = Math.max(0, Math.floor((now - lastProgressSyncMsRef.current) / 1000));
@@ -246,20 +251,12 @@ export default function SceneDetailPage() {
   };
 
   const setViewModeWithRoute = (next: SceneViewMode, variantId?: string | null) => {
-    const nextParams = new URLSearchParams(searchParams.toString());
-    if (next === "scene") {
-      nextParams.delete("view");
-      nextParams.delete("variant");
-    } else {
-      nextParams.set("view", next);
-      if (next === "variant-study" && variantId) {
-        nextParams.set("variant", variantId);
-      } else {
-        nextParams.delete("variant");
-      }
-    }
-    const query = nextParams.toString();
-    const href = query ? `/scene/${sceneSlug}?${query}` : `/scene/${sceneSlug}`;
+    const href = buildSceneDetailHref({
+      sceneSlug,
+      searchParams,
+      nextViewMode: next,
+      variantId,
+    });
     router.push(href, { scroll: false });
   };
 
@@ -297,11 +294,19 @@ export default function SceneDetailPage() {
           const cacheResult = await getSceneCache(requestSlug);
           if (!canApply()) return;
           if (cacheResult.found && cacheResult.record) {
-            hasCacheFallback = true;
-            cacheFresh = !cacheResult.isExpired;
-            setBaseLesson(cacheResult.record.data);
-            setSceneDataSource("cache");
-            setSceneLoading(false);
+            const presentation = resolveSceneCachePresentation({
+              cacheFound: true,
+              cacheExpired: cacheResult.isExpired,
+            });
+            hasCacheFallback = presentation.hasCacheFallback;
+            cacheFresh = presentation.cacheFresh;
+            if (presentation.shouldHydrateFromCache) {
+              setBaseLesson(cacheResult.record.data);
+              setSceneDataSource(presentation.nextDataSource);
+            }
+            if (presentation.shouldStopLoading) {
+              setSceneLoading(false);
+            }
           }
         } catch {
           // Non-blocking: cache failures should not block network flow.
@@ -323,21 +328,18 @@ export default function SceneDetailPage() {
 
           // Low-disturb prefetch: only after current scene network result is visible.
           void (async () => {
-            const candidates: string[] = [];
+            let sceneSlugs: string[] = [];
+            let candidates: string[] = [];
             try {
               const list = await getScenesFromApi();
               if (!canApply()) return;
-              const currentIndex = list.findIndex(
-                (item) => normalizeSceneSlug(item.slug) === requestSlug,
-              );
-              if (currentIndex >= 0) {
-                for (let i = currentIndex + 1; i < list.length; i += 1) {
-                  const nextSlug = normalizeSceneSlug(list[i]?.slug ?? "");
-                  if (!nextSlug || nextSlug === requestSlug) continue;
-                  candidates.push(nextSlug);
-                  if (candidates.length >= 2) break;
-                }
-              }
+              sceneSlugs = list.map((item) => item.slug);
+              candidates = buildScenePrefetchPlan({
+                requestSlug,
+                sceneSlugs,
+                recentCacheKeys: [],
+                extractSlugFromSceneCacheKey,
+              });
             } catch {
               // Non-blocking: prefetch candidates can degrade gracefully.
             }
@@ -345,13 +347,12 @@ export default function SceneDetailPage() {
             if (candidates.length < 2) {
               try {
                 const recentKeys = await listRecentSceneCacheKeys(8);
-                for (const key of recentKeys) {
-                  const recentSlug = normalizeSceneSlug(extractSlugFromSceneCacheKey(key));
-                  if (!recentSlug || recentSlug === requestSlug) continue;
-                  if (candidates.includes(recentSlug)) continue;
-                  candidates.push(recentSlug);
-                  if (candidates.length >= 2) break;
-                }
+                candidates = buildScenePrefetchPlan({
+                  requestSlug,
+                  sceneSlugs,
+                  recentCacheKeys: recentKeys,
+                  extractSlugFromSceneCacheKey,
+                });
               } catch {
                 // ignore
               }
@@ -468,11 +469,9 @@ export default function SceneDetailPage() {
   }, [baseLesson]);
 
   useEffect(() => {
-    const modeParam = searchParams.get("view");
-    const variantParam = searchParams.get("variant");
-    const parsedMode = modeParam && isSceneViewMode(modeParam) ? modeParam : "scene";
-    setViewMode(parsedMode === "variant-study" ? "variant-study" : parsedMode);
-    setActiveVariantId(parsedMode === "variant-study" ? variantParam : null);
+    const routeState = parseSceneDetailRouteState(searchParams);
+    setViewMode(routeState.viewMode);
+    setActiveVariantId(routeState.activeVariantId);
     setPracticeError(null);
     setVariantsError(null);
     setShowAnswerMap({});
@@ -495,11 +494,12 @@ export default function SceneDetailPage() {
   useEffect(() => {
     if (!baseLesson) return;
     const timer = window.setTimeout(() => {
-      void flushLearningDelta({
-        progressPercent: estimateProgressPercent(viewMode),
-        lastVariantIndex:
-          viewMode === "variant-study" && activeVariantId ? 1 : undefined,
-      });
+      void flushLearningDelta(
+        buildSceneLearningUpdatePayload({
+          viewMode,
+          activeVariantId,
+        }),
+      );
     }, 1200);
     return () => {
       window.clearTimeout(timer);
@@ -512,9 +512,11 @@ export default function SceneDetailPage() {
       window.clearInterval(learningPingTimerRef.current);
     }
     learningPingTimerRef.current = window.setInterval(() => {
-      void flushLearningDelta({
-        progressPercent: estimateProgressPercent(viewMode),
-      });
+      void flushLearningDelta(
+        buildSceneLearningUpdatePayload({
+          viewMode,
+        }),
+      );
     }, 60000);
 
     return () => {
@@ -528,10 +530,12 @@ export default function SceneDetailPage() {
   useEffect(() => {
     if (!baseLesson) return;
     return () => {
-      void flushLearningDelta({
-        progressPercent: estimateProgressPercent(currentViewModeRef.current),
-        withPause: true,
-      });
+      void flushLearningDelta(
+        buildSceneLearningUpdatePayload({
+          viewMode: currentViewModeRef.current,
+          withPause: true,
+        }),
+      );
     };
   }, [baseLesson, flushLearningDelta]);
 
@@ -1068,4 +1072,5 @@ export default function SceneDetailPage() {
     </div>
   );
 }
+
 
