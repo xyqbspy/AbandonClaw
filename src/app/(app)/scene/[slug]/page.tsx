@@ -11,8 +11,6 @@ import { SceneVariantsView } from "@/features/scene/components/scene-variants-vi
 import { sceneViewLabels } from "@/features/scene/components/scene-view-labels";
 import { getChunkLayerFromLesson } from "@/lib/data/mock-lessons";
 import { Lesson, LessonSentence, SelectionChunkLayer } from "@/lib/types";
-import { mapLessonToParsedScene } from "@/lib/adapters/scene-parser-adapter";
-import { practiceGenerateFromApi } from "@/lib/utils/practice-generate-api";
 import {
   deleteAllVariantSets,
   deletePracticeSet,
@@ -26,7 +24,6 @@ import {
 } from "@/lib/utils/scene-learning-flow-storage";
 import { SceneGeneratedState } from "@/lib/types/learning-flow";
 import { ExpressionMapResponse } from "@/lib/types/expression-map";
-import { generateExpressionMapFromApi } from "@/lib/utils/expression-map-api";
 import {
   clearExpiredSceneCaches,
   getSceneCache,
@@ -36,10 +33,8 @@ import {
 } from "@/lib/cache/scene-cache";
 import { getPrefetchDebugState, scheduleScenePrefetch } from "@/lib/cache/scene-prefetch";
 import {
-  generateSceneVariantsFromApi,
   getScenesFromApi,
   getSceneDetailBySlugFromApi,
-  getSceneVariantsFromApi,
 } from "@/lib/utils/scenes-api";
 import {
   completeSceneLearningFromApi,
@@ -67,32 +62,30 @@ import {
   APPLE_BUTTON_TEXT_SM,
 } from "@/lib/ui/apple-style";
 import {
-  buildReusedChunks,
   collectLessonChunkTexts,
   extractSlugFromSceneCacheKey,
   findChunkContext,
   toVariantStatusLabel,
   toVariantTitle,
 } from "./scene-detail-logic";
-import { buildPracticeSet, buildVariantSet, createGeneratedId } from "./scene-detail-actions";
 import {
   resolveSceneToolIntent,
   resolveVariantDeleteOutcome,
   sceneDetailConfirmMessages,
-  shouldReuseExpressionMapCache,
 } from "./scene-detail-controller";
 import {
   buildSceneLearningUpdatePayload,
   shouldFlushSceneLearningDelta,
 } from "./scene-detail-learning-logic";
 import {
-  buildScenePrefetchPlan,
-  resolveSceneCachePresentation,
-  resolveSceneNetworkFailure,
-} from "./scene-detail-load-logic";
+  ensureSceneExpressionMapData,
+  generateScenePracticeSet,
+  generateSceneVariantSet,
+  syncSceneVariantsFromDb,
+} from "./scene-detail-generation-logic";
+import { loadSceneDetail } from "./scene-detail-load-orchestrator";
 import {
   buildSceneDetailHref,
-  buildScenePrefetchCandidates,
   parseSceneDetailRouteState,
   SceneViewMode,
 } from "./scene-detail-page-logic";
@@ -277,108 +270,56 @@ export default function SceneDetailPage() {
     activeLoadTokenRef.current = requestToken;
     const requestSlug = normalizeSceneSlug(sceneSlug);
     let cancelled = false;
-    let hasCacheFallback = false;
-    let cacheFresh = false;
 
     const canApply = () =>
       !cancelled &&
       activeLoadTokenRef.current === requestToken &&
       latestSceneSlugRef.current === requestSlug;
 
-    const loadScene = async () => {
-      setSceneLoading(true);
-      setSceneDataSource("none");
-      setBaseLesson(null);
-      const cacheTask = (async () => {
-        try {
-          const cacheResult = await getSceneCache(requestSlug);
-          if (!canApply()) return;
-          if (cacheResult.found && cacheResult.record) {
-            const presentation = resolveSceneCachePresentation({
-              cacheFound: true,
-              cacheExpired: cacheResult.isExpired,
-            });
-            hasCacheFallback = presentation.hasCacheFallback;
-            cacheFresh = presentation.cacheFresh;
-            if (presentation.shouldHydrateFromCache) {
-              setBaseLesson(cacheResult.record.data);
-              setSceneDataSource(presentation.nextDataSource);
-            }
-            if (presentation.shouldStopLoading) {
-              setSceneLoading(false);
-            }
-          }
-        } catch {
-          // Non-blocking: cache failures should not block network flow.
-        }
-      })();
-
-      await cacheTask;
-      if (cacheFresh) return;
-
-      try {
-          const lesson = await getSceneDetailBySlugFromApi(sceneSlug);
-        if (!canApply()) return;
-        setBaseLesson(lesson);
-        setSceneDataSource("network");
-        setSceneLoading(false);
-          void setSceneCache(requestSlug, lesson).catch(() => {
-          // Non-blocking cache write.
-        });
-
-          // Low-disturb prefetch: only after current scene network result is visible.
-          void (async () => {
-            let sceneSlugs: string[] = [];
-            let candidates: string[] = [];
-            try {
-              const list = await getScenesFromApi();
-              if (!canApply()) return;
-              sceneSlugs = list.map((item) => item.slug);
-              candidates = buildScenePrefetchPlan({
-                requestSlug,
-                sceneSlugs,
-                recentCacheKeys: [],
-                extractSlugFromSceneCacheKey,
-              });
-            } catch {
-              // Non-blocking: prefetch candidates can degrade gracefully.
-            }
-
-            if (candidates.length < 2) {
-              try {
-                const recentKeys = await listRecentSceneCacheKeys(8);
-                candidates = buildScenePrefetchPlan({
-                  requestSlug,
-                  sceneSlugs,
-                  recentCacheKeys: recentKeys,
-                  extractSlugFromSceneCacheKey,
-                });
-              } catch {
-                // ignore
-              }
-            }
-
-            if (!canApply()) return;
-            scheduleScenePrefetch(candidates, { currentSlug: requestSlug });
-            if (process.env.NODE_ENV === "development") {
-              console.debug("[scene-prefetch][debug]", getPrefetchDebugState());
-            }
-          })();
-        } catch (error) {
-          if (!canApply()) return;
-          if (!hasCacheFallback) {
-            setBaseLesson(null);
-            setSceneLoading(false);
-            toast.error(error instanceof Error ? error.message : "加载场景失败。");
-          }
-        }
-      
-    };
-
     void clearExpiredSceneCaches().catch(() => {
       // Non-blocking cleanup.
     });
-    void loadScene();
+
+    void loadSceneDetail({
+      sceneSlug,
+      requestSlug,
+      callbacks: {
+        canApply,
+        onStart: () => {
+          setSceneLoading(true);
+          setSceneDataSource("none");
+          setBaseLesson(null);
+        },
+        onHydrateLesson: (lesson, source) => {
+          setBaseLesson(lesson);
+          setSceneDataSource(source);
+        },
+        onStopLoading: () => {
+          setSceneLoading(false);
+        },
+        onFailure: (message) => {
+          if (!message) return;
+          setBaseLesson(null);
+          toast.error(message);
+        },
+      },
+      deps: {
+        getSceneCache,
+        getSceneDetailBySlugFromApi,
+        setSceneCache,
+        getScenesFromApi,
+        listRecentSceneCacheKeys,
+        scheduleScenePrefetch,
+        extractSlugFromSceneCacheKey,
+        logPrefetchDebug:
+          process.env.NODE_ENV === "development"
+            ? () => {
+                console.debug("[scene-prefetch][debug]", getPrefetchDebugState());
+              }
+            : undefined,
+      },
+    });
+
     return () => {
       cancelled = true;
     };
@@ -440,29 +381,19 @@ export default function SceneDetailPage() {
     if (!baseLesson) return;
     let cancelled = false;
 
-    const syncVariantsFromDb = async () => {
-      try {
-        const variants = await getSceneVariantsFromApi(baseLesson.slug);
-        if (cancelled || variants.length === 0) return;
-
-        const current = getSceneGeneratedState(baseLesson.id).latestVariantSet;
-        if (current) return;
-
-        const variantSet = buildVariantSet({
-          baseLesson,
-          variants,
-          reusedChunks: buildReusedChunks(baseLesson),
-          nowIso: new Date().toISOString(),
-          createId: () => `db-variant-${baseLesson.id}`,
-        });
+    void syncSceneVariantsFromDb({
+      baseLesson,
+      hasExistingVariantSet: Boolean(getSceneGeneratedState(baseLesson.id).latestVariantSet),
+    })
+      .then((variantSet) => {
+        if (cancelled || !variantSet) return;
         saveVariantSet(variantSet);
         refreshGeneratedState(baseLesson.id);
-      } catch {
+      })
+      .catch(() => {
         // Keep local-only variants if db sync fails.
-      }
-    };
+      });
 
-    void syncVariantsFromDb();
     return () => {
       cancelled = true;
     };
@@ -556,18 +487,9 @@ export default function SceneDetailPage() {
     setPracticeLoading(true);
     setPracticeError(null);
     try {
-      const parsedScene = mapLessonToParsedScene(sourceLesson);
-      const exercises = await practiceGenerateFromApi({
-        scene: parsedScene,
-        exerciseCount: 8,
-      });
-
-      const practiceSet = buildPracticeSet({
+      const practiceSet = await generateScenePracticeSet({
         baseLesson,
         sourceLesson,
-        exercises,
-        nowIso: new Date().toISOString(),
-        createId: createGeneratedId,
       });
 
       savePracticeSet(practiceSet);
@@ -589,18 +511,8 @@ export default function SceneDetailPage() {
     setVariantsLoading(true);
     setVariantsError(null);
     try {
-      const variants = await generateSceneVariantsFromApi({
-        sceneSlug: baseLesson.slug,
-        variantCount: 3,
-        retainChunkRatio: 0.6,
-      });
-
-      const variantSet = buildVariantSet({
+      const variantSet = await generateSceneVariantSet({
         baseLesson,
-        variants,
-        reusedChunks: buildReusedChunks(baseLesson),
-        nowIso: new Date().toISOString(),
-        createId: createGeneratedId,
       });
 
       saveVariantSet(variantSet);
@@ -834,34 +746,23 @@ export default function SceneDetailPage() {
 
   const ensureExpressionMap = async () => {
     if (!baseLesson || !latestVariantSet) return null;
-    if (
-      expressionMap &&
-      shouldReuseExpressionMapCache({
-        currentVariantSetId: latestVariantSet.id,
-        cachedVariantSetId: expressionMapVariantSetId,
-      })
-    ) {
-      return expressionMap;
-    }
 
     setExpressionMapLoading(true);
     setExpressionMapError(null);
     try {
-      const response = await generateExpressionMapFromApi({
-        sourceSceneId: baseLesson.id,
-        sourceSceneTitle: baseLesson.title,
-        baseExpressions: buildReusedChunks(baseLesson, 50),
-        variantExpressionSources: latestVariantSet.variants.map((variant) => ({
-          sourceSceneId: variant.id,
-          expressions: buildReusedChunks(variant.lesson, 50),
-        })),
+      const result = await ensureSceneExpressionMapData({
+        baseLesson,
+        latestVariantSet,
+        cachedExpressionMap: expressionMap,
+        cachedVariantSetId: expressionMapVariantSetId,
       });
-      setExpressionMap(response);
-      setExpressionMapVariantSetId(latestVariantSet.id);
-      return response;
+      if (!result) return null;
+      setExpressionMap(result.expressionMap);
+      setExpressionMapVariantSetId(result.variantSetId);
+      return result.expressionMap;
     } catch (error) {
       setExpressionMapError(
-        error instanceof Error ? error.message : "表达地图生成失败。",
+        error instanceof Error ? error.message : "?????????",
       );
       return null;
     } finally {

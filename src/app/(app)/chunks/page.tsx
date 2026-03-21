@@ -76,10 +76,24 @@ import {
 import {
   buildClusterFilterChange,
   buildChunksSummary,
-  getClusterIdFromSearchParams,
+  parseChunksRouteState,
   resolveClusterFilterExpressionLabel,
   resolveFocusExpressionId,
+  shouldReplaceChunksRoute,
 } from "./chunks-page-logic";
+import {
+  buildChunksListRequestParams,
+  resolveChunksCachePresentation,
+  resolveChunksNetworkFailure,
+} from "./chunks-page-load-logic";
+import {
+  buildFocusDetailCloseState,
+  buildFocusDetailState,
+  createFocusDetailTrailItem,
+  resolveFocusRelationTabOnDetailTabChange,
+  resolveReopenFocusTrail,
+  updateFocusDetailTrail,
+} from "./chunks-focus-detail-logic";
 
 const zh = {
   loadFailed: "\u52a0\u8f7d\u8868\u8fbe\u5931\u8d25\u3002",
@@ -568,16 +582,22 @@ export default function ChunksPage() {
   const ttsPlaybackState = useTtsPlaybackState();
   const [playingText, setPlayingText] = useState<string | null>(null);
   const searchParams = useSearchParams();
-  const clusterFromQuery = getClusterIdFromSearchParams(searchParams);
-  // 页面基础状态
-  const [query, setQuery] = useState("");
+  const routeState = parseChunksRouteState(searchParams);
+  // ??????
+  const [query, setQuery] = useState(routeState.query);
   const [loading, setLoading] = useState(true);
   const [phrases, setPhrases] = useState<UserPhraseItemResponse[]>([]);
   const [total, setTotal] = useState(0);
-  const [reviewFilter, setReviewFilter] = useState<PhraseReviewStatus | "all">("all");
-  const [contentFilter, setContentFilter] = useState<"expression" | "sentence">("expression");
+  const [reviewFilter, setReviewFilter] = useState<PhraseReviewStatus | "all">(
+    routeState.reviewFilter,
+  );
+  const [contentFilter, setContentFilter] = useState<"expression" | "sentence">(
+    routeState.contentFilter,
+  );
   const [expressionViewMode, setExpressionViewMode] = useState<"list" | "focus">("focus");
-  const [expressionClusterFilterId, setExpressionClusterFilterId] = useState<string>(clusterFromQuery);
+  const [expressionClusterFilterId, setExpressionClusterFilterId] = useState<string>(
+    routeState.clusterId,
+  );
   const [listDataSource, setListDataSource] = useState<"none" | "cache" | "network">("none");
 
   // 地图与列表展示
@@ -744,8 +764,35 @@ export default function ChunksPage() {
   }, [query, reviewFilter, contentFilter, expressionClusterFilterId]);
 
   useEffect(() => {
-    setExpressionClusterFilterId(clusterFromQuery);
-  }, [clusterFromQuery]);
+    setQuery(routeState.query);
+    setReviewFilter(routeState.reviewFilter);
+    setContentFilter(routeState.contentFilter);
+    setExpressionClusterFilterId(routeState.clusterId);
+  }, [
+    routeState.clusterId,
+    routeState.contentFilter,
+    routeState.query,
+    routeState.reviewFilter,
+  ]);
+
+  useEffect(() => {
+    const routeUpdate = shouldReplaceChunksRoute({
+      searchParams,
+      query,
+      reviewFilter,
+      contentFilter,
+      clusterId: expressionClusterFilterId,
+    });
+    if (!routeUpdate.shouldReplace) return;
+    router.replace(routeUpdate.nextHref);
+  }, [
+    contentFilter,
+    expressionClusterFilterId,
+    query,
+    reviewFilter,
+    router,
+    searchParams,
+  ]);
 
   useEffect(() => {
     if (process.env.NODE_ENV !== "development") return;
@@ -1405,36 +1452,29 @@ export default function ChunksPage() {
     setFocusDetailTab(params.initialTab ?? "info");
     setFocusDetailActionsOpen(false);
     const savedItem = phraseByNormalized.get(normalizePhraseText(params.text)) ?? null;
-    const nextTrailItem: FocusDetailTrailItem = {
+    const nextTrailItem = createFocusDetailTrailItem({
       userPhraseId: savedItem?.userPhraseId ?? null,
       text: params.text,
       differenceLabel: params.differenceLabel ?? null,
       kind: params.kind,
       tab: params.initialTab ?? "info",
-    };
-    setFocusDetailTrail((current) => {
-      if (params.chainMode !== "append") return [nextTrailItem];
-      const next = [...current];
-      const duplicateIndex = next.findIndex(
-        (item) =>
-          normalizePhraseText(item.text) === normalizePhraseText(params.text) &&
-          item.kind === params.kind,
-      );
-      if (duplicateIndex >= 0) {
-        return next.slice(0, duplicateIndex + 1).map((item, index) =>
-          index === duplicateIndex ? nextTrailItem : item,
-        );
-      }
-      return [...next, nextTrailItem];
     });
+    setFocusDetailTrail((current) =>
+      updateFocusDetailTrail({
+        current,
+        nextItem: nextTrailItem,
+        chainMode: params.chainMode,
+      }),
+    );
     setFocusDetailOpen(true);
-    setFocusDetail({
-      text: params.text,
-      differenceLabel: params.differenceLabel ?? null,
-      kind: params.kind,
-      savedItem,
-      assistItem: null,
-    });
+    setFocusDetail(
+      buildFocusDetailState({
+        text: params.text,
+        differenceLabel: params.differenceLabel ?? null,
+        kind: params.kind,
+        savedItem,
+      }) as FocusDetailState,
+    );
 
     if (savedItem) return;
 
@@ -1486,22 +1526,27 @@ export default function ChunksPage() {
 
   const reopenFocusTrailItem = useCallback(
     (index: number) => {
-      const target = focusDetailTrail[index];
-      if (!target) return;
+      const reopen = resolveReopenFocusTrail({
+        trail: focusDetailTrail,
+        index,
+      });
+      if (!reopen) return;
+      const target = reopen.target;
       if (target.userPhraseId) {
         setFocusExpressionId(resolveFocusMainExpressionIdForRow(target.userPhraseId));
       }
-      setFocusDetailTab(target.tab);
-      setFocusDetailTrail((current) => current.slice(0, index + 1));
+      setFocusDetailTab(reopen.nextTab);
+      setFocusDetailTrail(reopen.nextTrail);
       const savedItem = phraseByNormalized.get(normalizePhraseText(target.text)) ?? null;
       setFocusDetailOpen(true);
-      setFocusDetail({
-        text: target.text,
-        differenceLabel: target.differenceLabel ?? null,
-        kind: target.kind,
-        savedItem,
-        assistItem: null,
-      });
+      setFocusDetail(
+        buildFocusDetailState({
+          text: target.text,
+          differenceLabel: target.differenceLabel ?? null,
+          kind: target.kind,
+          savedItem,
+        }) as FocusDetailState,
+      );
     },
     [focusDetailTrail, phraseByNormalized, resolveFocusMainExpressionIdForRow],
   );
@@ -1698,7 +1743,6 @@ export default function ChunksPage() {
       setContentFilter("expression");
       setReviewFilter("all");
     }
-    router.replace(next.nextHref);
     if (sourceExpressionText) {
       toast.message(`${zh.filteredClusterPrefix} ${sourceExpressionText} ${zh.filteredClusterSuffix}`);
     }
@@ -1710,7 +1754,6 @@ export default function ChunksPage() {
       clusterId: "",
     });
     setExpressionClusterFilterId(next.nextClusterId);
-    router.replace(next.nextHref);
   };
 
   const openGenerateSimilarSheet = async (item: UserPhraseItemResponse) => {
@@ -3208,9 +3251,10 @@ export default function ChunksPage() {
         onOpenChange={(open) => {
           setFocusDetailOpen(open);
           if (!open) {
-            setFocusDetailActionsOpen(false);
-            setFocusDetailTrail([]);
-            setFocusDetailTab("info");
+            const nextState = buildFocusDetailCloseState();
+            setFocusDetailActionsOpen(nextState.actionsOpen);
+            setFocusDetailTrail(nextState.trail);
+            setFocusDetailTab(nextState.tab);
           }
         }}
         onReopenPrevTrail={() => reopenFocusTrailItem(focusDetailTrail.length - 2)}
@@ -3252,9 +3296,9 @@ export default function ChunksPage() {
         onSpeak={handlePronounceSentence}
         onTabChange={(nextTab) => {
           setFocusDetailTab(nextTab);
-          if (nextTab === "similar" || nextTab === "contrast") {
-            setFocusRelationTab(nextTab);
-          }
+          setFocusRelationTab(
+            resolveFocusRelationTabOnDetailTabChange(nextTab, focusRelationTab),
+          );
         }}
         onOpenSimilarRow={(row) => {
           setFocusRelationTab("similar");

@@ -3,10 +3,13 @@ import test from "node:test";
 import {
   buildClusterFilterChange,
   buildChunksHref,
+  buildChunksRouteHref,
   buildChunksSummary,
   getClusterIdFromSearchParams,
+  parseChunksRouteState,
   resolveClusterFilterExpressionLabel,
   resolveFocusExpressionId,
+  shouldReplaceChunksRoute,
 } from "./chunks-page-logic";
 import { UserPhraseItemResponse } from "@/lib/utils/phrases-api";
 
@@ -53,6 +56,26 @@ const createPhrase = (
   masteredAt: overrides.masteredAt ?? null,
 });
 
+test("parseChunksRouteState 会从 URL 解析 query/review/content/cluster", () => {
+  const searchParams = new URLSearchParams(
+    "query=burned%20out&review=reviewing&content=sentence&cluster=cluster-1",
+  );
+
+  assert.deepEqual(parseChunksRouteState(searchParams), {
+    query: "burned out",
+    reviewFilter: "reviewing",
+    contentFilter: "sentence",
+    clusterId: "cluster-1",
+  });
+
+  assert.deepEqual(parseChunksRouteState(new URLSearchParams("review=oops&content=oops")), {
+    query: "",
+    reviewFilter: "all",
+    contentFilter: "expression",
+    clusterId: "",
+  });
+});
+
 test("chunks route helper 会稳定读写 cluster 查询参数", () => {
   const searchParams = new URLSearchParams("foo=1&cluster=abc");
 
@@ -73,13 +96,42 @@ test("chunks route helper 会稳定读写 cluster 查询参数", () => {
   );
 });
 
+test("buildChunksRouteHref 和 shouldReplaceChunksRoute 会稳定同步 query/filter 状态", () => {
+  const searchParams = new URLSearchParams("foo=1");
+
+  assert.equal(
+    buildChunksRouteHref({
+      searchParams,
+      query: " burned out ",
+      reviewFilter: "reviewing",
+      contentFilter: "sentence",
+      clusterId: "cluster-1",
+    }),
+    "/chunks?foo=1&query=burned+out&review=reviewing&content=sentence&cluster=cluster-1",
+  );
+
+  assert.deepEqual(
+    shouldReplaceChunksRoute({
+      searchParams,
+      query: "",
+      reviewFilter: "all",
+      contentFilter: "expression",
+      clusterId: "",
+    }),
+    {
+      nextHref: "/chunks?foo=1",
+      shouldReplace: false,
+    },
+  );
+});
+
 test("buildChunksSummary 会按 loading 状态输出摘要", () => {
   assert.equal(buildChunksSummary({ loading: true, total: 8, labels }), "加载中...");
   assert.equal(buildChunksSummary({ loading: false, total: 8, labels }), "共 8 条");
 });
 
 test("buildClusterFilterChange 会同时产出路由和筛选重置意图", () => {
-  const searchParams = new URLSearchParams("foo=1");
+  const searchParams = new URLSearchParams("foo=1&query=burned+out&review=reviewing");
 
   assert.deepEqual(
     buildClusterFilterChange({
@@ -88,7 +140,7 @@ test("buildClusterFilterChange 会同时产出路由和筛选重置意图", () =
     }),
     {
       nextClusterId: "cluster-2",
-      nextHref: "/chunks?foo=1&cluster=cluster-2",
+      nextHref: "/chunks?foo=1&query=burned+out&review=reviewing&cluster=cluster-2",
       shouldResetFilters: true,
     },
   );
@@ -100,7 +152,7 @@ test("buildClusterFilterChange 会同时产出路由和筛选重置意图", () =
     }),
     {
       nextClusterId: "",
-      nextHref: "/chunks?foo=1",
+      nextHref: "/chunks?foo=1&query=burned+out&review=reviewing",
       shouldResetFilters: false,
     },
   );

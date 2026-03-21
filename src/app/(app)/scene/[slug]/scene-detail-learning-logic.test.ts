@@ -2,44 +2,8 @@
 import test from "node:test";
 import {
   buildSceneLearningUpdatePayload,
-  resolveSceneNetworkStrategy,
   shouldFlushSceneLearningDelta,
 } from "./scene-detail-learning-logic";
-
-test("resolveSceneNetworkStrategy 会区分新鲜缓存、过期缓存和无缓存场景", () => {
-  assert.deepEqual(
-    resolveSceneNetworkStrategy({
-      cacheFound: false,
-      cacheExpired: false,
-    }),
-    {
-      shouldUseCacheFallback: false,
-      shouldFetchNetwork: true,
-    },
-  );
-
-  assert.deepEqual(
-    resolveSceneNetworkStrategy({
-      cacheFound: true,
-      cacheExpired: false,
-    }),
-    {
-      shouldUseCacheFallback: true,
-      shouldFetchNetwork: false,
-    },
-  );
-
-  assert.deepEqual(
-    resolveSceneNetworkStrategy({
-      cacheFound: true,
-      cacheExpired: true,
-    }),
-    {
-      shouldUseCacheFallback: true,
-      shouldFetchNetwork: true,
-    },
-  );
-});
 
 test("shouldFlushSceneLearningDelta 只在真正需要同步时返回 true", () => {
   assert.equal(

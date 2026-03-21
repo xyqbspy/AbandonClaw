@@ -1,32 +1,5 @@
 ﻿import { SceneViewMode, estimateSceneLearningProgress } from "./scene-detail-page-logic";
 
-export const resolveSceneNetworkStrategy = ({
-  cacheFound,
-  cacheExpired,
-}: {
-  cacheFound: boolean;
-  cacheExpired: boolean;
-}) => {
-  if (!cacheFound) {
-    return {
-      shouldUseCacheFallback: false,
-      shouldFetchNetwork: true,
-    };
-  }
-
-  if (cacheExpired) {
-    return {
-      shouldUseCacheFallback: true,
-      shouldFetchNetwork: true,
-    };
-  }
-
-  return {
-    shouldUseCacheFallback: true,
-    shouldFetchNetwork: false,
-  };
-};
-
 export const shouldFlushSceneLearningDelta = ({
   hasBaseLesson,
   learningStarted,
