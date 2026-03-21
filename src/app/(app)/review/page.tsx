@@ -6,7 +6,7 @@ import { getReviewPageCache, setReviewPageCache } from "@/lib/cache/review-page-
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getMyPhrasesFromApi, UserPhraseItemResponse } from "@/lib/utils/phrases-api";
+import { getMyPhrasesFromApi } from "@/lib/utils/phrases-api";
 import { readReviewSession } from "@/lib/utils/review-session";
 import {
   DueReviewItemResponse,
@@ -14,77 +14,19 @@ import {
   getReviewSummaryFromApi,
   submitPhraseReviewFromApi,
 } from "@/lib/utils/review-api";
+import {
+  buildFallbackExampleSentence,
+  mergePrioritizedReviewItems,
+  resolveReviewHints,
+  resolveReviewSourceLabel,
+} from "./review-page-selectors";
+import { reviewPageLabels as zh } from "./review-page-labels";
 
-const zh = {
-  loadFailed: "\u52a0\u8f7d\u590d\u4e60\u6570\u636e\u5931\u8d25\u3002",
-  submitFailed: "\u63d0\u4ea4\u590d\u4e60\u5931\u8d25\u3002",
-  submitOk: "\u5df2\u8bb0\u5f55\u590d\u4e60\u7ed3\u679c\u3002",
-  eyebrow: "\u590d\u4e60",
-  title: "\u5de9\u56fa\u5df2\u4fdd\u5b58\u8868\u8fbe",
-  desc: "\u628a\u5df2\u4fdd\u5b58\u8868\u8fbe\u8dd1\u8fdb\u771f\u5b9e\u590d\u4e60\u95ed\u73af\uff0c\u6301\u7eed\u5f62\u6210\u53ef\u8f93\u51fa\u80fd\u529b\u3002",
-  dueNow: "\u5f53\u524d\u5f85\u590d\u4e60",
-  doneToday: "\u4eca\u65e5\u5df2\u590d\u4e60",
-  accuracy: "\u590d\u4e60\u6b63\u786e\u7387",
-  statusJoiner: "\u00b7",
-  trainingGuidePrefix: "\u5148\u5728\u5fc3\u91cc\u8bf4\u4e00\u53e5\uff0c\u518d\u5224\u65ad\u4f60\u73b0\u5728\u7684",
-  trainingGuideSuffix: "\u719f\u6089\u7a0b\u5ea6",
-  trainingHintSubtle: "\u522b\u6025\u7740\u770b\u53c2\u8003\u53e5\uff0c\u5148\u81ea\u5df1\u8bd5\u4e00\u4e0b",
-  expressionLabel: "\u8868\u8fbe",
-  exampleLabel: "\u53c2\u8003\u53e5",
-  showReference: "\u60f3\u4e0d\u8d77\u6765\uff1f\u770b\u53c2\u8003\u53e5",
-  hideReference: "\u6536\u8d77\u53c2\u8003\u53e5",
-  activeRecallHint: "\u5728\u5fc3\u91cc\u8bf4\u4e00\u904d\uff0c\u6216\u7528\u4f60\u81ea\u5df1\u7684\u8bdd\u8bd5\u7740\u6539\u5199\u4e00\u53e5",
-  againLabel: "\u4e0d\u4f1a",
-  hardLabel: "\u6709\u70b9\u96be",
-  goodLabel: "\u4f1a\u7528\u4e86",
-  queueLoading: "\u590d\u4e60\u961f\u5217\u52a0\u8f7d\u4e2d...",
-  queueEmpty: "\u5f53\u524d\u6ca1\u6709\u5230\u671f\u5f85\u590d\u4e60\u9879\uff0c\u7a0d\u540e\u518d\u6765\u5de9\u56fa\u3002",
-  noTranslation: "\u6682\u65e0\u7ffb\u8bd1",
-  sourceSentence: "\u6765\u6e90\u53e5\u5b50\uff1a",
-  reviewStats: "\u590d\u4e60\u6b21\u6570",
-  correct: "\u6b63\u786e",
-  incorrect: "\u9519\u8bef",
-  dash: "\u2014",
-  sessionHint: "\u6b63\u5728\u590d\u4e60\u4f60\u521a\u9009\u4e2d\u7684\u8868\u8fbe\u3002",
-  manualSessionHint: "\u521a\u8bb0\u4e0b\u8fd9\u4e2a\u8868\u8fbe\uff0c\u73b0\u5728\u8bd5\u7740\u81ea\u5df1\u7528\u4e00\u4e0b\u3002",
-  manualTrainingHintSubtle:
-    "\u8fd9\u662f\u4f60\u521a\u6536\u85cf\u7684\u8868\u8fbe\uff0c\u5148\u522b\u770b\u53c2\u8003\u53e5\uff0c\u8bd5\u7740\u8bf4\u4e00\u53e5",
-  fromExpressionLibrary: "\u6765\u81ea\u8868\u8fbe\u5e93",
-  fromExpressionMap: "\u6765\u81ea\u8868\u8fbe\u5730\u56fe",
-  fromTodayTask: "\u6765\u81ea\u4eca\u65e5\u4efb\u52a1",
-  fromSelected: "\u6765\u81ea\u4f60\u7684\u9009\u4e2d\u8868\u8fbe",
-  sourcePrefix: "\u6765\u6e90",
-  defaultHint: "\u6b63\u5728\u8fdb\u884c\u5f53\u524d\u5230\u671f\u8868\u8fbe\u590d\u4e60\u3002",
-};
-
-const buildFallbackExampleSentence = (expression: string) =>
-  `I can use "${expression}" in a real sentence.`;
 const REVIEW_LIMIT = 20;
 
 const ExpressionWordMark = ({ children }: { children: ReactNode }) => (
   <span className="rounded bg-primary/10 px-1 py-0.5 text-primary">{children}</span>
 );
-
-const toDueItemFromSavedPhrase = (
-  row: UserPhraseItemResponse,
-): DueReviewItemResponse | null => {
-  if (!(row.reviewStatus === "saved" || row.reviewStatus === "reviewing")) return null;
-  return {
-    userPhraseId: row.userPhraseId,
-    phraseId: row.phraseId,
-    text: row.text,
-    translation: row.translation,
-    usageNote: row.usageNote,
-    sourceSceneSlug: row.sourceSceneSlug,
-    sourceSentenceText: row.sourceSentenceText,
-    expressionClusterId: row.expressionClusterId,
-    reviewStatus: row.reviewStatus,
-    reviewCount: row.reviewCount,
-    correctCount: row.correctCount,
-    incorrectCount: row.incorrectCount,
-    nextReviewAt: row.nextReviewAt,
-  };
-};
 
 export default function ReviewPage() {
   const [loading, setLoading] = useState(true);
@@ -172,32 +114,13 @@ export default function ReviewPage() {
         return;
       }
 
-      const dueById = new Map(dueRows.map((item) => [item.userPhraseId, item]));
-      const supplementalById = new Map<string, DueReviewItemResponse>();
-      for (const row of phraseList?.rows ?? []) {
-        const mapped = toDueItemFromSavedPhrase(row);
-        if (!mapped) continue;
-        supplementalById.set(mapped.userPhraseId, mapped);
-      }
-
-      const merged: DueReviewItemResponse[] = [];
-      const added = new Set<string>();
-
-      for (const id of prioritizedIds) {
-        const dueItem = dueById.get(id) ?? supplementalById.get(id) ?? null;
-        if (!dueItem) continue;
-        if (added.has(dueItem.userPhraseId)) continue;
-        merged.push(dueItem);
-        added.add(dueItem.userPhraseId);
-      }
-
-      for (const dueItem of dueRows) {
-        if (added.has(dueItem.userPhraseId)) continue;
-        merged.push(dueItem);
-        added.add(dueItem.userPhraseId);
-      }
-
-      setItems(merged);
+      setItems(
+        mergePrioritizedReviewItems({
+          prioritizedIds,
+          dueRows,
+          phraseRows: phraseList?.rows ?? [],
+        }),
+      );
       setSummary(nextSummary);
       void setReviewPageCache(
         {
@@ -227,25 +150,27 @@ export default function ReviewPage() {
   const exampleSentence = current
     ? current.sourceSentenceText?.trim() || buildFallbackExampleSentence(current.text)
     : "";
-  const sourceLabel = (() => {
-    if (!isSessionReview) return null;
-    if (sessionSource === "expression-library-manual-add") return zh.fromExpressionLibrary;
-    if (sessionSource === "expression-library-card") return zh.fromExpressionLibrary;
-    if (sessionSource === "expression-map-cluster" || sessionSource === "expression-map-single") {
-      return zh.fromExpressionMap;
-    }
-    if (sessionSource === "today-task") return zh.fromTodayTask;
-    return zh.fromSelected;
-  })();
-  const primaryHint = (() => {
-    if (!isSessionReview) return zh.defaultHint;
-    if (sessionSource === "expression-library-manual-add") return zh.manualSessionHint;
-    return zh.sessionHint;
-  })();
-  const trainingHintSubtle =
-    sessionSource === "expression-library-manual-add"
-      ? zh.manualTrainingHintSubtle
-      : zh.trainingHintSubtle;
+  const sourceLabel = resolveReviewSourceLabel({
+    isSessionReview,
+    sessionSource,
+    labels: {
+      fromExpressionLibrary: zh.fromExpressionLibrary,
+      fromExpressionMap: zh.fromExpressionMap,
+      fromTodayTask: zh.fromTodayTask,
+      fromSelected: zh.fromSelected,
+    },
+  });
+  const { primaryHint, trainingHintSubtle } = resolveReviewHints({
+    isSessionReview,
+    sessionSource,
+    labels: {
+      defaultHint: zh.defaultHint,
+      sessionHint: zh.sessionHint,
+      manualSessionHint: zh.manualSessionHint,
+      trainingHintSubtle: zh.trainingHintSubtle,
+      manualTrainingHintSubtle: zh.manualTrainingHintSubtle,
+    },
+  });
 
   const submit = async (result: "again" | "hard" | "good") => {
     if (!current || submitting) return;

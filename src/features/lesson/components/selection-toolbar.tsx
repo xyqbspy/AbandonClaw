@@ -53,7 +53,15 @@ export function SelectionToolbar({
         <RotateCcw className="size-3.5" />
         复习
       </Button>
-      <TtsActionButton size="sm" variant="ghost" className="h-7 px-2" onClick={onPronounce} />
+      <TtsActionButton
+        size="sm"
+        variant="ghost"
+        className="h-7 px-2"
+        label="朗读"
+        activeLabel="停止"
+        ariaLabel="朗读"
+        onClick={onPronounce}
+      />
     </div>
   );
 }

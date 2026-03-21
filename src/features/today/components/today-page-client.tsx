@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowRight, BookOpenCheck, Flame } from "lucide-react";
 import { toast } from "sonner";
 import { TodayTaskList } from "@/features/today/components/today-task-list";
+import { todayPageLabels as zh } from "@/features/today/components/today-page-labels";
 import {
   buildTodayTasks,
   getRecommendedScenes,
@@ -42,31 +43,6 @@ const EMPTY_DASHBOARD: LearningDashboardResponse = {
     reviewTask: { done: false, reviewItemsCompleted: 0, dueReviewCount: 0 },
     outputTask: { done: false, phrasesSavedToday: 0 },
   },
-};
-
-const zh = {
-  loadFail: "\u52a0\u8f7d\u4eca\u65e5\u5b66\u4e60\u6570\u636e\u5931\u8d25\u3002",
-  eyebrow: "\u4eca\u65e5\u5b66\u4e60",
-  desc: "\u4fdd\u6301\u77ed\u65f6\u3001\u7a33\u5b9a\u7684\u5b66\u4e60\u8282\u594f\uff0c\u6bd4\u4e00\u6b21\u6027\u5b66\u4e60\u66f4\u5bb9\u6613\u6c89\u6dc0\u8868\u8fbe\u3002",
-  statStreak: "\u8fde\u7eed\u5b66\u4e60",
-  statSaved: "\u5df2\u4fdd\u5b58\u8868\u8fbe",
-  statAcc: "\u590d\u4e60\u6b63\u786e\u7387",
-  continueTitle: "\u7ee7\u7eed\u5b66\u4e60",
-  continueEmptyTitle: "\u9009\u62e9\u4e00\u4e2a\u573a\u666f\u5f00\u59cb\u5b66\u4e60",
-  continueEmptyDesc: "\u4f60\u8fd8\u6ca1\u6709\u5b66\u4e60\u8bb0\u5f55\uff0c\u5148\u8fdb\u5165\u4e00\u4e2a\u573a\u666f\u5427\u3002",
-  continueBtn: "\u7ee7\u7eed\u5b66\u4e60",
-  currentProgress: "\u5f53\u524d\u8fdb\u5ea6",
-  recTitle: "\u63a8\u8350\u4e0b\u4e00\u7ec4\u573a\u666f",
-  sceneLoading: "\u573a\u666f\u52a0\u8f7d\u4e2d...",
-  recEmpty: "\u6682\u65e0\u53ef\u63a8\u8350\u573a\u666f\u3002",
-  estimatedMinutes: "\u9884\u8ba1\u65f6\u95f4",
-  minute: "\u5206\u949f",
-  taskSceneTitle: "\u5b8c\u6210\u4e00\u4e2a\u573a\u666f\u5b66\u4e60",
-  taskSceneDesc: "\u9009\u62e9\u4e00\u4e2a\u573a\u666f\u5e76\u5f00\u59cb\u5b66\u4e60\u3002",
-  taskReviewTitle: "\u8fdb\u884c\u4e00\u6b21\u77ed\u65f6\u590d\u4e60",
-  taskOutputTitle: "\u8f93\u51fa\u7ec3\u4e60",
-  userFallback: "\u5b66\u4e60\u8005",
-  day: "\u5929",
 };
 
 export function TodayPageClient({ displayName }: { displayName: string }) {

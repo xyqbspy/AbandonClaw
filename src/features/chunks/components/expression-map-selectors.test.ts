@@ -149,3 +149,84 @@ test("buildExpressionMapViewModel 会优先选择来源场景原始表达作为�
   assert.ok(!viewModel.displayedClusterExpressions.includes("push yourself too hard "));
   assert.equal(viewModel.expressionStatusByNormalized.get("push yourself too hard"), "mastered");
 });
+
+test("buildExpressionMapViewModel 在 activeClusterId 无效时不会错误带出簇数据", () => {
+  const sourceExpression = createPhrase({
+    userPhraseId: "source-1",
+    text: "call it a day",
+    reviewStatus: "saved",
+  });
+
+  const mapData: ExpressionMapResponse = {
+    version: "v1",
+    sourceSceneId: "scene-a",
+    clusters: [
+      {
+        id: "cluster-1",
+        anchor: "burn yourself out",
+        meaning: "过度消耗自己",
+        expressions: ["burn yourself out", "wear yourself out"],
+        sourceSceneIds: ["scene-a"],
+        nodes: [],
+      },
+    ],
+  };
+
+  const viewModel = buildExpressionMapViewModel({
+    mapData,
+    activeClusterId: "missing-cluster",
+    mapSourceExpression: sourceExpression,
+    phrases: [sourceExpression],
+  });
+
+  assert.equal(viewModel.activeCluster, null);
+  assert.equal(viewModel.centerExpressionText, "call it a day");
+  assert.deepEqual(viewModel.displayedClusterExpressions, []);
+});
+
+test("buildExpressionMapViewModel 对规范化重复短语会以后出现的状态为准", () => {
+  const sourceExpression = createPhrase({
+    userPhraseId: "source-1",
+    text: "burn yourself out",
+    normalizedText: "burn yourself out",
+  });
+  const duplicateSaved = createPhrase({
+    userPhraseId: "row-1",
+    text: "Wear Yourself Out",
+    normalizedText: "wear yourself out",
+    reviewStatus: "saved",
+  });
+  const duplicateMastered = createPhrase({
+    userPhraseId: "row-2",
+    text: "wear yourself out ",
+    normalizedText: "wear yourself out",
+    reviewStatus: "mastered",
+  });
+
+  const mapData: ExpressionMapResponse = {
+    version: "v1",
+    sourceSceneId: "scene-a",
+    clusters: [
+      {
+        id: "cluster-1",
+        anchor: "burn yourself out",
+        meaning: "过度消耗自己",
+        expressions: ["burn yourself out", "wear yourself out"],
+        sourceSceneIds: ["scene-a"],
+        nodes: [],
+      },
+    ],
+  };
+
+  const viewModel = buildExpressionMapViewModel({
+    mapData,
+    activeClusterId: "cluster-1",
+    mapSourceExpression: sourceExpression,
+    phrases: [sourceExpression, duplicateSaved, duplicateMastered],
+  });
+
+  assert.equal(
+    viewModel.expressionStatusByNormalized.get("wear yourself out"),
+    "mastered",
+  );
+});

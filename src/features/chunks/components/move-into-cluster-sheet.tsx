@@ -78,7 +78,8 @@ export function MoveIntoClusterSheet({
           {focusExpression ? (
             <div className="rounded-xl bg-[rgb(246,246,246)] p-4">
               <p className="text-xl font-semibold tracking-tight">
-                {labels.currentMain}：{focusExpression.text}
+                {labels.currentMain}
+                {focusExpression.text}
               </p>
             </div>
           ) : null}
