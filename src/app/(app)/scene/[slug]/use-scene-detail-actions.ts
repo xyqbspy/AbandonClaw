@@ -1,0 +1,313 @@
+import { useCallback, useMemo, useState } from "react";
+import {
+  deleteAllVariantSets,
+  deletePracticeSet,
+  deleteVariantItem,
+  markPracticeSetCompleted,
+  markVariantItemStatus,
+  markVariantSetCompleted,
+  savePracticeSet,
+  saveVariantSet,
+} from "@/lib/utils/scene-learning-flow-storage";
+import { completeSceneLearningFromApi } from "@/lib/utils/learning-api";
+import { Lesson } from "@/lib/types";
+import { ExpressionMapResponse } from "@/lib/types/expression-map";
+import { PracticeSet, VariantSet } from "@/lib/types/learning-flow";
+
+import {
+  resolveSceneToolIntent,
+  resolveVariantDeleteOutcome,
+  sceneDetailConfirmMessages,
+} from "./scene-detail-controller";
+import {
+  ensureSceneExpressionMapData,
+  generateScenePracticeSet,
+  generateSceneVariantSet,
+} from "./scene-detail-generation-logic";
+
+type UseSceneDetailActionsArgs = {
+  baseLesson: Lesson | null;
+  latestPracticeSet: PracticeSet | null;
+  latestVariantSet: VariantSet | null;
+  activeVariantId: string | null;
+  setActiveVariantId: (variantId: string | null) => void;
+  setViewModeWithRoute: (viewMode: "scene" | "practice" | "variants" | "expression-map" | "variant-study", variantId?: string | null) => void;
+  refreshGeneratedState: (sceneKey: string) => void;
+};
+
+export function useSceneDetailActions({
+  baseLesson,
+  latestPracticeSet,
+  latestVariantSet,
+  activeVariantId,
+  setActiveVariantId,
+  setViewModeWithRoute,
+  refreshGeneratedState,
+}: UseSceneDetailActionsArgs) {
+  const [practiceLoading, setPracticeLoading] = useState(false);
+  const [variantsLoading, setVariantsLoading] = useState(false);
+  const [practiceError, setPracticeError] = useState<string | null>(null);
+  const [variantsError, setVariantsError] = useState<string | null>(null);
+  const [showAnswerMap, setShowAnswerMap] = useState<Record<string, boolean>>({});
+  const [expressionMapLoading, setExpressionMapLoading] = useState(false);
+  const [expressionMapError, setExpressionMapError] = useState<string | null>(null);
+  const [expressionMap, setExpressionMap] = useState<ExpressionMapResponse | null>(null);
+  const [expressionMapVariantSetId, setExpressionMapVariantSetId] =
+    useState<string | null>(null);
+
+  const canGeneratePractice =
+    latestPracticeSet === null ? !practiceLoading : latestPracticeSet.status !== "generated" && !practiceLoading;
+  const canGenerateVariants =
+    latestVariantSet === null ? !variantsLoading : latestVariantSet.status !== "generated" && !variantsLoading;
+
+  const resetRouteScopedState = useCallback(() => {
+    setPracticeError(null);
+    setVariantsError(null);
+    setShowAnswerMap({});
+    setExpressionMapLoading(false);
+    setExpressionMapError(null);
+    setExpressionMap(null);
+    setExpressionMapVariantSetId(null);
+  }, []);
+
+  const handleGeneratePractice = useCallback(
+    async (sourceLesson: Lesson) => {
+      if (!baseLesson || !canGeneratePractice) return;
+
+      setPracticeLoading(true);
+      setPracticeError(null);
+      try {
+        const practiceSet = await generateScenePracticeSet({
+          baseLesson,
+          sourceLesson,
+        });
+
+        savePracticeSet(practiceSet);
+        refreshGeneratedState(baseLesson.id);
+        setShowAnswerMap({});
+        setViewModeWithRoute("practice");
+      } catch (error) {
+        setPracticeError(
+          error instanceof Error ? error.message : "Failed to generate practice.",
+        );
+      } finally {
+        setPracticeLoading(false);
+      }
+    },
+    [baseLesson, canGeneratePractice, refreshGeneratedState, setViewModeWithRoute],
+  );
+
+  const handleGenerateVariants = useCallback(async () => {
+    if (!baseLesson || !canGenerateVariants) return;
+
+    setVariantsLoading(true);
+    setVariantsError(null);
+    try {
+      const variantSet = await generateSceneVariantSet({
+        baseLesson,
+      });
+
+      saveVariantSet(variantSet);
+      refreshGeneratedState(baseLesson.id);
+      setActiveVariantId(null);
+      setViewModeWithRoute("variants");
+    } catch (error) {
+      setVariantsError(
+        error instanceof Error ? error.message : "Failed to generate variants.",
+      );
+    } finally {
+      setVariantsLoading(false);
+    }
+  }, [
+    baseLesson,
+    canGenerateVariants,
+    refreshGeneratedState,
+    setActiveVariantId,
+    setViewModeWithRoute,
+  ]);
+
+  const handleMarkPracticeComplete = useCallback(() => {
+    if (!baseLesson || !latestPracticeSet) return;
+    markPracticeSetCompleted(baseLesson.id, latestPracticeSet.id);
+    refreshGeneratedState(baseLesson.id);
+    void completeSceneLearningFromApi(baseLesson.slug).catch(() => {
+      // Non-blocking.
+    });
+  }, [baseLesson, latestPracticeSet, refreshGeneratedState]);
+
+  const handleMarkVariantSetComplete = useCallback(() => {
+    if (!baseLesson || !latestVariantSet) return;
+    markVariantSetCompleted(baseLesson.id, latestVariantSet.id);
+    refreshGeneratedState(baseLesson.id);
+    void completeSceneLearningFromApi(baseLesson.slug).catch(() => {
+      // Non-blocking.
+    });
+  }, [baseLesson, latestVariantSet, refreshGeneratedState]);
+
+  const handleOpenVariant = useCallback(
+    (variantId: string) => {
+      if (!baseLesson || !latestVariantSet) return;
+      markVariantItemStatus(baseLesson.id, latestVariantSet.id, variantId, "viewed");
+      refreshGeneratedState(baseLesson.id);
+      setActiveVariantId(variantId);
+      setViewModeWithRoute("variant-study", variantId);
+    },
+    [baseLesson, latestVariantSet, refreshGeneratedState, setActiveVariantId, setViewModeWithRoute],
+  );
+
+  const handleDeletePracticeSet = useCallback(() => {
+    if (!baseLesson || !latestPracticeSet) return;
+    const confirmed = window.confirm(sceneDetailConfirmMessages.deletePracticeSet);
+    if (!confirmed) return;
+    deletePracticeSet(baseLesson.id, latestPracticeSet.id);
+    refreshGeneratedState(baseLesson.id);
+    setShowAnswerMap({});
+    setViewModeWithRoute("scene");
+  }, [baseLesson, latestPracticeSet, refreshGeneratedState, setViewModeWithRoute]);
+
+  const handleDeleteVariantSet = useCallback(() => {
+    if (!baseLesson || !latestVariantSet) return;
+    const confirmed = window.confirm(sceneDetailConfirmMessages.deleteVariantSet);
+    if (!confirmed) return;
+    deleteAllVariantSets(baseLesson.id);
+    refreshGeneratedState(baseLesson.id);
+    setActiveVariantId(null);
+    setExpressionMap(null);
+    setExpressionMapVariantSetId(null);
+    setViewModeWithRoute("scene");
+  }, [baseLesson, latestVariantSet, refreshGeneratedState, setActiveVariantId, setViewModeWithRoute]);
+
+  const handleDeleteVariantItem = useCallback(
+    (variantId: string) => {
+      if (!baseLesson || !latestVariantSet) return;
+      const confirmed = window.confirm(sceneDetailConfirmMessages.deleteVariantItem);
+      if (!confirmed) return;
+      deleteVariantItem(baseLesson.id, latestVariantSet.id, variantId);
+      refreshGeneratedState(baseLesson.id);
+      setExpressionMap(null);
+      setExpressionMapVariantSetId(null);
+      const deleteOutcome = resolveVariantDeleteOutcome({
+        activeVariantId,
+        deletingVariantId: variantId,
+      });
+      if (deleteOutcome.shouldClearActiveVariant) {
+        setActiveVariantId(null);
+      }
+      if (deleteOutcome.nextViewMode) {
+        setViewModeWithRoute(deleteOutcome.nextViewMode);
+      }
+    },
+    [
+      activeVariantId,
+      baseLesson,
+      latestVariantSet,
+      refreshGeneratedState,
+      setActiveVariantId,
+      setViewModeWithRoute,
+    ],
+  );
+
+  const handlePracticeToolClick = useCallback(() => {
+    const intent = resolveSceneToolIntent({
+      hasBaseLesson: Boolean(baseLesson),
+      loading: practiceLoading,
+      status: latestPracticeSet ? latestPracticeSet.status : "idle",
+    });
+    if (intent === "ignore" || !baseLesson) return;
+    if (intent === "generate") {
+      void handleGeneratePractice(baseLesson);
+      return;
+    }
+    setViewModeWithRoute("practice");
+  }, [baseLesson, handleGeneratePractice, latestPracticeSet, practiceLoading, setViewModeWithRoute]);
+
+  const handleVariantToolClick = useCallback(() => {
+    const intent = resolveSceneToolIntent({
+      hasBaseLesson: Boolean(baseLesson),
+      loading: variantsLoading,
+      status: latestVariantSet ? latestVariantSet.status : "idle",
+    });
+    if (intent === "ignore" || !baseLesson) return;
+    if (intent === "generate") {
+      void handleGenerateVariants();
+      return;
+    }
+    setViewModeWithRoute("variants");
+  }, [baseLesson, handleGenerateVariants, latestVariantSet, setViewModeWithRoute, variantsLoading]);
+
+  const ensureExpressionMap = useCallback(async () => {
+    if (!baseLesson || !latestVariantSet) return null;
+
+    setExpressionMapLoading(true);
+    setExpressionMapError(null);
+    try {
+      const result = await ensureSceneExpressionMapData({
+        baseLesson,
+        latestVariantSet,
+        cachedExpressionMap: expressionMap,
+        cachedVariantSetId: expressionMapVariantSetId,
+      });
+      if (!result) return null;
+      setExpressionMap(result.expressionMap);
+      setExpressionMapVariantSetId(result.variantSetId);
+      return result.expressionMap;
+    } catch (error) {
+      setExpressionMapError(
+        error instanceof Error ? error.message : "Failed to build expression map.",
+      );
+      return null;
+    } finally {
+      setExpressionMapLoading(false);
+    }
+  }, [baseLesson, expressionMap, expressionMapVariantSetId, latestVariantSet]);
+
+  const handleOpenExpressionMap = useCallback(async () => {
+    const result = await ensureExpressionMap();
+    if (!result) return;
+    setViewModeWithRoute("expression-map");
+  }, [ensureExpressionMap, setViewModeWithRoute]);
+
+  const actionState = useMemo(
+    () => ({
+      practiceLoading,
+      variantsLoading,
+      practiceError,
+      variantsError,
+      showAnswerMap,
+      expressionMapLoading,
+      expressionMapError,
+      expressionMap,
+      canGeneratePractice,
+      canGenerateVariants,
+    }),
+    [
+      practiceLoading,
+      variantsLoading,
+      practiceError,
+      variantsError,
+      showAnswerMap,
+      expressionMapLoading,
+      expressionMapError,
+      expressionMap,
+      canGeneratePractice,
+      canGenerateVariants,
+    ],
+  );
+
+  return {
+    ...actionState,
+    setShowAnswerMap,
+    resetRouteScopedState,
+    handleGeneratePractice,
+    handleGenerateVariants,
+    handleMarkPracticeComplete,
+    handleMarkVariantSetComplete,
+    handleOpenVariant,
+    handleDeletePracticeSet,
+    handleDeleteVariantSet,
+    handleDeleteVariantItem,
+    handlePracticeToolClick,
+    handleVariantToolClick,
+    handleOpenExpressionMap,
+  };
+}

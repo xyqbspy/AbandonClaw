@@ -1,4 +1,5 @@
 import { ManualExpressionAssistResponse, UserPhraseItemResponse } from "@/lib/utils/phrases-api";
+import { normalizePhraseText } from "@/lib/shared/phrases";
 
 export type FocusDetailKind =
   | "current"
@@ -22,6 +23,13 @@ export type FocusDetailStateLike = {
   kind: FocusDetailKind;
   savedItem: UserPhraseItemResponse | null;
   assistItem: ManualExpressionAssistResponse["inputItem"] | null;
+};
+
+export type FocusDetailCandidateLike = {
+  text: string;
+  differenceLabel?: string | null;
+  kind: FocusDetailKind;
+  savedItem: UserPhraseItemResponse | null;
 };
 
 export const createFocusDetailTrailItem = ({
@@ -61,6 +69,62 @@ export const buildFocusDetailState = ({
   savedItem,
   assistItem: null,
 });
+
+export const resolveFocusDetailInitialTab = ({
+  kind,
+  initialTab,
+}: {
+  kind: FocusDetailKind;
+  initialTab?: FocusDetailTabValue;
+}) => {
+  if (initialTab) return initialTab;
+  if (kind === "contrast") return "contrast";
+  if (kind === "library-similar" || kind === "suggested-similar") return "similar";
+  return "info";
+};
+
+export const resolveFocusDetailItemFromCollections = ({
+  text,
+  kind,
+  phraseByNormalized,
+  focusSimilarItems,
+  focusContrastItems,
+}: {
+  text: string;
+  kind: FocusDetailKind;
+  phraseByNormalized: Map<string, UserPhraseItemResponse>;
+  focusSimilarItems: FocusDetailCandidateLike[];
+  focusContrastItems: FocusDetailCandidateLike[];
+}) => {
+  const normalized = normalizePhraseText(text);
+  const collection =
+    kind === "contrast"
+      ? focusContrastItems
+      : kind === "library-similar" || kind === "suggested-similar"
+        ? focusSimilarItems
+        : [];
+  const matched = collection.find((item) => normalizePhraseText(item.text) === normalized) ?? null;
+
+  return {
+    matched,
+    savedItem: matched?.savedItem ?? phraseByNormalized.get(normalized) ?? null,
+  };
+};
+
+export const resolveFocusDetailSiblingCollection = ({
+  focusDetail,
+  focusRelationTab,
+  focusSimilarItems,
+  focusContrastItems,
+}: {
+  focusDetail: FocusDetailStateLike | null;
+  focusRelationTab: "similar" | "contrast";
+  focusSimilarItems: FocusDetailCandidateLike[];
+  focusContrastItems: FocusDetailCandidateLike[];
+}) => {
+  if (!focusDetail || focusDetail.kind === "current") return [] as FocusDetailCandidateLike[];
+  return focusRelationTab === "contrast" ? focusContrastItems : focusSimilarItems;
+};
 
 const normalizeTrailKey = (item: Pick<FocusDetailTrailItem, "text" | "kind">) =>
   `${item.kind}:${item.text.trim().toLowerCase()}`;

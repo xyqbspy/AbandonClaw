@@ -4,6 +4,9 @@ import {
   buildFocusDetailCloseState,
   buildFocusDetailState,
   createFocusDetailTrailItem,
+  resolveFocusDetailInitialTab,
+  resolveFocusDetailItemFromCollections,
+  resolveFocusDetailSiblingCollection,
   resolveFocusRelationTabOnDetailTabChange,
   resolveReopenFocusTrail,
   updateFocusDetailTrail,
@@ -100,6 +103,87 @@ test("buildFocusDetailState 会稳定构造 detail 状态", () => {
       savedItem,
       assistItem: null,
     },
+  );
+});
+
+test("focus detail 纯规则会稳定解析默认 tab、候选命中和兄弟集合", () => {
+  const savedItem = {
+    userPhraseId: "p1",
+    normalizedText: "wrap it up",
+  } as UserPhraseItemResponse;
+  const fallbackItem = {
+    userPhraseId: "p2",
+    normalizedText: "keep going",
+  } as UserPhraseItemResponse;
+
+  assert.equal(resolveFocusDetailInitialTab({ kind: "current" }), "info");
+  assert.equal(resolveFocusDetailInitialTab({ kind: "library-similar" }), "similar");
+  assert.equal(resolveFocusDetailInitialTab({ kind: "contrast" }), "contrast");
+  assert.equal(resolveFocusDetailInitialTab({ kind: "current", initialTab: "similar" }), "similar");
+
+  assert.deepEqual(
+    resolveFocusDetailItemFromCollections({
+      text: "Wrap It Up",
+      kind: "library-similar",
+      phraseByNormalized: new Map([["keep going", fallbackItem]]),
+      focusSimilarItems: [
+        {
+          text: "wrap it up",
+          differenceLabel: "closing",
+          kind: "library-similar",
+          savedItem,
+        },
+      ],
+      focusContrastItems: [],
+    }),
+    {
+      matched: {
+        text: "wrap it up",
+        differenceLabel: "closing",
+        kind: "library-similar",
+        savedItem,
+      },
+      savedItem,
+    },
+  );
+
+  assert.deepEqual(
+    resolveFocusDetailItemFromCollections({
+      text: "keep going",
+      kind: "contrast",
+      phraseByNormalized: new Map([["keep going", fallbackItem]]),
+      focusSimilarItems: [],
+      focusContrastItems: [],
+    }),
+    {
+      matched: null,
+      savedItem: fallbackItem,
+    },
+  );
+
+  assert.deepEqual(
+    resolveFocusDetailSiblingCollection({
+      focusDetail: null,
+      focusRelationTab: "similar",
+      focusSimilarItems: [{ text: "wrap it up", kind: "library-similar", savedItem: null }],
+      focusContrastItems: [{ text: "keep going", kind: "contrast", savedItem: null }],
+    }),
+    [],
+  );
+
+  assert.deepEqual(
+    resolveFocusDetailSiblingCollection({
+      focusDetail: {
+        text: "wrap it up",
+        kind: "library-similar",
+        savedItem: null,
+        assistItem: null,
+      },
+      focusRelationTab: "contrast",
+      focusSimilarItems: [{ text: "wrap it up", kind: "library-similar", savedItem: null }],
+      focusContrastItems: [{ text: "keep going", kind: "contrast", savedItem: null }],
+    }),
+    [{ text: "keep going", kind: "contrast", savedItem: null }],
   );
 });
 

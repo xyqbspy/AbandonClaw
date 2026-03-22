@@ -1,13 +1,16 @@
 "use client";
 
-import { ChevronLeft } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { DetailSheetShell } from "@/components/shared/detail-sheet-shell";
 import { ManualExpressionAssistResponse, UserPhraseItemResponse } from "@/lib/utils/phrases-api";
-import { FocusDetailActions } from "./focus-detail-actions";
 import { FocusDetailConfirm } from "./focus-detail-confirm";
 import { FocusDetailContent } from "./focus-detail-content";
+import { FocusDetailSheetFooter } from "./focus-detail-sheet-footer";
+import { FocusDetailSheetHeader } from "./focus-detail-sheet-header";
 import { FocusDetailSheetLabels } from "./focus-detail-labels";
+import {
+  buildFocusDetailConfirmState,
+  buildFocusDetailContentLabels,
+} from "./focus-detail-sheet-view-model";
+import { DetailSheetShell } from "@/components/shared/detail-sheet-shell";
 
 type FocusDetailTabValue = "info" | "similar" | "contrast";
 type FocusDetailConfirmAction = "set-cluster-main" | "set-standalone-main";
@@ -120,6 +123,9 @@ export function FocusDetailSheet({
   onCloseConfirm,
   onConfirm,
 }: FocusDetailSheetProps) {
+  const contentLabels = buildFocusDetailContentLabels(labels, reviewHint);
+  const confirmState = buildFocusDetailConfirmState(labels, detailConfirmAction, detail);
+
   return (
     <>
       <DetailSheetShell
@@ -130,107 +136,50 @@ export function FocusDetailSheet({
         panelClassName="!h-[88dvh] !min-h-[88dvh] !max-h-[88dvh] md:!h-[88vh] md:!min-h-[88vh] md:!max-h-[88vh]"
         bodyClassName="min-h-0 min-w-0 flex-1 overflow-hidden px-4 pb-4 pt-4"
         header={
-          <div className="space-y-3">
-            <p className="truncate text-base font-semibold">{labels.title}</p>
-            <div className="flex items-center justify-between gap-3">
-              {trailLength > 1 ? (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  className={`${appleButtonClassName} h-8 min-w-0 gap-1 px-2 sm:px-3`}
-                  onClick={onReopenPrevTrail}
-                >
-                  <ChevronLeft className="size-4" />
-                  <span className="hidden sm:inline">{labels.backToCurrent}</span>
-                </Button>
-              ) : (
-                <div className="h-8 w-8 sm:w-20" aria-hidden="true" />
-              )}
-              <div className="ml-auto flex shrink-0 items-center justify-end gap-2">
-                {canShowFindRelations ? (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    className={appleButtonClassName}
-                    disabled={detailLoading || focusAssistLoading}
-                    onClick={onFindRelations}
-                  >
-                    {focusAssistLoading ? `${labels.findRelations}...` : labels.findRelations}
-                  </Button>
-                ) : (
-                  <div className="hidden h-9 min-w-[120px] sm:block" aria-hidden="true" />
-                )}
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  className={`${appleButtonClassName} ${canShowSiblingNav ? "" : "invisible pointer-events-none"}`}
-                  onClick={onOpenPrevSibling}
-                >
-                  {labels.prev}
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  className={`${appleButtonClassName} ${canShowSiblingNav ? "" : "invisible pointer-events-none"}`}
-                  onClick={onOpenNextSibling}
-                >
-                  {labels.next}
-                </Button>
-              </div>
-            </div>
-          </div>
+          <FocusDetailSheetHeader
+            title={labels.title}
+            trailLength={trailLength}
+            backToCurrentLabel={labels.backToCurrent}
+            canShowFindRelations={canShowFindRelations}
+            findRelationsLabel={labels.findRelations}
+            detailLoading={detailLoading}
+            focusAssistLoading={focusAssistLoading}
+            canShowSiblingNav={canShowSiblingNav}
+            prevLabel={labels.prev}
+            nextLabel={labels.next}
+            appleButtonClassName={appleButtonClassName}
+            onReopenPrevTrail={onReopenPrevTrail}
+            onFindRelations={onFindRelations}
+            onOpenPrevSibling={onOpenPrevSibling}
+            onOpenNextSibling={onOpenNextSibling}
+          />
         }
         headerClassName="border-b border-[rgb(236,238,240)] bg-[rgb(250,250,250)]"
         footer={
-          <div className="flex items-center justify-between gap-2">
-            <FocusDetailActions
-              open={detailActionsOpen}
-              show={Boolean(detail) && (canSetCurrentClusterMain || canMoveIntoCurrentCluster || canSetStandaloneMain)}
-              canSetCurrentClusterMain={canSetCurrentClusterMain}
-              canMoveIntoCurrentCluster={canMoveIntoCurrentCluster}
-              canSetStandaloneMain={canSetStandaloneMain}
-              movingIntoCluster={movingIntoCluster}
-              ensuringMoveTargetCluster={ensuringMoveTargetCluster}
-              detachingClusterMember={detachingClusterMember}
-              hasFocusDetailText={Boolean(detail?.text)}
-              appleButtonClassName={appleButtonClassName}
-              labels={{
-                moreActions: labels.detailMoreActions,
-                openAsMain: labels.detailOpenAsMain,
-                moveIntoCluster: labels.moveIntoCluster,
-                detachClusterMember: labels.detachClusterMember,
-              }}
-              onToggleOpen={() => onSetDetailActionsOpen(!detailActionsOpen)}
-              onRequestSetCurrentClusterMain={onRequestSetCurrentClusterMain}
-              onRequestMoveIntoCluster={onRequestMoveIntoCluster}
-              onRequestSetStandaloneMain={onRequestSetStandaloneMain}
-            />
-
-            {detail?.savedItem ? (
-              <Button
-                type="button"
-                variant="ghost"
-                className={appleButtonClassName}
-                onClick={onPrimaryAction}
-              >
-                {primaryActionLabel}
-              </Button>
-            ) : (
-              <Button
-                type="button"
-                variant="ghost"
-                className={appleButtonClassName}
-                disabled={savingFocusCandidate || !detail}
-                onClick={onSecondaryAction}
-              >
-                {labels.addThisExpression}
-              </Button>
-            )}
-          </div>
+          <FocusDetailSheetFooter
+            detail={detail}
+            detailActionsOpen={detailActionsOpen}
+            canSetCurrentClusterMain={canSetCurrentClusterMain}
+            canMoveIntoCurrentCluster={canMoveIntoCurrentCluster}
+            canSetStandaloneMain={canSetStandaloneMain}
+            movingIntoCluster={movingIntoCluster}
+            ensuringMoveTargetCluster={ensuringMoveTargetCluster}
+            detachingClusterMember={detachingClusterMember}
+            savingFocusCandidate={savingFocusCandidate}
+            primaryActionLabel={primaryActionLabel}
+            addThisExpressionLabel={labels.addThisExpression}
+            appleButtonClassName={appleButtonClassName}
+            onSetDetailActionsOpen={onSetDetailActionsOpen}
+            onRequestSetCurrentClusterMain={onRequestSetCurrentClusterMain}
+            onRequestMoveIntoCluster={onRequestMoveIntoCluster}
+            onRequestSetStandaloneMain={onRequestSetStandaloneMain}
+            onPrimaryAction={onPrimaryAction}
+            onSecondaryAction={onSecondaryAction}
+            moreActionsLabel={labels.detailMoreActions}
+            openAsMainLabel={labels.detailOpenAsMain}
+            moveIntoClusterLabel={labels.moveIntoCluster}
+            detachClusterMemberLabel={labels.detachClusterMember}
+          />
         }
         footerClassName="border-t border-[rgb(236,238,240)] bg-[rgb(250,250,250)]"
       >
@@ -250,29 +199,7 @@ export function FocusDetailSheet({
             semanticFocus={semanticFocus}
             reviewHint={reviewHint}
             exampleCards={exampleCards}
-            labels={{
-              speakSentence: labels.speakSentence,
-              candidateBadge: labels.detailCandidateBadge,
-              noTranslation: labels.noTranslation,
-              loading: labels.detailLoading,
-              tabInfo: labels.detailTabInfo,
-              tabSimilar: labels.detailTabSavedSimilar,
-              tabContrast: labels.detailTabContrast,
-              commonUsage: labels.commonUsage,
-              typicalScenario: labels.typicalScenarioLabel,
-              semanticFocus: labels.semanticFocusLabel,
-              reviewStage: labels.reviewStage,
-              usageHintFallback: labels.usageHintFallback,
-              typicalScenarioPending: labels.typicalScenarioPending,
-              semanticFocusPending: labels.semanticFocusPending,
-              reviewHintFallback: reviewHint,
-              sourceSentence: labels.sourceSentence,
-              noSourceSentence: labels.noSourceSentence,
-              similarHint: labels.detailSimilarHint,
-              emptySimilar: labels.focusEmptySimilar,
-              contrastHint: labels.detailContrastHint,
-              emptyContrast: labels.noContrastExpressions,
-            }}
+            labels={contentLabels}
             onSpeak={onSpeak}
             onTabChange={onTabChange}
             onOpenSimilarRow={onOpenSimilarRow}
@@ -282,19 +209,11 @@ export function FocusDetailSheet({
       </DetailSheetShell>
 
       <FocusDetailConfirm
-        open={Boolean(detailConfirmAction && detail?.savedItem)}
-        title={
-          detailConfirmAction === "set-cluster-main"
-            ? labels.detailOpenAsMainConfirmTitle
-            : labels.detachClusterMemberConfirmTitle
-        }
-        description={
-          detailConfirmAction === "set-cluster-main"
-            ? labels.detailOpenAsMainConfirmDesc
-            : labels.detachClusterMemberConfirmDesc
-        }
-        text={detail?.savedItem?.text ?? ""}
-        translation={detail?.savedItem?.translation ?? null}
+        open={confirmState.open}
+        title={confirmState.title}
+        description={confirmState.description}
+        text={confirmState.text}
+        translation={confirmState.translation}
         confirmLabel={labels.confirmContinue}
         cancelLabel={labels.confirmCancel}
         submitting={detachingClusterMember}

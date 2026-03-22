@@ -6,10 +6,14 @@ import { ManualExpressionAssistResponse, UserPhraseItemResponse } from "@/lib/ut
 import {
   buildFocusDetailState,
   createFocusDetailTrailItem,
+  FocusDetailCandidateLike,
   FocusDetailKind,
   FocusDetailStateLike,
   FocusDetailTabValue,
   FocusDetailTrailItem,
+  resolveFocusDetailInitialTab,
+  resolveFocusDetailItemFromCollections,
+  resolveFocusDetailSiblingCollection,
   resolveReopenFocusTrail,
   updateFocusDetailTrail,
 } from "./chunks-focus-detail-logic";
@@ -22,61 +26,7 @@ type FocusDetailCandidate = {
   savedItem: UserPhraseItemResponse | null;
 };
 
-const resolveInitialTab = ({
-  kind,
-  initialTab,
-}: {
-  kind: FocusDetailKind;
-  initialTab?: FocusDetailTabValue;
-}) => {
-  if (initialTab) return initialTab;
-  if (kind === "contrast") return "contrast";
-  if (kind === "library-similar" || kind === "suggested-similar") return "similar";
-  return "info";
-};
-
-const resolveItemFromCollections = ({
-  text,
-  kind,
-  phraseByNormalized,
-  focusSimilarItems,
-  focusContrastItems,
-}: {
-  text: string;
-  kind: FocusDetailKind;
-  phraseByNormalized: Map<string, UserPhraseItemResponse>;
-  focusSimilarItems: FocusDetailCandidate[];
-  focusContrastItems: FocusDetailCandidate[];
-}) => {
-  const normalized = normalizePhraseText(text);
-  const collection =
-    kind === "contrast"
-      ? focusContrastItems
-      : kind === "library-similar" || kind === "suggested-similar"
-        ? focusSimilarItems
-        : [];
-  const matched = collection.find((item) => normalizePhraseText(item.text) === normalized) ?? null;
-
-  return {
-    matched,
-    savedItem: matched?.savedItem ?? phraseByNormalized.get(normalized) ?? null,
-  };
-};
-
-const resolveSiblingCollection = ({
-  focusDetail,
-  focusRelationTab,
-  focusSimilarItems,
-  focusContrastItems,
-}: {
-  focusDetail: FocusDetailStateLike | null;
-  focusRelationTab: "similar" | "contrast";
-  focusSimilarItems: FocusDetailCandidate[];
-  focusContrastItems: FocusDetailCandidate[];
-}) => {
-  if (!focusDetail || focusDetail.kind === "current") return [] as FocusDetailCandidate[];
-  return focusRelationTab === "contrast" ? focusContrastItems : focusSimilarItems;
-};
+const toLogicCandidates = (items: FocusDetailCandidate[]): FocusDetailCandidateLike[] => items;
 
 export const useFocusDetailController = ({
   phraseByNormalized,
@@ -116,12 +66,12 @@ export const useFocusDetailController = ({
       initialTab?: FocusDetailTabValue;
       chainMode?: "reset" | "append";
     }) => {
-      const { matched, savedItem } = resolveItemFromCollections({
+      const { matched, savedItem } = resolveFocusDetailItemFromCollections({
         text,
         kind,
         phraseByNormalized,
-        focusSimilarItems,
-        focusContrastItems,
+        focusSimilarItems: toLogicCandidates(focusSimilarItems),
+        focusContrastItems: toLogicCandidates(focusContrastItems),
       });
       const nextDetail = buildFocusDetailState({
         text,
@@ -129,7 +79,7 @@ export const useFocusDetailController = ({
         kind,
         savedItem,
       });
-      const nextTab = resolveInitialTab({ kind, initialTab });
+      const nextTab = resolveFocusDetailInitialTab({ kind, initialTab });
 
       if (savedItem?.userPhraseId) {
         onSetFocusExpressionId(resolveFocusMainExpressionIdForRow(savedItem.userPhraseId));
@@ -166,11 +116,11 @@ export const useFocusDetailController = ({
 
   const openFocusSiblingDetail = useCallback(
     (direction: -1 | 1) => {
-      const siblings = resolveSiblingCollection({
+      const siblings = resolveFocusDetailSiblingCollection({
         focusDetail,
         focusRelationTab,
-        focusSimilarItems,
-        focusContrastItems,
+        focusSimilarItems: toLogicCandidates(focusSimilarItems),
+        focusContrastItems: toLogicCandidates(focusContrastItems),
       });
       if (!focusDetail || siblings.length <= 1) return;
 

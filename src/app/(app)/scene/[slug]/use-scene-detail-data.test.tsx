@@ -155,3 +155,51 @@ test("useSceneDetailData 会忽略旧 slug 的迟到回填", async () => {
     assert.equal(result.current.sceneDataSource, "network");
   });
 });
+
+test("useSceneDetailData 在 initialLesson slug 匹配时会直接使用初始数据", async () => {
+  const initialLesson = createLesson("scene-ssr", "scene-ssr");
+  let loadSceneDetailCalled = false;
+
+  const deps: SceneDetailDataDeps = {
+    clearExpiredSceneCaches: async () => undefined,
+    getSceneCache: async () => ({ found: false, isExpired: false, record: null }),
+    getSceneDetailBySlugFromApi: async () => initialLesson,
+    setSceneCache: async () => undefined,
+    getScenesFromApi: async () => [],
+    listRecentSceneCacheKeys: async () => [],
+    scheduleScenePrefetch: () => undefined,
+    extractSlugFromSceneCacheKey: (key: string) => key,
+    getPrefetchDebugState: () => ({
+      pendingKeys: [],
+      inFlightKey: null,
+      recentPrefetchedKeys: [],
+    }),
+    loadSceneDetail: async () => {
+      loadSceneDetailCalled = true;
+    },
+    getSavedNormalizedPhraseTextsFromApi: async () => [],
+    collectLessonChunkTexts: () => [],
+    normalizePhraseText: (text: string) => text,
+    getSceneGeneratedState: () => ({
+      latestPracticeSet: null,
+      latestVariantSet: null,
+      practiceStatus: "idle",
+      variantStatus: "idle",
+    }),
+    syncSceneVariantsFromDb: async () => null,
+    saveVariantSet: () => undefined,
+  };
+
+  const { result } = renderHook(() =>
+    useSceneDetailData("scene-ssr", { initialLesson, deps }),
+  );
+
+  await waitFor(() => {
+    assert.equal(result.current.baseLesson?.id, "scene-ssr");
+    assert.equal(result.current.sceneDataSource, "network");
+    assert.equal(result.current.sceneLoading, false);
+  });
+
+  assert.equal(loadSceneDetailCalled, false);
+  assert.equal(result.current.loadErrorMessage, null);
+});
