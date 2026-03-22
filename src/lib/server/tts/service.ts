@@ -37,11 +37,6 @@ type SceneFullSegment = {
   speaker?: string;
 };
 
-type SynthesizedAudioResult = {
-  buffer: Buffer;
-  persisted: boolean;
-};
-
 type SignedUrlCacheEntry = {
   url: string;
   expiresAt: number;
@@ -216,27 +211,13 @@ const persistBufferIfPossible = async (targetPath: string, buffer: Buffer) => {
   await writeFile(targetPath, buffer);
 };
 
-const synthesizeToFile = async (
-  targetPath: string,
-  text: string,
-  voice: string,
-  mode: TtsMode,
-): Promise<SynthesizedAudioResult> => {
-  const buffer = await synthesizeToBuffer(text, voice, mode);
+const tryPersistBufferToFile = async (targetPath: string, buffer: Buffer) => {
   try {
     await persistBufferIfPossible(targetPath, buffer);
-    return {
-      buffer,
-      persisted: true,
-    };
   } catch (error) {
     if (!canFallbackToInlineAudio(error)) {
       throw error;
     }
-    return {
-      buffer,
-      persisted: false,
-    };
   }
 };
 
@@ -277,29 +258,6 @@ const synthesizeSceneFullBuffer = async (
     return Buffer.concat(buffers);
   } finally {
     tts.close();
-  }
-};
-
-const synthesizeSceneFullToFile = async (
-  targetPath: string,
-  segments: SceneFullSegment[],
-  sceneType: "dialogue" | "monologue",
-): Promise<SynthesizedAudioResult> => {
-  const buffer = await synthesizeSceneFullBuffer(segments, sceneType);
-  try {
-    await persistBufferIfPossible(targetPath, buffer);
-    return {
-      buffer,
-      persisted: true,
-    };
-  } catch (error) {
-    if (!canFallbackToInlineAudio(error)) {
-      throw error;
-    }
-    return {
-      buffer,
-      persisted: false,
-    };
   }
 };
 
@@ -398,21 +356,15 @@ export async function generateTtsAudio(payload: TtsRequestPayload) {
   let cached = Boolean(responseUrl);
 
   if (!responseUrl) {
-    if (kind === "scene_full") {
-      const result = await synthesizeSceneFullToFile(
-        target.absolutePath,
-        mergedSceneFullSegments,
-        sceneType,
-      );
-      responseUrl = result.persisted
-        ? await uploadAudioToStorage(target.storagePath, result.buffer)
-        : toInlineAudioUrl(result.buffer);
-    } else {
-      const result = await synthesizeToFile(target.absolutePath, text, target.voice, target.mode);
-      responseUrl = result.persisted
-        ? await uploadAudioToStorage(target.storagePath, result.buffer)
-        : toInlineAudioUrl(result.buffer);
-    }
+    const buffer =
+      kind === "scene_full"
+        ? await synthesizeSceneFullBuffer(mergedSceneFullSegments, sceneType)
+        : await synthesizeToBuffer(text, target.voice, target.mode);
+
+    await tryPersistBufferToFile(target.absolutePath, buffer);
+    responseUrl = await uploadAudioToStorage(target.storagePath, buffer).catch(() =>
+      toInlineAudioUrl(buffer),
+    );
     cached = false;
   }
 
