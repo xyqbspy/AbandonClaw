@@ -47,12 +47,14 @@ type TtsUrlCacheEntry = {
 
 export type TtsPlaybackState = {
   kind: "sentence" | "chunk" | "scene" | null;
+  status?: "idle" | "loading" | "playing";
   sentenceId?: string;
   chunkKey?: string;
   sceneSlug?: string;
   mode?: "normal" | "slow";
   isLooping?: boolean;
   text?: string;
+  requestId?: number;
 };
 
 export type BrowserTtsCacheEntry = {
@@ -65,8 +67,10 @@ export type BrowserTtsCacheEntry = {
 let currentAudio: HTMLAudioElement | null = null;
 let playbackAudio: HTMLAudioElement | null = null;
 let playbackGeneration = 0;
+let playbackRequestSeq = 0;
 let playbackState: TtsPlaybackState = {
   kind: null,
+  status: "idle",
   isLooping: false,
 };
 const playbackListeners = new Set<(state: TtsPlaybackState) => void>();
@@ -75,7 +79,7 @@ const pendingTtsUrlRequests = new Map<string, Promise<string>>();
 const preloadedAudioUrls = new Set<string>();
 const persistentAudioObjectUrls = new Map<string, string>();
 const ttsUrlCacheTtlMs = 45 * 60 * 1000;
-const browserTtsCacheName = "tts-audio-v1";
+const browserTtsCacheName = "tts-audio-v2";
 
 const emitPlaybackState = () => {
   for (const listener of playbackListeners) {
@@ -101,6 +105,22 @@ export const setTtsLooping = (isLooping: boolean) => {
   setPlaybackState({
     ...playbackState,
     isLooping,
+  });
+};
+
+const nextPlaybackRequestId = () => {
+  playbackRequestSeq += 1;
+  return playbackRequestSeq;
+};
+
+const clearPlaybackStateIfCurrent = (requestId: number) => {
+  if (playbackState.requestId !== requestId) return;
+  setPlaybackState({
+    kind: null,
+    status: "idle",
+    isLooping: false,
+    text: undefined,
+    requestId: undefined,
   });
 };
 
@@ -359,10 +379,17 @@ const requestTtsUrl = async (
     if (!data.url) {
       throw new Error("Invalid tts audio response.");
     }
-    const persistentAudioUrl =
-      (await persistAudioToBrowserCache(cacheKey, data.url).catch(() => null)) ?? data.url;
-    const url = cacheTtsUrl(cacheKey, persistentAudioUrl);
+    const url = cacheTtsUrl(cacheKey, data.url);
     preloadAudioUrl(url);
+    void persistAudioToBrowserCache(cacheKey, data.url)
+      .then((persistentUrl) => {
+        if (!persistentUrl) return;
+        cacheTtsUrl(cacheKey, persistentUrl);
+        preloadAudioUrl(persistentUrl);
+      })
+      .catch(() => {
+        // Non-blocking persistence.
+      });
     return url;
   })().finally(() => {
     pendingTtsUrlRequests.delete(cacheKey);
@@ -415,15 +442,27 @@ export const stopTtsPlayback = () => {
   }
   setPlaybackState({
     kind: null,
+    status: "idle",
     isLooping: false,
     text: undefined,
+    requestId: undefined,
   });
 };
 
 const playAudioUrl = async (url: string) => {
-  stopTtsPlayback();
   const generation = playbackGeneration + 1;
   playbackGeneration = generation;
+  if (currentAudio) {
+    currentAudio.onended = null;
+    currentAudio.onerror = null;
+    currentAudio.loop = false;
+    currentAudio.pause();
+    currentAudio.currentTime = 0;
+    currentAudio = null;
+  }
+  if (typeof window !== "undefined" && "speechSynthesis" in window) {
+    window.speechSynthesis.cancel();
+  }
   const audio = ensurePlaybackAudio();
   audio.loop = false;
   if (audio.src !== url) {
@@ -435,20 +474,10 @@ const playAudioUrl = async (url: string) => {
   await new Promise<void>((resolve, reject) => {
     audio.onended = () => {
       if (currentAudio === audio) currentAudio = null;
-      setPlaybackState({
-        kind: null,
-        isLooping: playbackState.isLooping ?? false,
-        text: undefined,
-      });
       resolve();
     };
     audio.onerror = () => {
       if (currentAudio === audio) currentAudio = null;
-      setPlaybackState({
-        kind: null,
-        isLooping: playbackState.isLooping ?? false,
-        text: undefined,
-      });
       reject(new Error("audio playback failed"));
     };
     audio
@@ -574,15 +603,30 @@ export async function playSentenceAudio(params: {
   speaker?: string;
   mode?: "normal" | "slow";
 }) {
+  const requestId = nextPlaybackRequestId();
   setPlaybackState({
     kind: "sentence",
+    status: "loading",
     sentenceId: params.sentenceId,
     mode: params.mode ?? "normal",
     isLooping: playbackState.isLooping ?? false,
     text: params.text,
+    requestId,
   });
   try {
     const url = await ensureSentenceAudio(params);
+    if (playbackState.requestId !== requestId) {
+      return { ok: true as const, url, stopped: true as const };
+    }
+    setPlaybackState({
+      kind: "sentence",
+      status: "playing",
+      sentenceId: params.sentenceId,
+      mode: params.mode ?? "normal",
+      isLooping: false,
+      text: params.text,
+      requestId,
+    });
     await playAudioUrl(url);
     return { ok: true as const, url };
   } catch {
@@ -592,25 +636,36 @@ export async function playSentenceAudio(params: {
     }
     throw new Error("语音播放失败，请稍后重试。");
   } finally {
-    setPlaybackState({
-      kind: null,
-      isLooping: playbackState.isLooping ?? false,
-      text: undefined,
-    });
+    clearPlaybackStateIfCurrent(requestId);
   }
 }
 
 export async function playChunkAudio(params: { chunkText: string; chunkKey?: string }) {
   const chunkKey = params.chunkKey ?? buildChunkAudioKey(params.chunkText);
+  const requestId = nextPlaybackRequestId();
   setPlaybackState({
     kind: "chunk",
+    status: "loading",
     chunkKey,
     mode: "normal",
     isLooping: playbackState.isLooping ?? false,
     text: params.chunkText,
+    requestId,
   });
   try {
     const url = await ensureChunkAudio({ ...params, chunkKey });
+    if (playbackState.requestId !== requestId) {
+      return { ok: true as const, url, stopped: true as const };
+    }
+    setPlaybackState({
+      kind: "chunk",
+      status: "playing",
+      chunkKey,
+      mode: "normal",
+      isLooping: false,
+      text: params.chunkText,
+      requestId,
+    });
     await playAudioUrl(url);
     return { ok: true as const, url };
   } catch {
@@ -620,11 +675,7 @@ export async function playChunkAudio(params: { chunkText: string; chunkKey?: str
     }
     throw new Error("语音播放失败，请稍后重试。");
   } finally {
-    setPlaybackState({
-      kind: null,
-      isLooping: playbackState.isLooping ?? false,
-      text: undefined,
-    });
+    clearPlaybackStateIfCurrent(requestId);
   }
 }
 
@@ -643,11 +694,14 @@ export async function playSceneLoopAudio(params: {
   }
 
   stopTtsPlayback();
+  const requestId = nextPlaybackRequestId();
   setPlaybackState({
     kind: "scene",
+    status: "loading",
     sceneSlug: params.sceneSlug,
     isLooping: true,
     text: params.sceneSlug,
+    requestId,
   });
   const generation = playbackGeneration;
 
@@ -661,6 +715,14 @@ export async function playSceneLoopAudio(params: {
     ) {
       return { ok: true as const, url: null, stopped: true as const };
     }
+    setPlaybackState({
+      kind: "scene",
+      status: "playing",
+      sceneSlug: params.sceneSlug,
+      isLooping: true,
+      text: params.sceneSlug,
+      requestId,
+    });
     const audio = ensurePlaybackAudio();
     if (audio.src !== url) {
       audio.src = url;
@@ -675,8 +737,10 @@ export async function playSceneLoopAudio(params: {
       }
       setPlaybackState({
         kind: null,
+        status: "idle",
         isLooping: false,
         text: undefined,
+        requestId: undefined,
       });
     };
     await audio.play();
@@ -684,8 +748,10 @@ export async function playSceneLoopAudio(params: {
   } catch (error) {
     setPlaybackState({
       kind: null,
+      status: "idle",
       isLooping: false,
       text: undefined,
+      requestId: undefined,
     });
     throw error;
   }

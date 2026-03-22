@@ -46,6 +46,7 @@ export function SelectionDetailPanel({
   relatedChunks,
   loading,
   speakingText,
+  loadingText,
   onSave,
   onReview,
   saved = false,
@@ -54,6 +55,7 @@ export function SelectionDetailPanel({
   hoveredChunkKey,
   onHoverChunk,
   playingChunkKey,
+  loadingChunkKey,
   showSpeaker: _showSpeaker = true,
   sentenceSectionLabel = "当前句子",
   onSelectSentence,
@@ -64,6 +66,7 @@ export function SelectionDetailPanel({
   relatedChunks: string[];
   loading: boolean;
   speakingText: string | null;
+  loadingText?: string | null;
   onSave: () => void;
   onReview: () => void;
   saved?: boolean;
@@ -72,6 +75,7 @@ export function SelectionDetailPanel({
   hoveredChunkKey: string | null;
   onHoverChunk: (chunkKey: string | null) => void;
   playingChunkKey?: string | null;
+  loadingChunkKey?: string | null;
   showSpeaker?: boolean;
   sentenceSectionLabel?: string;
   onSelectSentence?: (sentenceId: string) => void;
@@ -130,6 +134,7 @@ export function SelectionDetailPanel({
             ) : null}
             <TtsActionButton
               active={speakingText === currentSentence.text}
+              loading={loadingText === currentSentence.text}
               size="sm"
               variant="ghost"
               className={cn(
@@ -179,12 +184,14 @@ export function SelectionDetailPanel({
                         hoveredChunkKey?.toLowerCase() === chunk.toLowerCase() &&
                           chunkDetail?.text.toLowerCase() !== chunk.toLowerCase() &&
                           LESSON_CHIP_HOVER_CLASS,
-                        playingChunkKey?.toLowerCase() === chunk.toLowerCase() &&
+                        (playingChunkKey?.toLowerCase() === chunk.toLowerCase() ||
+                          loadingChunkKey?.toLowerCase() === chunk.toLowerCase()) &&
                           "ring-1 ring-primary/45 text-primary",
                         !(
                           chunkDetail?.text.toLowerCase() === chunk.toLowerCase() ||
                           hoveredChunkKey?.toLowerCase() === chunk.toLowerCase() ||
-                          playingChunkKey?.toLowerCase() === chunk.toLowerCase()
+                          playingChunkKey?.toLowerCase() === chunk.toLowerCase() ||
+                          loadingChunkKey?.toLowerCase() === chunk.toLowerCase()
                         ) && LESSON_CHIP_INACTIVE_CLASS,
                       )}
                     >
@@ -218,6 +225,7 @@ export function SelectionDetailPanel({
                 <div className="flex gap-2">
                   <TtsActionButton
                     active={speakingText === chunkDetail.text}
+                    loading={loadingText === chunkDetail.text}
                     variant="ghost"
                     size="sm"
                     className={appleButtonClassName}
@@ -274,6 +282,7 @@ export function SelectionDetailPanel({
                             </button>
                             <TtsActionButton
                               active={speakingText === exampleText}
+                              loading={loadingText === exampleText}
                               variant="ghost"
                               size="sm"
                               className="h-auto px-0 text-xs text-muted-foreground hover:text-foreground"

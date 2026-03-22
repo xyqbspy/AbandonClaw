@@ -7,13 +7,16 @@ import {
   ensureChunkAudio,
   ensureSentenceAudio,
   getBrowserTtsCacheSummary,
+  getTtsPlaybackState,
   listBrowserTtsCacheEntries,
   playChunkAudio,
+  subscribeTtsPlaybackState,
   stopTtsPlayback,
 } from "./tts-api";
 
 const originalFetch = globalThis.fetch;
 const originalAudio = globalThis.Audio;
+const originalWindow = globalThis.window;
 const originalCaches = globalThis.caches;
 const originalCreateObjectURL = globalThis.URL.createObjectURL;
 const originalRevokeObjectURL = globalThis.URL.revokeObjectURL;
@@ -33,6 +36,7 @@ afterEach(async () => {
   stopTtsPlayback();
   globalThis.fetch = originalFetch;
   globalThis.Audio = originalAudio;
+  globalThis.window = originalWindow;
   globalThis.caches = originalCaches;
   globalThis.URL.createObjectURL = originalCreateObjectURL;
   globalThis.URL.revokeObjectURL = originalRevokeObjectURL;
@@ -121,6 +125,7 @@ test("ensureChunkAudio 首次成功后会优先命中浏览器本地缓存", asy
   let sourceAudioFetchCount = 0;
   let objectUrlCount = 0;
   const cacheBuckets = new Map<string, Map<string, Response>>();
+  globalThis.window = globalThis as typeof globalThis & Window;
 
   globalThis.Audio = class {
     preload = "auto";
@@ -178,9 +183,13 @@ test("ensureChunkAudio 首次成功后会优先命中浏览器本地缓存", asy
     chunkKey: "hang-in-there",
   });
 
-  assert.match(firstUrl, /^blob:tts-/);
+  assert.equal(firstUrl, "https://cdn.test/chunk-persisted.mp3");
   assert.equal(apiRequestCount, 1);
   assert.equal(sourceAudioFetchCount, 1);
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    if ((cacheBuckets.get("tts-audio-v2")?.size ?? 0) > 0) break;
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
 
   await __resetTtsTestState({ preservePersistentCache: true });
 
@@ -200,6 +209,7 @@ test("ensureChunkAudio 首次成功后会优先命中浏览器本地缓存", asy
 
 test("浏览器 TTS 缓存 helper 可以列出大小并定向清理", async () => {
   const cacheBuckets = new Map<string, Map<string, Response>>();
+  globalThis.window = globalThis as typeof globalThis & Window;
 
   globalThis.caches = {
     open: async (name: string) => {
@@ -231,7 +241,7 @@ test("浏览器 TTS 缓存 helper 可以列出大小并定向清理", async () =
     match: async () => undefined,
   } as CacheStorage;
 
-  const cache = await globalThis.caches.open("tts-audio-v1");
+  const cache = await globalThis.caches.open("tts-audio-v2");
   await cache.put(
     new Request("https://local.tts.cache/chunk%3Awrap-up"),
     new Response(new Blob(["1234"], { type: "audio/mpeg" })),
@@ -314,4 +324,50 @@ test("playChunkAudio 会复用同一个播放音频实例", async () => {
   });
 
   assert.equal(playedInstanceIds.size, 1);
+});
+
+test("playChunkAudio 会依次发出 loading、playing 和 idle 状态", async () => {
+  const states: Array<ReturnType<typeof getTtsPlaybackState>> = [];
+  const unsubscribe = subscribeTtsPlaybackState((state) => {
+    states.push(state);
+  });
+
+  class FakeAudio {
+    preload = "auto";
+    src = "";
+    currentTime = 0;
+    loop = false;
+    onended: null | (() => void) = null;
+    onerror: null | (() => void) = null;
+
+    load() {}
+
+    play() {
+      queueMicrotask(() => {
+        this.onended?.();
+      });
+      return Promise.resolve();
+    }
+
+    pause() {}
+  }
+
+  globalThis.Audio = FakeAudio as unknown as typeof Audio;
+  globalThis.fetch = (async () =>
+    new Response(JSON.stringify({ url: "https://cdn.test/chunk-status.mp3" }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    })) as typeof fetch;
+
+  await playChunkAudio({
+    chunkText: "status test",
+    chunkKey: "status-test",
+  });
+  unsubscribe();
+
+  assert.equal(states[0]?.status, "loading");
+  assert.equal(states[0]?.text, "status test");
+  assert.ok(states.some((state) => state.status === "playing" && state.text === "status test"));
+  assert.equal(getTtsPlaybackState().status, "idle");
+  assert.equal(getTtsPlaybackState().kind, null);
 });

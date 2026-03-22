@@ -23,6 +23,7 @@ export function SentenceBlock({
   sentence,
   showSpeaker = true,
   speaking,
+  loading = false,
   activeChunkKey,
   hoveredChunkKey,
   onPronounce,
@@ -34,6 +35,7 @@ export function SentenceBlock({
   sentence: LessonSentence;
   showSpeaker?: boolean;
   speaking?: boolean;
+  loading?: boolean;
   activeChunkKey?: string | null;
   hoveredChunkKey?: string | null;
   onPronounce?: (text: string) => void;
@@ -85,6 +87,7 @@ export function SentenceBlock({
           </button>
           <TtsActionButton
             active={speaking}
+            loading={loading}
             variant="ghost"
             size="sm"
             className="h-auto px-0 text-muted-foreground hover:text-foreground"

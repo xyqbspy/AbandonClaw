@@ -250,6 +250,7 @@ export function LessonReader({
     playbackState.sceneSlug === lesson.slug &&
     Boolean(playbackState.isLooping);
   const effectiveSpeakingText = playbackState.text ?? null;
+  const effectiveLoadingText = playbackState.status === "loading" ? playbackState.text ?? null : null;
   const isSentencePlaying = useCallback(
     (sentenceId: string, mode?: "normal" | "slow") => {
       if (playbackState.kind !== "sentence") return false;
@@ -259,6 +260,33 @@ export function LessonReader({
     },
     [playbackState.kind, playbackState.mode, playbackState.sentenceId],
   );
+  const isSentenceLoading = useCallback(
+    (sentenceId: string, mode?: "normal" | "slow") => {
+      if (playbackState.kind !== "sentence") return false;
+      if (playbackState.status !== "loading") return false;
+      if (playbackState.sentenceId !== sentenceId) return false;
+      if (!mode) return true;
+      return (playbackState.mode ?? "normal") === mode;
+    },
+    [playbackState.kind, playbackState.mode, playbackState.sentenceId, playbackState.status],
+  );
+  const isChunkLoading = useCallback(
+    (text: string) => {
+      const clean = text.trim();
+      if (!clean) return false;
+      return playbackState.kind === "chunk" && playbackState.status === "loading" && effectiveLoadingText === clean;
+    },
+    [effectiveLoadingText, playbackState.kind, playbackState.status],
+  );
+  const loadingChunkKey =
+    playbackState.kind === "chunk" && playbackState.status === "loading" && effectiveLoadingText
+      ? effectiveLoadingText
+      : null;
+  const isSceneLoopLoading =
+    playbackState.kind === "scene" &&
+    playbackState.sceneSlug === lesson.slug &&
+    playbackState.status === "loading" &&
+    Boolean(playbackState.isLooping);
   const stopAudio = useCallback(() => {
     stopTtsPlayback();
     setTtsLooping(false);
@@ -829,6 +857,7 @@ export function LessonReader({
                 <span className="opacity-40">·</span>
                 <TtsActionButton
                   active={isBlockSpeaking}
+                  loading={isSentenceLoading(blockPlaybackId, "normal")}
                   variant="ghost"
                   size="sm"
                   className="h-auto px-0 text-inherit hover:text-foreground"
@@ -853,6 +882,7 @@ export function LessonReader({
       handleSentenceTap,
       playBlockTts,
       isSentencePlaying,
+      isSentenceLoading,
       playbackState.kind,
       playbackState.sentenceId,
       toggleDialogueBlockTranslation,
@@ -881,6 +911,13 @@ export function LessonReader({
         onSave={handleSave}
         onReview={handleAddReview}
         onPronounce={() => handlePronounce(state.selectionState?.text ?? "")}
+        loadingPronounce={Boolean(
+          state.selectionState?.text &&
+            ((playbackState.kind === "sentence" &&
+              playbackState.status === "loading" &&
+              effectiveLoadingText === state.selectionState.text) ||
+              isChunkLoading(state.selectionState.text)),
+        )}
       />
 
       <div
@@ -896,6 +933,7 @@ export function LessonReader({
               {headerTools}
               <LoopActionButton
                 active={isSceneLooping}
+                loading={isSceneLoopLoading}
                 variant="ghost"
                 size="sm"
                 className={cn(
@@ -914,6 +952,7 @@ export function LessonReader({
               {headerTools}
               <LoopActionButton
                 active={isSceneLooping}
+                loading={isSceneLoopLoading}
                 variant="ghost"
                 size="sm"
                 className={cn(
@@ -947,6 +986,7 @@ export function LessonReader({
                     </h1>
                     <LoopActionButton
                       active={isSceneLooping}
+                      loading={isSceneLoopLoading}
                       variant="ghost"
                       size="sm"
                       className="h-6 px-1.5 text-[10px] text-muted-foreground/80"
@@ -986,11 +1026,13 @@ export function LessonReader({
                   <div className="flex flex-wrap gap-2">
                     <LoopActionButton
                       active={isSceneLooping}
+                      loading={isSceneLoopLoading}
                       variant="outline"
                       className="cursor-pointer transition-all duration-150 hover:border-primary/40 hover:bg-accent"
                       onClick={toggleSceneLoopPlayback}
                     />
                     <TtsActionButton
+                      loading={isChunkLoading(currentSentence?.text ?? lesson.title)}
                       variant="outline"
                       className="cursor-pointer transition-all duration-150 hover:border-primary/40 hover:bg-accent"
                       onClick={() =>
@@ -1081,6 +1123,7 @@ export function LessonReader({
                               </button>
                               <TtsActionButton
                                 active={groupPlaying}
+                                loading={isChunkLoading(groupText)}
                                 variant="ghost"
                                 size="sm"
                                 className={cn(
@@ -1172,6 +1215,13 @@ export function LessonReader({
                         </button>
                         <span className="opacity-40">·</span>
                         <TtsActionButton
+                          loading={isChunkLoading(
+                            block.tts?.trim() ||
+                              block.sentences
+                                .map((sentence) => sentence.tts?.trim() || sentence.audioText || sentence.text)
+                                .filter(Boolean)
+                                .join(" "),
+                          )}
                           variant="ghost"
                           size="sm"
                           className="h-auto px-0 text-inherit hover:text-foreground"
@@ -1221,6 +1271,7 @@ export function LessonReader({
           sentenceSectionLabel={sentenceSectionLabel}
           loading={false}
           speakingText={effectiveSpeakingText}
+          loadingText={effectiveLoadingText}
           onSave={handleSave}
           onReview={handleAddReview}
           saved={chunkSaved}
@@ -1235,6 +1286,7 @@ export function LessonReader({
             dispatchAction({ type: "CHUNK_HOVERED", payload: { chunkKey } })
           }
           playingChunkKey={playbackState.kind === "chunk" ? (playbackState.text ?? null) : null}
+          loadingChunkKey={loadingChunkKey}
           onSelectSentence={(sentenceId) => handleSentenceTap(sentenceId)}
         />
       </div>
@@ -1249,6 +1301,7 @@ export function LessonReader({
         sentenceSectionLabel={sentenceSectionLabel}
         loading={false}
         speakingText={effectiveSpeakingText}
+        loadingText={effectiveLoadingText}
         onOpenChange={setSheetOpen}
         onSave={handleSave}
         onReview={handleAddReview}
@@ -1265,6 +1318,7 @@ export function LessonReader({
           dispatchAction({ type: "CHUNK_HOVERED", payload: { chunkKey } })
         }
         playingChunkKey={playbackState.kind === "chunk" ? (playbackState.text ?? null) : null}
+        loadingChunkKey={loadingChunkKey}
         onSelectSentence={(sentenceId) => handleSentenceTap(sentenceId)}
       />
     </div>

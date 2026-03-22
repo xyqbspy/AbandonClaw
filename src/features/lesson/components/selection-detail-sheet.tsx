@@ -33,6 +33,7 @@ export function SelectionDetailSheet({
   open,
   loading,
   speakingText,
+  loadingText,
   onOpenChange,
   onSave,
   onReview,
@@ -43,6 +44,7 @@ export function SelectionDetailSheet({
   hoveredChunkKey,
   onHoverChunk,
   playingChunkKey,
+  loadingChunkKey,
   showSentenceSection = true,
   showSpeaker = true,
   sentenceSectionLabel = "当前句子",
@@ -55,6 +57,7 @@ export function SelectionDetailSheet({
   open: boolean;
   loading: boolean;
   speakingText: string | null;
+  loadingText?: string | null;
   onOpenChange: (open: boolean) => void;
   onSave: () => void;
   onReview: () => void;
@@ -65,6 +68,7 @@ export function SelectionDetailSheet({
   hoveredChunkKey: string | null;
   onHoverChunk: (chunkKey: string | null) => void;
   playingChunkKey?: string | null;
+  loadingChunkKey?: string | null;
   showSentenceSection?: boolean;
   showSpeaker?: boolean;
   sentenceSectionLabel?: string;
@@ -135,6 +139,7 @@ export function SelectionDetailSheet({
                       </button>
                       <TtsActionButton
                         active={speakingText === currentSentence.text}
+                        loading={loadingText === currentSentence.text}
                         variant="ghost"
                         size="sm"
                         className="h-auto px-0 text-xs text-muted-foreground hover:text-foreground"
@@ -195,12 +200,14 @@ export function SelectionDetailSheet({
                               hoveredChunkKey?.toLowerCase() === chunk.toLowerCase() &&
                                 chunkDetail?.text.toLowerCase() !== chunk.toLowerCase() &&
                                 LESSON_CHIP_HOVER_CLASS,
-                              playingChunkKey?.toLowerCase() === chunk.toLowerCase() &&
+                              (playingChunkKey?.toLowerCase() === chunk.toLowerCase() ||
+                                loadingChunkKey?.toLowerCase() === chunk.toLowerCase()) &&
                                 "ring-1 ring-primary/45 text-primary",
                               !(
                                 chunkDetail?.text.toLowerCase() === chunk.toLowerCase() ||
                                 hoveredChunkKey?.toLowerCase() === chunk.toLowerCase() ||
-                                playingChunkKey?.toLowerCase() === chunk.toLowerCase()
+                                playingChunkKey?.toLowerCase() === chunk.toLowerCase() ||
+                                loadingChunkKey?.toLowerCase() === chunk.toLowerCase()
                               ) && LESSON_CHIP_INACTIVE_CLASS,
                             )}
                             onClick={() => onSelectRelated(chunk)}
@@ -227,6 +234,7 @@ export function SelectionDetailSheet({
                   {chunkDetail ? (
                     <TtsActionButton
                       active={speakingText === chunkDetail.text}
+                      loading={loadingText === chunkDetail.text}
                       variant="ghost"
                       size="sm"
                       className="h-auto px-0 text-xs text-muted-foreground hover:text-foreground"
@@ -284,6 +292,7 @@ export function SelectionDetailSheet({
                               </button>
                               <TtsActionButton
                                 active={speakingText === exampleText}
+                                loading={loadingText === exampleText}
                                 variant="ghost"
                                 size="sm"
                                 className="h-auto px-0 text-xs text-muted-foreground hover:text-foreground"

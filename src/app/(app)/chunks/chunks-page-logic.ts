@@ -1,4 +1,12 @@
-﻿import { PhraseReviewStatus, UserPhraseItemResponse } from "@/lib/utils/phrases-api";
+import { normalizePhraseText } from "@/lib/shared/phrases";
+import { PhraseReviewStatus, UserPhraseItemResponse } from "@/lib/utils/phrases-api";
+import { MoveIntoClusterGroup } from "@/features/chunks/components/types";
+import {
+  buildFocusDetailCloseState,
+  FocusDetailStateLike,
+  FocusDetailTabValue,
+  resolveFocusRelationTabOnDetailTabChange,
+} from "./chunks-focus-detail-logic";
 
 type SearchParamsLike = {
   get(name: string): string | null;
@@ -193,3 +201,254 @@ export const resolveFocusExpressionId = ({
 
   return resolvedId;
 };
+
+export const buildFocusDetailSheetState = ({
+  focusDetail,
+  focusDetailTrailLength,
+  focusRelationTab,
+  focusSimilarCount,
+  focusContrastCount,
+  canShowFindRelations,
+  focusExpression,
+  savingFocusCandidateKey,
+  playingText,
+  ttsPlaybackText,
+  detailSpeakText,
+}: {
+  focusDetail: FocusDetailStateLike | null;
+  focusDetailTrailLength: number;
+  focusRelationTab: "similar" | "contrast";
+  focusSimilarCount: number;
+  focusContrastCount: number;
+  canShowFindRelations: boolean;
+  focusExpression: UserPhraseItemResponse | null;
+  savingFocusCandidateKey: string | null | undefined;
+  playingText: string | null;
+  ttsPlaybackText: string | null | undefined;
+  detailSpeakText: string;
+}) => ({
+  trailLength: focusDetailTrailLength,
+  canShowSiblingNav: Boolean(
+    focusDetail &&
+      focusDetail.kind !== "current" &&
+      (focusRelationTab === "contrast" ? focusContrastCount : focusSimilarCount) > 1,
+  ),
+  canShowFindRelations,
+  savingFocusCandidate: Boolean(
+    !focusExpression ||
+      !focusDetail ||
+      savingFocusCandidateKey ===
+        `${focusDetail.kind === "contrast" ? "contrast" : "similar"}:${normalizePhraseText(focusDetail.text)}`,
+  ),
+  isDetailSpeaking: Boolean(
+    detailSpeakText && (playingText === detailSpeakText || ttsPlaybackText === detailSpeakText),
+  ),
+});
+
+export const buildFocusDetailClosePayload = () => {
+  const nextState = buildFocusDetailCloseState();
+  return {
+    open: nextState.open,
+    actionsOpen: nextState.actionsOpen,
+    trail: nextState.trail,
+    tab: nextState.tab,
+  };
+};
+
+export const buildFocusDetailTabChangeState = ({
+  nextTab,
+  focusRelationTab,
+}: {
+  nextTab: FocusDetailTabValue;
+  focusRelationTab: "similar" | "contrast";
+}): {
+  nextTab: FocusDetailTabValue;
+  nextRelationTab: "similar" | "contrast";
+} => ({
+  nextTab,
+  nextRelationTab: resolveFocusRelationTabOnDetailTabChange(nextTab, focusRelationTab),
+});
+
+export const buildFocusDetailOpenRowAction = ({
+  row,
+  kind,
+}: {
+  row: Pick<UserPhraseItemResponse, "text">;
+  kind: "library-similar" | "contrast";
+}): {
+  nextRelationTab: "similar" | "contrast";
+  detailInput: {
+    text: string;
+    kind: "library-similar" | "contrast";
+    chainMode: "append";
+  };
+} => ({
+  nextRelationTab: kind === "contrast" ? "contrast" : "similar",
+  detailInput: {
+    text: row.text,
+    kind,
+    chainMode: "append" as const,
+  },
+});
+
+export const buildFocusDetailSecondaryActionInput = ({
+  focusExpression,
+  focusDetail,
+  defaultDifferenceLabel,
+}: {
+  focusExpression: UserPhraseItemResponse | null;
+  focusDetail: FocusDetailStateLike | null;
+  defaultDifferenceLabel: string;
+}): {
+  focusExpression: UserPhraseItemResponse;
+  candidate: {
+    text: string;
+    differenceLabel: string;
+  };
+  relationKind: "similar" | "contrast";
+} | null => {
+  if (!focusExpression || !focusDetail) return null;
+
+  return {
+    focusExpression,
+    candidate: {
+      text: focusDetail.text,
+      differenceLabel: focusDetail.differenceLabel ?? defaultDifferenceLabel,
+    },
+    relationKind: focusDetail.kind === "contrast" ? "contrast" : ("similar" as const),
+  };
+};
+
+export const buildMoveIntoClusterSheetState = ({
+  focusExpression,
+  groups,
+  expandedGroups,
+  selectedMap,
+  submitting,
+  appleButtonClassName,
+  labels,
+}: {
+  focusExpression: UserPhraseItemResponse | null;
+  groups: MoveIntoClusterGroup[];
+  expandedGroups: Record<string, boolean>;
+  selectedMap: Record<string, boolean>;
+  submitting: boolean;
+  appleButtonClassName: string;
+  labels: {
+    close: string;
+    title: string;
+    description: string;
+    currentMain: string;
+    empty: string;
+    selectGroup: string;
+    selectedGroup: string;
+    coveredByMain: string;
+    submit: string;
+    mainExpression: string;
+    subExpression: string;
+  };
+}) => ({
+  focusExpression,
+  groups,
+  expandedGroups,
+  selectedMap,
+  submitting,
+  appleButtonClassName,
+  labels: {
+    close: labels.close,
+    title: labels.title,
+    description: labels.description,
+    currentMain: labels.currentMain,
+    empty: labels.empty,
+    selectGroup: labels.selectGroup,
+    selectedGroup: labels.selectedGroup,
+    coveredByMain: labels.coveredByMain,
+    submit: labels.submit,
+    mainExpression: labels.mainExpression,
+    subExpression: labels.subExpression,
+    selected: "已选",
+    unselected: "未选",
+    covered: "已覆盖",
+  },
+});
+
+export const buildMoveIntoClusterOpenChangeState = (open: boolean) => ({
+  open,
+  shouldResetSelection: !open,
+});
+
+export const buildManualSheetState = ({
+  manualItemType,
+  manualExpressionAssist,
+  savingManual,
+  savingManualSentence,
+  labels,
+}: {
+  manualItemType: "expression" | "sentence";
+  manualExpressionAssist: unknown | null;
+  savingManual: boolean;
+  savingManualSentence: boolean;
+  labels: {
+    title: string;
+    description: string;
+    itemTypeLabel: string;
+    saveSentence: string;
+    saveSelectedExpressions: string;
+    saveToLibrary: string;
+    saveAndReview: string;
+  };
+}) => {
+  const isSaving = savingManual || savingManualSentence;
+  const primaryIdleLabel =
+    manualItemType === "sentence"
+      ? labels.saveSentence
+      : manualExpressionAssist
+        ? labels.saveSelectedExpressions
+        : labels.saveToLibrary;
+
+  return {
+    title: labels.title,
+    description: labels.description,
+    itemTypeLabel: labels.itemTypeLabel,
+    isSaving,
+    footerGridClassName: manualItemType === "sentence" ? "grid-cols-1" : "grid-cols-2",
+    primaryActionLabel: isSaving ? `${primaryIdleLabel}...` : primaryIdleLabel,
+    secondaryActionLabel: isSaving ? `${labels.saveAndReview}...` : labels.saveAndReview,
+    showSecondaryAction: manualItemType === "expression",
+  };
+};
+
+export const buildGeneratedSimilarSheetState = ({
+  similarSeedExpression,
+  generatingSimilarForId,
+  generatedSimilarCandidates,
+  savingSelectedSimilar,
+  labels,
+}: {
+  similarSeedExpression: Pick<UserPhraseItemResponse, "text"> | null;
+  generatingSimilarForId: string | null;
+  generatedSimilarCandidates: unknown[];
+  savingSelectedSimilar: boolean;
+  labels: {
+    title: string;
+    description: string;
+    centerExpression: string;
+    generating: string;
+    empty: string;
+    close: string;
+    submit: string;
+  };
+}) => ({
+  title: labels.title,
+  description: labels.description,
+  centerExpressionLabel: labels.centerExpression,
+  generatingLabel: `${labels.generating}...`,
+  emptyLabel: labels.empty,
+  closeLabel: labels.close,
+  submitLabel: savingSelectedSimilar ? `${labels.submit}...` : labels.submit,
+  showSeedExpression: Boolean(similarSeedExpression),
+  showGenerating: Boolean(generatingSimilarForId),
+  showEmpty: !generatingSimilarForId && generatedSimilarCandidates.length === 0,
+  showCandidates: !generatingSimilarForId && generatedSimilarCandidates.length > 0,
+  submitDisabled: savingSelectedSimilar || generatingSimilarForId !== null,
+});

@@ -15,6 +15,7 @@ type SelectionToolbarProps = {
   onSave: () => void;
   onReview: () => void;
   onPronounce: () => void;
+  loadingPronounce?: boolean;
 };
 
 export function SelectionToolbar({
@@ -26,6 +27,7 @@ export function SelectionToolbar({
   onSave,
   onReview,
   onPronounce,
+  loadingPronounce = false,
 }: SelectionToolbarProps) {
   return (
     <div
@@ -54,6 +56,7 @@ export function SelectionToolbar({
         复习
       </Button>
       <TtsActionButton
+        loading={loadingPronounce}
         size="sm"
         variant="ghost"
         className="h-7 px-2"

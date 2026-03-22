@@ -1,8 +1,8 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ChevronDown, Search } from "lucide-react";
+import { Search } from "lucide-react";
 import { toast } from "sonner";
 import { TtsActionButton } from "@/components/audio/tts-action-button";
 import { useTtsPlaybackState } from "@/hooks/use-tts-playback-state";
@@ -27,8 +27,6 @@ import { startReviewSession } from "@/lib/utils/review-session";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { EmptyState } from "@/components/shared/empty-state";
-import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -62,15 +60,20 @@ import {
   APPLE_SURFACE,
 } from "@/lib/ui/apple-style";
 import {
+  buildFocusDetailClosePayload,
+  buildFocusDetailOpenRowAction,
+  buildFocusDetailSecondaryActionInput,
+  buildFocusDetailSheetState,
+  buildFocusDetailTabChangeState,
+  buildGeneratedSimilarSheetState,
+  buildManualSheetState,
+  buildMoveIntoClusterOpenChangeState,
+  buildMoveIntoClusterSheetState,
   buildClusterFilterChange,
   buildChunksSummary,
   resolveClusterFilterExpressionLabel,
   resolveFocusExpressionId,
 } from "./chunks-page-logic";
-import {
-  buildFocusDetailCloseState,
-  resolveFocusRelationTabOnDetailTabChange,
-} from "./chunks-focus-detail-logic";
 import { useChunksRouteState } from "./use-chunks-route-state";
 import { useExpressionClusterActions } from "./use-expression-cluster-actions";
 import { useFocusAssist } from "./use-focus-assist";
@@ -80,6 +83,7 @@ import { useManualExpressionComposer } from "./use-manual-expression-composer";
 import { useManualSentenceComposer } from "./use-manual-sentence-composer";
 import { useSavedRelations } from "./use-saved-relations";
 import { useFocusDetailController } from "./use-focus-detail-controller";
+import { ChunksListView } from "./chunks-list-view";
 
 const zh = {
   loadFailed: "\u52a0\u8f7d\u8868\u8fbe\u5931\u8d25\u3002",
@@ -493,6 +497,7 @@ const renderExampleSentenceCards = (
   options?: {
     onSpeak?: (text: string) => void;
     isSpeakingText?: (text: string) => boolean;
+    isLoadingText?: (text: string) => boolean;
   },
 ) => {
   if (examples.length === 0) return null;
@@ -507,6 +512,7 @@ const renderExampleSentenceCards = (
             {options?.onSpeak ? (
               <TtsActionButton
                 active={options.isSpeakingText?.(example.en) ?? false}
+                loading={options.isLoadingText?.(example.en) ?? false}
                 onClick={() => options.onSpeak?.(example.en)}
                 className="mt-0.5 h-auto shrink-0 px-0 text-xs text-muted-foreground hover:text-foreground"
                 iconClassName="size-4"
@@ -1328,7 +1334,9 @@ export default function ChunksPage() {
   const handlePronounceSentence = (sentence: string | null | undefined) => {
     const text = (sentence ?? "").trim();
     if (!text) return;
-    if (playingText === text) {
+    const isLoadingCurrentText =
+      ttsPlaybackState.status === "loading" && ttsPlaybackState.text?.trim() === text;
+    if (playingText === text || isLoadingCurrentText) {
       stopTtsPlayback();
       setPlayingText(null);
       return;
@@ -1338,8 +1346,8 @@ export default function ChunksPage() {
       setPlayingText(text);
       try {
         await playChunkAudio({ chunkText: text });
-      } catch {
-        toast.message(zh.speechUnsupported);
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : zh.speechUnsupported);
       } finally {
         setPlayingText((prev) => (prev === text ? null : prev));
       }
@@ -1635,21 +1643,49 @@ export default function ChunksPage() {
     }
   };
 
-  const manualSheetPrimaryActionLabel = savingManual || savingManualSentence
-    ? `${
-        manualItemType === "sentence"
-          ? zh.saveSentence
-          : manualExpressionAssist
-            ? zh.saveSelectedExpressions
-            : zh.saveToLibrary
-      }...`
-    : manualItemType === "sentence"
-      ? zh.saveSentence
-      : manualExpressionAssist
-        ? zh.saveSelectedExpressions
-        : zh.saveToLibrary;
-  const manualSheetIsSaving = savingManual || savingManualSentence;
-  const similarSheetSubmitLabel = savingSelectedSimilar ? `${zh.addSelectedSimilar}...` : zh.addSelectedSimilar;
+  const manualSheetState = buildManualSheetState({
+    manualItemType,
+    manualExpressionAssist,
+    savingManual,
+    savingManualSentence,
+    labels: {
+      title: zh.manualAddTitle,
+      description: zh.manualAddDesc,
+      itemTypeLabel: zh.itemTypeLabel,
+      saveSentence: zh.saveSentence,
+      saveSelectedExpressions: zh.saveSelectedExpressions,
+      saveToLibrary: zh.saveToLibrary,
+      saveAndReview: zh.saveAndReview,
+    },
+  });
+  const generatedSimilarSheetState = buildGeneratedSimilarSheetState({
+    similarSeedExpression,
+    generatingSimilarForId,
+    generatedSimilarCandidates,
+    savingSelectedSimilar,
+    labels: {
+      title: zh.generatedSimilarTitle,
+      description: zh.generatedSimilarDesc,
+      centerExpression: zh.centerExpression,
+      generating: zh.generatingSimilar,
+      empty: zh.noGeneratedSimilar,
+      close: zh.close,
+      submit: zh.addSelectedSimilar,
+    },
+  });
+  const focusDetailSheetState = buildFocusDetailSheetState({
+    focusDetail,
+    focusDetailTrailLength: focusDetailTrail.length,
+    focusRelationTab,
+    focusSimilarCount: focusSimilarItems.length,
+    focusContrastCount: focusContrastItems.length,
+    canShowFindRelations: focusDetailViewModel.canShowFindRelations,
+    focusExpression,
+    savingFocusCandidateKey,
+    playingText,
+    ttsPlaybackText: ttsPlaybackState.text,
+    detailSpeakText: focusDetailViewModel.detailSpeakText,
+  });
 
   const focusDetailSheetProps = {
     open: focusDetailOpen,
@@ -1658,13 +1694,9 @@ export default function ChunksPage() {
     detailLoading: focusDetailLoading,
     detailActionsOpen: focusDetailActionsOpen,
     detailConfirmAction,
-    trailLength: focusDetailTrail.length,
-    canShowSiblingNav: Boolean(
-      focusDetail &&
-        focusDetail.kind !== "current" &&
-        (focusRelationTab === "contrast" ? focusContrastItems.length : focusSimilarItems.length) > 1,
-    ),
-    canShowFindRelations: focusDetailViewModel.canShowFindRelations,
+    trailLength: focusDetailSheetState.trailLength,
+    canShowSiblingNav: focusDetailSheetState.canShowSiblingNav,
+    canShowFindRelations: focusDetailSheetState.canShowFindRelations,
     focusAssistLoading,
     movingIntoCluster,
     ensuringMoveTargetCluster,
@@ -1672,20 +1704,11 @@ export default function ChunksPage() {
     canSetCurrentClusterMain,
     canMoveIntoCurrentCluster,
     canSetStandaloneMain,
-    savingFocusCandidate: Boolean(
-      !focusExpression ||
-        !focusDetail ||
-        savingFocusCandidateKey ===
-          `${focusDetail.kind === "contrast" ? "contrast" : "similar"}:${normalizePhraseText(focusDetail.text)}`,
-    ),
+    savingFocusCandidate: focusDetailSheetState.savingFocusCandidate,
     primaryActionLabel: focusDetail?.savedItem ? getPrimaryActionLabel(focusDetail.savedItem) : undefined,
     appleButtonClassName,
     activeAssistItem: focusDetailViewModel.activeAssistItem,
-    isDetailSpeaking: Boolean(
-      focusDetailViewModel.detailSpeakText &&
-        (playingText === focusDetailViewModel.detailSpeakText ||
-          ttsPlaybackState.text === focusDetailViewModel.detailSpeakText),
-    ),
+    isDetailSpeaking: focusDetailSheetState.isDetailSpeaking,
     detailSpeakText: focusDetailViewModel.detailSpeakText,
     similarRows: focusDetailViewModel.similarRows,
     contrastRows: focusDetailViewModel.contrastRows,
@@ -1703,6 +1726,10 @@ export default function ChunksPage() {
             isSpeakingText: (text) =>
               Boolean(text) &&
               (playingText === text.trim() || ttsPlaybackState.text === text.trim()),
+            isLoadingText: (text) =>
+              Boolean(text) &&
+              ttsPlaybackState.status === "loading" &&
+              ttsPlaybackState.text === text.trim(),
           },
         ) ?? null)
       : null,
@@ -1713,7 +1740,7 @@ export default function ChunksPage() {
     onOpenChange: (open: boolean) => {
       setFocusDetailOpen(open);
       if (!open) {
-        const nextState = buildFocusDetailCloseState();
+        const nextState = buildFocusDetailClosePayload();
         setFocusDetailActionsOpen(nextState.actionsOpen);
         setFocusDetailTrail(nextState.trail);
         setFocusDetailTab(nextState.tab);
@@ -1745,38 +1772,42 @@ export default function ChunksPage() {
       setFocusDetailOpen(false);
     },
     onSecondaryAction: () => {
-      if (!focusExpression || !focusDetail) return;
-      void saveFocusCandidate(
+      const nextAction = buildFocusDetailSecondaryActionInput({
         focusExpression,
-        {
-          text: focusDetail.text,
-          differenceLabel: focusDetail.differenceLabel ?? "相关说法",
-        },
-        focusDetail.kind === "contrast" ? "contrast" : "similar",
+        focusDetail,
+        defaultDifferenceLabel: "鐩稿叧璇存硶",
+      });
+      if (!nextAction) return;
+      void saveFocusCandidate(
+        nextAction.focusExpression,
+        nextAction.candidate,
+        nextAction.relationKind,
       );
     },
     onSpeak: handlePronounceSentence,
     onTabChange: (nextTab: "info" | "similar" | "contrast") => {
-      setFocusDetailTab(nextTab);
-      setFocusRelationTab(
-        resolveFocusRelationTabOnDetailTabChange(nextTab, focusRelationTab),
-      );
+      const nextState = buildFocusDetailTabChangeState({
+        nextTab,
+        focusRelationTab,
+      });
+      setFocusDetailTab(nextState.nextTab);
+      setFocusRelationTab(nextState.nextRelationTab);
     },
     onOpenSimilarRow: (row: UserPhraseItemResponse) => {
-      setFocusRelationTab("similar");
-      void openFocusDetail({
-        text: row.text,
+      const nextAction = buildFocusDetailOpenRowAction({
+        row,
         kind: "library-similar",
-        chainMode: "append",
       });
+      setFocusRelationTab(nextAction.nextRelationTab);
+      void openFocusDetail(nextAction.detailInput);
     },
     onOpenContrastRow: (row: UserPhraseItemResponse) => {
-      setFocusRelationTab("contrast");
-      void openFocusDetail({
-        text: row.text,
+      const nextAction = buildFocusDetailOpenRowAction({
+        row,
         kind: "contrast",
-        chainMode: "append",
       });
+      setFocusRelationTab(nextAction.nextRelationTab);
+      void openFocusDetail(nextAction.detailInput);
     },
     onCloseConfirm: () => setDetailConfirmAction(null),
     onConfirm: () => {
@@ -1788,8 +1819,7 @@ export default function ChunksPage() {
     },
   };
 
-  const moveIntoClusterSheetProps = {
-    open: moveIntoClusterOpen,
+  const moveIntoClusterSheetState = buildMoveIntoClusterSheetState({
     focusExpression,
     groups: moveIntoClusterGroups,
     expandedGroups: expandedMoveIntoClusterGroups,
@@ -1808,13 +1838,16 @@ export default function ChunksPage() {
       submit: zh.moveIntoClusterSubmit,
       mainExpression: zh.moveIntoClusterMainExpression,
       subExpression: zh.moveIntoClusterSubExpression,
-      selected: "已选",
-      unselected: "未选",
-      covered: "已覆盖",
     },
+  });
+
+  const moveIntoClusterSheetProps = {
+    open: moveIntoClusterOpen,
+    ...moveIntoClusterSheetState,
     onOpenChange: (open: boolean) => {
-      setMoveIntoClusterOpen(open);
-      if (!open) {
+      const nextState = buildMoveIntoClusterOpenChangeState(open);
+      setMoveIntoClusterOpen(nextState.open);
+      if (nextState.shouldResetSelection) {
         resetMoveIntoClusterSelection();
       }
     },
@@ -2018,379 +2051,89 @@ export default function ChunksPage() {
 
         </div>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {phrases.map((item) => {
-            const sentenceExpressions =
-              item.learningItemType === "sentence" ? extractExpressionsFromSentenceItem(item) : [];
-            const familyMembers =
-              item.learningItemType === "expression" && item.expressionClusterId
-                ? (clusterMembersByClusterId.get(item.expressionClusterId) ?? []).filter(
-                    (row) => row.userPhraseId !== item.userPhraseId,
-                  )
-                : [];
-            const similarPreview = familyMembers.slice(0, 5);
-            const hasSimilarPreview = similarPreview.length > 0;
-            const isSimilarExpanded = Boolean(expandedSimilarIds[item.userPhraseId]);
-            const pendingSimilarDiffLabel =
-              hasSimilarPreview && item.aiEnrichmentStatus === "pending"
-                ? buildDifferenceNote(item.text, similarPreview[0].text)
-                : null;
-            return (
-            <Card key={item.userPhraseId} className={`h-full overflow-hidden ${APPLE_SURFACE}`}>
-              <CardHeader className="px-3 py-2.5">
-                <button
-                  type="button"
-                  className="w-full text-left"
-                  onClick={() => toggleCardExpanded(item.userPhraseId)}
-                  aria-expanded={Boolean(expandedCardIds[item.userPhraseId])}
-                  aria-label={item.text}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="text-[11px] text-muted-foreground">
-                        {item.learningItemType === "sentence" ? zh.sentenceUnit : zh.expressionUnit}
-                      </p>
-                      <p className="mt-0.5 text-[15px] font-semibold leading-snug">
-                        {item.text}
-                      </p>
-                      <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
-                        {item.translation ??
-                          (item.aiEnrichmentStatus === "pending"
-                            ? zh.learningInfoPending
-                            : item.aiEnrichmentStatus === "failed"
-                              ? zh.learningInfoFailed
-                              : zh.noTranslation)}
-                      </p>
-                    </div>
-                    <div className="mt-0.5 flex shrink-0 items-center gap-1.5">
-                      <Badge variant="secondary">{reviewStatusLabel[item.reviewStatus]}</Badge>
-                      {item.aiEnrichmentStatus === "pending" ? (
-                        <Badge variant="outline">{zh.learningInfoPending}</Badge>
-                      ) : null}
-                      <ChevronDown
-                        className={`size-4 text-muted-foreground transition-transform duration-200 ${
-                          expandedCardIds[item.userPhraseId] ? "rotate-180" : "rotate-0"
-                        }`}
-                      />
-                    </div>
-                  </div>
-                </button>
-              </CardHeader>
-              <div
-                className={`overflow-hidden transition-all duration-200 ${
-                  expandedCardIds[item.userPhraseId]
-                    ? "max-h-[780px] opacity-100"
-                    : "max-h-0 opacity-0"
-                }`}
-              >
-                <CardContent className="space-y-3.5 p-3 pt-2.5 pb-2">
-                  {item.learningItemType === "sentence" ? (
-                    <>
-                      <div className="space-y-0.5">
-                        <p className="text-xs text-muted-foreground">{zh.usageHint}</p>
-                        <p className="line-clamp-2 text-sm text-foreground/90">{getUsageHint(item)}</p>
-                      </div>
-                      <div className="space-y-0.5">
-                        <p className="text-xs text-muted-foreground">{zh.sentenceSource}</p>
-                        <p className="line-clamp-2 text-sm text-muted-foreground">
-                          {item.sourceSceneSlug ? item.sourceSceneSlug : zh.sentenceSourceFallback}
-                        </p>
-                        <p className="text-xs text-muted-foreground">{zh.sentenceUnitHint}</p>
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-xs text-muted-foreground">{zh.sentenceExpressions}</p>
-                        <p className="text-[11px] text-muted-foreground">{zh.sentenceExpressionsHint}</p>
-                        {sentenceExpressions.length > 0 ? (
-                          <div className="flex flex-wrap gap-1.5">
-                            {sentenceExpressions.map((expression) => {
-                              const normalized = normalizePhraseText(expression);
-                              const key = `${item.userPhraseId}:${normalized}`;
-                              const isSaved = Boolean(savedSentenceExpressionKeys[key]);
-                              const isSaving = savingSentenceExpressionKey === key;
-                              return (
-                                <div
-                                  key={key}
-                                  className="flex items-center gap-1 rounded-full bg-[rgb(240,240,240)] px-2 py-1"
-                                >
-                                  <span className="text-xs text-foreground">{expression}</span>
-                                  <Button
-                                    type="button"
-                                    size="sm"
-                                    variant="ghost"
-                                    className={`${APPLE_BUTTON_BASE} h-5 px-1.5 py-0 text-[11px]`}
-                                    disabled={isSaved || isSaving}
-                                    onClick={() => void saveExpressionFromSentence(item, expression)}
-                                  >
-                                    {isSaved
-                                      ? zh.sentenceSavedExpression
-                                      : isSaving
-                                        ? `${zh.sentenceSaveExpression}...`
-                                        : zh.sentenceSaveExpression}
-                                  </Button>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        ) : (
-                          <p className="text-xs text-muted-foreground">{zh.sentenceNoExpressions}</p>
-                        )}
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      {item.aiEnrichmentStatus === "pending" ? (
-                        <div className="space-y-1 rounded-lg bg-[rgb(246,246,246)] p-2.5">
-                          <p className="text-xs text-muted-foreground">{zh.learningInfoPending}</p>
-                          <p className="text-sm font-medium text-foreground">{item.text}</p>
-                          <p className="text-xs text-muted-foreground">{zh.learningInfoPendingHint}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {zh.reviewStage}：{getReviewActionHint(item.reviewStatus)}
-                          </p>
-                          {pendingSimilarDiffLabel ? (
-                            <p className="text-xs text-muted-foreground">
-                              {zh.similarExpressions}：{pendingSimilarDiffLabel}
-                            </p>
-                          ) : null}
-                        </div>
-                      ) : null}
-                      <div className="space-y-0.5">
-                        <p className="text-xs text-muted-foreground">{zh.translationLabel}</p>
-                        <p className="line-clamp-2 text-sm text-foreground/90">
-                          {item.translation ??
-                            (item.aiEnrichmentStatus === "pending"
-                              ? zh.learningInfoPending
-                              : item.aiEnrichmentStatus === "failed"
-                                ? zh.learningInfoFailed
-                                : zh.noTranslation)}
-                        </p>
-                      </div>
-                      <div className="space-y-0.5">
-                        <p className="text-xs text-muted-foreground">{zh.usageHint}</p>
-                        <p className="line-clamp-2 text-sm text-foreground/90">{getUsageHint(item)}</p>
-                      </div>
-                      <div className="space-y-0.5">
-                        <div className="flex items-center justify-between gap-2">
-                          <p className="text-xs text-muted-foreground">{zh.sourceSentence}</p>
-                          <TtsActionButton
-                            active={
-                              playingText ===
-                              (item.exampleSentences[0]?.en ?? item.sourceSentenceText ?? "").trim()
-                            }
-                            size="sm"
-                            variant="ghost"
-                            className="h-6 px-2 text-[11px]"
-                            iconClassName="size-3"
-                            onClick={() =>
-                              handlePronounceSentence(
-                                item.exampleSentences[0]?.en ?? item.sourceSentenceText,
-                              )
-                            }
-                            label={zh.speakSentence}
-                          />
-                        </div>
-                        {item.exampleSentences.length > 0 ? (
-                          renderExampleSentenceCards(item.exampleSentences, item.text, {
-                            onSpeak: handlePronounceSentence,
-                            isSpeakingText: (text) =>
-                              Boolean(text) &&
-                              (playingText === text.trim() || ttsPlaybackState.text === text.trim()),
-                          })
-                        ) : (
-                          <p className="line-clamp-2 text-sm text-muted-foreground">
-                            {item.sourceSentenceText
-                              ? renderSentenceWithExpressionHighlight(item.sourceSentenceText, item.text)
-                              : item.aiEnrichmentStatus === "pending"
-                                ? zh.learningInfoPending
-                                : zh.noSourceSentence}
-                          </p>
-                        )}
-                      </div>
-                      <div className="space-y-0.5">
-                        <p className="text-xs text-muted-foreground">{zh.semanticFocusLabel}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {item.semanticFocus ??
-                            (item.aiEnrichmentStatus === "pending"
-                              ? zh.semanticFocusPending
-                              : zh.diffRelated)}
-                        </p>
-                      </div>
-                      <div className="space-y-0.5">
-                        <p className="text-xs text-muted-foreground">{zh.typicalScenarioLabel}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {item.typicalScenario ??
-                            (item.aiEnrichmentStatus === "pending"
-                              ? zh.typicalScenarioPending
-                              : zh.diffRelated)}
-                        </p>
-                      </div>
-                      <div className="space-y-1.5 rounded-lg bg-[rgb(246,246,246)] p-2.5">
-                        <button
-                          type="button"
-                          className="flex w-full items-center justify-between text-left"
-                          onClick={() => toggleSimilarExpanded(item.userPhraseId)}
-                          aria-expanded={isSimilarExpanded}
-                        >
-                          <p className="text-xs text-muted-foreground">{zh.similarExpressions}</p>
-                          <p className="text-[11px] text-muted-foreground">
-                            {isSimilarExpanded ? zh.hideSimilar : zh.showSimilar}
-                          </p>
-                        </button>
-                        {isSimilarExpanded ? (
-                          hasSimilarPreview ? (
-                            <div className="space-y-2">
-                              {similarPreview.map((similarItem) => (
-                                <div key={similarItem.userPhraseId} className="rounded-md bg-[rgb(240,240,240)] px-2 py-1.5">
-                                  <p className="text-xs font-medium text-foreground">{similarItem.text}</p>
-                                  <p className="text-[11px] text-muted-foreground">
-                                    {buildDifferenceNote(item.text, similarItem.text)}
-                                  </p>
-                                </div>
-                              ))}
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="ghost"
-                                className="h-7 px-0 text-xs"
-                                onClick={() =>
-                                  item.expressionClusterId
-                                    ? applyClusterFilter(item.expressionClusterId, item.text)
-                                    : void openGenerateSimilarSheet(item)
-                                }
-                              >
-                                {zh.viewAllSimilar}
-                              </Button>
-                            </div>
-                          ) : (
-                            <div className="space-y-2">
-                              <p className="text-xs text-muted-foreground">{zh.similarEmpty}</p>
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="ghost"
-                                className={`h-7 text-xs ${appleButtonClassName}`}
-                                disabled={generatingSimilarForId === item.userPhraseId}
-                                onClick={() => void openGenerateSimilarSheet(item)}
-                              >
-                                {generatingSimilarForId === item.userPhraseId
-                                  ? `${zh.generatingSimilar}...`
-                                  : zh.findMoreSimilar}
-                              </Button>
-                            </div>
-                          )
-                        ) : null}
-                      </div>
-                    </>
-                  )}
-                  {item.sourceType === "manual" ? (
-                    <div className="space-y-0.5">
-                      <p className="text-xs text-muted-foreground">{zh.manualRecorded}</p>
-                      {item.sourceNote ? (
-                        <p className="line-clamp-1 text-xs text-muted-foreground">
-                          {zh.sourceNoteDisplay}：{item.sourceNote}
-                        </p>
-                      ) : null}
-                    </div>
-                  ) : null}
-                  <div className="space-y-0.5">
-                    <p className="text-xs text-muted-foreground">{zh.reviewStage}</p>
-                    <p className="text-xs text-foreground/80">{getReviewActionHint(item.reviewStatus)}</p>
-                  </div>
-                  {item.usageNote && item.usageNote.trim().length > 70 ? (
-                    <div className="space-y-1.5">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        className="h-auto px-0 text-xs text-muted-foreground"
-                        onClick={() => toggleExpanded(item.userPhraseId)}
-                      >
-                        {expandedIds[item.userPhraseId] ? zh.collapseDetail : zh.expandDetail}
-                      </Button>
-                      {expandedIds[item.userPhraseId] ? (
-                        <div className="space-y-1.5 pt-0.5">
-                          <p className="text-xs text-muted-foreground">{zh.inThisSentence}</p>
-                          <p className="text-sm text-foreground/90">
-                            {item.translation ?? zh.noTranslation}
-                          </p>
-                          <p className="text-xs text-muted-foreground">{zh.commonUsage}</p>
-                          <p className="text-sm text-muted-foreground">{item.usageNote}</p>
-                        </div>
-                      ) : null}
-                    </div>
-                  ) : null}
-                </CardContent>
-                <CardFooter className="flex flex-wrap gap-2 px-3 py-2.5">
-                  {item.learningItemType === "sentence" ? (
-                    <>
-                      {/* TODO: Re-enable one-click extraction after stable server-side chunk detection is available. */}
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        className={appleButtonClassName}
-                        onClick={() => openExpressionComposerFromSentence()}
-                      >
-                        {zh.sentenceRecordExpression}
-                      </Button>
-                    </>
-                  ) : (
-                    <>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        className={appleButtonClassName}
-                        onClick={() => startReviewFromCard(item)}
-                      >
-                        {getPrimaryActionLabel(item)}
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        className={appleButtonClassName}
-                        disabled={!item.expressionClusterId}
-                        onClick={() => void openExpressionMap(item)}
-                      >
-                        {!item.expressionClusterId
-                          ? zh.mapUnavailable
-                          : mapOpeningForId === item.userPhraseId
-                            ? zh.mapPending
-                            : zh.openMap}
-                      </Button>
-                      {item.sourceSceneSlug ? (
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="ghost"
-                          className={appleButtonClassName}
-                          onClick={() => router.push(`/scene/${item.sourceSceneSlug}`)}
-                        >
-                          {zh.sourceScene}
-                        </Button>
-                      ) : null}
-                      {item.aiEnrichmentStatus === "failed" ? (
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="ghost"
-                          className={appleButtonClassName}
-                          disabled={Boolean(retryingEnrichmentIds[item.userPhraseId])}
-                          onClick={() => void retryAiEnrichment(item)}
-                        >
-                          {retryingEnrichmentIds[item.userPhraseId]
-                            ? `${zh.retryEnrichment}...`
-                            : zh.retryEnrichment}
-                        </Button>
-                      ) : null}
-                    </>
-                  )}
-                </CardFooter>
-              </div>
-            </Card>
-          );
-          })}
-        </div>
+        <ChunksListView
+          phrases={phrases}
+          clusterMembersByClusterId={clusterMembersByClusterId}
+          expandedSimilarIds={expandedSimilarIds}
+          expandedCardIds={expandedCardIds}
+          expandedIds={expandedIds}
+          savedSentenceExpressionKeys={savedSentenceExpressionKeys}
+          retryingEnrichmentIds={retryingEnrichmentIds}
+          reviewStatusLabel={reviewStatusLabel}
+          savingSentenceExpressionKey={savingSentenceExpressionKey}
+          generatingSimilarForId={generatingSimilarForId}
+          mapOpeningForId={mapOpeningForId}
+          playingText={playingText}
+          ttsPlaybackText={ttsPlaybackState.text}
+          ttsLoadingText={ttsPlaybackState.status === "loading" ? ttsPlaybackState.text : null}
+          appleButtonClassName={appleButtonClassName}
+          appleSurfaceClassName={APPLE_SURFACE}
+          labels={{
+            sentenceUnit: zh.sentenceUnit,
+            expressionUnit: zh.expressionUnit,
+            learningInfoPending: zh.learningInfoPending,
+            learningInfoFailed: zh.learningInfoFailed,
+            noTranslation: zh.noTranslation,
+            usageHint: zh.usageHint,
+            sentenceSource: zh.sentenceSource,
+            sentenceSourceFallback: zh.sentenceSourceFallback,
+            sentenceUnitHint: zh.sentenceUnitHint,
+            sentenceExpressions: zh.sentenceExpressions,
+            sentenceExpressionsHint: zh.sentenceExpressionsHint,
+            sentenceSavedExpression: zh.sentenceSavedExpression,
+            sentenceSaveExpression: zh.sentenceSaveExpression,
+            sentenceNoExpressions: zh.sentenceNoExpressions,
+            reviewStage: zh.reviewStage,
+            similarExpressions: zh.similarExpressions,
+            translationLabel: zh.translationLabel,
+            sourceSentence: zh.sourceSentence,
+            speakSentence: zh.speakSentence,
+            noSourceSentence: zh.noSourceSentence,
+            semanticFocusLabel: zh.semanticFocusLabel,
+            semanticFocusPending: zh.semanticFocusPending,
+            diffRelated: zh.diffRelated,
+            typicalScenarioLabel: zh.typicalScenarioLabel,
+            typicalScenarioPending: zh.typicalScenarioPending,
+            hideSimilar: zh.hideSimilar,
+            showSimilar: zh.showSimilar,
+            viewAllSimilar: zh.viewAllSimilar,
+            similarEmpty: zh.similarEmpty,
+            generatingSimilar: zh.generatingSimilar,
+            findMoreSimilar: zh.findMoreSimilar,
+            manualRecorded: zh.manualRecorded,
+            sourceNoteDisplay: zh.sourceNoteDisplay,
+            collapseDetail: zh.collapseDetail,
+            expandDetail: zh.expandDetail,
+            inThisSentence: zh.inThisSentence,
+            commonUsage: zh.commonUsage,
+            sentenceRecordExpression: zh.sentenceRecordExpression,
+            mapUnavailable: zh.mapUnavailable,
+            mapPending: zh.mapPending,
+            openMap: zh.openMap,
+            sourceScene: zh.sourceScene,
+            retryEnrichment: zh.retryEnrichment,
+            learningInfoPendingHint: zh.learningInfoPendingHint,
+          }}
+          toggleCardExpanded={toggleCardExpanded}
+          toggleSimilarExpanded={toggleSimilarExpanded}
+          toggleExpanded={toggleExpanded}
+          getUsageHint={getUsageHint}
+          getReviewActionHint={getReviewActionHint}
+          getPrimaryActionLabel={getPrimaryActionLabel}
+          buildDifferenceNote={buildDifferenceNote}
+          extractExpressionsFromSentenceItem={extractExpressionsFromSentenceItem}
+          renderExampleSentenceCards={renderExampleSentenceCards}
+          renderSentenceWithExpressionHighlight={renderSentenceWithExpressionHighlight}
+          handlePronounceSentence={handlePronounceSentence}
+          saveExpressionFromSentence={saveExpressionFromSentence}
+          openExpressionComposerFromSentence={openExpressionComposerFromSentence}
+          startReviewFromCard={startReviewFromCard}
+          openExpressionMap={openExpressionMap}
+          openSourceScene={(slug) => router.push(`/scene/${slug}`)}
+          retryAiEnrichment={retryAiEnrichment}
+          applyClusterFilter={applyClusterFilter}
+          openGenerateSimilarSheet={openGenerateSimilarSheet}
+        />
       )}
 
       <Sheet
@@ -2402,12 +2145,12 @@ export default function ChunksPage() {
       >
         <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto rounded-t-2xl border-0 bg-white">
           <SheetHeader>
-            <SheetTitle>{zh.manualAddTitle}</SheetTitle>
-            <SheetDescription>{zh.manualAddDesc}</SheetDescription>
+            <SheetTitle>{manualSheetState.title}</SheetTitle>
+            <SheetDescription>{manualSheetState.description}</SheetDescription>
           </SheetHeader>
           <div className="space-y-4 px-4 pb-2">
             <div className="space-y-1">
-              <p className="text-xs text-muted-foreground">{zh.itemTypeLabel}</p>
+              <p className="text-xs text-muted-foreground">{manualSheetState.itemTypeLabel}</p>
               <Tabs
                 value={manualItemType}
                 onValueChange={(value) =>
@@ -2478,6 +2221,10 @@ export default function ChunksPage() {
                               isSpeakingText: (text) =>
                                 Boolean(text) &&
                                 (playingText === text.trim() || ttsPlaybackState.text === text.trim()),
+                              isLoadingText: (text) =>
+                                Boolean(text) &&
+                                ttsPlaybackState.status === "loading" &&
+                                ttsPlaybackState.text === text.trim(),
                             },
                           )}
                         </div>
@@ -2557,27 +2304,27 @@ export default function ChunksPage() {
           <SheetFooter>
             <div
               className={`grid gap-2 pb-safe ${
-                manualItemType === "sentence" ? "grid-cols-1" : "grid-cols-2"
+                manualSheetState.footerGridClassName
               }`}
             >
               <Button
                 type="button"
                 variant="ghost"
                 className={appleButtonClassName}
-                disabled={manualSheetIsSaving}
+                disabled={manualSheetState.isSaving}
                 onClick={() => void handleSaveManualExpression("save")}
               >
-                {manualSheetPrimaryActionLabel}
+                {manualSheetState.primaryActionLabel}
               </Button>
-              {manualItemType === "expression" ? (
+              {manualSheetState.showSecondaryAction ? (
                 <Button
                   type="button"
                   variant="ghost"
                   className={appleButtonClassName}
-                  disabled={manualSheetIsSaving}
+                  disabled={manualSheetState.isSaving}
                   onClick={() => void handleSaveManualExpression("save_and_review")}
                 >
-                  {manualSheetIsSaving ? `${zh.saveAndReview}...` : zh.saveAndReview}
+                  {manualSheetState.secondaryActionLabel}
                 </Button>
               ) : null}
             </div>
@@ -2594,26 +2341,26 @@ export default function ChunksPage() {
           }
         }}
       >
-        <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto rounded-t-2xl border-0 bg-white">
-          <SheetHeader>
-            <SheetTitle>{zh.generatedSimilarTitle}</SheetTitle>
-            <SheetDescription>{zh.generatedSimilarDesc}</SheetDescription>
+          <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto rounded-t-2xl border-0 bg-white">
+            <SheetHeader>
+            <SheetTitle>{generatedSimilarSheetState.title}</SheetTitle>
+            <SheetDescription>{generatedSimilarSheetState.description}</SheetDescription>
           </SheetHeader>
 
           <div className="space-y-3 px-4 pb-2">
-            {similarSeedExpression ? (
+            {generatedSimilarSheetState.showSeedExpression ? (
               <div className="rounded-lg bg-[rgb(246,246,246)] p-2.5">
-                <p className="text-xs text-muted-foreground">{zh.centerExpression}</p>
-                <p className="text-sm font-medium">{similarSeedExpression.text}</p>
+                <p className="text-xs text-muted-foreground">{generatedSimilarSheetState.centerExpressionLabel}</p>
+                <p className="text-sm font-medium">{similarSeedExpression?.text ?? ""}</p>
               </div>
             ) : null}
-            {generatingSimilarForId ? (
-              <p className="text-sm text-muted-foreground">{zh.generatingSimilar}...</p>
+            {generatedSimilarSheetState.showGenerating ? (
+              <p className="text-sm text-muted-foreground">{generatedSimilarSheetState.generatingLabel}</p>
             ) : null}
-            {!generatingSimilarForId && generatedSimilarCandidates.length === 0 ? (
-              <p className="text-sm text-muted-foreground">{zh.noGeneratedSimilar}</p>
+            {generatedSimilarSheetState.showEmpty ? (
+              <p className="text-sm text-muted-foreground">{generatedSimilarSheetState.emptyLabel}</p>
             ) : null}
-            {!generatingSimilarForId && generatedSimilarCandidates.length > 0 ? (
+            {generatedSimilarSheetState.showCandidates ? (
               <div className="space-y-2">
                 {generatedSimilarCandidates.map((candidate) => {
                   const normalized = normalizePhraseText(candidate.text);
@@ -2642,16 +2389,16 @@ export default function ChunksPage() {
           <SheetFooter>
             <div className="grid grid-cols-2 gap-2 pb-safe">
               <Button type="button" variant="ghost" className={appleButtonClassName} onClick={() => setSimilarSheetOpen(false)}>
-                {zh.close}
+                {generatedSimilarSheetState.closeLabel}
               </Button>
               <Button
                 type="button"
                 variant="ghost"
                 className={appleButtonClassName}
-                disabled={savingSelectedSimilar || generatingSimilarForId !== null}
+                disabled={generatedSimilarSheetState.submitDisabled}
                 onClick={() => void saveSelectedSimilarCandidates()}
               >
-                {similarSheetSubmitLabel}
+                {generatedSimilarSheetState.submitLabel}
               </Button>
             </div>
           </SheetFooter>
