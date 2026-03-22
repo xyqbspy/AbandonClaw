@@ -1,4 +1,4 @@
-export type ScenePracticeViewLabels = {
+﻿export type ScenePracticeViewLabels = {
   back: string;
   delete: string;
   complete: string;
@@ -60,7 +60,7 @@ export const sceneViewLabels: SceneViewLabels = {
     variantsHint: "把这些核心表达迁移到相似语境里继续练习。",
     reusedChunksTitle: "核心表达",
     openMap: "查看表达地图",
-    loadingMap: "生成中…",
+    loadingMap: "生成中",
     empty: "还没有可查看的变体集。",
     statusPrefix: "状态：",
     open: "打开",

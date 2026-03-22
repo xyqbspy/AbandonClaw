@@ -5,33 +5,21 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronDown, Search } from "lucide-react";
 import { toast } from "sonner";
 import { TtsActionButton } from "@/components/audio/tts-action-button";
-import { getPhraseListCache, setPhraseListCache } from "@/lib/cache/phrase-list-cache";
 import { useTtsPlaybackState } from "@/hooks/use-tts-playback-state";
 import { normalizePhraseText } from "@/lib/shared/phrases";
 import { playChunkAudio, stopTtsPlayback } from "@/lib/utils/tts-api";
 import { generateExpressionMapFromApi } from "@/lib/utils/expression-map-api";
-import {
-  detachExpressionClusterMemberFromApi,
-  ensureExpressionClusterForPhraseFromApi,
-  moveExpressionClusterMemberFromApi,
-  setExpressionClusterMainFromApi,
-} from "@/lib/utils/expression-clusters-api";
 import { ExpressionCluster, ExpressionMapResponse } from "@/lib/types/expression-map";
 import {
   enrichSimilarExpressionFromApi,
   enrichSimilarExpressionsBatchFromApi,
   generateManualExpressionAssistFromApi,
-  generateManualSentenceAssistFromApi,
-  getPhraseRelationsBatchFromApi,
-  getPhraseRelationsFromApi,
   generateSimilarExpressionsFromApi,
-  getMyPhrasesFromApi,
   ManualExpressionAssistResponse,
   PhraseReviewStatus,
   savePhrasesBatchFromApi,
   SimilarExpressionCandidateResponse,
   savePhraseFromApi,
-  UserPhraseRelationItemResponse,
   UserPhraseItemResponse,
 } from "@/lib/utils/phrases-api";
 import { startReviewSession } from "@/lib/utils/review-session";
@@ -60,7 +48,6 @@ import { buildFocusDetailViewModel } from "@/features/chunks/components/focus-de
 import {
   MoveIntoClusterCandidate,
   MoveIntoClusterGroup,
-  SavedRelationRowsBySourceId,
 } from "@/features/chunks/components/types";
 import {
   getFocusMainExpressionRows,
@@ -76,24 +63,22 @@ import {
 import {
   buildClusterFilterChange,
   buildChunksSummary,
-  parseChunksRouteState,
   resolveClusterFilterExpressionLabel,
   resolveFocusExpressionId,
-  shouldReplaceChunksRoute,
 } from "./chunks-page-logic";
 import {
-  buildChunksListRequestParams,
-  resolveChunksCachePresentation,
-  resolveChunksNetworkFailure,
-} from "./chunks-page-load-logic";
-import {
   buildFocusDetailCloseState,
-  buildFocusDetailState,
-  createFocusDetailTrailItem,
   resolveFocusRelationTabOnDetailTabChange,
-  resolveReopenFocusTrail,
-  updateFocusDetailTrail,
 } from "./chunks-focus-detail-logic";
+import { useChunksRouteState } from "./use-chunks-route-state";
+import { useExpressionClusterActions } from "./use-expression-cluster-actions";
+import { useFocusAssist } from "./use-focus-assist";
+import { useGeneratedSimilarSheet } from "./use-generated-similar-sheet";
+import { useChunksListData } from "./use-chunks-list-data";
+import { useManualExpressionComposer } from "./use-manual-expression-composer";
+import { useManualSentenceComposer } from "./use-manual-sentence-composer";
+import { useSavedRelations } from "./use-saved-relations";
+import { useFocusDetailController } from "./use-focus-detail-controller";
 
 const zh = {
   loadFailed: "\u52a0\u8f7d\u8868\u8fbe\u5931\u8d25\u3002",
@@ -545,11 +530,6 @@ type FocusDetailState = {
 
 type FocusDetailTabValue = "info" | "similar" | "contrast";
 
-type SavedRelationCacheEntry = {
-  loaded: boolean;
-  rows: UserPhraseRelationItemResponse[];
-};
-
 type FocusDetailTrailItem = {
   userPhraseId: string | null;
   text: string;
@@ -582,23 +562,21 @@ export default function ChunksPage() {
   const ttsPlaybackState = useTtsPlaybackState();
   const [playingText, setPlayingText] = useState<string | null>(null);
   const searchParams = useSearchParams();
-  const routeState = parseChunksRouteState(searchParams);
-  // ??????
-  const [query, setQuery] = useState(routeState.query);
-  const [loading, setLoading] = useState(true);
-  const [phrases, setPhrases] = useState<UserPhraseItemResponse[]>([]);
-  const [total, setTotal] = useState(0);
-  const [reviewFilter, setReviewFilter] = useState<PhraseReviewStatus | "all">(
-    routeState.reviewFilter,
-  );
-  const [contentFilter, setContentFilter] = useState<"expression" | "sentence">(
-    routeState.contentFilter,
-  );
+  const {
+    routeState,
+    query,
+    setQuery,
+    reviewFilter,
+    setReviewFilter,
+    contentFilter,
+    setContentFilter,
+    expressionClusterFilterId,
+    setExpressionClusterFilterId,
+  } = useChunksRouteState({
+    searchParams,
+    router,
+  });
   const [expressionViewMode, setExpressionViewMode] = useState<"list" | "focus">("focus");
-  const [expressionClusterFilterId, setExpressionClusterFilterId] = useState<string>(
-    routeState.clusterId,
-  );
-  const [listDataSource, setListDataSource] = useState<"none" | "cache" | "network">("none");
 
   // 地图与列表展示
   const [mapOpen, setMapOpen] = useState(false);
@@ -619,9 +597,6 @@ export default function ChunksPage() {
   const [manualItemType, setManualItemType] = useState<"expression" | "sentence">("expression");
   const [manualText, setManualText] = useState("");
   const [manualSentence, setManualSentence] = useState("");
-  const [manualExpressionAssist, setManualExpressionAssist] = useState<ManualExpressionAssistResponse | null>(null);
-  const [manualAssistLoading, setManualAssistLoading] = useState(false);
-  const [manualSelectedMap, setManualSelectedMap] = useState<Record<string, boolean>>({});
   const [savingManual, setSavingManual] = useState(false);
   const [savingSentenceExpressionKey, setSavingSentenceExpressionKey] = useState<string | null>(
     null,
@@ -629,42 +604,16 @@ export default function ChunksPage() {
   const [savedSentenceExpressionKeys, setSavedSentenceExpressionKeys] = useState<
     Record<string, boolean>
   >({});
-  const [similarSheetOpen, setSimilarSheetOpen] = useState(false);
-  const [similarSeedExpression, setSimilarSeedExpression] = useState<UserPhraseItemResponse | null>(null);
-  const [generatingSimilarForId, setGeneratingSimilarForId] = useState<string | null>(null);
-  const [generatedSimilarCandidates, setGeneratedSimilarCandidates] = useState<
-    SimilarExpressionCandidateResponse[]
-  >([]);
-  const [selectedSimilarMap, setSelectedSimilarMap] = useState<Record<string, boolean>>({});
-  const [savingSelectedSimilar, setSavingSelectedSimilar] = useState(false);
   const [retryingEnrichmentIds, setRetryingEnrichmentIds] = useState<Record<string, boolean>>({});
   // Focus 主表达与详情
   const [focusExpressionId, setFocusExpressionId] = useState<string>("");
-  const [focusAssistLoading, setFocusAssistLoading] = useState(false);
-  const [focusAssistData, setFocusAssistData] = useState<ManualExpressionAssistResponse | null>(null);
   const [focusRelationTab, setFocusRelationTab] = useState<"similar" | "contrast">("similar");
   const [expandedFocusMainId, setExpandedFocusMainId] = useState<string | null>(null);
   const [focusRelationActiveText, setFocusRelationActiveText] = useState("");
-  const [savingFocusCandidateKey, setSavingFocusCandidateKey] = useState<string | null>(null);
-  const [detachingClusterMember, setDetachingClusterMember] = useState(false);
   const [detailConfirmAction, setDetailConfirmAction] = useState<FocusDetailConfirmAction | null>(null);
-  const [moveIntoClusterOpen, setMoveIntoClusterOpen] = useState(false);
-  const [movingIntoCluster, setMovingIntoCluster] = useState(false);
-  const [ensuringMoveTargetCluster, setEnsuringMoveTargetCluster] = useState(false);
   const [expandedMoveIntoClusterGroups, setExpandedMoveIntoClusterGroups] = useState<Record<string, boolean>>({});
   const [selectedMoveIntoClusterMap, setSelectedMoveIntoClusterMap] = useState<Record<string, boolean>>({});
-  const [focusDetailOpen, setFocusDetailOpen] = useState(false);
-  const [focusDetailLoading, setFocusDetailLoading] = useState(false);
-  const [focusDetail, setFocusDetail] = useState<FocusDetailState | null>(null);
-  const [focusDetailTab, setFocusDetailTab] = useState<FocusDetailTabValue>("info");
   const [focusDetailActionsOpen, setFocusDetailActionsOpen] = useState(false);
-  const [focusDetailTrail, setFocusDetailTrail] = useState<FocusDetailTrailItem[]>([]);
-  const [savedRelationCache, setSavedRelationCache] = useState<Record<string, SavedRelationCacheEntry>>({});
-  const [savedRelationLoadingKey, setSavedRelationLoadingKey] = useState<string | null>(null);
-  const [focusRelationsBootstrapDone, setFocusRelationsBootstrapDone] = useState(false);
-  const pendingRelationRequestIdsRef = useRef<Set<string>>(new Set());
-
-  const activeLoadTokenRef = useRef(0);
 
   useEffect(
     () => () => {
@@ -673,137 +622,15 @@ export default function ChunksPage() {
     [],
   );
 
-  const loadPhrases = async (
-    nextQuery: string,
-    nextFilter: PhraseReviewStatus | "all",
-    nextContentFilter: "expression" | "sentence",
-    nextExpressionClusterFilterId: string,
-    options?: { preferCache?: boolean },
-  ) => {
-    const token = activeLoadTokenRef.current + 1;
-    activeLoadTokenRef.current = token;
-    const preferCache = options?.preferCache ?? false;
-    if (!preferCache) setListDataSource("none");
-    setLoading(true);
-
-    let hasCacheFallback = false;
-    const canApply = () => activeLoadTokenRef.current === token;
-
-    const requestParams = {
-      query: nextQuery.trim(),
-      limit: 100,
-      page: 1,
-      status: "saved" as const,
-      reviewStatus: nextFilter,
-      learningItemType: nextContentFilter,
-      expressionClusterId: nextExpressionClusterFilterId || undefined,
-    };
-
-    if (preferCache) {
-      try {
-        const cache = await getPhraseListCache({
-          query: requestParams.query,
-          status: requestParams.status,
-          reviewStatus: requestParams.reviewStatus,
-          learningItemType: requestParams.learningItemType,
-          expressionClusterId: requestParams.expressionClusterId,
-          page: requestParams.page,
-          limit: requestParams.limit,
-        });
-        if (canApply() && cache.found && cache.record) {
-          hasCacheFallback = true;
-          setPhrases(cache.record.data.rows);
-          setTotal(cache.record.data.total);
-          setListDataSource("cache");
-          setLoading(false);
-        }
-      } catch {
-        // Ignore cache failure.
-      }
-    }
-
-    try {
-      const result = await getMyPhrasesFromApi(requestParams);
-      if (!canApply()) return;
-      setPhrases(result.rows);
-      setTotal(result.total);
-      setListDataSource("network");
-      setLoading(false);
-      void setPhraseListCache(
-        {
-          query: requestParams.query,
-          status: requestParams.status,
-          reviewStatus: requestParams.reviewStatus,
-          learningItemType: requestParams.learningItemType,
-          expressionClusterId: requestParams.expressionClusterId,
-          page: requestParams.page,
-          limit: requestParams.limit,
-        },
-        result,
-      ).catch(() => {
-        // Non-blocking.
-      });
-    } catch (error) {
-      if (!canApply()) return;
-      if (!hasCacheFallback) {
-        toast.error(error instanceof Error ? error.message : zh.loadFailed);
-        setPhrases([]);
-        setTotal(0);
-        setLoading(false);
-      }
-    }
-  };
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      void loadPhrases(query, reviewFilter, contentFilter, expressionClusterFilterId, {
-        preferCache: true,
-      });
-    }, 180);
-    return () => window.clearTimeout(timer);
-  }, [query, reviewFilter, contentFilter, expressionClusterFilterId]);
-
-  useEffect(() => {
-    setQuery(routeState.query);
-    setReviewFilter(routeState.reviewFilter);
-    setContentFilter(routeState.contentFilter);
-    setExpressionClusterFilterId(routeState.clusterId);
-  }, [
-    routeState.clusterId,
-    routeState.contentFilter,
-    routeState.query,
-    routeState.reviewFilter,
-  ]);
-
-  useEffect(() => {
-    const routeUpdate = shouldReplaceChunksRoute({
-      searchParams,
-      query,
-      reviewFilter,
-      contentFilter,
-      clusterId: expressionClusterFilterId,
-    });
-    if (!routeUpdate.shouldReplace) return;
-    router.replace(routeUpdate.nextHref);
-  }, [
-    contentFilter,
-    expressionClusterFilterId,
+  const { loading, phrases, total, listDataSource, loadPhrases } = useChunksListData({
     query,
     reviewFilter,
-    router,
-    searchParams,
-  ]);
-
-  useEffect(() => {
-    if (process.env.NODE_ENV !== "development") return;
-    console.debug("[expression-library][cache-debug]", {
-      source: listDataSource,
-      count: phrases.length,
-      filter: reviewFilter,
-      contentFilter,
-      expressionClusterFilterId,
-    });
-  }, [listDataSource, phrases.length, reviewFilter, contentFilter, expressionClusterFilterId]);
+    contentFilter,
+    expressionClusterFilterId,
+    onLoadFailed: (message) => {
+      toast.error(message || zh.loadFailed);
+    },
+  });
 
   const summary = useMemo(() => {
     return buildChunksSummary({
@@ -892,7 +719,7 @@ export default function ChunksPage() {
     if (contentFilter !== "expression") return;
     if (focusMainExpressionRows.length === 0) {
       setFocusExpressionId("");
-      setFocusAssistData(null);
+      resetFocusAssist();
       return;
     }
     const resolvedId = resolveFocusExpressionId({
@@ -915,9 +742,9 @@ export default function ChunksPage() {
   }, [contentFilter, focusExpressionId, focusMainExpressionRows, resolveFocusMainExpressionIdForRow]);
 
   useEffect(() => {
-    setFocusAssistData(null);
+    resetFocusAssist();
     setFocusRelationTab("similar");
-  }, [focusExpressionId]);
+  }, [focusExpressionId, resetFocusAssist]);
 
   const clusterFilterExpressionLabel = useMemo(() => {
     return resolveClusterFilterExpressionLabel({
@@ -952,23 +779,6 @@ export default function ChunksPage() {
     }
     return zh.startReview;
   };
-
-  const loadFocusAssist = useCallback(async (item: UserPhraseItemResponse) => {
-    if (item.learningItemType !== "expression") return;
-    setFocusAssistLoading(true);
-    try {
-      const response = await generateManualExpressionAssistFromApi({
-        text: item.text,
-        existingExpressions: expressionRows.map((row) => row.text),
-      });
-      setFocusAssistData(response);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : zh.loadFailed);
-      setFocusAssistData(null);
-    } finally {
-      setFocusAssistLoading(false);
-    }
-  }, [expressionRows]);
 
   const focusSavedSimilarRows = useMemo(() => {
     if (!focusExpression?.expressionClusterId) return [] as UserPhraseItemResponse[];
@@ -1108,6 +918,136 @@ export default function ChunksPage() {
     });
   }, [focusAssistData?.contrastExpressions, phraseByNormalized]);
 
+  const {
+    focusDetailOpen,
+    setFocusDetailOpen,
+    focusDetailLoading,
+    setFocusDetailLoading,
+    focusDetail,
+    setFocusDetail,
+    focusDetailTab,
+    setFocusDetailTab,
+    focusDetailTrail,
+    setFocusDetailTrail,
+    openFocusDetail: openFocusDetailBase,
+    openFocusSiblingDetail: openFocusSiblingDetailBase,
+    reopenFocusTrailItem,
+  } = useFocusDetailController({
+    phraseByNormalized,
+    expressionRows,
+    focusSimilarItems,
+    focusContrastItems,
+    focusRelationTab,
+    resolveFocusMainExpressionIdForRow,
+    onSetFocusExpressionId: setFocusExpressionId,
+    onLoadFailed: (message) => {
+      toast.error(message || zh.loadFailed);
+    },
+  });
+  const openFocusDetail = useCallback(
+    (params: Parameters<typeof openFocusDetailBase>[0]) => {
+      setFocusDetailActionsOpen(false);
+      return openFocusDetailBase(params);
+    },
+    [openFocusDetailBase],
+  );
+  const openFocusSiblingDetail = useCallback(
+    (direction: -1 | 1) => {
+      setFocusDetailActionsOpen(false);
+      openFocusSiblingDetailBase(direction);
+    },
+    [openFocusSiblingDetailBase],
+  );
+  const {
+    savedRelationCache,
+    savedRelationRowsBySourceId,
+    savedRelationLoadingKey,
+    focusRelationsBootstrapDone,
+    invalidateSavedRelations,
+  } = useSavedRelations({
+    contentFilter,
+    expressionViewMode,
+    expressionRows,
+    focusDetailUserPhraseId: focusDetail?.savedItem?.userPhraseId ?? null,
+    onLoadFailed: (message) => {
+      toast.error(message || zh.loadFailed);
+    },
+  });
+  const {
+    focusAssistLoading,
+    focusAssistData,
+    setFocusAssistData,
+    resetFocusAssist,
+    loadFocusAssist,
+    savingFocusCandidateKey,
+    saveFocusCandidate,
+  } = useFocusAssist({
+    expressionRows,
+    onLoadFailed: (message) => {
+      toast.error(message || zh.loadFailed);
+    },
+    onCandidateSaved: async ({ focusItem, candidate, kind }) => {
+      await loadPhrases(query, reviewFilter, contentFilter, expressionClusterFilterId, {
+        preferCache: false,
+      });
+      invalidateSavedRelations([focusItem.userPhraseId]);
+      toast.success(zh.addSelectedSimilarSuccess);
+    },
+  });
+  const {
+    manualExpressionAssist,
+    manualAssistLoading,
+    manualSelectedMap,
+    savingManualExpression,
+    clearManualExpressionAssist,
+    resetManualExpressionComposer,
+    toggleManualSelected,
+    loadManualExpressionAssist,
+    saveManualExpression,
+  } = useManualExpressionComposer({
+    expressionRows,
+    onError: (message) => {
+      toast.error(message || zh.loadFailed);
+    },
+    onPartialEnrichFailed: () => {
+      toast.error(zh.autoEnrichFailedKeepSaved);
+    },
+  });
+  const { savingManualSentence, saveManualSentence } = useManualSentenceComposer({
+    onError: (message) => {
+      toast.error(message || zh.loadFailed);
+    },
+  });
+  const {
+    similarSheetOpen,
+    setSimilarSheetOpen,
+    similarSeedExpression,
+    generatingSimilarForId,
+    generatedSimilarCandidates,
+    selectedSimilarMap,
+    savingSelectedSimilar,
+    openGenerateSimilarSheet,
+    toggleCandidateSelected,
+    saveSelectedSimilarCandidates,
+    resetGeneratedSimilarSheet,
+  } = useGeneratedSimilarSheet({
+    expressionRows,
+    normalizeSimilarLabel,
+    onLoadCluster: async (clusterId) => {
+      await loadPhrases(query, reviewFilter, contentFilter, clusterId, { preferCache: false });
+    },
+    onApplyClusterFilter: applyClusterFilter,
+    onSelectAtLeastOne: () => {
+      toast.message(zh.selectAtLeastOne);
+    },
+    onSuccess: () => {
+      toast.success(zh.addSelectedSimilarSuccess);
+    },
+    onError: (message) => {
+      toast.error(message || zh.loadFailed);
+    },
+  });
+
   useEffect(() => {
     const sourceItems = focusRelationTab === "contrast" ? focusContrastItems : focusSimilarItems;
     if (sourceItems.length === 0) {
@@ -1154,8 +1094,7 @@ export default function ChunksPage() {
   const openExpressionComposerFromSentence = () => {
     setManualItemType("expression");
     setManualText("");
-    setManualExpressionAssist(null);
-    setManualSelectedMap({});
+    resetManualExpressionComposer();
     setAddSheetOpen(true);
     toast.message(zh.sentenceOpenExpressionComposer);
   };
@@ -1184,225 +1123,11 @@ export default function ChunksPage() {
     }
   };
 
-  const saveFocusCandidate = async (
-    focusItem: UserPhraseItemResponse,
-    candidate: SimilarExpressionCandidateResponse,
-    kind: "similar" | "contrast",
-  ) => {
-    const key = `${kind}:${normalizePhraseText(candidate.text)}`;
-    if (savingFocusCandidateKey === key) return;
-    setSavingFocusCandidateKey(key);
-    try {
-      const response = await savePhraseFromApi({
-        text: candidate.text,
-        learningItemType: "expression",
-        sourceType: "manual",
-        sourceNote: kind === "similar" ? "focus-similar-ai" : "focus-contrast-ai",
-        sourceSentenceText: focusItem.sourceSentenceText ?? undefined,
-        sourceChunkText: candidate.text,
-        expressionClusterId: kind === "similar" ? focusItem.expressionClusterId ?? undefined : undefined,
-        relationSourceUserPhraseId: focusItem.userPhraseId,
-        relationType: kind,
-      });
-      await enrichSimilarExpressionFromApi({
-        userPhraseId: response.userPhrase.id,
-        baseExpression: focusItem.text,
-        differenceLabel: candidate.differenceLabel,
-      });
-      await loadPhrases(query, reviewFilter, contentFilter, expressionClusterFilterId, {
-        preferCache: false,
-      });
-      setSavedRelationCache((current) => {
-        const next = { ...current };
-        delete next[focusItem.userPhraseId];
-        return next;
-      });
-      toast.success(zh.addSelectedSimilarSuccess);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : zh.loadFailed);
-    } finally {
-      setSavingFocusCandidateKey(null);
-    }
-  };
-
   // 表达簇动作
   const resetMoveIntoClusterSelection = useCallback(() => {
     setExpandedMoveIntoClusterGroups({});
     setSelectedMoveIntoClusterMap({});
   }, []);
-
-  const detachFocusDetailFromCluster = async () => {
-    const savedItem = focusDetail?.savedItem;
-    const clusterId = savedItem?.expressionClusterId ?? "";
-    if (!savedItem || !clusterId) return;
-
-    setDetachingClusterMember(true);
-    try {
-      await detachExpressionClusterMemberFromApi({
-        clusterId,
-        userPhraseId: savedItem.userPhraseId,
-        createNewCluster: true,
-      });
-      await loadPhrases(query, reviewFilter, contentFilter, expressionClusterFilterId, {
-        preferCache: false,
-      });
-      setSavedRelationCache((current) => {
-        const next = { ...current };
-        delete next[savedItem.userPhraseId];
-        if (focusExpression?.userPhraseId) {
-          delete next[focusExpression.userPhraseId];
-        }
-        return next;
-      });
-      toast.success(zh.detachClusterMemberSuccess);
-      setDetailConfirmAction(null);
-      setFocusDetailOpen(false);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : zh.loadFailed);
-    } finally {
-      setDetachingClusterMember(false);
-    }
-  };
-
-  const setFocusDetailAsClusterMain = async () => {
-    const detailText = focusDetail?.text ?? "";
-    if (!detailText) return;
-
-    const saved = phraseByNormalized.get(normalizePhraseText(detailText));
-    if (!saved) return;
-
-    try {
-      if (saved.expressionClusterId) {
-        await setExpressionClusterMainFromApi({
-          clusterId: saved.expressionClusterId,
-          mainUserPhraseId: saved.userPhraseId,
-        });
-      }
-      assignFocusMainExpression(saved);
-      setFocusDetailActionsOpen(false);
-      setDetailConfirmAction(null);
-      setFocusDetailOpen(false);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : zh.loadFailed);
-    }
-  };
-
-  const handleMoveSelectedIntoCurrentCluster = async () => {
-    const targetClusterId = focusExpression?.expressionClusterId ?? "";
-    const targetMainUserPhraseId = focusExpression?.userPhraseId ?? "";
-    if (!targetClusterId || !targetMainUserPhraseId) return;
-
-    const selectedCandidates = moveIntoClusterCandidates.filter(
-      (candidate) => selectedMoveIntoClusterMap[candidate.row.userPhraseId],
-    );
-    if (selectedCandidates.length === 0) {
-      toast.error(zh.moveIntoClusterSelectOne);
-      return;
-    }
-
-    setMovingIntoCluster(true);
-    let successCount = 0;
-    let mergedClusterCount = 0;
-    let movedMemberCount = 0;
-    let attachedMemberCount = 0;
-    const coveredSourceClusterIds = new Set<string>();
-    const failedMessages: string[] = [];
-
-    try {
-      for (const candidate of selectedCandidates) {
-        if (candidate.sourceClusterId && coveredSourceClusterIds.has(candidate.sourceClusterId)) {
-          continue;
-        }
-
-        try {
-          const result = await moveExpressionClusterMemberFromApi({
-            targetClusterId,
-            userPhraseId: candidate.row.userPhraseId,
-            targetMainUserPhraseId,
-          });
-          successCount += 1;
-          if (result.action === "merged_cluster") {
-            mergedClusterCount += 1;
-            if (candidate.sourceClusterId) {
-              coveredSourceClusterIds.add(candidate.sourceClusterId);
-            }
-          } else if (result.action === "moved_member") {
-            movedMemberCount += 1;
-          } else {
-            attachedMemberCount += 1;
-          }
-        } catch (error) {
-          const message = error instanceof Error ? error.message : zh.loadFailed;
-          if (message.includes("already belongs to the target cluster")) {
-            continue;
-          }
-          failedMessages.push(`${candidate.row.text}：${message}`);
-        }
-      }
-
-      if (successCount > 0) {
-        await loadPhrases(query, reviewFilter, contentFilter, expressionClusterFilterId, {
-          preferCache: false,
-        });
-        setSavedRelationCache((current) => {
-          const next = { ...current };
-          if (focusExpression?.userPhraseId) {
-            delete next[focusExpression.userPhraseId];
-          }
-          for (const candidate of selectedCandidates) {
-            delete next[candidate.row.userPhraseId];
-          }
-          return next;
-        });
-
-        const summary = [
-          mergedClusterCount ? `${mergedClusterCount}\u4e2a\u6574\u7c07` : "",
-          movedMemberCount ? `${movedMemberCount}\u4e2a\u5b50\u8868\u8fbe` : "",
-          attachedMemberCount ? `${attachedMemberCount}\u4e2a\u72ec\u7acb\u8868\u8fbe` : "",
-        ]
-          .filter(Boolean)
-          .join("\u3001");
-        toast.success(
-          `${zh.moveIntoClusterSuccess} ${successCount} \u9879${summary ? `\uff08${summary}\uff09` : ""}`,
-        );
-        setMoveIntoClusterOpen(false);
-        resetMoveIntoClusterSelection();
-      }
-
-      if (failedMessages.length > 0) {
-        toast.error(`${zh.moveIntoClusterPartialFailed}\uff1a${failedMessages[0]}`);
-      }
-    } finally {
-      setMovingIntoCluster(false);
-    }
-  };
-
-  const openMoveIntoCurrentCluster = async () => {
-    if (!focusExpression || moveIntoClusterCandidates.length === 0) return;
-
-    setFocusDetailActionsOpen(false);
-    resetMoveIntoClusterSelection();
-
-    if (!focusExpression.expressionClusterId) {
-      setEnsuringMoveTargetCluster(true);
-      try {
-        await ensureExpressionClusterForPhraseFromApi({
-          userPhraseId: focusExpression.userPhraseId,
-          title: focusExpression.text,
-        });
-        await loadPhrases(query, reviewFilter, contentFilter, expressionClusterFilterId, {
-          preferCache: false,
-        });
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : zh.loadFailed);
-        return;
-      } finally {
-        setEnsuringMoveTargetCluster(false);
-      }
-    }
-
-    setMoveIntoClusterOpen(true);
-  };
 
   const focusDetailClusterMemberCount = useMemo(() => {
     const clusterId = focusDetail?.savedItem?.expressionClusterId ?? null;
@@ -1412,10 +1137,6 @@ export default function ChunksPage() {
 
   // Focus 详情 selector 与 UI 映射
   const canMoveIntoCurrentCluster = Boolean(focusExpression) && moveIntoClusterCandidates.length > 0;
-  const savedRelationRowsBySourceId: SavedRelationRowsBySourceId = useMemo(
-    () => Object.fromEntries(Object.entries(savedRelationCache).map(([key, value]) => [key, value.rows])),
-    [savedRelationCache],
-  );
   const toggleMoveIntoClusterGroupExpand = useCallback((groupKey: string) => {
     setExpandedMoveIntoClusterGroups((current) => ({
       ...current,
@@ -1441,249 +1162,56 @@ export default function ChunksPage() {
   const canSetStandaloneMain = Boolean(
     focusDetail?.savedItem?.expressionClusterId && focusDetailClusterMemberCount > 1,
   );
-  // Focus 详情打开与链路切换
-  const openFocusDetail = async (params: {
-    text: string;
-    differenceLabel?: string;
-    kind: FocusDetailState["kind"];
-    initialTab?: FocusDetailTabValue;
-    chainMode?: "reset" | "append";
-  }) => {
-    setFocusDetailTab(params.initialTab ?? "info");
-    setFocusDetailActionsOpen(false);
-    const savedItem = phraseByNormalized.get(normalizePhraseText(params.text)) ?? null;
-    const nextTrailItem = createFocusDetailTrailItem({
-      userPhraseId: savedItem?.userPhraseId ?? null,
-      text: params.text,
-      differenceLabel: params.differenceLabel ?? null,
-      kind: params.kind,
-      tab: params.initialTab ?? "info",
-    });
-    setFocusDetailTrail((current) =>
-      updateFocusDetailTrail({
-        current,
-        nextItem: nextTrailItem,
-        chainMode: params.chainMode,
-      }),
-    );
-    setFocusDetailOpen(true);
-    setFocusDetail(
-      buildFocusDetailState({
-        text: params.text,
-        differenceLabel: params.differenceLabel ?? null,
-        kind: params.kind,
-        savedItem,
-      }) as FocusDetailState,
-    );
-
-    if (savedItem) return;
-
-    setFocusDetailLoading(true);
-    try {
-      const response = await generateManualExpressionAssistFromApi({
-        text: params.text,
-        existingExpressions: expressionRows.map((row) => row.text),
+  const {
+    detachingClusterMember,
+    moveIntoClusterOpen,
+    setMoveIntoClusterOpen,
+    movingIntoCluster,
+    ensuringMoveTargetCluster,
+    detachFocusDetailFromCluster,
+    setFocusDetailAsClusterMain,
+    handleMoveSelectedIntoCurrentCluster,
+    openMoveIntoCurrentCluster,
+  } = useExpressionClusterActions({
+    focusExpression,
+    focusDetailSavedItem: focusDetail?.savedItem ?? null,
+    moveIntoClusterCandidates,
+    selectedMoveIntoClusterMap,
+    loadPhrases: async () => {
+      await loadPhrases(query, reviewFilter, contentFilter, expressionClusterFilterId, {
+        preferCache: false,
       });
-      setFocusDetail((current) =>
-        current && normalizePhraseText(current.text) === normalizePhraseText(params.text)
-          ? {
-              ...current,
-              assistItem: response.inputItem,
-              savedItem:
-                phraseByNormalized.get(normalizePhraseText(params.text)) ?? current.savedItem,
-            }
-          : current,
-      );
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : zh.loadFailed);
-    } finally {
-      setFocusDetailLoading(false);
-    }
-  };
-
-  const openFocusSiblingDetail = (direction: -1 | 1) => {
-    const sourceItems =
-      focusRelationTab === "contrast"
-        ? focusContrastItems
-        : focusSimilarItems;
-    if (!focusDetail || sourceItems.length === 0) return;
-
-    const currentIndex = sourceItems.findIndex(
-      (item) => normalizePhraseText(item.text) === normalizePhraseText(focusDetail.text),
-    );
-    if (currentIndex < 0) return;
-    const nextIndex = (currentIndex + direction + sourceItems.length) % sourceItems.length;
-    const nextItem = sourceItems[nextIndex];
-    if (!nextItem) return;
-    void openFocusDetail({
-      text: nextItem.text,
-      differenceLabel: nextItem.differenceLabel,
-      kind: nextItem.kind,
-      initialTab: focusDetailTab === "contrast" ? "contrast" : focusDetailTab === "similar" ? "similar" : "info",
-      chainMode: "append",
-    });
-  };
-
-  const reopenFocusTrailItem = useCallback(
-    (index: number) => {
-      const reopen = resolveReopenFocusTrail({
-        trail: focusDetailTrail,
-        index,
-      });
-      if (!reopen) return;
-      const target = reopen.target;
-      if (target.userPhraseId) {
-        setFocusExpressionId(resolveFocusMainExpressionIdForRow(target.userPhraseId));
-      }
-      setFocusDetailTab(reopen.nextTab);
-      setFocusDetailTrail(reopen.nextTrail);
-      const savedItem = phraseByNormalized.get(normalizePhraseText(target.text)) ?? null;
-      setFocusDetailOpen(true);
-      setFocusDetail(
-        buildFocusDetailState({
-          text: target.text,
-          differenceLabel: target.differenceLabel ?? null,
-          kind: target.kind,
-          savedItem,
-        }) as FocusDetailState,
-      );
     },
-    [focusDetailTrail, phraseByNormalized, resolveFocusMainExpressionIdForRow],
-  );
-
-  useEffect(() => {
-    if (contentFilter !== "expression" || expressionRows.length === 0) return;
-    const pendingIds = expressionRows
-      .map((row) => row.userPhraseId)
-      .filter(
-        (userPhraseId) =>
-          !savedRelationCache[userPhraseId]?.loaded &&
-          !pendingRelationRequestIdsRef.current.has(userPhraseId),
-      );
-    if (pendingIds.length === 0) return;
-
-    for (const userPhraseId of pendingIds) {
-      pendingRelationRequestIdsRef.current.add(userPhraseId);
-    }
-
-    let cancelled = false;
-    void getPhraseRelationsBatchFromApi(pendingIds)
-      .then((response) => {
-        if (cancelled) return;
-        const grouped = new Map<string, UserPhraseRelationItemResponse[]>();
-        for (const row of response.rows) {
-          const bucket = grouped.get(row.sourceUserPhraseId) ?? [];
-          bucket.push(row);
-          grouped.set(row.sourceUserPhraseId, bucket);
-        }
-        setSavedRelationCache((current) => {
-          const next = { ...current };
-          for (const userPhraseId of pendingIds) {
-            next[userPhraseId] = {
-              loaded: true,
-              rows: grouped.get(userPhraseId) ?? [],
-            };
-          }
-          return next;
-        });
-        setFocusRelationsBootstrapDone(true);
-      })
-      .catch((error) => {
-        if (cancelled) return;
-        toast.error(error instanceof Error ? error.message : zh.loadFailed);
-        setSavedRelationCache((current) => {
-          const next = { ...current };
-          for (const userPhraseId of pendingIds) {
-            next[userPhraseId] = {
-              loaded: true,
-              rows: [],
-            };
-          }
-          return next;
-        });
-        setFocusRelationsBootstrapDone(true);
-      })
-      .finally(() => {
-        for (const userPhraseId of pendingIds) {
-          pendingRelationRequestIdsRef.current.delete(userPhraseId);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [contentFilter, expressionRows, savedRelationCache]);
-
-  useEffect(() => {
-    if (contentFilter !== "expression") {
-      setFocusRelationsBootstrapDone(false);
-      return;
-    }
-    if (expressionRows.length === 0) {
-      setFocusRelationsBootstrapDone(true);
-      return;
-    }
-    const hasPending = expressionRows.some(
-      (row) =>
-        !savedRelationCache[row.userPhraseId]?.loaded ||
-        pendingRelationRequestIdsRef.current.has(row.userPhraseId),
-    );
-    if (!hasPending) {
-      setFocusRelationsBootstrapDone(true);
-    }
-  }, [contentFilter, expressionRows, savedRelationCache]);
-
-  useEffect(() => {
-    const userPhraseId = focusDetail?.savedItem?.userPhraseId ?? "";
-    if (!userPhraseId) return;
-    if (savedRelationCache[userPhraseId]?.loaded) return;
-    if (pendingRelationRequestIdsRef.current.has(userPhraseId)) return;
-    if (contentFilter === "expression" && expressionViewMode === "focus") {
-      return;
-    }
-
-    let cancelled = false;
-    pendingRelationRequestIdsRef.current.add(userPhraseId);
-    setSavedRelationLoadingKey(userPhraseId);
-
-    void getPhraseRelationsFromApi(userPhraseId)
-      .then((response) => {
-        if (cancelled) return;
-        setSavedRelationCache((current) => ({
-          ...current,
-          [userPhraseId]: {
-            loaded: true,
-            rows: response.rows,
-          },
-        }));
-      })
-      .catch((error) => {
-        if (cancelled) return;
-        toast.error(error instanceof Error ? error.message : zh.loadFailed);
-        setSavedRelationCache((current) => ({
-          ...current,
-          [userPhraseId]: {
-            loaded: true,
-            rows: [],
-          },
-        }));
-      })
-      .finally(() => {
-        pendingRelationRequestIdsRef.current.delete(userPhraseId);
-        if (cancelled) return;
-        setSavedRelationLoadingKey((current) => (current === userPhraseId ? null : current));
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    contentFilter,
-    expressionViewMode,
-    focusDetail?.savedItem?.userPhraseId,
-    focusRelationsBootstrapDone,
-    savedRelationCache,
-  ]);
+    onInvalidateSavedRelations: invalidateSavedRelations,
+    onAssignFocusMainExpression: assignFocusMainExpression,
+    onResetMoveSelection: resetMoveIntoClusterSelection,
+    onOpenMoveSheet: () => {},
+    onCloseMoveSheet: () => {},
+    onCloseFocusDetail: () => {
+      setFocusDetailOpen(false);
+    },
+    onCloseFocusActions: () => {
+      setFocusDetailActionsOpen(false);
+    },
+    onClearDetailConfirm: () => {
+      setDetailConfirmAction(null);
+    },
+    onSuccess: (message) => {
+      toast.success(message);
+    },
+    onError: (message) => {
+      toast.error(message || zh.loadFailed);
+    },
+    labels: {
+      loadFailed: zh.loadFailed,
+      detachClusterMemberSuccess: zh.detachClusterMemberSuccess,
+      moveIntoClusterSelectOne: zh.moveIntoClusterSelectOne,
+      moveIntoClusterSuccess: zh.moveIntoClusterSuccess,
+      moveIntoClusterPartialFailed: zh.moveIntoClusterPartialFailed,
+    },
+  });
+  // Focus 详情打开与链路切换
+  
 
   const openExpressionMap = async (expression: UserPhraseItemResponse) => {
     if (expression.learningItemType === "sentence") return;
@@ -1754,106 +1282,6 @@ export default function ChunksPage() {
       clusterId: "",
     });
     setExpressionClusterFilterId(next.nextClusterId);
-  };
-
-  const openGenerateSimilarSheet = async (item: UserPhraseItemResponse) => {
-    if (item.learningItemType !== "expression") return;
-    if (generatingSimilarForId === item.userPhraseId) return;
-    setGeneratingSimilarForId(item.userPhraseId);
-    setSimilarSeedExpression(item);
-    setGeneratedSimilarCandidates([]);
-    setSelectedSimilarMap({});
-    setSimilarSheetOpen(true);
-    try {
-      const existingExpressions = expressionRows.map((row) => row.text);
-      const response = await generateSimilarExpressionsFromApi({
-        baseExpression: item.text,
-        existingExpressions,
-      });
-      setGeneratedSimilarCandidates(response.candidates);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : zh.loadFailed);
-    } finally {
-      setGeneratingSimilarForId(null);
-    }
-  };
-
-  const toggleCandidateSelected = (candidateText: string) => {
-    const key = normalizePhraseText(candidateText);
-    if (!key) return;
-    setSelectedSimilarMap((prev) => ({ ...prev, [key]: !prev[key] }));
-  };
-
-  const selectedSimilarCandidates = useMemo(
-    () =>
-      generatedSimilarCandidates.filter((candidate) =>
-        Boolean(selectedSimilarMap[normalizePhraseText(candidate.text)]),
-      ),
-    [generatedSimilarCandidates, selectedSimilarMap],
-  );
-
-  const saveSelectedSimilarCandidates = async () => {
-    if (!similarSeedExpression || savingSelectedSimilar) return;
-    if (selectedSimilarCandidates.length === 0) {
-      toast.message(zh.selectAtLeastOne);
-      return;
-    }
-    setSavingSelectedSimilar(true);
-    try {
-      const baseSaveResult = await savePhraseFromApi({
-        text: similarSeedExpression.text,
-        expressionClusterId:
-          similarSeedExpression.expressionClusterId ??
-          `create-cluster:${similarSeedExpression.userPhraseId}`,
-        sourceType: similarSeedExpression.sourceType,
-        sourceSceneSlug: similarSeedExpression.sourceSceneSlug ?? undefined,
-        sourceSentenceText: similarSeedExpression.sourceSentenceText ?? undefined,
-        sourceChunkText: similarSeedExpression.text,
-        translation: similarSeedExpression.translation ?? undefined,
-      });
-      const clusterId = baseSaveResult.expressionClusterId;
-      if (!clusterId) {
-        throw new Error("未能为主表达创建同类表达组。");
-      }
-
-      const batchResult = await savePhrasesBatchFromApi({
-        items: selectedSimilarCandidates.map((candidate) => ({
-          text: candidate.text,
-          expressionClusterId: clusterId,
-          sourceType: "manual" as const,
-          sourceNote: "similar-ai-mvp",
-          sourceSentenceText: similarSeedExpression.sourceSentenceText ?? undefined,
-          sourceChunkText: candidate.text,
-          relationSourceUserPhraseId: similarSeedExpression.userPhraseId,
-          relationType: "similar" as const,
-        })),
-      });
-      const savedResponses = batchResult.items;
-
-      void enrichSimilarExpressionsBatchFromApi({
-        items: savedResponses.map((response, index) => {
-          const candidate = selectedSimilarCandidates[index];
-          return {
-            userPhraseId: response.userPhrase.id,
-            baseExpression: similarSeedExpression.text,
-            differenceLabel: normalizeSimilarLabel(candidate?.differenceLabel),
-          };
-        }),
-      }).finally(() => {
-        window.setTimeout(() => {
-          void loadPhrases(query, reviewFilter, contentFilter, clusterId, { preferCache: false });
-        }, 600);
-      });
-
-      await loadPhrases(query, reviewFilter, contentFilter, clusterId, { preferCache: false });
-      applyClusterFilter(clusterId, similarSeedExpression.text);
-      setSimilarSheetOpen(false);
-      toast.success(zh.addSelectedSimilarSuccess);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : zh.loadFailed);
-    } finally {
-      setSavingSelectedSimilar(false);
-    }
   };
 
   const retryAiEnrichment = async (item: UserPhraseItemResponse) => {
@@ -2069,39 +1497,7 @@ export default function ChunksPage() {
     setManualItemType("expression");
     setManualText("");
     setManualSentence("");
-    setManualExpressionAssist(null);
-    setManualSelectedMap({});
-  };
-
-  const toggleManualSelected = (text: string) => {
-    const key = normalizePhraseText(text);
-    if (!key) return;
-    setManualSelectedMap((prev) => ({ ...prev, [key]: !prev[key] }));
-  };
-
-  const loadManualExpressionAssist = async () => {
-    const text = manualText.trim();
-    if (!text) {
-      toast.error(zh.missingExpression);
-      return;
-    }
-    if (manualAssistLoading) return;
-
-    setManualAssistLoading(true);
-    try {
-      const response = await generateManualExpressionAssistFromApi({
-        text,
-        existingExpressions: expressionRows.map((row) => row.text),
-      });
-      setManualExpressionAssist(response);
-      setManualSelectedMap({
-        [normalizePhraseText(response.inputItem.text)]: true,
-      });
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : zh.loadFailed);
-    } finally {
-      setManualAssistLoading(false);
-    }
+    resetManualExpressionComposer();
   };
 
   const handleSaveManualExpression = async (mode: "save" | "save_and_review") => {
@@ -2122,185 +1518,24 @@ export default function ChunksPage() {
       let reviewSessionExpressions: Array<{ userPhraseId: string; text: string }> = [];
 
       if (manualItemType === "sentence") {
-        const assist = await generateManualSentenceAssistFromApi({ text: sentenceText });
-        const response = await savePhraseFromApi({
-          learningItemType: "sentence",
-          sentenceText,
-          translation: assist.sentenceItem.translation || undefined,
-          usageNote: assist.sentenceItem.usageNote || undefined,
-          sourceType: "manual",
-          sourceSentenceText: sentenceText,
-          sourceChunkText:
-            assist.sentenceItem.extractedExpressions.join(" | ") || undefined,
-        });
-
-        reviewSessionExpressions = [
-          {
-            userPhraseId: response.userPhrase.id,
-            text: sentenceText,
-          },
-        ];
-      } else if (!manualExpressionAssist) {
-        const response = await savePhraseFromApi({
-          text,
-          learningItemType: "expression",
-          sourceType: "manual",
-          sourceChunkText: text,
-        });
-        try {
-          await enrichSimilarExpressionFromApi({
-            userPhraseId: response.userPhrase.id,
-          });
-        } catch (enrichError) {
-          console.warn("[phrases] auto enrich after manual save failed", enrichError);
-          toast.error(zh.autoEnrichFailedKeepSaved);
-        }
-        reviewSessionExpressions = [
-          {
-            userPhraseId: response.userPhrase.id,
-            text,
-          },
-        ];
-      } else {
-        const baseKey = normalizePhraseText(manualExpressionAssist.inputItem.text);
-        const selectedBase = Boolean(manualSelectedMap[baseKey]);
-        const selectedSimilar = manualExpressionAssist.similarExpressions.filter((candidate) =>
-          Boolean(manualSelectedMap[normalizePhraseText(candidate.text)]),
-        );
-        const selectedContrast = manualExpressionAssist.contrastExpressions.filter((candidate) =>
-          Boolean(manualSelectedMap[normalizePhraseText(candidate.text)]),
-        );
-
-        if (!selectedBase && selectedSimilar.length === 0 && selectedContrast.length === 0) {
-          toast.message(zh.selectAtLeastOne);
-          setSavingManual(false);
+        const result = await saveManualSentence(sentenceText);
+        if (!result) {
           return;
         }
-
-        const savedForEnrich: Array<{ userPhraseId: string; text: string; differenceLabel?: string }> = [];
-        let baseUserPhraseId: string | null = null;
-        let familyId: string | null = null;
-
-        if (selectedBase) {
-          const baseResponse = await savePhraseFromApi({
-            text: manualExpressionAssist.inputItem.text,
-            learningItemType: "expression",
-            translation: manualExpressionAssist.inputItem.translation || undefined,
-            usageNote: manualExpressionAssist.inputItem.usageNote || undefined,
-            expressionClusterId:
-              selectedSimilar.length > 0 ? `create-cluster:${baseKey}` : undefined,
-            sourceType: "manual",
-            sourceSentenceText: manualExpressionAssist.inputItem.examples[0]?.en || undefined,
-            sourceChunkText: manualExpressionAssist.inputItem.text,
-          });
-          familyId = baseResponse.expressionClusterId;
-          await enrichSimilarExpressionFromApi({
-            userPhraseId: baseResponse.userPhrase.id,
-            baseExpression: manualExpressionAssist.inputItem.text,
-          });
-          baseUserPhraseId = baseResponse.userPhrase.id;
-          reviewSessionExpressions.push({
-            userPhraseId: baseResponse.userPhrase.id,
-            text: manualExpressionAssist.inputItem.text,
-          });
+        reviewSessionExpressions = result.reviewSessionExpressions;
+      } else {
+        const result = await saveManualExpression({
+          text,
+          mode,
+        });
+        if (!result) {
+          return;
         }
-
-        if (selectedSimilar.length > 0) {
-          let remainingSimilar = selectedSimilar;
-          if (!familyId) {
-            const seedCandidate = selectedSimilar[0];
-            const seedResponse = await savePhraseFromApi({
-              text: seedCandidate.text,
-              sourceType: "manual",
-              sourceNote: "manual-similar-ai",
-              sourceSentenceText: manualExpressionAssist.inputItem.examples[0]?.en || undefined,
-              sourceChunkText: seedCandidate.text,
-            });
-            familyId = seedResponse.expressionClusterId;
-            savedForEnrich.push({
-              userPhraseId: seedResponse.userPhrase.id,
-              text: seedCandidate.text,
-              differenceLabel: seedCandidate.differenceLabel,
-            });
-            reviewSessionExpressions.push({
-              userPhraseId: seedResponse.userPhrase.id,
-              text: seedCandidate.text,
-            });
-            remainingSimilar = selectedSimilar.slice(1);
-          }
-
-          if (!familyId) {
-            throw new Error("未能创建同类表达组。");
-          }
-
-          const batchItems = remainingSimilar.map((candidate) => ({
-            text: candidate.text,
-            expressionClusterId: familyId as string,
-            sourceType: "manual" as const,
-            sourceNote: "manual-similar-ai",
-            sourceSentenceText: manualExpressionAssist.inputItem.examples[0]?.en || undefined,
-            sourceChunkText: candidate.text,
-            relationSourceUserPhraseId: baseUserPhraseId ?? undefined,
-            relationType: baseUserPhraseId ? ("similar" as const) : undefined,
-          }));
-          if (batchItems.length === 0) {
-            // Seed candidate already handled above.
-          } else {
-          const batchResult = await savePhrasesBatchFromApi({
-            items: batchItems,
-          });
-          savedForEnrich.push(
-            ...batchResult.items.map((response, index) => ({
-              userPhraseId: response.userPhrase.id,
-              text: remainingSimilar[index].text,
-              differenceLabel: remainingSimilar[index].differenceLabel,
-            })),
-          );
-          reviewSessionExpressions.push(
-            ...batchResult.items.map((response, index) => ({
-              userPhraseId: response.userPhrase.id,
-              text: remainingSimilar[index].text,
-            })),
-          );
-          }
+        if (result.emptySelection) {
+          toast.message(zh.selectAtLeastOne);
+          return;
         }
-
-        if (selectedContrast.length > 0) {
-          const batchResult = await savePhrasesBatchFromApi({
-            items: selectedContrast.map((candidate) => ({
-              text: candidate.text,
-              sourceType: "manual" as const,
-              sourceNote: "manual-contrast-ai",
-              sourceSentenceText: manualExpressionAssist.inputItem.examples[0]?.en || undefined,
-              sourceChunkText: candidate.text,
-              relationSourceUserPhraseId: baseUserPhraseId ?? undefined,
-              relationType: baseUserPhraseId ? ("contrast" as const) : undefined,
-            })),
-          });
-          savedForEnrich.push(
-            ...batchResult.items.map((response, index) => ({
-              userPhraseId: response.userPhrase.id,
-              text: selectedContrast[index].text,
-              differenceLabel: selectedContrast[index].differenceLabel,
-            })),
-          );
-          reviewSessionExpressions.push(
-            ...batchResult.items.map((response, index) => ({
-              userPhraseId: response.userPhrase.id,
-              text: selectedContrast[index].text,
-            })),
-          );
-        }
-
-        if (savedForEnrich.length > 0) {
-          await enrichSimilarExpressionsBatchFromApi({
-            items: savedForEnrich.map((item) => ({
-              userPhraseId: item.userPhraseId,
-              baseExpression: manualExpressionAssist.inputItem.text,
-              differenceLabel: item.differenceLabel,
-            })),
-          });
-        }
+        reviewSessionExpressions = result.reviewSessionExpressions;
       }
 
       const nextContentFilter =
@@ -2946,8 +2181,7 @@ export default function ChunksPage() {
                     value={manualText}
                     onChange={(event) => {
                       setManualText(event.target.value);
-                      setManualExpressionAssist(null);
-                      setManualSelectedMap({});
+                      clearManualExpressionAssist();
                     }}
                     placeholder={zh.expressionTextPlaceholder}
                   />
@@ -2957,7 +2191,7 @@ export default function ChunksPage() {
                   variant="ghost"
                   className={appleButtonClassName}
                   disabled={manualAssistLoading || !manualText.trim()}
-                  onClick={() => void loadManualExpressionAssist()}
+                  onClick={() => void loadManualExpressionAssist(manualText)}
                 >
                   {manualAssistLoading ? `${zh.generatingSuggestions}...` : zh.findMoreRelated}
                 </Button>
@@ -3078,10 +2312,10 @@ export default function ChunksPage() {
                 type="button"
                 variant="ghost"
                 className={appleButtonClassName}
-                disabled={savingManual}
+                disabled={savingManual || savingManualSentence}
                 onClick={() => void handleSaveManualExpression("save")}
               >
-                {savingManual
+                {savingManual || savingManualSentence
                   ? `${
                       manualItemType === "sentence"
                         ? zh.saveSentence
@@ -3100,10 +2334,10 @@ export default function ChunksPage() {
                   type="button"
                   variant="ghost"
                   className={appleButtonClassName}
-                  disabled={savingManual}
+                  disabled={savingManual || savingManualSentence}
                   onClick={() => void handleSaveManualExpression("save_and_review")}
                 >
-                  {savingManual ? `${zh.saveAndReview}...` : zh.saveAndReview}
+                  {savingManual || savingManualSentence ? `${zh.saveAndReview}...` : zh.saveAndReview}
                 </Button>
               ) : null}
             </div>
@@ -3116,9 +2350,7 @@ export default function ChunksPage() {
         onOpenChange={(open) => {
           setSimilarSheetOpen(open);
           if (!open && !savingSelectedSimilar) {
-            setGeneratedSimilarCandidates([]);
-            setSelectedSimilarMap({});
-            setSimilarSeedExpression(null);
+            resetGeneratedSimilarSheet();
           }
         }}
       >

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { LessonReader } from "@/features/lesson/components/lesson-reader";
@@ -22,28 +22,9 @@ import {
   savePracticeSet,
   saveVariantSet,
 } from "@/lib/utils/scene-learning-flow-storage";
-import { SceneGeneratedState } from "@/lib/types/learning-flow";
 import { ExpressionMapResponse } from "@/lib/types/expression-map";
+import { completeSceneLearningFromApi } from "@/lib/utils/learning-api";
 import {
-  clearExpiredSceneCaches,
-  getSceneCache,
-  listRecentSceneCacheKeys,
-  normalizeSceneSlug,
-  setSceneCache,
-} from "@/lib/cache/scene-cache";
-import { getPrefetchDebugState, scheduleScenePrefetch } from "@/lib/cache/scene-prefetch";
-import {
-  getScenesFromApi,
-  getSceneDetailBySlugFromApi,
-} from "@/lib/utils/scenes-api";
-import {
-  completeSceneLearningFromApi,
-  pauseSceneLearningFromApi,
-  startSceneLearningFromApi,
-  updateSceneLearningProgressFromApi,
-} from "@/lib/utils/learning-api";
-import {
-  getSavedNormalizedPhraseTextsFromApi,
   savePhraseFromApi,
 } from "@/lib/utils/phrases-api";
 import { normalizePhraseText } from "@/lib/shared/phrases";
@@ -62,8 +43,6 @@ import {
   APPLE_BUTTON_TEXT_SM,
 } from "@/lib/ui/apple-style";
 import {
-  collectLessonChunkTexts,
-  extractSlugFromSceneCacheKey,
   findChunkContext,
   toVariantStatusLabel,
   toVariantTitle,
@@ -74,21 +53,13 @@ import {
   sceneDetailConfirmMessages,
 } from "./scene-detail-controller";
 import {
-  buildSceneLearningUpdatePayload,
-  shouldFlushSceneLearningDelta,
-} from "./scene-detail-learning-logic";
-import {
   ensureSceneExpressionMapData,
   generateScenePracticeSet,
   generateSceneVariantSet,
-  syncSceneVariantsFromDb,
 } from "./scene-detail-generation-logic";
-import { loadSceneDetail } from "./scene-detail-load-orchestrator";
-import {
-  buildSceneDetailHref,
-  parseSceneDetailRouteState,
-  SceneViewMode,
-} from "./scene-detail-page-logic";
+import { useSceneDetailData } from "./use-scene-detail-data";
+import { useSceneLearningSync } from "./use-scene-learning-sync";
+import { useSceneDetailRouteState } from "./use-scene-detail-route-state";
 
 const appleButtonSmClassName = `${APPLE_BUTTON_BASE} ${APPLE_BUTTON_TEXT_SM}`;
 const appleButtonLgClassName = `${APPLE_BUTTON_BASE} ${APPLE_BUTTON_TEXT_LG}`;
@@ -99,15 +70,7 @@ export default function SceneDetailPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const sceneSlug = params?.slug ?? "";
-  const [baseLesson, setBaseLesson] = useState<Lesson | null>(null);
-  const [sceneDataSource, setSceneDataSource] = useState<"none" | "cache" | "network">(
-    "none",
-  );
-  const [sceneLoading, setSceneLoading] = useState(true);
-  const baseSceneId = baseLesson?.id ?? "";
-
-  const [viewMode, setViewMode] = useState<SceneViewMode>("scene");
-  const [activeVariantId, setActiveVariantId] = useState<string | null>(null);
+  const [viewResetVersion, setViewResetVersion] = useState(0);
   const [practiceLoading, setPracticeLoading] = useState(false);
   const [variantsLoading, setVariantsLoading] = useState(false);
   const [practiceError, setPracticeError] = useState<string | null>(null);
@@ -129,20 +92,61 @@ export default function SceneDetailPage() {
   const [expressionMap, setExpressionMap] = useState<ExpressionMapResponse | null>(null);
   const [expressionMapVariantSetId, setExpressionMapVariantSetId] =
     useState<string | null>(null);
-  const [savedPhraseTextSet, setSavedPhraseTextSet] = useState<Set<string>>(new Set());
-  const [generatedState, setGeneratedState] = useState<SceneGeneratedState>({
-    latestPracticeSet: null,
-    latestVariantSet: null,
-    practiceStatus: "idle",
-    variantStatus: "idle",
-  });
   const playbackState = useTtsPlaybackState();
-  const activeLoadTokenRef = useRef(0);
-  const latestSceneSlugRef = useRef(normalizeSceneSlug(sceneSlug));
-  const learningStartedRef = useRef(false);
-  const lastProgressSyncMsRef = useRef<number>(Date.now());
-  const learningPingTimerRef = useRef<number | null>(null);
-  const currentViewModeRef = useRef<SceneViewMode>("scene");
+  const {
+    baseLesson,
+    sceneLoading,
+    loadErrorMessage,
+    savedPhraseTextSet,
+    setSavedPhraseTextSet,
+    generatedState,
+    refreshGeneratedState,
+  } = useSceneDetailData(sceneSlug);
+  const routeResetState = useMemo(
+    () => ({
+      practiceError: null as string | null,
+      variantsError: null as string | null,
+      showAnswerMap: {} as Record<string, boolean>,
+      variantChunkModalOpen: false,
+      variantChunkDetail: null as SelectionChunkLayer | null,
+      variantChunkSentence: null as LessonSentence | null,
+      variantChunkRelatedChunks: [] as string[],
+      variantChunkHoveredKey: null as string | null,
+      expressionMapLoading: false,
+      expressionMapError: null as string | null,
+      expressionMap: null as ExpressionMapResponse | null,
+      expressionMapVariantSetId: null as string | null,
+    }),
+    [],
+  );
+  const handleSceneRouteChange = useCallback(() => {
+    setPracticeError(routeResetState.practiceError);
+    setVariantsError(routeResetState.variantsError);
+    setShowAnswerMap(routeResetState.showAnswerMap);
+    setVariantChunkModalOpen(routeResetState.variantChunkModalOpen);
+    setVariantChunkDetail(routeResetState.variantChunkDetail);
+    setVariantChunkSentence(routeResetState.variantChunkSentence);
+    setVariantChunkRelatedChunks(routeResetState.variantChunkRelatedChunks);
+    setVariantChunkHoveredKey(routeResetState.variantChunkHoveredKey);
+    setExpressionMapLoading(routeResetState.expressionMapLoading);
+    setExpressionMapError(routeResetState.expressionMapError);
+    setExpressionMap(routeResetState.expressionMap);
+    setExpressionMapVariantSetId(routeResetState.expressionMapVariantSetId);
+    setViewResetVersion((current) => current + 1);
+  }, [routeResetState]);
+  const { viewMode, activeVariantId, setActiveVariantId, setViewModeWithRoute } =
+    useSceneDetailRouteState({
+      sceneSlug,
+      searchParams,
+      router,
+      onRouteChange: handleSceneRouteChange,
+    });
+  useSceneLearningSync({
+    baseLesson,
+    viewMode,
+    activeVariantId,
+  });
+  const baseSceneId = baseLesson?.id ?? "";
   const savePhraseForScene = useCallback(
     async (payload: {
       text: string;
@@ -198,277 +202,15 @@ export default function SceneDetailPage() {
         toast.error(error instanceof Error ? error.message : "收藏短语失败");
       });
   }, [baseLesson, savePhraseForScene, variantChunkDetail, variantChunkSentence]);
-  const flushLearningDelta = useCallback(
-    (payload: {
-      progressPercent: number;
-      lastVariantIndex?: number;
-      withPause?: boolean;
-    }) => {
-      const studySecondsDelta = computeElapsedSecondsSinceLastSync();
-      if (
-        !shouldFlushSceneLearningDelta({
-          hasBaseLesson: Boolean(baseLesson),
-          learningStarted: learningStartedRef.current,
-          studySecondsDelta,
-          withPause: Boolean(payload.withPause),
-        })
-      ) {
-        return Promise.resolve();
-      }
-
-      if (!baseLesson) return Promise.resolve();
-
-      return updateSceneLearningProgressFromApi(baseLesson.slug, {
-        progressPercent: payload.progressPercent,
-        lastVariantIndex: payload.lastVariantIndex,
-        studySecondsDelta,
-      })
-        .then(() => {
-          if (payload.withPause) {
-            return pauseSceneLearningFromApi(baseLesson.slug);
-          }
-          return undefined;
-        })
-        .catch(() => {
-          // Non-blocking.
-        });
-    },
-    [baseLesson],
-  );
-
-  const computeElapsedSecondsSinceLastSync = () => {
-    const now = Date.now();
-    const elapsed = Math.max(0, Math.floor((now - lastProgressSyncMsRef.current) / 1000));
-    lastProgressSyncMsRef.current = now;
-    return elapsed;
-  };
-
-  const setViewModeWithRoute = (next: SceneViewMode, variantId?: string | null) => {
-    const href = buildSceneDetailHref({
-      sceneSlug,
-      searchParams,
-      nextViewMode: next,
-      variantId,
-    });
-    router.push(href, { scroll: false });
-  };
-
-  const refreshGeneratedState = (sceneKey: string) => {
-    if (!sceneKey) return;
-    setGeneratedState(getSceneGeneratedState(sceneKey));
-  };
-
-  useEffect(() => {
-    latestSceneSlugRef.current = normalizeSceneSlug(sceneSlug);
-  }, [sceneSlug]);
-
-  useEffect(() => {
-    if (!sceneSlug) return;
-    learningStartedRef.current = false;
-    lastProgressSyncMsRef.current = Date.now();
-    const requestToken = activeLoadTokenRef.current + 1;
-    activeLoadTokenRef.current = requestToken;
-    const requestSlug = normalizeSceneSlug(sceneSlug);
-    let cancelled = false;
-
-    const canApply = () =>
-      !cancelled &&
-      activeLoadTokenRef.current === requestToken &&
-      latestSceneSlugRef.current === requestSlug;
-
-    void clearExpiredSceneCaches().catch(() => {
-      // Non-blocking cleanup.
-    });
-
-    void loadSceneDetail({
-      sceneSlug,
-      requestSlug,
-      callbacks: {
-        canApply,
-        onStart: () => {
-          setSceneLoading(true);
-          setSceneDataSource("none");
-          setBaseLesson(null);
-        },
-        onHydrateLesson: (lesson, source) => {
-          setBaseLesson(lesson);
-          setSceneDataSource(source);
-        },
-        onStopLoading: () => {
-          setSceneLoading(false);
-        },
-        onFailure: (message) => {
-          if (!message) return;
-          setBaseLesson(null);
-          toast.error(message);
-        },
-      },
-      deps: {
-        getSceneCache,
-        getSceneDetailBySlugFromApi,
-        setSceneCache,
-        getScenesFromApi,
-        listRecentSceneCacheKeys,
-        scheduleScenePrefetch,
-        extractSlugFromSceneCacheKey,
-        logPrefetchDebug:
-          process.env.NODE_ENV === "development"
-            ? () => {
-                console.debug("[scene-prefetch][debug]", getPrefetchDebugState());
-              }
-            : undefined,
-      },
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [sceneSlug]);
-
-  useEffect(() => {
-    if (process.env.NODE_ENV !== "development") return;
-    if (!sceneSlug) return;
-    void listRecentSceneCacheKeys(5)
-      .then((keys) => {
-        console.debug("[scene-cache][debug]", {
-          slug: sceneSlug,
-          source: sceneDataSource,
-          queueTop5: keys,
-          prefetch: getPrefetchDebugState(),
-        });
-      })
-      .catch(() => {
-        // ignore
-      });
-  }, [sceneDataSource, sceneSlug]);
-
-  useEffect(() => {
-    if (!baseLesson || learningStartedRef.current) return;
-    learningStartedRef.current = true;
-    lastProgressSyncMsRef.current = Date.now();
-    void startSceneLearningFromApi(baseLesson.slug).catch(() => {
-      // Non-blocking: scene reading should still work if progress API fails temporarily.
-    });
-  }, [baseLesson]);
-
-  useEffect(() => {
-    if (!baseLesson) {
-      setSavedPhraseTextSet(new Set());
-      return;
-    }
-    const candidates = collectLessonChunkTexts(baseLesson);
-    if (candidates.length === 0) {
-      setSavedPhraseTextSet(new Set());
-      return;
-    }
-    let cancelled = false;
-    void getSavedNormalizedPhraseTextsFromApi(candidates)
-      .then((texts) => {
-        if (cancelled) return;
-        setSavedPhraseTextSet(new Set(texts.map((text) => normalizePhraseText(text))));
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setSavedPhraseTextSet(new Set());
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [baseLesson]);
-
-
   useEffect(() => {
     if (!baseLesson) return;
-    let cancelled = false;
-
-    void syncSceneVariantsFromDb({
-      baseLesson,
-      hasExistingVariantSet: Boolean(getSceneGeneratedState(baseLesson.id).latestVariantSet),
-    })
-      .then((variantSet) => {
-        if (cancelled || !variantSet) return;
-        saveVariantSet(variantSet);
-        refreshGeneratedState(baseLesson.id);
-      })
-      .catch(() => {
-        // Keep local-only variants if db sync fails.
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [baseLesson]);
+    refreshGeneratedState(baseLesson.id);
+  }, [baseLesson, refreshGeneratedState, viewResetVersion]);
 
   useEffect(() => {
-    const routeState = parseSceneDetailRouteState(searchParams);
-    setViewMode(routeState.viewMode);
-    setActiveVariantId(routeState.activeVariantId);
-    setPracticeError(null);
-    setVariantsError(null);
-    setShowAnswerMap({});
-    setVariantChunkModalOpen(false);
-    setVariantChunkDetail(null);
-    setVariantChunkSentence(null);
-    setVariantChunkRelatedChunks([]);
-    setVariantChunkHoveredKey(null);
-    setExpressionMapLoading(false);
-    setExpressionMapError(null);
-    setExpressionMap(null);
-    setExpressionMapVariantSetId(null);
-    refreshGeneratedState(baseSceneId);
-  }, [sceneSlug, baseSceneId, searchParams]);
-
-  useEffect(() => {
-    currentViewModeRef.current = viewMode;
-  }, [viewMode]);
-
-  useEffect(() => {
-    if (!baseLesson) return;
-    const timer = window.setTimeout(() => {
-      void flushLearningDelta(
-        buildSceneLearningUpdatePayload({
-          viewMode,
-          activeVariantId,
-        }),
-      );
-    }, 1200);
-    return () => {
-      window.clearTimeout(timer);
-    };
-  }, [activeVariantId, baseLesson, flushLearningDelta, viewMode]);
-
-  useEffect(() => {
-    if (!baseLesson) return;
-    if (learningPingTimerRef.current) {
-      window.clearInterval(learningPingTimerRef.current);
-    }
-    learningPingTimerRef.current = window.setInterval(() => {
-      void flushLearningDelta(
-        buildSceneLearningUpdatePayload({
-          viewMode,
-        }),
-      );
-    }, 60000);
-
-    return () => {
-      if (learningPingTimerRef.current) {
-        window.clearInterval(learningPingTimerRef.current);
-        learningPingTimerRef.current = null;
-      }
-    };
-  }, [baseLesson, flushLearningDelta, viewMode]);
-
-  useEffect(() => {
-    if (!baseLesson) return;
-    return () => {
-      void flushLearningDelta(
-        buildSceneLearningUpdatePayload({
-          viewMode: currentViewModeRef.current,
-          withPause: true,
-        }),
-      );
-    };
-  }, [baseLesson, flushLearningDelta]);
+    if (!loadErrorMessage) return;
+    toast.error(loadErrorMessage);
+  }, [loadErrorMessage]);
 
   const latestPracticeSet = generatedState.latestPracticeSet;
   const latestVariantSet = generatedState.latestVariantSet;
@@ -973,5 +715,3 @@ export default function SceneDetailPage() {
     </div>
   );
 }
-
-

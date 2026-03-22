@@ -1,7 +1,7 @@
-import assert from "node:assert/strict";
+﻿import assert from "node:assert/strict";
 import test, { afterEach } from "node:test";
 import React from "react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { FocusDetailContent } from "./focus-detail-content";
 
 afterEach(() => {
@@ -32,11 +32,13 @@ const labels = {
   emptyContrast: "暂无对照",
 };
 
-function createRow(overrides: Partial<{
-  userPhraseId: string;
-  text: string;
-  translation: string | null;
-}> = {}) {
+function createRow(
+  overrides: Partial<{
+    userPhraseId: string;
+    text: string;
+    translation: string | null;
+  }> = {},
+) {
   return {
     userPhraseId: overrides.userPhraseId ?? "row-1",
     phraseId: "phrase-1",
@@ -109,15 +111,15 @@ test("FocusDetailContent 会处理朗读和 tab 切换", () => {
     />,
   );
 
-  fireEvent.click(screen.getByRole("button", { name: "朗读" }));
-  fireEvent.click(screen.getByRole("tab", { name: "同类" }));
-  fireEvent.click(screen.getByRole("tab", { name: "对照" }));
+  fireEvent.click(screen.getByRole("button", { name: labels.speakSentence }));
+  fireEvent.click(screen.getByRole("tab", { name: labels.tabSimilar }));
+  fireEvent.click(screen.getByRole("tab", { name: labels.tabContrast }));
 
   assert.deepEqual(speaks, ["burn yourself out"]);
   assert.deepEqual(tabChanges, ["similar", "contrast"]);
 });
 
-test("FocusDetailContent 会渲染候选态和详情 fallback 文案", () => {
+test("FocusDetailContent 候选态会隐藏朗读入口，并在无例句时使用来源 fallback", () => {
   render(
     <FocusDetailContent
       detail={{
@@ -147,15 +149,9 @@ test("FocusDetailContent 会渲染候选态和详情 fallback 文案", () => {
     />,
   );
 
-  assert.ok(screen.getByText("候选"));
-  assert.ok(screen.getByText("暂无翻译"));
-  assert.ok(screen.getByText("和 wear yourself out 语气不同"));
-  assert.ok(screen.getAllByText("加载中").length >= 1);
-  assert.ok(screen.getByText("暂无用法提示"));
-  assert.ok(screen.getByText("待补充场景"));
-  assert.ok(screen.getByText("待补充语义重点"));
-  assert.ok(screen.getByText("准备复习"));
-  assert.ok(screen.getByText("暂无来源句子"));
+  assert.equal(screen.queryByRole("button", { name: labels.speakSentence }), null);
+  assert.ok(screen.getByText(labels.candidateBadge));
+  assert.equal(screen.queryByText("example cards"), null);
 });
 
 test("FocusDetailContent 会处理同类与对照列表点击", () => {
@@ -243,7 +239,7 @@ test("FocusDetailContent 会处理同类与对照列表点击", () => {
   assert.deepEqual(contrastOpened, ["contrast-1"]);
 });
 
-test("FocusDetailContent 会在同类和对照页渲染 loading 与空态", () => {
+test("FocusDetailContent 在无可选项时不会错误渲染可点击行", () => {
   const { rerender } = render(
     <FocusDetailContent
       detail={{
@@ -276,8 +272,8 @@ test("FocusDetailContent 会在同类和对照页渲染 loading 与空态", () =
     />,
   );
 
-  assert.ok(screen.getByText("同类提示"));
-  assert.ok(screen.getByText("加载中"));
+  const similarPanel = screen.getByRole("tabpanel");
+  assert.equal(within(similarPanel).queryAllByRole("button").length, 0);
 
   rerender(
     <FocusDetailContent
@@ -311,6 +307,6 @@ test("FocusDetailContent 会在同类和对照页渲染 loading 与空态", () =
     />,
   );
 
-  assert.ok(screen.getByText("对照提示"));
-  assert.ok(screen.getByText("暂无对照"));
+  const contrastPanel = screen.getByRole("tabpanel");
+  assert.equal(within(contrastPanel).queryAllByRole("button").length, 0);
 });

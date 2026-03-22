@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { PracticeSet } from "@/lib/types/learning-flow";
 import { APPLE_SURFACE } from "@/lib/ui/apple-style";
@@ -60,7 +60,7 @@ export function ScenePracticeView({
           {practiceSet?.sourceType === "variant" ? (
             <p>
               {labels.basedOnVariantPrefix}
-              {`${practiceSet.sourceVariantTitle ?? "Variant"}；${labels.basedOnScenePrefix}${practiceSet.sourceSceneTitle}`}
+              {`${practiceSet.sourceVariantTitle ?? "Variant"} / ${labels.basedOnScenePrefix}${practiceSet.sourceSceneTitle}`}
             </p>
           ) : (
             <p>{labels.basedOnVariantPrefix}{practiceSet?.sourceSceneTitle ?? "-"}</p>
@@ -109,3 +109,4 @@ export function ScenePracticeView({
     </div>
   );
 }
+

@@ -1,0 +1,159 @@
+import assert from "node:assert/strict";
+import test, { afterEach } from "node:test";
+import React from "react";
+import { act, cleanup, renderHook } from "@testing-library/react";
+
+import { useGeneratedSimilarSheet } from "./use-generated-similar-sheet";
+
+afterEach(() => {
+  cleanup();
+});
+
+const expressionRows = [
+  {
+    userPhraseId: "p1",
+    phraseId: "phrase-1",
+    text: "call it a day",
+    normalizedText: "call it a day",
+    translation: "今天先到这里",
+    usageNote: null,
+    difficulty: null,
+    tags: [],
+    sourceSceneSlug: "scene-1",
+    sourceType: "manual",
+    sourceNote: null,
+    sourceSentenceIndex: null,
+    sourceSentenceText: "I should call it a day.",
+    sourceChunkText: null,
+    expressionClusterId: null,
+    expressionClusterRole: null,
+    expressionClusterMainUserPhraseId: null,
+    aiEnrichmentStatus: null,
+    semanticFocus: null,
+    typicalScenario: null,
+    exampleSentences: [],
+    aiEnrichmentError: null,
+    learningItemType: "expression",
+    savedAt: "2026-03-21T00:00:00.000Z",
+    lastSeenAt: "2026-03-21T00:00:00.000Z",
+    reviewStatus: "saved",
+    reviewCount: 0,
+    correctCount: 0,
+    incorrectCount: 0,
+    lastReviewedAt: null,
+    nextReviewAt: null,
+    masteredAt: null,
+  },
+] as any[];
+
+test("useGeneratedSimilarSheet 会打开并加载候选", async () => {
+  const { result } = renderHook(() =>
+    useGeneratedSimilarSheet({
+      expressionRows,
+      normalizeSimilarLabel: (label) => label ?? "",
+      onLoadCluster: async () => undefined,
+      onApplyClusterFilter: () => undefined,
+      deps: {
+        generateSimilarExpressionsFromApi: async () => ({
+          version: "v1",
+          candidates: [{ text: "wrap it up", differenceLabel: "更偏收尾" }],
+        }),
+        savePhraseFromApi: async () => ({}) as any,
+        savePhrasesBatchFromApi: async () => ({}) as any,
+        enrichSimilarExpressionsBatchFromApi: async () => ({}) as any,
+        setTimeoutFn: () => 1 as never,
+      } as never,
+    }),
+  );
+
+  await act(async () => {
+    await result.current.openGenerateSimilarSheet(expressionRows[0]);
+  });
+
+  assert.equal(result.current.similarSheetOpen, true);
+  assert.equal(result.current.generatedSimilarCandidates.length, 1);
+  assert.equal(result.current.generatedSimilarCandidates[0]?.text, "wrap it up");
+});
+
+test("useGeneratedSimilarSheet 会保存选中候选并加载 cluster", async () => {
+  const loaded: string[] = [];
+  const filtered: string[] = [];
+  const success: string[] = [];
+  const { result } = renderHook(() =>
+    useGeneratedSimilarSheet({
+      expressionRows,
+      normalizeSimilarLabel: (label) => label ?? "",
+      onLoadCluster: async (clusterId) => {
+        loaded.push(clusterId);
+      },
+      onApplyClusterFilter: (clusterId, text) => {
+        filtered.push(`${clusterId}:${text}`);
+      },
+      onSuccess: (message) => success.push(message),
+      deps: {
+        generateSimilarExpressionsFromApi: async () => ({
+          version: "v1",
+          candidates: [{ text: "wrap it up", differenceLabel: "更偏收尾" }],
+        }),
+        savePhraseFromApi: async () => ({
+          expressionClusterId: "cluster-1",
+        }),
+        savePhrasesBatchFromApi: async () => ({
+          items: [{ userPhrase: { id: "saved-2" } }],
+        }),
+        enrichSimilarExpressionsBatchFromApi: async () => ({}),
+        setTimeoutFn: (callback: () => void) => {
+          callback();
+          return 1 as never;
+        },
+      } as never,
+    }),
+  );
+
+  await act(async () => {
+    await result.current.openGenerateSimilarSheet(expressionRows[0]);
+  });
+  act(() => {
+    result.current.toggleCandidateSelected("wrap it up");
+  });
+  await act(async () => {
+    await result.current.saveSelectedSimilarCandidates();
+  });
+
+  assert.deepEqual(loaded, ["cluster-1", "cluster-1"]);
+  assert.deepEqual(filtered, ["cluster-1:call it a day"]);
+  assert.deepEqual(success, ["saved"]);
+  assert.equal(result.current.similarSheetOpen, false);
+});
+
+test("useGeneratedSimilarSheet 在未选中候选时会提示选择", async () => {
+  const messages: string[] = [];
+  const { result } = renderHook(() =>
+    useGeneratedSimilarSheet({
+      expressionRows,
+      normalizeSimilarLabel: (label) => label ?? "",
+      onLoadCluster: async () => undefined,
+      onApplyClusterFilter: () => undefined,
+      onSelectAtLeastOne: () => messages.push("select"),
+      deps: {
+        generateSimilarExpressionsFromApi: async () => ({
+          version: "v1",
+          candidates: [{ text: "wrap it up", differenceLabel: "更偏收尾" }],
+        }),
+        savePhraseFromApi: async () => ({}) as any,
+        savePhrasesBatchFromApi: async () => ({}) as any,
+        enrichSimilarExpressionsBatchFromApi: async () => ({}) as any,
+        setTimeoutFn: () => 1 as never,
+      } as never,
+    }),
+  );
+
+  await act(async () => {
+    await result.current.openGenerateSimilarSheet(expressionRows[0]);
+  });
+  await act(async () => {
+    await result.current.saveSelectedSimilarCandidates();
+  });
+
+  assert.deepEqual(messages, ["select"]);
+});
