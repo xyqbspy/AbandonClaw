@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   buildFocusDetailClosePayload,
   buildFocusDetailOpenRowAction,
+  buildSavedFocusDetailState,
   buildFocusDetailSecondaryActionInput,
   buildClusterFilterChange,
   buildChunksHref,
@@ -327,6 +328,7 @@ test("focus detail 页面 helper 会稳定返回关闭、tab 切换和行打开�
       nextRelationTab: "similar",
       detailInput: {
         text: "wrap it up",
+        differenceLabel: null,
         kind: "library-similar",
         chainMode: "append",
       },
@@ -342,6 +344,7 @@ test("focus detail 页面 helper 会稳定返回关闭、tab 切换和行打开�
       nextRelationTab: "contrast",
       detailInput: {
         text: "keep going",
+        differenceLabel: null,
         kind: "contrast",
         chainMode: "append",
       },

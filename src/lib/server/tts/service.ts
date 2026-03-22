@@ -7,6 +7,7 @@ import { ValidationError } from "@/lib/server/errors";
 import {
   createTtsStorageSignedUrl,
   getTtsStorageSignedUrlIfExists,
+  removeTtsStorageFiles,
   uploadTtsAudioToStorage,
 } from "@/lib/server/tts/repo";
 import {
@@ -182,6 +183,11 @@ const getStorageSignedUrlIfExists = async (storagePath: string) => {
 const uploadAudioToStorage = async (storagePath: string, buffer: Buffer) => {
   const url = await uploadTtsAudioToStorage(storagePath, buffer, false);
   return cacheSignedUrl(storagePath, url);
+};
+
+const clearSignedUrlCache = (storagePath: string) => {
+  signedUrlCache.delete(storagePath);
+  pendingSignedUrlRequests.delete(storagePath);
 };
 
 const synthesizeToBuffer = async (text: string, voice: string, mode: TtsMode) => {
@@ -387,5 +393,49 @@ export async function generateTtsAudio(payload: TtsRequestPayload) {
     url: responseUrl,
     cached,
     source,
+  };
+}
+
+export async function regenerateChunkTtsAudioBatch(
+  items: Array<{ text: string; chunkKey?: string }>,
+) {
+  const normalizedItems = Array.from(
+    new Map(
+      items
+        .map((item) => {
+          const text = parseRequiredText(item.text);
+          const chunkKey =
+            typeof item.chunkKey === "string" && item.chunkKey.trim()
+              ? item.chunkKey.trim()
+              : buildChunkAudioKey(text);
+          return [chunkKey, { text, chunkKey }] as const;
+        })
+        .filter((entry) => entry[1].text.length > 0),
+    ).values(),
+  );
+
+  for (const item of normalizedItems) {
+    const target = resolveAudioTarget({
+      kind: "chunk",
+      mode: "normal",
+      text: item.text,
+      chunkKey: item.chunkKey,
+    });
+    clearSignedUrlCache(target.storagePath);
+    await rm(target.absolutePath, { force: true }).catch(() => {
+      // Non-blocking local cleanup.
+    });
+    await removeTtsStorageFiles([target.storagePath]).catch(() => {
+      // Storage may not have existing file yet.
+    });
+    await generateTtsAudio({
+      kind: "chunk",
+      text: item.text,
+      chunkKey: item.chunkKey,
+    });
+  }
+
+  return {
+    regeneratedCount: normalizedItems.length,
   };
 }

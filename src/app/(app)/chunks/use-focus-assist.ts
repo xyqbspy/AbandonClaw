@@ -41,16 +41,19 @@ export const useFocusAssist = ({
   const [focusAssistLoading, setFocusAssistLoading] = useState(false);
   const [focusAssistData, setFocusAssistData] =
     useState<ManualExpressionAssistResponse | null>(null);
-  const [savingFocusCandidateKey, setSavingFocusCandidateKey] = useState<string | null>(null);
+  const [savingFocusCandidateKeys, setSavingFocusCandidateKeys] = useState<string[]>([]);
+  const [completedFocusCandidateKeys, setCompletedFocusCandidateKeys] = useState<string[]>([]);
 
   const resetFocusAssist = useCallback(() => {
     setFocusAssistData(null);
+    setCompletedFocusCandidateKeys([]);
   }, []);
 
   const loadFocusAssist = useCallback(
     async (item: UserPhraseItemResponse) => {
       if (item.learningItemType !== "expression") return;
       setFocusAssistLoading(true);
+      setCompletedFocusCandidateKeys([]);
       try {
         const response = await deps.generateManualExpressionAssistFromApi({
           text: item.text,
@@ -74,8 +77,12 @@ export const useFocusAssist = ({
       kind: "similar" | "contrast",
     ) => {
       const key = `${kind}:${normalizePhraseText(candidate.text)}`;
-      if (savingFocusCandidateKey === key) return;
-      setSavingFocusCandidateKey(key);
+      if (!key) return;
+      if (savingFocusCandidateKeys.includes(key) || completedFocusCandidateKeys.includes(key)) {
+        return;
+      }
+
+      setSavingFocusCandidateKeys((current) => [...current, key]);
       try {
         const response = await deps.savePhraseFromApi({
           text: candidate.text,
@@ -94,6 +101,9 @@ export const useFocusAssist = ({
           baseExpression: focusItem.text,
           differenceLabel: candidate.differenceLabel,
         });
+        setCompletedFocusCandidateKeys((current) =>
+          current.includes(key) ? current : [...current, key],
+        );
         await onCandidateSaved?.({
           focusItem,
           savedUserPhraseId: response.userPhrase.id,
@@ -101,12 +111,12 @@ export const useFocusAssist = ({
           kind,
         });
       } catch (error) {
-        onLoadFailed?.(error instanceof Error ? error.message : "加载表达失败。");
+        onLoadFailed?.(error instanceof Error ? error.message : "保存表达失败。");
       } finally {
-        setSavingFocusCandidateKey(null);
+        setSavingFocusCandidateKeys((current) => current.filter((item) => item !== key));
       }
     },
-    [deps, onCandidateSaved, onLoadFailed, savingFocusCandidateKey],
+    [completedFocusCandidateKeys, deps, onCandidateSaved, onLoadFailed, savingFocusCandidateKeys],
   );
 
   return {
@@ -115,7 +125,8 @@ export const useFocusAssist = ({
     setFocusAssistData,
     resetFocusAssist,
     loadFocusAssist,
-    savingFocusCandidateKey,
+    savingFocusCandidateKeys,
+    completedFocusCandidateKeys,
     saveFocusCandidate,
   };
 };

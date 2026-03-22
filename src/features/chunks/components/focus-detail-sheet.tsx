@@ -1,6 +1,7 @@
 "use client";
 
 import { ManualExpressionAssistResponse, UserPhraseItemResponse } from "@/lib/utils/phrases-api";
+import { FocusDetailRelatedItem } from "./focus-detail-selectors";
 import { FocusDetailConfirm } from "./focus-detail-confirm";
 import { FocusDetailContent } from "./focus-detail-content";
 import { FocusDetailSheetFooter } from "./focus-detail-sheet-footer";
@@ -32,21 +33,28 @@ type FocusDetailSheetProps = {
   trailLength: number;
   canShowSiblingNav: boolean;
   canShowFindRelations: boolean;
+  canShowManualAddRelated?: boolean;
+  canShowRegenerateAudio?: boolean;
+  canShowRetryEnrichment?: boolean;
+  canCompleteAssist?: boolean;
+  completeAssistDisabled?: boolean;
   focusAssistLoading: boolean;
+  openingManualAddRelated?: boolean;
+  regeneratingAudio?: boolean;
+  retryingEnrichment?: boolean;
   movingIntoCluster: boolean;
   ensuringMoveTargetCluster: boolean;
   detachingClusterMember: boolean;
   canSetCurrentClusterMain: boolean;
   canMoveIntoCurrentCluster: boolean;
   canSetStandaloneMain: boolean;
-  savingFocusCandidate: boolean;
   primaryActionLabel?: string;
   appleButtonClassName: string;
   activeAssistItem: ManualExpressionAssistResponse["inputItem"] | null;
   isDetailSpeaking: boolean;
   detailSpeakText: string;
-  similarRows: UserPhraseItemResponse[];
-  contrastRows: UserPhraseItemResponse[];
+  similarRows: FocusDetailRelatedItem[];
+  contrastRows: FocusDetailRelatedItem[];
   isSavedRelatedLoading: boolean;
   usageHint: string;
   typicalScenario: string;
@@ -54,21 +62,28 @@ type FocusDetailSheetProps = {
   reviewHint: string;
   exampleCards: React.ReactNode;
   labels: FocusDetailSheetLabels;
+  savingFocusCandidateKeys?: string[];
+  completedFocusCandidateKeys?: string[];
   onOpenChange: (open: boolean) => void;
   onReopenPrevTrail: () => void;
   onFindRelations: () => void;
+  onOpenManualAddRelated?: () => void;
+  onRegenerateAudio?: () => void;
+  onRetryEnrichment?: () => void;
   onOpenPrevSibling: () => void;
   onOpenNextSibling: () => void;
   onSetDetailActionsOpen: (open: boolean) => void;
   onRequestSetCurrentClusterMain: () => void;
   onRequestMoveIntoCluster: () => void;
   onRequestSetStandaloneMain: () => void;
+  onCompleteAssist?: () => void;
   onPrimaryAction: () => void;
-  onSecondaryAction: () => void;
   onSpeak: (text: string) => void;
   onTabChange: (tab: FocusDetailTabValue) => void;
-  onOpenSimilarRow: (row: UserPhraseItemResponse) => void;
-  onOpenContrastRow: (row: UserPhraseItemResponse) => void;
+  onOpenSimilarRow: (row: FocusDetailRelatedItem) => void;
+  onOpenContrastRow: (row: FocusDetailRelatedItem) => void;
+  onSaveSimilarRow?: (row: FocusDetailRelatedItem) => void;
+  onSaveContrastRow?: (row: FocusDetailRelatedItem) => void;
   onCloseConfirm: () => void;
   onConfirm: () => void;
 };
@@ -83,14 +98,21 @@ export function FocusDetailSheet({
   trailLength,
   canShowSiblingNav,
   canShowFindRelations,
+  canShowManualAddRelated = false,
+  canShowRegenerateAudio = false,
+  canShowRetryEnrichment = false,
+  canCompleteAssist = false,
+  completeAssistDisabled = false,
   focusAssistLoading,
+  openingManualAddRelated = false,
+  regeneratingAudio = false,
+  retryingEnrichment = false,
   movingIntoCluster,
   ensuringMoveTargetCluster,
   detachingClusterMember,
   canSetCurrentClusterMain,
   canMoveIntoCurrentCluster,
   canSetStandaloneMain,
-  savingFocusCandidate,
   primaryActionLabel,
   appleButtonClassName,
   activeAssistItem,
@@ -105,21 +127,28 @@ export function FocusDetailSheet({
   reviewHint,
   exampleCards,
   labels,
+  savingFocusCandidateKeys = [],
+  completedFocusCandidateKeys = [],
   onOpenChange,
   onReopenPrevTrail,
   onFindRelations,
+  onOpenManualAddRelated = () => undefined,
+  onRegenerateAudio = () => undefined,
+  onRetryEnrichment = () => undefined,
   onOpenPrevSibling,
   onOpenNextSibling,
   onSetDetailActionsOpen,
   onRequestSetCurrentClusterMain,
   onRequestMoveIntoCluster,
   onRequestSetStandaloneMain,
+  onCompleteAssist = () => undefined,
   onPrimaryAction,
-  onSecondaryAction,
   onSpeak,
   onTabChange,
   onOpenSimilarRow,
   onOpenContrastRow,
+  onSaveSimilarRow = () => undefined,
+  onSaveContrastRow = () => undefined,
   onCloseConfirm,
   onConfirm,
 }: FocusDetailSheetProps) {
@@ -140,16 +169,11 @@ export function FocusDetailSheet({
             title={labels.title}
             trailLength={trailLength}
             backToCurrentLabel={labels.backToCurrent}
-            canShowFindRelations={canShowFindRelations}
-            findRelationsLabel={labels.findRelations}
-            detailLoading={detailLoading}
-            focusAssistLoading={focusAssistLoading}
             canShowSiblingNav={canShowSiblingNav}
             prevLabel={labels.prev}
             nextLabel={labels.next}
             appleButtonClassName={appleButtonClassName}
             onReopenPrevTrail={onReopenPrevTrail}
-            onFindRelations={onFindRelations}
             onOpenPrevSibling={onOpenPrevSibling}
             onOpenNextSibling={onOpenNextSibling}
           />
@@ -159,26 +183,43 @@ export function FocusDetailSheet({
           <FocusDetailSheetFooter
             detail={detail}
             detailActionsOpen={detailActionsOpen}
+            canShowFindRelations={canShowFindRelations}
+            canShowManualAddRelated={canShowManualAddRelated}
+            canShowRegenerateAudio={canShowRegenerateAudio}
+            canShowRetryEnrichment={canShowRetryEnrichment}
             canSetCurrentClusterMain={canSetCurrentClusterMain}
             canMoveIntoCurrentCluster={canMoveIntoCurrentCluster}
             canSetStandaloneMain={canSetStandaloneMain}
+            focusAssistLoading={focusAssistLoading}
+            openingManualAddRelated={openingManualAddRelated}
+            regeneratingAudio={regeneratingAudio}
+            retryingEnrichment={retryingEnrichment}
             movingIntoCluster={movingIntoCluster}
             ensuringMoveTargetCluster={ensuringMoveTargetCluster}
             detachingClusterMember={detachingClusterMember}
-            savingFocusCandidate={savingFocusCandidate}
+            canCompleteAssist={canCompleteAssist}
+            completeAssistDisabled={completeAssistDisabled}
             primaryActionLabel={primaryActionLabel}
-            addThisExpressionLabel={labels.addThisExpression}
             appleButtonClassName={appleButtonClassName}
             onSetDetailActionsOpen={onSetDetailActionsOpen}
+            onRequestFindRelations={onFindRelations}
+            onRequestManualAddRelated={onOpenManualAddRelated}
+            onRequestRegenerateAudio={onRegenerateAudio}
+            onRequestRetryEnrichment={onRetryEnrichment}
             onRequestSetCurrentClusterMain={onRequestSetCurrentClusterMain}
             onRequestMoveIntoCluster={onRequestMoveIntoCluster}
             onRequestSetStandaloneMain={onRequestSetStandaloneMain}
+            onCompleteAssist={onCompleteAssist}
             onPrimaryAction={onPrimaryAction}
-            onSecondaryAction={onSecondaryAction}
             moreActionsLabel={labels.detailMoreActions}
+            findRelationsLabel={labels.findRelations}
+            manualAddRelatedLabel={labels.detailManualAddRelated ?? "添加关联表达"}
+            regenerateAudioLabel={labels.detailRegenerateAudio ?? "重新生成音频"}
+            retryEnrichmentLabel={labels.detailRetryEnrichment ?? "补全当前chunk"}
             openAsMainLabel={labels.detailOpenAsMain}
             moveIntoClusterLabel={labels.moveIntoCluster}
             detachClusterMemberLabel={labels.detachClusterMember}
+            completeAssistLabel={labels.completeAssist ?? "完成"}
           />
         }
         footerClassName="border-t border-[rgb(236,238,240)] bg-[rgb(250,250,250)]"
@@ -189,6 +230,7 @@ export function FocusDetailSheet({
             activeAssistItem={activeAssistItem}
             focusDetailTab={detailTab}
             focusDetailLoading={detailLoading}
+            retryingEnrichment={retryingEnrichment}
             isDetailSpeaking={isDetailSpeaking}
             detailSpeakText={detailSpeakText}
             similarRows={similarRows}
@@ -200,10 +242,14 @@ export function FocusDetailSheet({
             reviewHint={reviewHint}
             exampleCards={exampleCards}
             labels={contentLabels}
+            savingFocusCandidateKeys={savingFocusCandidateKeys}
+            completedFocusCandidateKeys={completedFocusCandidateKeys}
             onSpeak={onSpeak}
             onTabChange={onTabChange}
             onOpenSimilarRow={onOpenSimilarRow}
             onOpenContrastRow={onOpenContrastRow}
+            onSaveSimilarRow={onSaveSimilarRow}
+            onSaveContrastRow={onSaveContrastRow}
           />
         ) : null}
       </DetailSheetShell>

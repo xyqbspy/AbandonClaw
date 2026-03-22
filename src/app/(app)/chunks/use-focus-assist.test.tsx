@@ -150,7 +150,8 @@ test("useFocusAssist 会保存候选并执行后续回调", async () => {
     );
   });
 
-  assert.equal(result.current.savingFocusCandidateKey, null);
+  assert.deepEqual(result.current.savingFocusCandidateKeys, []);
+  assert.deepEqual(result.current.completedFocusCandidateKeys, ["similar:wrap it up"]);
   assert.equal(savedPayloads[0]?.relationType, "similar");
   assert.equal(savedPayloads[0]?.expressionClusterId, "cluster-1");
   assert.deepEqual(callbackPayloads, [{ savedUserPhraseId: "saved-2", kind: "similar" }]);
@@ -192,6 +193,6 @@ test("useFocusAssist 在失败时会回调错误并清理 loading key", async ()
   });
 
   assert.equal(result.current.focusAssistLoading, false);
-  assert.equal(result.current.savingFocusCandidateKey, null);
+  assert.deepEqual(result.current.savingFocusCandidateKeys, []);
   assert.deepEqual(messages, ["boom", "save failed"]);
 });

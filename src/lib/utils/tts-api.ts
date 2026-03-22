@@ -41,6 +41,11 @@ interface TtsResponse {
   error?: string;
 }
 
+type RegenerateTtsResponse = {
+  regeneratedCount: number;
+  error?: string;
+};
+
 type TtsUrlCacheEntry = {
   url: string;
   expiresAt: number;
@@ -310,6 +315,52 @@ export const clearBrowserTtsCacheEntries = async (cacheKeys: string[]) => {
     removedCount,
     removedBytes,
   };
+};
+
+export const regenerateChunkAudioBatch = async (items: Array<{ chunkText: string; chunkKey?: string }>) => {
+  const normalizedItems = Array.from(
+    new Map(
+      items
+        .map((item) => {
+          const chunkText = item.chunkText.trim();
+          if (!chunkText) return null;
+          const chunkKey = item.chunkKey ?? buildChunkAudioKey(chunkText);
+          return [chunkKey, { chunkText, chunkKey }] as const;
+        })
+        .filter((item): item is readonly [string, { chunkText: string; chunkKey: string }] => Boolean(item)),
+    ).values(),
+  );
+
+  if (normalizedItems.length === 0) {
+    return { regeneratedCount: 0 };
+  }
+
+  stopTtsPlayback();
+  await clearBrowserTtsCacheEntries(normalizedItems.map((item) => `chunk:${item.chunkKey}`));
+
+  const response = await fetch("/api/tts/regenerate", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      items: normalizedItems.map((item) => ({
+        text: item.chunkText,
+        chunkKey: item.chunkKey,
+      })),
+    }),
+  });
+  if (!response.ok) {
+    throw new Error(await extractError(response, "Failed to regenerate chunk audio."));
+  }
+  const data = (await response.json()) as RegenerateTtsResponse;
+  for (const item of normalizedItems) {
+    void prefetchChunkAudio({
+      chunkText: item.chunkText,
+      chunkKey: item.chunkKey,
+    });
+  }
+  return data;
 };
 
 export const clearAllBrowserTtsCache = async () => {

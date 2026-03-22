@@ -1,6 +1,15 @@
 import { normalizePhraseText } from "@/lib/shared/phrases";
 import { ManualExpressionAssistResponse, UserPhraseItemResponse, UserPhraseRelationItemResponse } from "@/lib/utils/phrases-api";
 
+export type FocusDetailRelatedItem = {
+  key: string;
+  text: string;
+  translation?: string | null;
+  differenceLabel?: string | null;
+  kind: "library-similar" | "suggested-similar" | "contrast";
+  savedItem: UserPhraseItemResponse | null;
+};
+
 type FocusDetailStateLike = {
   text: string;
   differenceLabel?: string | null;
@@ -50,8 +59,8 @@ export const buildFocusDetailViewModel = ({
     return {
       activeAssistItem: null,
       detailSpeakText: "",
-      similarRows: [] as UserPhraseItemResponse[],
-      contrastRows: [] as UserPhraseItemResponse[],
+      similarRows: [] as FocusDetailRelatedItem[],
+      contrastRows: [] as FocusDetailRelatedItem[],
       isSavedRelatedLoading: false,
       usageHint: defaults.usageHintFallback,
       typicalScenario: defaults.typicalScenarioPending,
@@ -104,31 +113,79 @@ export const buildFocusDetailViewModel = ({
     return items;
   })();
 
-  const similarRows = savedRelatedRows
-    .filter(({ relationType }) => relationType === "similar")
-    .map(({ row }) => row);
+  const similarRows = (() => {
+    const items: FocusDetailRelatedItem[] = [];
+    const seen = new Set<string>();
 
-  const contrastRows = [
-    ...savedRelatedRows.filter(({ relationType }) => relationType === "contrast"),
-    ...generatedContrastRows
-      .map((candidate) => {
-        const saved = phraseByNormalized.get(normalizePhraseText(candidate.text)) ?? null;
-        return saved ? { row: saved, relationType: "contrast" as const } : null;
-      })
-      .filter(
-        (
-          item,
-        ): item is { row: UserPhraseItemResponse; relationType: "contrast" } => Boolean(item),
-      ),
-  ]
-    .filter(
-      ({ row }, index, array) =>
-        array.findIndex(
-          (candidate) =>
-            normalizePhraseText(candidate.row.text) === normalizePhraseText(row.text),
-        ) === index,
-    )
-    .map(({ row }) => row);
+    for (const { row } of savedRelatedRows.filter(({ relationType }) => relationType === "similar")) {
+      const normalized = normalizePhraseText(row.text);
+      if (!normalized || seen.has(normalized)) continue;
+      seen.add(normalized);
+      items.push({
+        key: `saved:${row.userPhraseId}`,
+        text: row.text,
+        translation: row.translation,
+        differenceLabel: null,
+        kind: "library-similar",
+        savedItem: row,
+      });
+    }
+
+    if (isCurrentFocusMainDetail) {
+      for (const candidate of focusAssistData?.similarExpressions ?? []) {
+        const normalized = normalizePhraseText(candidate.text);
+        if (!normalized || seen.has(normalized)) continue;
+        seen.add(normalized);
+        const savedItem = phraseByNormalized.get(normalized) ?? null;
+        items.push({
+          key: savedItem ? `saved:${savedItem.userPhraseId}` : `ai:${normalized}`,
+          text: candidate.text,
+          translation: savedItem?.translation ?? null,
+          differenceLabel: candidate.differenceLabel,
+          kind: savedItem ? "library-similar" : "suggested-similar",
+          savedItem,
+        });
+      }
+    }
+
+    return items;
+  })();
+
+  const contrastRows = (() => {
+    const items: FocusDetailRelatedItem[] = [];
+    const seen = new Set<string>();
+
+    for (const { row } of savedRelatedRows.filter(({ relationType }) => relationType === "contrast")) {
+      const normalized = normalizePhraseText(row.text);
+      if (!normalized || seen.has(normalized)) continue;
+      seen.add(normalized);
+      items.push({
+        key: `saved:${row.userPhraseId}`,
+        text: row.text,
+        translation: row.translation,
+        differenceLabel: null,
+        kind: "contrast",
+        savedItem: row,
+      });
+    }
+
+    for (const candidate of generatedContrastRows) {
+      const normalized = normalizePhraseText(candidate.text);
+      if (!normalized || seen.has(normalized)) continue;
+      seen.add(normalized);
+      const savedItem = phraseByNormalized.get(normalized) ?? null;
+      items.push({
+        key: savedItem ? `saved:${savedItem.userPhraseId}` : `contrast:${normalized}`,
+        text: candidate.text,
+        translation: savedItem?.translation ?? null,
+        differenceLabel: candidate.differenceLabel,
+        kind: "contrast",
+        savedItem,
+      });
+    }
+
+    return items;
+  })();
 
   return {
     activeAssistItem,

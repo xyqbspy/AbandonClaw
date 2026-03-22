@@ -15,6 +15,7 @@ export function buildFocusDetailContentLabels(labels: FocusDetailSheetLabels, re
     candidateBadge: labels.detailCandidateBadge,
     noTranslation: labels.noTranslation,
     loading: labels.detailLoading,
+    enriching: `${labels.detailRetryEnrichment ?? "补全当前chunk"}...`,
     tabInfo: labels.detailTabInfo,
     tabSimilar: labels.detailTabSavedSimilar,
     tabContrast: labels.detailTabContrast,
@@ -32,6 +33,9 @@ export function buildFocusDetailContentLabels(labels: FocusDetailSheetLabels, re
     emptySimilar: labels.focusEmptySimilar,
     contrastHint: labels.detailContrastHint,
     emptyContrast: labels.noContrastExpressions,
+    addThisExpression: labels.addThisExpression,
+    addingThisExpression: labels.addingThisExpression ?? labels.addThisExpression,
+    addedThisExpression: labels.addedThisExpression ?? labels.addThisExpression,
   };
 }
 

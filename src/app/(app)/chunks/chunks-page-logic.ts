@@ -273,19 +273,21 @@ export const buildFocusDetailOpenRowAction = ({
   row,
   kind,
 }: {
-  row: Pick<UserPhraseItemResponse, "text">;
-  kind: "library-similar" | "contrast";
+  row: Pick<UserPhraseItemResponse, "text"> & { differenceLabel?: string | null };
+  kind: "library-similar" | "suggested-similar" | "contrast";
 }): {
   nextRelationTab: "similar" | "contrast";
   detailInput: {
     text: string;
-    kind: "library-similar" | "contrast";
+    differenceLabel?: string | null;
+    kind: "library-similar" | "suggested-similar" | "contrast";
     chainMode: "append";
   };
 } => ({
   nextRelationTab: kind === "contrast" ? "contrast" : "similar",
   detailInput: {
     text: row.text,
+    differenceLabel: row.differenceLabel ?? null,
     kind,
     chainMode: "append" as const,
   },
@@ -316,6 +318,39 @@ export const buildFocusDetailSecondaryActionInput = ({
       differenceLabel: focusDetail.differenceLabel ?? defaultDifferenceLabel,
     },
     relationKind: focusDetail.kind === "contrast" ? "contrast" : ("similar" as const),
+  };
+};
+
+export const buildSavedFocusDetailState = ({
+  focusDetail,
+  matchedSavedItem,
+}: {
+  focusDetail: FocusDetailStateLike | null;
+  matchedSavedItem: UserPhraseItemResponse | null;
+}): FocusDetailStateLike | null => {
+  if (!focusDetail || !matchedSavedItem) {
+    return focusDetail;
+  }
+
+  if (normalizePhraseText(focusDetail.text) !== normalizePhraseText(matchedSavedItem.text)) {
+    return focusDetail;
+  }
+
+  const nextKind =
+    focusDetail.kind === "contrast"
+      ? "contrast"
+      : focusDetail.kind === "current"
+        ? "current"
+        : "library-similar";
+
+  if (focusDetail.savedItem === matchedSavedItem && focusDetail.kind === nextKind) {
+    return focusDetail;
+  }
+
+  return {
+    ...focusDetail,
+    savedItem: matchedSavedItem,
+    kind: nextKind,
   };
 };
 

@@ -8,7 +8,12 @@ import { TtsActionButton } from "@/components/audio/tts-action-button";
 import { useTtsPlaybackState } from "@/hooks/use-tts-playback-state";
 import { normalizePhraseText } from "@/lib/shared/phrases";
 import { buildChunkAudioKey } from "@/lib/shared/tts";
-import { playChunkAudio, prefetchChunkAudio, stopTtsPlayback } from "@/lib/utils/tts-api";
+import {
+  playChunkAudio,
+  prefetchChunkAudio,
+  regenerateChunkAudioBatch,
+  stopTtsPlayback,
+} from "@/lib/utils/tts-api";
 import { generateExpressionMapFromApi } from "@/lib/utils/expression-map-api";
 import { ExpressionCluster, ExpressionMapResponse } from "@/lib/types/expression-map";
 import {
@@ -44,6 +49,7 @@ import { ExpressionMapSheet } from "@/features/chunks/components/expression-map-
 import { buildExpressionMapViewModel } from "@/features/chunks/components/expression-map-selectors";
 import { ClusterFocusList } from "@/features/chunks/components/cluster-focus-list";
 import { buildFocusDetailViewModel } from "@/features/chunks/components/focus-detail-selectors";
+import type { FocusDetailRelatedItem } from "@/features/chunks/components/focus-detail-selectors";
 import {
   MoveIntoClusterCandidate,
   MoveIntoClusterGroup,
@@ -60,9 +66,9 @@ import {
   APPLE_SURFACE,
 } from "@/lib/ui/apple-style";
 import {
+  buildSavedFocusDetailState,
   buildFocusDetailClosePayload,
   buildFocusDetailOpenRowAction,
-  buildFocusDetailSecondaryActionInput,
   buildFocusDetailSheetState,
   buildFocusDetailTabChangeState,
   buildGeneratedSimilarSheetState,
@@ -117,6 +123,9 @@ const zh = {
   focusCollapse: "\u6536\u8d77",
   focusRelatedEmpty: "\u6682\u65e0\u76f8\u5173\u8868\u8fbe",
   addThisExpression: "\u52a0\u5165\u8868\u8fbe\u5e93",
+  addingThisExpression: "\u52a0\u5165\u4e2d",
+  addedThisExpression: "\u5df2\u52a0\u5165",
+  completeAssist: "\u5b8c\u6210",
   detailTitle: "\u8868\u8fbe\u8be6\u60c5",
   detailLoading: "\u6b63\u5728\u52a0\u8f7d\u8868\u8fbe\u8be6\u60c5...",
   detailOpenAsMain: "\u8bbe\u4e3a\u672c\u7c07\u4e3b\u8868\u8fbe",
@@ -133,6 +142,9 @@ const zh = {
   detailTabSuggested: "AI \u540c\u7c7b",
   detailTabContrast: "\u5bf9\u7167\u8868\u8fbe",
   detailMoreActions: "\u66f4\u591a\u64cd\u4f5c",
+  detailManualAddRelated: "\u6dfb\u52a0\u5173\u8054\u8868\u8fbe",
+  detailRegenerateAudio: "\u91cd\u65b0\u751f\u6210\u97f3\u9891",
+  detailRetryEnrichment: "\u8865\u5168\u5f53\u524dchunk",
   detailSimilarHint: "\u8fd9\u4e00\u7ec4\u8868\u8fbe\u610f\u601d\u63a5\u8fd1\uff0c\u53ef\u4ee5\u653e\u5728\u4e00\u8d77\u5bf9\u6bd4\u7740\u5b66\u3002",
   detailContrastHint: "\u8fd9\u4e9b\u8868\u8fbe\u548c\u5f53\u524d\u8bf4\u6cd5\u5f62\u6210\u5bf9\u7167\uff0c\u9002\u5408\u653e\u5728\u4e00\u8d77\u533a\u5206\u3002",
   detailPrev: "\u4e0a\u4e00\u6761",
@@ -287,6 +299,26 @@ const zh = {
   mergeClusterSuccess: "\u5df2\u5408\u5e76\u8868\u8fbe\u7c07",
   moveIntoCluster: "\u79fb\u5165\u5f53\u524d\u8868\u8fbe\u7c07",
   moveIntoClusterTitle: "\u79fb\u5165\u5f53\u524d\u8868\u8fbe\u7c07",
+  quickAddRelatedTitle: "\u6dfb\u52a0\u5173\u8054\u8868\u8fbe",
+  quickAddRelatedDesc: "\u76f4\u63a5\u628a\u4f60\u624b\u52a8\u60f3\u5230\u7684\u8868\u8fbe\u6302\u5230\u5f53\u524d\u4e3b\u8868\u8fbe\u4e0a\uff0c\u4fdd\u5b58\u540e\u4f1a\u81ea\u52a8\u8865\u5168\u5b66\u4e60\u4fe1\u606f\u3002",
+  quickAddTargetLabel: "\u5f53\u524d\u4e3b\u8868\u8fbe",
+  quickAddCopyTarget: "\u70b9\u51fb\u590d\u5236",
+  quickAddCopySuccess: "\u5df2\u590d\u5236\u5f53\u524d\u4e3b\u8868\u8fbe\u3002",
+  quickAddCopyFailed: "\u590d\u5236\u5931\u8d25\uff0c\u8bf7\u7a0d\u540e\u518d\u8bd5\u3002",
+  quickAddTextLabel: "\u5173\u8054\u8868\u8fbe",
+  quickAddTextPlaceholder: "get through the day",
+  quickAddRelationTypeLabel: "\u5173\u8054\u7c7b\u578b",
+  quickAddSimilar: "\u540c\u7c7b",
+  quickAddContrast: "\u5bf9\u7167",
+  quickAddSubmit: "\u4fdd\u5b58\u5173\u8054\u8868\u8fbe",
+  quickAddSuccessSimilar: "\u5df2\u52a0\u5165\u540c\u7c7b\u8868\u8fbe\u5e76\u5efa\u7acb\u5173\u8054\u3002",
+  quickAddSuccessContrast: "\u5df2\u52a0\u5165\u5bf9\u7167\u8868\u8fbe\u5e76\u5efa\u7acb\u5173\u8054\u3002",
+  quickAddDuplicateCurrent: "\u4e0d\u80fd\u628a\u5f53\u524d\u4e3b\u8868\u8fbe\u91cd\u590d\u52a0\u5165\u4e3a\u5173\u8054\u9879\u3002",
+  quickAddDuplicateSimilar: "\u8fd9\u6761\u540c\u7c7b\u8868\u8fbe\u5df2\u5728\u5f53\u524d\u5217\u8868\u91cc\u4e86\u3002",
+  quickAddDuplicateContrast: "\u8fd9\u6761\u5bf9\u7167\u8868\u8fbe\u5df2\u5728\u5f53\u524d\u5217\u8868\u91cc\u4e86\u3002",
+  quickAddExistingLibraryHint: "\u8fd9\u6761\u8868\u8fbe\u5df2\u5728\u8868\u8fbe\u5e93\u91cc\uff0c\u4fdd\u5b58\u540e\u4f1a\u76f4\u63a5\u4e0e\u5f53\u524d\u4e3b\u8868\u8fbe\u5efa\u7acb\u5173\u8054\u3002",
+  regenerateAudioSuccess: "\u5df2\u91cd\u65b0\u751f\u6210\u5f53\u524d\u8be6\u60c5\u7684\u97f3\u9891\u3002",
+  regenerateAudioFailed: "\u91cd\u65b0\u751f\u6210\u97f3\u9891\u5931\u8d25\uff0c\u8bf7\u7a0d\u540e\u518d\u8bd5\u3002",
   moveIntoClusterDesc:
     "\u53ef\u4ee5\u4e00\u6b21\u52fe\u9009\u591a\u4e2a\u8868\u8fbe\u6216\u5176\u5b50\u8868\u8fbe\uff0c\u7edf\u4e00\u79fb\u5165\u5f53\u524d\u4e3b\u8868\u8fbe\u6240\u5728\u7684\u7c07\u3002",
   moveIntoClusterCurrentMain: "\u5f53\u524d\u76ee\u6807\u4e3b\u8868\u8fbe",
@@ -621,6 +653,12 @@ export default function ChunksPage() {
   const [expandedMoveIntoClusterGroups, setExpandedMoveIntoClusterGroups] = useState<Record<string, boolean>>({});
   const [selectedMoveIntoClusterMap, setSelectedMoveIntoClusterMap] = useState<Record<string, boolean>>({});
   const [focusDetailActionsOpen, setFocusDetailActionsOpen] = useState(false);
+  const [quickAddRelatedOpen, setQuickAddRelatedOpen] = useState(false);
+  const [quickAddRelatedText, setQuickAddRelatedText] = useState("");
+  const [quickAddRelatedType, setQuickAddRelatedType] = useState<"similar" | "contrast">("similar");
+  const [savingQuickAddRelated, setSavingQuickAddRelated] = useState(false);
+  const quickAddRelatedInputRef = useRef<HTMLInputElement | null>(null);
+  const [regeneratingDetailAudio, setRegeneratingDetailAudio] = useState(false);
 
   useEffect(
     () => () => {
@@ -628,6 +666,18 @@ export default function ChunksPage() {
     },
     [],
   );
+
+  useEffect(() => {
+    if (!quickAddRelatedOpen) return;
+
+    const timer = window.setTimeout(() => {
+      quickAddRelatedInputRef.current?.focus();
+    }, 120);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [quickAddRelatedOpen]);
 
   const { loading, phrases, setPhrases, total, listDataSource, loadPhrases } = useChunksListData({
     query,
@@ -848,7 +898,8 @@ export default function ChunksPage() {
     focusAssistData,
     resetFocusAssist,
     loadFocusAssist,
-    savingFocusCandidateKey,
+    savingFocusCandidateKeys,
+    completedFocusCandidateKeys,
     saveFocusCandidate,
   } = useFocusAssist({
     expressionRows,
@@ -954,6 +1005,7 @@ export default function ChunksPage() {
     },
     [openFocusSiblingDetailBase],
   );
+
   const {
     savedRelationCache,
     savedRelationRowsBySourceId,
@@ -1421,6 +1473,29 @@ export default function ChunksPage() {
   );
 
   useEffect(() => {
+    if (!focusDetail) return;
+
+    const normalized = normalizePhraseText(focusDetail.text);
+    if (!normalized) return;
+
+    const matchedSavedItem =
+      (focusDetail.savedItem
+        ? phrases.find((row) => row.userPhraseId === focusDetail.savedItem?.userPhraseId) ?? null
+        : null) ??
+      phraseByNormalized.get(normalized) ??
+      null;
+
+    const nextDetail = buildSavedFocusDetailState({
+      focusDetail,
+      matchedSavedItem,
+    });
+
+    if (nextDetail !== focusDetail) {
+      setFocusDetail(nextDetail);
+    }
+  }, [focusDetail, phraseByNormalized, phrases, setFocusDetail]);
+
+  useEffect(() => {
     if (!focusDetailOpen || !focusDetail) return;
 
     const timer = window.setTimeout(() => {
@@ -1463,10 +1538,16 @@ export default function ChunksPage() {
         detailPrev: zh.detailPrev,
         detailNext: zh.detailNext,
         detailMoreActions: zh.detailMoreActions,
+        detailManualAddRelated: zh.detailManualAddRelated,
+        detailRegenerateAudio: zh.detailRegenerateAudio,
+        detailRetryEnrichment: zh.detailRetryEnrichment,
         detailOpenAsMain: zh.detailOpenAsMain,
         moveIntoCluster: zh.moveIntoCluster,
         detachClusterMember: zh.detachClusterMember,
         addThisExpression: zh.addThisExpression,
+        addingThisExpression: zh.addingThisExpression,
+        addedThisExpression: zh.addedThisExpression,
+        completeAssist: zh.completeAssist,
         confirmCancel: zh.confirmCancel,
         confirmContinue: zh.confirmContinue,
         detailOpenAsMainConfirmTitle: zh.detailOpenAsMainConfirmTitle,
@@ -1569,6 +1650,151 @@ export default function ChunksPage() {
     setManualText("");
     setManualSentence("");
     resetManualExpressionComposer();
+  };
+
+  const resetQuickAddRelatedForm = () => {
+    setQuickAddRelatedText("");
+    setQuickAddRelatedType("similar");
+  };
+
+  const quickAddRelatedValidationMessage = useMemo(() => {
+    const text = quickAddRelatedText.trim();
+    if (!text || !focusExpression) return null;
+
+    const normalizedText = normalizePhraseText(text);
+    const normalizedFocusText = normalizePhraseText(focusExpression.text);
+    if (normalizedText === normalizedFocusText) {
+      return zh.quickAddDuplicateCurrent;
+    }
+
+    const duplicateExists =
+      quickAddRelatedType === "similar"
+        ? focusDetailViewModel.similarRows.some(
+            (row) => normalizePhraseText(row.text) === normalizedText,
+          )
+        : focusDetailViewModel.contrastRows.some(
+            (row) => normalizePhraseText(row.text) === normalizedText,
+          );
+
+    if (!duplicateExists) return null;
+    return quickAddRelatedType === "similar"
+      ? zh.quickAddDuplicateSimilar
+      : zh.quickAddDuplicateContrast;
+  }, [
+    focusDetailViewModel.contrastRows,
+    focusDetailViewModel.similarRows,
+    focusExpression,
+    quickAddRelatedText,
+    quickAddRelatedType,
+  ]);
+
+  const quickAddRelatedLibraryHint = useMemo(() => {
+    const text = quickAddRelatedText.trim();
+    if (!text || !focusExpression || quickAddRelatedValidationMessage) return null;
+
+    const existingItem = phraseByNormalized.get(normalizePhraseText(text));
+    if (!existingItem || existingItem.learningItemType !== "expression") return null;
+    return zh.quickAddExistingLibraryHint;
+  }, [focusExpression, phraseByNormalized, quickAddRelatedText, quickAddRelatedValidationMessage]);
+
+  const handleSaveQuickAddRelated = async () => {
+    if (!focusExpression || !focusDetail?.savedItem) return;
+
+    const text = quickAddRelatedText.trim();
+    if (!text) {
+      toast.error(zh.missingExpression);
+      return;
+    }
+    if (savingQuickAddRelated) return;
+    if (quickAddRelatedValidationMessage) {
+      toast.message(quickAddRelatedValidationMessage);
+      return;
+    }
+
+    setSavingQuickAddRelated(true);
+    try {
+      const response = await savePhraseFromApi({
+        text,
+        learningItemType: "expression",
+        sourceType: "manual",
+        sourceNote:
+          quickAddRelatedType === "similar"
+            ? "manual-similar-direct"
+            : "manual-contrast-direct",
+        sourceSentenceText: focusExpression.sourceSentenceText ?? undefined,
+        sourceChunkText: text,
+        relationSourceUserPhraseId: focusExpression.userPhraseId,
+        relationType: quickAddRelatedType,
+      });
+      await enrichSimilarExpressionFromApi({
+        userPhraseId: response.userPhrase.id,
+        baseExpression: focusExpression.text,
+      });
+      await loadPhrases(query, reviewFilter, contentFilter, expressionClusterFilterId, {
+        preferCache: false,
+      });
+      invalidateSavedRelations([focusExpression.userPhraseId, response.userPhrase.id]);
+      setFocusRelationTab(quickAddRelatedType);
+      setFocusDetailTab(quickAddRelatedType);
+      setFocusDetailActionsOpen(false);
+      setQuickAddRelatedOpen(false);
+      resetQuickAddRelatedForm();
+      toast.success(
+        quickAddRelatedType === "similar"
+          ? zh.quickAddSuccessSimilar
+          : zh.quickAddSuccessContrast,
+      );
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : zh.loadFailed);
+    } finally {
+      setSavingQuickAddRelated(false);
+    }
+  };
+
+  const handleCopyQuickAddTarget = async () => {
+    const text = focusExpression?.text?.trim() ?? "";
+    if (!text) return;
+
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success(zh.quickAddCopySuccess);
+    } catch {
+      toast.error(zh.quickAddCopyFailed);
+    }
+  };
+
+  const handleRegenerateCurrentDetailAudio = async () => {
+    if (!focusDetail || regeneratingDetailAudio) return;
+
+    const candidateTexts = [
+      focusDetailViewModel.detailSpeakText,
+      ...(focusDetail.savedItem?.exampleSentences ?? focusDetailViewModel.activeAssistItem?.examples ?? [])
+        .map((example) => example.en?.trim() ?? ""),
+    ]
+      .map((text) => text.trim())
+      .filter(Boolean);
+    const uniqueTexts = Array.from(new Set(candidateTexts));
+
+    if (uniqueTexts.length === 0) {
+      toast.message(zh.noSourceSentence);
+      return;
+    }
+
+    setRegeneratingDetailAudio(true);
+    try {
+      await regenerateChunkAudioBatch(
+        uniqueTexts.map((text) => ({
+          chunkText: text,
+          chunkKey: buildChunkAudioKey(text),
+        })),
+      );
+      setFocusDetailActionsOpen(false);
+      toast.success(zh.regenerateAudioSuccess);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : zh.regenerateAudioFailed);
+    } finally {
+      setRegeneratingDetailAudio(false);
+    }
   };
 
   const handleSaveManualExpression = async (mode: "save" | "save_and_review") => {
@@ -1681,7 +1907,7 @@ export default function ChunksPage() {
     focusContrastCount: focusContrastItems.length,
     canShowFindRelations: focusDetailViewModel.canShowFindRelations,
     focusExpression,
-    savingFocusCandidateKey,
+    savingFocusCandidateKey: savingFocusCandidateKeys[0] ?? null,
     playingText,
     ttsPlaybackText: ttsPlaybackState.text,
     detailSpeakText: focusDetailViewModel.detailSpeakText,
@@ -1697,14 +1923,30 @@ export default function ChunksPage() {
     trailLength: focusDetailSheetState.trailLength,
     canShowSiblingNav: focusDetailSheetState.canShowSiblingNav,
     canShowFindRelations: focusDetailSheetState.canShowFindRelations,
+    canShowManualAddRelated:
+      Boolean(focusDetail?.savedItem) &&
+      Boolean(focusExpression) &&
+      normalizePhraseText(focusDetail?.text ?? "") === normalizePhraseText(focusExpression?.text ?? ""),
+    canShowRegenerateAudio: Boolean(focusDetail),
+    canShowRetryEnrichment: Boolean(focusDetail?.savedItem),
+    canCompleteAssist:
+      Boolean(focusAssistData) &&
+      Boolean(focusDetail?.savedItem) &&
+      Boolean(focusExpression) &&
+      normalizePhraseText(focusDetail?.text ?? "") === normalizePhraseText(focusExpression?.text ?? ""),
+    completeAssistDisabled: savingFocusCandidateKeys.length > 0,
     focusAssistLoading,
+    openingManualAddRelated: savingQuickAddRelated,
+    regeneratingAudio: regeneratingDetailAudio,
+    retryingEnrichment: Boolean(
+      focusDetail?.savedItem && retryingEnrichmentIds[focusDetail.savedItem.userPhraseId],
+    ),
     movingIntoCluster,
     ensuringMoveTargetCluster,
     detachingClusterMember,
     canSetCurrentClusterMain,
     canMoveIntoCurrentCluster,
     canSetStandaloneMain,
-    savingFocusCandidate: focusDetailSheetState.savingFocusCandidate,
     primaryActionLabel: focusDetail?.savedItem ? getPrimaryActionLabel(focusDetail.savedItem) : undefined,
     appleButtonClassName,
     activeAssistItem: focusDetailViewModel.activeAssistItem,
@@ -1717,6 +1959,8 @@ export default function ChunksPage() {
     typicalScenario: focusDetailViewModel.typicalScenario,
     semanticFocus: focusDetailViewModel.semanticFocus,
     reviewHint: focusDetailViewModel.reviewHint,
+    savingFocusCandidateKeys,
+    completedFocusCandidateKeys,
     exampleCards: focusDetail
       ? (renderExampleSentenceCards(
           focusDetail.savedItem?.exampleSentences ?? focusDetailViewModel.activeAssistItem?.examples ?? [],
@@ -1744,12 +1988,26 @@ export default function ChunksPage() {
         setFocusDetailActionsOpen(nextState.actionsOpen);
         setFocusDetailTrail(nextState.trail);
         setFocusDetailTab(nextState.tab);
+        setQuickAddRelatedOpen(false);
+        setMoveIntoClusterOpen(false);
+        setDetailConfirmAction(null);
       }
     },
     onReopenPrevTrail: () => reopenFocusTrailItem(focusDetailTrail.length - 2),
     onFindRelations: () => {
       if (!focusDetail?.savedItem) return;
       void loadFocusAssist(focusDetail.savedItem);
+    },
+    onOpenManualAddRelated: () => {
+      setFocusDetailActionsOpen(false);
+      setQuickAddRelatedOpen(true);
+    },
+    onRegenerateAudio: () => {
+      void handleRegenerateCurrentDetailAudio();
+    },
+    onRetryEnrichment: () => {
+      if (!focusDetail?.savedItem) return;
+      void retryAiEnrichment(focusDetail.savedItem);
     },
     onOpenPrevSibling: () => openFocusSiblingDetail(-1),
     onOpenNextSibling: () => openFocusSiblingDetail(1),
@@ -1771,18 +2029,10 @@ export default function ChunksPage() {
       startReviewFromCard(focusDetail.savedItem as UserPhraseItemResponse);
       setFocusDetailOpen(false);
     },
-    onSecondaryAction: () => {
-      const nextAction = buildFocusDetailSecondaryActionInput({
-        focusExpression,
-        focusDetail,
-        defaultDifferenceLabel: "鐩稿叧璇存硶",
-      });
-      if (!nextAction) return;
-      void saveFocusCandidate(
-        nextAction.focusExpression,
-        nextAction.candidate,
-        nextAction.relationKind,
-      );
+    onCompleteAssist: () => {
+      resetFocusAssist();
+      setFocusDetailActionsOpen(false);
+      setFocusRelationTab("similar");
     },
     onSpeak: handlePronounceSentence,
     onTabChange: (nextTab: "info" | "similar" | "contrast") => {
@@ -1793,21 +2043,43 @@ export default function ChunksPage() {
       setFocusDetailTab(nextState.nextTab);
       setFocusRelationTab(nextState.nextRelationTab);
     },
-    onOpenSimilarRow: (row: UserPhraseItemResponse) => {
+    onOpenSimilarRow: (row: FocusDetailRelatedItem) => {
       const nextAction = buildFocusDetailOpenRowAction({
         row,
-        kind: "library-similar",
+        kind: row.kind,
       });
       setFocusRelationTab(nextAction.nextRelationTab);
       void openFocusDetail(nextAction.detailInput);
     },
-    onOpenContrastRow: (row: UserPhraseItemResponse) => {
+    onOpenContrastRow: (row: FocusDetailRelatedItem) => {
       const nextAction = buildFocusDetailOpenRowAction({
         row,
         kind: "contrast",
       });
       setFocusRelationTab(nextAction.nextRelationTab);
       void openFocusDetail(nextAction.detailInput);
+    },
+    onSaveSimilarRow: (row: FocusDetailRelatedItem) => {
+      if (!focusExpression || row.savedItem) return;
+      void saveFocusCandidate(
+        focusExpression,
+        {
+          text: row.text,
+          differenceLabel: row.differenceLabel ?? "鐩稿叧璇存硶",
+        },
+        "similar",
+      );
+    },
+    onSaveContrastRow: (row: FocusDetailRelatedItem) => {
+      if (!focusExpression || row.savedItem) return;
+      void saveFocusCandidate(
+        focusExpression,
+        {
+          text: row.text,
+          differenceLabel: row.differenceLabel ?? "鐩稿叧璇存硶",
+        },
+        "contrast",
+      );
     },
     onCloseConfirm: () => setDetailConfirmAction(null),
     onConfirm: () => {
@@ -2333,6 +2605,95 @@ export default function ChunksPage() {
       </Sheet>
 
       <Sheet
+        open={quickAddRelatedOpen}
+        onOpenChange={(open) => {
+          setQuickAddRelatedOpen(open);
+          if (!open && !savingQuickAddRelated) {
+            resetQuickAddRelatedForm();
+          }
+        }}
+      >
+        <SheetContent
+          side="bottom"
+          overlayClassName="z-[80]"
+          className="z-[81] max-h-[85vh] overflow-y-auto rounded-t-2xl border-0 bg-white"
+        >
+          <SheetHeader>
+            <SheetTitle>{zh.quickAddRelatedTitle}</SheetTitle>
+            <SheetDescription>{zh.quickAddRelatedDesc}</SheetDescription>
+          </SheetHeader>
+
+          <div className="space-y-4 px-4 pb-2">
+            <button
+              type="button"
+              className="w-full rounded-xl bg-[rgb(246,246,246)] p-3 text-left transition hover:bg-[rgb(238,240,242)]"
+              onClick={() => void handleCopyQuickAddTarget()}
+            >
+              <div className="space-y-1">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-xs text-muted-foreground">{zh.quickAddTargetLabel}</p>
+                  <p className="text-xs text-muted-foreground">{zh.quickAddCopyTarget}</p>
+                </div>
+                <p className="text-sm font-medium">{focusExpression?.text ?? ""}</p>
+              </div>
+            </button>
+
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground">{zh.quickAddTextLabel}</p>
+              <Input
+                ref={quickAddRelatedInputRef}
+                value={quickAddRelatedText}
+                onChange={(event) => setQuickAddRelatedText(event.target.value)}
+                placeholder={zh.quickAddTextPlaceholder}
+              />
+              {quickAddRelatedValidationMessage ? (
+                <p className="text-xs text-[rgb(185,28,28)]">{quickAddRelatedValidationMessage}</p>
+              ) : quickAddRelatedLibraryHint ? (
+                <p className="text-xs text-[rgb(8,99,117)]">{quickAddRelatedLibraryHint}</p>
+              ) : null}
+            </div>
+
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground">{zh.quickAddRelationTypeLabel}</p>
+              <Tabs
+                value={quickAddRelatedType}
+                onValueChange={(value) =>
+                  setQuickAddRelatedType(value === "contrast" ? "contrast" : "similar")
+                }
+              >
+                <TabsList className="w-full overflow-y-hidden">
+                  <TabsTrigger value="similar" className="flex-1">
+                    {zh.quickAddSimilar}
+                  </TabsTrigger>
+                  <TabsTrigger value="contrast" className="flex-1">
+                    {zh.quickAddContrast}
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
+          </div>
+
+          <SheetFooter>
+            <div className="grid gap-2 pb-safe">
+              <Button
+                type="button"
+                variant="ghost"
+                className={appleButtonClassName}
+                disabled={
+                  savingQuickAddRelated ||
+                  !quickAddRelatedText.trim() ||
+                  Boolean(quickAddRelatedValidationMessage)
+                }
+                onClick={() => void handleSaveQuickAddRelated()}
+              >
+                {savingQuickAddRelated ? `${zh.quickAddSubmit}...` : zh.quickAddSubmit}
+              </Button>
+            </div>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
+
+      <Sheet
         open={similarSheetOpen}
         onOpenChange={(open) => {
           setSimilarSheetOpen(open);
@@ -2341,8 +2702,8 @@ export default function ChunksPage() {
           }
         }}
       >
-          <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto rounded-t-2xl border-0 bg-white">
-            <SheetHeader>
+        <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto rounded-t-2xl border-0 bg-white">
+          <SheetHeader>
             <SheetTitle>{generatedSimilarSheetState.title}</SheetTitle>
             <SheetDescription>{generatedSimilarSheetState.description}</SheetDescription>
           </SheetHeader>

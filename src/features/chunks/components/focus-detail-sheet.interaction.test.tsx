@@ -11,30 +11,33 @@ afterEach(() => {
 const labels = {
   title: "表达详情",
   backToCurrent: "返回",
-  findRelations: "查找关系",
+  findRelations: "查找同类 / 对照表达",
   prev: "上一条",
   next: "下一条",
   detailMoreActions: "更多操作",
   detailOpenAsMain: "设为本簇主表达",
   moveIntoCluster: "移入当前表达簇",
-  detachClusterMember: "设置为独立主表达",
+  detachClusterMember: "设为独立主表达",
   addThisExpression: "加入表达库",
+  addingThisExpression: "加入中",
+  addedThisExpression: "已加入",
+  completeAssist: "完成",
   confirmCancel: "取消",
   confirmContinue: "继续",
-  detailOpenAsMainConfirmTitle: "确认设为主表达？",
-  detailOpenAsMainConfirmDesc: "会把当前表达设为本簇主表达。",
+  detailOpenAsMainConfirmTitle: "设为主表达？",
+  detailOpenAsMainConfirmDesc: "会把该表达设置为当前表达簇的主表达。",
   detachClusterMemberConfirmTitle: "确认独立？",
-  detachClusterMemberConfirmDesc: "会拆出当前表达。",
-  detailCandidateBadge: "候选",
+  detachClusterMemberConfirmDesc: "会把当前表达拆出为独立表达。",
+  detailCandidateBadge: "AI 候选",
   noTranslation: "暂无翻译",
-  detailLoading: "加载中",
+  detailLoading: "正在加载表达详情...",
   detailTabInfo: "详情",
-  detailTabSavedSimilar: "同类",
-  detailTabContrast: "对照",
+  detailTabSavedSimilar: "同类表达",
+  detailTabContrast: "对照表达",
   commonUsage: "常见用法",
   typicalScenarioLabel: "典型场景",
   semanticFocusLabel: "语义重点",
-  reviewStage: "复习阶段",
+  reviewStage: "当前阶段",
   usageHintFallback: "暂无用法提示",
   typicalScenarioPending: "待补充场景",
   semanticFocusPending: "待补充语义重点",
@@ -84,21 +87,17 @@ function createSavedItem() {
   };
 }
 
-test("FocusDetailSheet 会触发查找关系和主按钮动作", () => {
+test("FocusDetailSheet 会通过更多操作触发查找关系并保留主操作", () => {
   let findCount = 0;
   let primaryCount = 0;
 
   render(
     <FocusDetailSheet
       open
-      detail={{
-        text: "burn yourself out",
-        kind: "current",
-        savedItem: createSavedItem(),
-      }}
+      detail={{ text: "burn yourself out", kind: "current", savedItem: createSavedItem() }}
       detailTab="info"
       detailLoading={false}
-      detailActionsOpen={false}
+      detailActionsOpen
       detailConfirmAction={null}
       trailLength={1}
       canShowSiblingNav={false}
@@ -110,7 +109,6 @@ test("FocusDetailSheet 会触发查找关系和主按钮动作", () => {
       canSetCurrentClusterMain={false}
       canMoveIntoCurrentCluster={false}
       canSetStandaloneMain={false}
-      savingFocusCandidate={false}
       primaryActionLabel="开始复习"
       appleButtonClassName="btn"
       activeAssistItem={null}
@@ -139,7 +137,6 @@ test("FocusDetailSheet 会触发查找关系和主按钮动作", () => {
       onPrimaryAction={() => {
         primaryCount += 1;
       }}
-      onSecondaryAction={() => undefined}
       onSpeak={() => undefined}
       onTabChange={() => undefined}
       onOpenSimilarRow={() => undefined}
@@ -149,24 +146,18 @@ test("FocusDetailSheet 会触发查找关系和主按钮动作", () => {
     />,
   );
 
-  fireEvent.click(screen.getByRole("button", { name: "查找关系" }));
+  fireEvent.click(screen.getByRole("button", { name: "查找同类 / 对照表达" }));
   fireEvent.click(screen.getByRole("button", { name: "开始复习" }));
 
   assert.equal(findCount, 1);
   assert.equal(primaryCount, 1);
 });
 
-test("FocusDetailSheet 对未保存表达会走加入表达库动作，并在保存中禁用按钮", () => {
-  let secondaryCount = 0;
-
-  const { rerender } = render(
+test("FocusDetailSheet 对未保存表达不会在页脚显示加入按钮", () => {
+  render(
     <FocusDetailSheet
       open
-      detail={{
-        text: "burn yourself out",
-        kind: "suggested-similar",
-        savedItem: null,
-      }}
+      detail={{ text: "burn yourself out", kind: "suggested-similar", savedItem: null }}
       detailTab="info"
       detailLoading={false}
       detailActionsOpen={false}
@@ -181,7 +172,6 @@ test("FocusDetailSheet 对未保存表达会走加入表达库动作，并在保
       canSetCurrentClusterMain={false}
       canMoveIntoCurrentCluster={false}
       canSetStandaloneMain={false}
-      savingFocusCandidate={false}
       primaryActionLabel="开始复习"
       appleButtonClassName="btn"
       activeAssistItem={null}
@@ -206,9 +196,6 @@ test("FocusDetailSheet 对未保存表达会走加入表达库动作，并在保
       onRequestMoveIntoCluster={() => undefined}
       onRequestSetStandaloneMain={() => undefined}
       onPrimaryAction={() => undefined}
-      onSecondaryAction={() => {
-        secondaryCount += 1;
-      }}
       onSpeak={() => undefined}
       onTabChange={() => undefined}
       onOpenSimilarRow={() => undefined}
@@ -218,72 +205,10 @@ test("FocusDetailSheet 对未保存表达会走加入表达库动作，并在保
     />,
   );
 
-  fireEvent.click(screen.getByRole("button", { name: "加入表达库" }));
-  assert.equal(secondaryCount, 1);
-
-  rerender(
-    <FocusDetailSheet
-      open
-      detail={{
-        text: "burn yourself out",
-        kind: "suggested-similar",
-        savedItem: null,
-      }}
-      detailTab="info"
-      detailLoading={false}
-      detailActionsOpen={false}
-      detailConfirmAction={null}
-      trailLength={1}
-      canShowSiblingNav={false}
-      canShowFindRelations={false}
-      focusAssistLoading={false}
-      movingIntoCluster={false}
-      ensuringMoveTargetCluster={false}
-      detachingClusterMember={false}
-      canSetCurrentClusterMain={false}
-      canMoveIntoCurrentCluster={false}
-      canSetStandaloneMain={false}
-      savingFocusCandidate
-      primaryActionLabel="开始复习"
-      appleButtonClassName="btn"
-      activeAssistItem={null}
-      isDetailSpeaking={false}
-      detailSpeakText="burn yourself out"
-      similarRows={[]}
-      contrastRows={[]}
-      isSavedRelatedLoading={false}
-      usageHint="提醒别透支自己"
-      typicalScenario="长期加班时"
-      semanticFocus="过度消耗"
-      reviewHint="准备复习"
-      exampleCards={<div>example cards</div>}
-      labels={labels}
-      onOpenChange={() => undefined}
-      onReopenPrevTrail={() => undefined}
-      onFindRelations={() => undefined}
-      onOpenPrevSibling={() => undefined}
-      onOpenNextSibling={() => undefined}
-      onSetDetailActionsOpen={() => undefined}
-      onRequestSetCurrentClusterMain={() => undefined}
-      onRequestMoveIntoCluster={() => undefined}
-      onRequestSetStandaloneMain={() => undefined}
-      onPrimaryAction={() => undefined}
-      onSecondaryAction={() => {
-        secondaryCount += 1;
-      }}
-      onSpeak={() => undefined}
-      onTabChange={() => undefined}
-      onOpenSimilarRow={() => undefined}
-      onOpenContrastRow={() => undefined}
-      onCloseConfirm={() => undefined}
-      onConfirm={() => undefined}
-    />,
-  );
-
-  assert.equal(screen.getByRole("button", { name: "加入表达库" }).hasAttribute("disabled"), true);
+  assert.equal(screen.queryByRole("button", { name: "加入表达库" }), null);
 });
 
-test("FocusDetailSheet 会处理返回、兄弟导航和查找关系禁用态", () => {
+test("FocusDetailSheet 会处理返回、兄弟导航与查找关系禁用态", () => {
   let backCount = 0;
   let prevCount = 0;
   let nextCount = 0;
@@ -292,14 +217,10 @@ test("FocusDetailSheet 会处理返回、兄弟导航和查找关系禁用态", 
   render(
     <FocusDetailSheet
       open
-      detail={{
-        text: "burn yourself out",
-        kind: "current",
-        savedItem: createSavedItem(),
-      }}
+      detail={{ text: "burn yourself out", kind: "current", savedItem: createSavedItem() }}
       detailTab="info"
       detailLoading={false}
-      detailActionsOpen={false}
+      detailActionsOpen
       detailConfirmAction={null}
       trailLength={2}
       canShowSiblingNav
@@ -311,7 +232,6 @@ test("FocusDetailSheet 会处理返回、兄弟导航和查找关系禁用态", 
       canSetCurrentClusterMain={false}
       canMoveIntoCurrentCluster={false}
       canSetStandaloneMain={false}
-      savingFocusCandidate={false}
       primaryActionLabel="开始复习"
       appleButtonClassName="btn"
       activeAssistItem={null}
@@ -344,7 +264,6 @@ test("FocusDetailSheet 会处理返回、兄弟导航和查找关系禁用态", 
       onRequestMoveIntoCluster={() => undefined}
       onRequestSetStandaloneMain={() => undefined}
       onPrimaryAction={() => undefined}
-      onSecondaryAction={() => undefined}
       onSpeak={() => undefined}
       onTabChange={() => undefined}
       onOpenSimilarRow={() => undefined}
@@ -358,7 +277,7 @@ test("FocusDetailSheet 会处理返回、兄弟导航和查找关系禁用态", 
   fireEvent.click(screen.getByRole("button", { name: "上一条" }));
   fireEvent.click(screen.getByRole("button", { name: "下一条" }));
 
-  const findButton = screen.getByRole("button", { name: "查找关系..." });
+  const findButton = screen.getByRole("button", { name: "查找同类 / 对照表达..." });
   assert.equal(findButton.hasAttribute("disabled"), true);
   fireEvent.click(findButton);
 
@@ -368,6 +287,70 @@ test("FocusDetailSheet 会处理返回、兄弟导航和查找关系禁用态", 
   assert.equal(findCount, 0);
 });
 
+test("FocusDetailSheet 会显示完成按钮并触发清理操作", () => {
+  let completeCount = 0;
+
+  render(
+    <FocusDetailSheet
+      open
+      detail={{ text: "burn yourself out", kind: "current", savedItem: createSavedItem() }}
+      detailTab="similar"
+      detailLoading={false}
+      detailActionsOpen={false}
+      detailConfirmAction={null}
+      trailLength={1}
+      canShowSiblingNav={false}
+      canShowFindRelations
+      canCompleteAssist
+      completeAssistDisabled={false}
+      focusAssistLoading={false}
+      movingIntoCluster={false}
+      ensuringMoveTargetCluster={false}
+      detachingClusterMember={false}
+      canSetCurrentClusterMain={false}
+      canMoveIntoCurrentCluster={false}
+      canSetStandaloneMain={false}
+      primaryActionLabel="开始复习"
+      appleButtonClassName="btn"
+      activeAssistItem={null}
+      isDetailSpeaking={false}
+      detailSpeakText="burn yourself out"
+      similarRows={[]}
+      contrastRows={[]}
+      isSavedRelatedLoading={false}
+      usageHint="提醒别透支自己"
+      typicalScenario="长期加班时"
+      semanticFocus="过度消耗"
+      reviewHint="准备复习"
+      exampleCards={<div>example cards</div>}
+      labels={labels}
+      onOpenChange={() => undefined}
+      onReopenPrevTrail={() => undefined}
+      onFindRelations={() => undefined}
+      onOpenPrevSibling={() => undefined}
+      onOpenNextSibling={() => undefined}
+      onSetDetailActionsOpen={() => undefined}
+      onRequestSetCurrentClusterMain={() => undefined}
+      onRequestMoveIntoCluster={() => undefined}
+      onRequestSetStandaloneMain={() => undefined}
+      onCompleteAssist={() => {
+        completeCount += 1;
+      }}
+      onPrimaryAction={() => undefined}
+      onSpeak={() => undefined}
+      onTabChange={() => undefined}
+      onOpenSimilarRow={() => undefined}
+      onOpenContrastRow={() => undefined}
+      onCloseConfirm={() => undefined}
+      onConfirm={() => undefined}
+    />,
+  );
+
+  fireEvent.click(screen.getByRole("button", { name: "完成" }));
+
+  assert.equal(completeCount, 1);
+});
+
 test("FocusDetailSheet 会在确认弹层打开时处理遮罩、取消和提交态", () => {
   let closeCount = 0;
   let confirmCount = 0;
@@ -375,11 +358,7 @@ test("FocusDetailSheet 会在确认弹层打开时处理遮罩、取消和提交
   render(
     <FocusDetailSheet
       open
-      detail={{
-        text: "burn yourself out",
-        kind: "current",
-        savedItem: createSavedItem(),
-      }}
+      detail={{ text: "burn yourself out", kind: "current", savedItem: createSavedItem() }}
       detailTab="info"
       detailLoading={false}
       detailActionsOpen={false}
@@ -394,7 +373,6 @@ test("FocusDetailSheet 会在确认弹层打开时处理遮罩、取消和提交
       canSetCurrentClusterMain={false}
       canMoveIntoCurrentCluster={false}
       canSetStandaloneMain
-      savingFocusCandidate={false}
       primaryActionLabel="开始复习"
       appleButtonClassName="btn"
       activeAssistItem={null}
@@ -419,7 +397,6 @@ test("FocusDetailSheet 会在确认弹层打开时处理遮罩、取消和提交
       onRequestMoveIntoCluster={() => undefined}
       onRequestSetStandaloneMain={() => undefined}
       onPrimaryAction={() => undefined}
-      onSecondaryAction={() => undefined}
       onSpeak={() => undefined}
       onTabChange={() => undefined}
       onOpenSimilarRow={() => undefined}

@@ -68,7 +68,11 @@ export function MoveIntoClusterSheet({
 }: MoveIntoClusterSheetProps) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="flex h-[85vh] max-h-[85vh] flex-col rounded-t-2xl border-0 bg-white">
+      <SheetContent
+        side="bottom"
+        overlayClassName="z-[80]"
+        className="z-[81] flex h-[85vh] max-h-[85vh] flex-col rounded-t-2xl border-0 bg-white"
+      >
         <SheetHeader className="shrink-0 border-b border-[rgb(236,238,240)] bg-[rgb(250,250,250)] px-4 pb-4 pt-4">
           <SheetTitle>{labels.title}</SheetTitle>
           <SheetDescription>{labels.description}</SheetDescription>

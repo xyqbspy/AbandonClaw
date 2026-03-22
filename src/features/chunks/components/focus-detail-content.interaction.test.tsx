@@ -3,6 +3,7 @@ import test, { afterEach } from "node:test";
 import React from "react";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { FocusDetailContent } from "./focus-detail-content";
+import { FocusDetailRelatedItem } from "./focus-detail-selectors";
 
 afterEach(() => {
   cleanup();
@@ -13,6 +14,7 @@ const labels = {
   candidateBadge: "候选",
   noTranslation: "暂无翻译",
   loading: "加载中",
+  enriching: "补全当前chunk...",
   tabInfo: "详情",
   tabSimilar: "同类",
   tabContrast: "对照",
@@ -72,6 +74,25 @@ function createRow(
     lastReviewedAt: null,
     nextReviewAt: null,
     masteredAt: null,
+  };
+}
+
+function createRelatedItem(
+  overrides: Partial<FocusDetailRelatedItem> = {},
+): FocusDetailRelatedItem {
+  const savedItem = overrides.savedItem ?? createRow({
+    userPhraseId: overrides.key ?? "row-1",
+    text: overrides.text ?? "wear yourself out",
+    translation: overrides.translation ?? "把自己拖垮",
+  });
+
+  return {
+    key: overrides.key ?? `saved:${savedItem.userPhraseId}`,
+    text: overrides.text ?? savedItem.text,
+    translation: overrides.translation ?? savedItem.translation,
+    differenceLabel: overrides.differenceLabel ?? null,
+    kind: overrides.kind ?? "library-similar",
+    savedItem,
   };
 }
 
@@ -157,15 +178,17 @@ test("FocusDetailContent 候选态会隐藏朗读入口，并在无例句时使�
 test("FocusDetailContent 会处理同类与对照列表点击", () => {
   const similarOpened: string[] = [];
   const contrastOpened: string[] = [];
-  const similarRow = createRow({
-    userPhraseId: "similar-1",
+  const similarRow = createRelatedItem({
+    key: "saved:similar-1",
     text: "wear yourself out",
     translation: "把自己拖垮",
+    kind: "library-similar",
   });
-  const contrastRow = createRow({
-    userPhraseId: "contrast-1",
+  const contrastRow = createRelatedItem({
+    key: "saved:contrast-1",
     text: "save your energy",
     translation: "留点力气",
+    kind: "contrast",
   });
 
   const { rerender } = render(
@@ -195,13 +218,13 @@ test("FocusDetailContent 会处理同类与对照列表点击", () => {
       labels={labels}
       onSpeak={() => undefined}
       onTabChange={() => undefined}
-      onOpenSimilarRow={(row) => similarOpened.push(row.userPhraseId)}
-      onOpenContrastRow={(row) => contrastOpened.push(row.userPhraseId)}
+      onOpenSimilarRow={(row) => similarOpened.push(row.key)}
+      onOpenContrastRow={(row) => contrastOpened.push(row.key)}
     />,
   );
 
   fireEvent.click(screen.getByRole("button", { name: /wear yourself out/ }));
-  assert.deepEqual(similarOpened, ["similar-1"]);
+  assert.deepEqual(similarOpened, ["saved:similar-1"]);
 
   rerender(
     <FocusDetailContent
@@ -230,13 +253,13 @@ test("FocusDetailContent 会处理同类与对照列表点击", () => {
       labels={labels}
       onSpeak={() => undefined}
       onTabChange={() => undefined}
-      onOpenSimilarRow={(row) => similarOpened.push(row.userPhraseId)}
-      onOpenContrastRow={(row) => contrastOpened.push(row.userPhraseId)}
+      onOpenSimilarRow={(row) => similarOpened.push(row.key)}
+      onOpenContrastRow={(row) => contrastOpened.push(row.key)}
     />,
   );
 
   fireEvent.click(screen.getByRole("button", { name: /save your energy/ }));
-  assert.deepEqual(contrastOpened, ["contrast-1"]);
+  assert.deepEqual(contrastOpened, ["saved:contrast-1"]);
 });
 
 test("FocusDetailContent 在无可选项时不会错误渲染可点击行", () => {
@@ -309,4 +332,44 @@ test("FocusDetailContent 在无可选项时不会错误渲染可点击行", () =
 
   const contrastPanel = screen.getByRole("tabpanel");
   assert.equal(within(contrastPanel).queryAllByRole("button").length, 0);
+});
+
+test("FocusDetailContent 补全中会显示详情占位态", () => {
+  render(
+    <FocusDetailContent
+      detail={{
+        text: "get through the day",
+        kind: "current",
+        savedItem: createRow({
+          userPhraseId: "saved-2",
+          text: "get through the day",
+          translation: null,
+        }),
+      }}
+      activeAssistItem={null}
+      focusDetailTab="info"
+      focusDetailLoading={false}
+      retryingEnrichment
+      isDetailSpeaking={false}
+      detailSpeakText="get through the day"
+      similarRows={[]}
+      contrastRows={[]}
+      isSavedRelatedLoading={false}
+      usageHint=""
+      typicalScenario=""
+      semanticFocus=""
+      reviewHint=""
+      exampleCards={<div>example cards</div>}
+      labels={labels}
+      onSpeak={() => undefined}
+      onTabChange={() => undefined}
+      onOpenSimilarRow={() => undefined}
+      onOpenContrastRow={() => undefined}
+    />,
+  );
+
+  assert.ok(screen.getAllByText(labels.enriching).length >= 1);
+  assert.ok(screen.getByLabelText("常见用法补全中"));
+  assert.ok(screen.getByLabelText("例句补全中"));
+  assert.equal(screen.queryByText("example cards"), null);
 });

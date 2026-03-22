@@ -5,10 +5,16 @@ export type FocusDetailSheetLabels = {
   prev: string;
   next: string;
   detailMoreActions: string;
+  detailManualAddRelated?: string;
+  detailRegenerateAudio?: string;
+  detailRetryEnrichment?: string;
   detailOpenAsMain: string;
   moveIntoCluster: string;
   detachClusterMember: string;
   addThisExpression: string;
+  addingThisExpression?: string;
+  addedThisExpression?: string;
+  completeAssist?: string;
   confirmCancel: string;
   confirmContinue: string;
   detailOpenAsMainConfirmTitle: string;
@@ -44,10 +50,16 @@ type FocusDetailLabelSource = {
   detailPrev: string;
   detailNext: string;
   detailMoreActions: string;
+  detailManualAddRelated?: string;
+  detailRegenerateAudio?: string;
+  detailRetryEnrichment?: string;
   detailOpenAsMain: string;
   moveIntoCluster: string;
   detachClusterMember: string;
   addThisExpression: string;
+  addingThisExpression?: string;
+  addedThisExpression?: string;
+  completeAssist?: string;
   confirmCancel: string;
   confirmContinue: string;
   detailOpenAsMainConfirmTitle: string;
@@ -85,10 +97,16 @@ export const buildFocusDetailLabels = (
   prev: source.detailPrev,
   next: source.detailNext,
   detailMoreActions: source.detailMoreActions,
+  detailManualAddRelated: source.detailManualAddRelated,
+  detailRegenerateAudio: source.detailRegenerateAudio,
+  detailRetryEnrichment: source.detailRetryEnrichment,
   detailOpenAsMain: source.detailOpenAsMain,
   moveIntoCluster: source.moveIntoCluster,
   detachClusterMember: source.detachClusterMember,
   addThisExpression: source.addThisExpression,
+  addingThisExpression: source.addingThisExpression,
+  addedThisExpression: source.addedThisExpression,
+  completeAssist: source.completeAssist,
   confirmCancel: source.confirmCancel,
   confirmContinue: source.confirmContinue,
   detailOpenAsMainConfirmTitle: source.detailOpenAsMainConfirmTitle,

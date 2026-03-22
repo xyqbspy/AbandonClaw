@@ -5,6 +5,10 @@ import { Button } from "@/components/ui/button";
 
 type FocusDetailActionsLabels = {
   moreActions: string;
+  findRelations: string;
+  manualAddRelated?: string;
+  regenerateAudio?: string;
+  retryEnrichment?: string;
   openAsMain: string;
   moveIntoCluster: string;
   detachClusterMember: string;
@@ -13,9 +17,17 @@ type FocusDetailActionsLabels = {
 type FocusDetailActionsProps = {
   open: boolean;
   show: boolean;
+  canShowFindRelations: boolean;
+  canShowManualAddRelated: boolean;
+  canShowRegenerateAudio: boolean;
+  canShowRetryEnrichment: boolean;
   canSetCurrentClusterMain: boolean;
   canMoveIntoCurrentCluster: boolean;
   canSetStandaloneMain: boolean;
+  focusAssistLoading: boolean;
+  openingManualAddRelated: boolean;
+  regeneratingAudio: boolean;
+  retryingEnrichment: boolean;
   movingIntoCluster: boolean;
   ensuringMoveTargetCluster: boolean;
   detachingClusterMember: boolean;
@@ -23,6 +35,10 @@ type FocusDetailActionsProps = {
   appleButtonClassName: string;
   labels: FocusDetailActionsLabels;
   onToggleOpen: () => void;
+  onRequestFindRelations: () => void;
+  onRequestManualAddRelated: () => void;
+  onRequestRegenerateAudio: () => void;
+  onRequestRetryEnrichment: () => void;
   onRequestSetCurrentClusterMain: () => void;
   onRequestMoveIntoCluster: () => void;
   onRequestSetStandaloneMain: () => void;
@@ -31,9 +47,17 @@ type FocusDetailActionsProps = {
 export function FocusDetailActions({
   open,
   show,
+  canShowFindRelations,
+  canShowManualAddRelated,
+  canShowRegenerateAudio,
+  canShowRetryEnrichment,
   canSetCurrentClusterMain,
   canMoveIntoCurrentCluster,
   canSetStandaloneMain,
+  focusAssistLoading,
+  openingManualAddRelated,
+  regeneratingAudio,
+  retryingEnrichment,
   movingIntoCluster,
   ensuringMoveTargetCluster,
   detachingClusterMember,
@@ -41,6 +65,10 @@ export function FocusDetailActions({
   appleButtonClassName,
   labels,
   onToggleOpen,
+  onRequestFindRelations,
+  onRequestManualAddRelated,
+  onRequestRegenerateAudio,
+  onRequestRetryEnrichment,
   onRequestSetCurrentClusterMain,
   onRequestMoveIntoCluster,
   onRequestSetStandaloneMain,
@@ -62,6 +90,52 @@ export function FocusDetailActions({
 
       {open ? (
         <div className="absolute bottom-full left-0 z-10 mb-2 min-w-[200px] overflow-hidden rounded-2xl border border-[rgb(228,232,236)] bg-white p-1 shadow-lg">
+          {canShowFindRelations ? (
+            <button
+              type="button"
+              className="flex w-full items-center rounded-xl px-3 py-2.5 text-left text-sm text-foreground transition hover:bg-[rgb(246,246,246)] disabled:text-muted-foreground"
+              disabled={focusAssistLoading}
+              onClick={onRequestFindRelations}
+            >
+              {focusAssistLoading ? `${labels.findRelations}...` : labels.findRelations}
+            </button>
+          ) : null}
+          {canShowManualAddRelated ? (
+            <button
+              type="button"
+              className="flex w-full items-center rounded-xl px-3 py-2.5 text-left text-sm text-foreground transition hover:bg-[rgb(246,246,246)] disabled:text-muted-foreground"
+              disabled={openingManualAddRelated}
+              onClick={onRequestManualAddRelated}
+            >
+              {openingManualAddRelated
+                ? `${labels.manualAddRelated ?? "添加关联表达"}...`
+                : labels.manualAddRelated ?? "添加关联表达"}
+            </button>
+          ) : null}
+          {canShowRegenerateAudio ? (
+            <button
+              type="button"
+              className="flex w-full items-center rounded-xl px-3 py-2.5 text-left text-sm text-foreground transition hover:bg-[rgb(246,246,246)] disabled:text-muted-foreground"
+              disabled={regeneratingAudio}
+              onClick={onRequestRegenerateAudio}
+            >
+              {regeneratingAudio
+                ? `${labels.regenerateAudio ?? "重新生成音频"}...`
+                : labels.regenerateAudio ?? "重新生成音频"}
+            </button>
+          ) : null}
+          {canShowRetryEnrichment ? (
+            <button
+              type="button"
+              className="flex w-full items-center rounded-xl px-3 py-2.5 text-left text-sm text-foreground transition hover:bg-[rgb(246,246,246)] disabled:text-muted-foreground"
+              disabled={retryingEnrichment}
+              onClick={onRequestRetryEnrichment}
+            >
+              {retryingEnrichment
+                ? `${labels.retryEnrichment ?? "补全当前chunk"}...`
+                : labels.retryEnrichment ?? "补全当前chunk"}
+            </button>
+          ) : null}
           {canSetCurrentClusterMain ? (
             <button
               type="button"
