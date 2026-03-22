@@ -42,6 +42,11 @@ export const useSavedRelations = ({
   const [savedRelationLoadingKey, setSavedRelationLoadingKey] = useState<string | null>(null);
   const [focusRelationsBootstrapDone, setFocusRelationsBootstrapDone] = useState(false);
   const pendingRelationRequestIdsRef = useRef<Set<string>>(new Set());
+  const onLoadFailedRef = useRef(onLoadFailed);
+
+  useEffect(() => {
+    onLoadFailedRef.current = onLoadFailed;
+  }, [onLoadFailed]);
 
   useEffect(() => {
     if (contentFilter !== "expression" || expressionRows.length === 0) return;
@@ -83,7 +88,7 @@ export const useSavedRelations = ({
       })
       .catch((error) => {
         if (cancelled) return;
-        onLoadFailed?.(error instanceof Error ? error.message : "加载表达关系失败。");
+        onLoadFailedRef.current?.(error instanceof Error ? error.message : "加载表达关系失败。");
         setSavedRelationCache((current) => {
           const next = { ...current };
           for (const userPhraseId of pendingIds) {
@@ -105,7 +110,7 @@ export const useSavedRelations = ({
     return () => {
       cancelled = true;
     };
-  }, [contentFilter, deps, expressionRows, onLoadFailed, savedRelationCache]);
+  }, [contentFilter, deps, expressionRows, savedRelationCache]);
 
   useEffect(() => {
     if (contentFilter !== "expression") {
@@ -153,7 +158,7 @@ export const useSavedRelations = ({
       })
       .catch((error) => {
         if (cancelled) return;
-        onLoadFailed?.(error instanceof Error ? error.message : "加载表达关系失败。");
+        onLoadFailedRef.current?.(error instanceof Error ? error.message : "加载表达关系失败。");
         setSavedRelationCache((current) => ({
           ...current,
           [userPhraseId]: {
@@ -171,7 +176,7 @@ export const useSavedRelations = ({
     return () => {
       cancelled = true;
     };
-  }, [contentFilter, deps, expressionViewMode, focusDetailUserPhraseId, onLoadFailed, savedRelationCache]);
+  }, [contentFilter, deps, expressionViewMode, focusDetailUserPhraseId, savedRelationCache]);
 
   const savedRelationRowsBySourceId: SavedRelationRowsBySourceId = useMemo(
     () => Object.fromEntries(Object.entries(savedRelationCache).map(([key, value]) => [key, value.rows])),

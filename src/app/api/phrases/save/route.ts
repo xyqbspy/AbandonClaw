@@ -4,6 +4,7 @@ import { toApiErrorResponse } from "@/lib/server/api-error";
 import { savePhraseForUser } from "@/lib/server/phrases/service";
 import { trackChunksForUser } from "@/lib/server/chunks/service";
 import {
+  parseJsonBody,
   parseOptionalNonNegativeInt,
   parseOptionalTrimmedString,
 } from "@/lib/server/validation";
@@ -30,7 +31,7 @@ interface SavePhrasePayload {
 export async function POST(request: Request) {
   try {
     const { user } = await requireCurrentProfile();
-    const payload = (await request.json()) as SavePhrasePayload;
+    const payload = await parseJsonBody<SavePhrasePayload>(request);
     const sourceSceneSlug = parseOptionalTrimmedString(
       payload.sourceSceneSlug,
       "sourceSceneSlug",

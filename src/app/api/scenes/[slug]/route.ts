@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { requireCurrentProfile } from "@/lib/server/auth";
 import { toApiErrorResponse } from "@/lib/server/api-error";
 import { ForbiddenError, NotFoundError } from "@/lib/server/errors";
-import { deleteImportedScene, getSceneBySlug } from "@/lib/server/services/scene-service";
+import { deleteImportedScene, getSceneBySlug } from "@/lib/server/scene/service";
 
 export async function GET(
   _request: Request,

@@ -51,6 +51,11 @@ export const useChunksListData = ({
   const [total, setTotal] = useState(0);
   const [listDataSource, setListDataSource] = useState<"none" | "cache" | "network">("none");
   const activeLoadTokenRef = useRef(0);
+  const onLoadFailedRef = useRef(onLoadFailed);
+
+  useEffect(() => {
+    onLoadFailedRef.current = onLoadFailed;
+  }, [onLoadFailed]);
 
   const loadPhrases = useCallback(
     async (
@@ -121,11 +126,11 @@ export const useChunksListData = ({
           setLoading(false);
         }
         if (failure.message) {
-          onLoadFailed?.(failure.message);
+          onLoadFailedRef.current?.(failure.message);
         }
       }
     },
-    [deps, onLoadFailed],
+    [deps],
   );
 
   useEffect(() => {

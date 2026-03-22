@@ -2,7 +2,7 @@ import { PageHeader } from "@/components/shared/page-header";
 import { StatCard } from "@/components/shared/stat-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireCurrentProfile } from "@/lib/server/auth";
-import { getLearningOverview } from "@/lib/server/services/learning-service";
+import { getLearningOverview } from "@/lib/server/learning/service";
 
 export default async function ProgressPage() {
   const { user } = await requireCurrentProfile();

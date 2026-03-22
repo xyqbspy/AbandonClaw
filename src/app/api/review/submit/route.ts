@@ -2,7 +2,12 @@ import { NextResponse } from "next/server";
 import { requireCurrentProfile } from "@/lib/server/auth";
 import { toApiErrorResponse } from "@/lib/server/api-error";
 import { submitPhraseReview, getReviewSummary } from "@/lib/server/review/service";
-import { parseOptionalTrimmedString, parseRequiredTrimmedString, parseReviewResult } from "@/lib/server/validation";
+import {
+  parseJsonBody,
+  parseOptionalTrimmedString,
+  parseRequiredTrimmedString,
+  parseReviewResult,
+} from "@/lib/server/validation";
 
 interface SubmitReviewPayload {
   userPhraseId?: unknown;
@@ -13,7 +18,7 @@ interface SubmitReviewPayload {
 export async function POST(request: Request) {
   try {
     const { user } = await requireCurrentProfile();
-    const payload = (await request.json()) as SubmitReviewPayload;
+    const payload = await parseJsonBody<SubmitReviewPayload>(request);
     const item = await submitPhraseReview(user.id, {
       userPhraseId: parseRequiredTrimmedString(payload.userPhraseId, "userPhraseId", 64),
       reviewResult: parseReviewResult(payload.reviewResult),

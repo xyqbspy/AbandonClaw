@@ -1,4 +1,9 @@
-﻿import { buildChunkAudioKey } from "@/lib/shared/tts";
+import {
+  buildChunkAudioKey,
+  buildSceneFullAudioKey,
+  buildSentenceAudioKey,
+  mergeSceneFullSegments,
+} from "@/lib/shared/tts";
 
 type SentenceTtsPayload = {
   kind: "sentence";
@@ -35,6 +40,11 @@ interface TtsResponse {
   error?: string;
 }
 
+type TtsUrlCacheEntry = {
+  url: string;
+  expiresAt: number;
+};
+
 export type TtsPlaybackState = {
   kind: "sentence" | "chunk" | "scene" | null;
   sentenceId?: string;
@@ -45,13 +55,27 @@ export type TtsPlaybackState = {
   text?: string;
 };
 
+export type BrowserTtsCacheEntry = {
+  cacheKey: string;
+  kind: "sentence" | "chunk" | "scene" | "unknown";
+  size: number;
+  contentType: string | null;
+};
+
 let currentAudio: HTMLAudioElement | null = null;
+let playbackAudio: HTMLAudioElement | null = null;
 let playbackGeneration = 0;
 let playbackState: TtsPlaybackState = {
   kind: null,
   isLooping: false,
 };
 const playbackListeners = new Set<(state: TtsPlaybackState) => void>();
+const ttsUrlCache = new Map<string, TtsUrlCacheEntry>();
+const pendingTtsUrlRequests = new Map<string, Promise<string>>();
+const preloadedAudioUrls = new Set<string>();
+const persistentAudioObjectUrls = new Map<string, string>();
+const ttsUrlCacheTtlMs = 45 * 60 * 1000;
+const browserTtsCacheName = "tts-audio-v1";
 
 const emitPlaybackState = () => {
   for (const listener of playbackListeners) {
@@ -92,6 +116,262 @@ const extractError = async (response: Response, fallback: string) => {
   return fallback;
 };
 
+const getCachedTtsUrl = (cacheKey: string) => {
+  const entry = ttsUrlCache.get(cacheKey);
+  if (!entry) return null;
+  if (entry.expiresAt <= Date.now()) {
+    ttsUrlCache.delete(cacheKey);
+    return null;
+  }
+  return entry.url;
+};
+
+const cacheTtsUrl = (cacheKey: string, url: string) => {
+  ttsUrlCache.set(cacheKey, {
+    url,
+    expiresAt: Date.now() + ttsUrlCacheTtlMs,
+  });
+  return url;
+};
+
+const canUseBrowserAudioCache = () =>
+  typeof window !== "undefined" && typeof caches !== "undefined" && typeof URL !== "undefined";
+
+const buildBrowserAudioCacheRequest = (cacheKey: string) =>
+  new Request(`https://local.tts.cache/${encodeURIComponent(cacheKey)}`);
+
+const getBrowserAudioCache = async () => {
+  if (!canUseBrowserAudioCache()) return null;
+  return caches.open(browserTtsCacheName);
+};
+
+const resolveBrowserTtsCacheKind = (cacheKey: string): BrowserTtsCacheEntry["kind"] => {
+  if (cacheKey.startsWith("sentence:")) return "sentence";
+  if (cacheKey.startsWith("chunk:")) return "chunk";
+  if (cacheKey.startsWith("scene:")) return "scene";
+  return "unknown";
+};
+
+const revokePersistentAudioObjectUrl = (cacheKey: string) => {
+  const objectUrl = persistentAudioObjectUrls.get(cacheKey);
+  if (!objectUrl) return;
+  if (typeof URL !== "undefined" && typeof URL.revokeObjectURL === "function") {
+    URL.revokeObjectURL(objectUrl);
+  }
+  persistentAudioObjectUrls.delete(cacheKey);
+};
+
+const clearTtsCachesByKeys = (cacheKeys: string[]) => {
+  for (const cacheKey of cacheKeys) {
+    revokePersistentAudioObjectUrl(cacheKey);
+    ttsUrlCache.delete(cacheKey);
+    pendingTtsUrlRequests.delete(cacheKey);
+  }
+};
+
+const readPersistentAudioUrl = async (cacheKey: string) => {
+  const inMemoryUrl = persistentAudioObjectUrls.get(cacheKey);
+  if (inMemoryUrl) {
+    return inMemoryUrl;
+  }
+  if (!canUseBrowserAudioCache()) return null;
+
+  const cache = await getBrowserAudioCache();
+  if (!cache) return null;
+  const response = await cache.match(buildBrowserAudioCacheRequest(cacheKey));
+  if (!response) return null;
+
+  const blob = await response.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  persistentAudioObjectUrls.set(cacheKey, objectUrl);
+  return objectUrl;
+};
+
+const persistAudioToBrowserCache = async (cacheKey: string, sourceUrl: string) => {
+  if (!canUseBrowserAudioCache()) return null;
+
+  const cache = await getBrowserAudioCache();
+  if (!cache) return null;
+  const cacheRequest = buildBrowserAudioCacheRequest(cacheKey);
+  const existing = await cache.match(cacheRequest);
+  if (existing) {
+    const existingUrl = persistentAudioObjectUrls.get(cacheKey);
+    if (existingUrl) return existingUrl;
+    const blob = await existing.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    persistentAudioObjectUrls.set(cacheKey, objectUrl);
+    return objectUrl;
+  }
+
+  const sourceResponse = await fetch(sourceUrl);
+  if (!sourceResponse.ok) {
+    throw new Error("Failed to persist tts audio.");
+  }
+  const blob = await sourceResponse.blob();
+  await cache.put(
+    cacheRequest,
+    new Response(blob, {
+      headers: {
+        "Content-Type": blob.type || "audio/mpeg",
+      },
+    }),
+  );
+  const objectUrl = URL.createObjectURL(blob);
+  persistentAudioObjectUrls.set(cacheKey, objectUrl);
+  return objectUrl;
+};
+
+export const listBrowserTtsCacheEntries = async (): Promise<BrowserTtsCacheEntry[]> => {
+  const cache = await getBrowserAudioCache();
+  if (!cache || typeof cache.keys !== "function") return [];
+
+  const requests = await cache.keys();
+  const entries = await Promise.all(
+    requests.map(async (request) => {
+      const response = await cache.match(request);
+      if (!response) return null;
+
+      const blob = await response.blob();
+      const encodedKey = request.url.replace("https://local.tts.cache/", "");
+      const cacheKey = decodeURIComponent(encodedKey);
+
+      return {
+        cacheKey,
+        kind: resolveBrowserTtsCacheKind(cacheKey),
+        size: blob.size,
+        contentType: response.headers.get("Content-Type"),
+      } satisfies BrowserTtsCacheEntry;
+    }),
+  );
+
+  return entries
+    .filter((entry): entry is BrowserTtsCacheEntry => Boolean(entry))
+    .sort((a, b) => b.size - a.size || a.cacheKey.localeCompare(b.cacheKey));
+};
+
+export const getBrowserTtsCacheSummary = async () => {
+  const entries = await listBrowserTtsCacheEntries();
+  return {
+    entryCount: entries.length,
+    totalBytes: entries.reduce((sum, entry) => sum + entry.size, 0),
+  };
+};
+
+export const clearBrowserTtsCacheEntries = async (cacheKeys: string[]) => {
+  if (cacheKeys.length === 0) {
+    return { removedCount: 0, removedBytes: 0 };
+  }
+
+  const cache = await getBrowserAudioCache();
+  if (!cache) {
+    clearTtsCachesByKeys(cacheKeys);
+    return { removedCount: 0, removedBytes: 0 };
+  }
+
+  let removedCount = 0;
+  let removedBytes = 0;
+
+  for (const cacheKey of cacheKeys) {
+    const request = buildBrowserAudioCacheRequest(cacheKey);
+    const existing = await cache.match(request);
+    if (existing) {
+      removedBytes += (await existing.blob()).size;
+      const deleted = await cache.delete(request);
+      if (deleted) {
+        removedCount += 1;
+      }
+    }
+  }
+
+  clearTtsCachesByKeys(cacheKeys);
+
+  return {
+    removedCount,
+    removedBytes,
+  };
+};
+
+export const clearAllBrowserTtsCache = async () => {
+  const entries = await listBrowserTtsCacheEntries();
+  const result = await clearBrowserTtsCacheEntries(entries.map((entry) => entry.cacheKey));
+  return {
+    ...result,
+    previousEntryCount: entries.length,
+  };
+};
+
+const preloadAudioUrl = (url: string) => {
+  if (typeof window === "undefined" || typeof Audio === "undefined") return;
+  if (preloadedAudioUrls.has(url)) return;
+  preloadedAudioUrls.add(url);
+  const audio = new Audio();
+  audio.preload = "auto";
+  audio.src = url;
+  audio.load();
+};
+
+const ensurePlaybackAudio = () => {
+  if (typeof Audio === "undefined") {
+    throw new Error("audio playback unavailable");
+  }
+  if (!playbackAudio) {
+    playbackAudio = new Audio();
+    playbackAudio.preload = "auto";
+  }
+  return playbackAudio;
+};
+
+const requestTtsUrl = async (
+  cacheKey: string,
+  payload: TtsRequestPayload,
+  fallbackError: string,
+) => {
+  const persistentUrl = await readPersistentAudioUrl(cacheKey);
+  if (persistentUrl) {
+    cacheTtsUrl(cacheKey, persistentUrl);
+    preloadAudioUrl(persistentUrl);
+    return persistentUrl;
+  }
+
+  const cachedUrl = getCachedTtsUrl(cacheKey);
+  if (cachedUrl) {
+    preloadAudioUrl(cachedUrl);
+    return cachedUrl;
+  }
+
+  const pending = pendingTtsUrlRequests.get(cacheKey);
+  if (pending) {
+    return pending;
+  }
+
+  const task = (async () => {
+    const response = await fetch("/api/tts", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      throw new Error(await extractError(response, fallbackError));
+    }
+    const data = (await response.json()) as TtsResponse;
+    if (!data.url) {
+      throw new Error("Invalid tts audio response.");
+    }
+    const persistentAudioUrl =
+      (await persistAudioToBrowserCache(cacheKey, data.url).catch(() => null)) ?? data.url;
+    const url = cacheTtsUrl(cacheKey, persistentAudioUrl);
+    preloadAudioUrl(url);
+    return url;
+  })().finally(() => {
+    pendingTtsUrlRequests.delete(cacheKey);
+  });
+
+  pendingTtsUrlRequests.set(cacheKey, task);
+  return task;
+};
+
 const speakByBrowser = async (text: string, mode: "normal" | "slow" = "normal") => {
   if (typeof window === "undefined") {
     throw new Error("window is unavailable");
@@ -123,6 +403,9 @@ const fallbackSpeakSafe = async (text: string, mode: "normal" | "slow") => {
 export const stopTtsPlayback = () => {
   playbackGeneration += 1;
   if (currentAudio) {
+    currentAudio.onended = null;
+    currentAudio.onerror = null;
+    currentAudio.loop = false;
     currentAudio.pause();
     currentAudio.currentTime = 0;
     currentAudio = null;
@@ -141,7 +424,13 @@ const playAudioUrl = async (url: string) => {
   stopTtsPlayback();
   const generation = playbackGeneration + 1;
   playbackGeneration = generation;
-  const audio = new Audio(url);
+  const audio = ensurePlaybackAudio();
+  audio.loop = false;
+  if (audio.src !== url) {
+    audio.src = url;
+  }
+  audio.currentTime = 0;
+  audio.load();
   currentAudio = audio;
   await new Promise<void>((resolve, reject) => {
     audio.onended = () => {
@@ -182,28 +471,25 @@ export async function ensureSentenceAudio(params: {
   speaker?: string;
   mode?: "normal" | "slow";
 }) {
-  const response = await fetch("/api/tts", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
+  const mode = params.mode ?? "normal";
+  const sentenceAudioKey = buildSentenceAudioKey({
+    sentenceId: params.sentenceId,
+    text: params.text,
+    speaker: params.speaker,
+    mode,
+  });
+  return requestTtsUrl(
+    `sentence:${params.sceneSlug}:${sentenceAudioKey}`,
+    {
       kind: "sentence",
       sceneSlug: params.sceneSlug,
       sentenceId: params.sentenceId,
       text: params.text,
       speaker: params.speaker,
-      mode: params.mode ?? "normal",
-    } satisfies SentenceTtsPayload),
-  });
-  if (!response.ok) {
-    throw new Error(await extractError(response, "Failed to generate sentence audio."));
-  }
-  const data = (await response.json()) as TtsResponse;
-  if (!data.url) {
-    throw new Error("Invalid sentence audio response.");
-  }
-  return data.url;
+      mode,
+    } satisfies SentenceTtsPayload,
+    "Failed to generate sentence audio.",
+  );
 }
 
 export async function ensureChunkAudio(params: {
@@ -211,25 +497,15 @@ export async function ensureChunkAudio(params: {
   chunkKey?: string;
 }) {
   const key = params.chunkKey ?? buildChunkAudioKey(params.chunkText);
-  const response = await fetch("/api/tts", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
+  return requestTtsUrl(
+    `chunk:${key}`,
+    {
       kind: "chunk",
       chunkKey: key,
       text: params.chunkText,
-    } satisfies ChunkTtsPayload),
-  });
-  if (!response.ok) {
-    throw new Error(await extractError(response, "Failed to generate chunk audio."));
-  }
-  const data = (await response.json()) as TtsResponse;
-  if (!data.url) {
-    throw new Error("Invalid chunk audio response.");
-  }
-  return data.url;
+    } satisfies ChunkTtsPayload,
+    "Failed to generate chunk audio.",
+  );
 }
 
 export async function ensureSceneFullAudio(params: {
@@ -237,27 +513,59 @@ export async function ensureSceneFullAudio(params: {
   sceneType?: "dialogue" | "monologue";
   segments: Array<{ text: string; speaker?: string }>;
 }) {
-  const response = await fetch("/api/tts", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
+  const sceneType = params.sceneType ?? "monologue";
+  const sceneFullKey = buildSceneFullAudioKey(
+    mergeSceneFullSegments(params.segments, sceneType),
+    sceneType,
+  );
+  return requestTtsUrl(
+    `scene:${params.sceneSlug}:${sceneFullKey}`,
+    {
       kind: "scene_full",
       sceneSlug: params.sceneSlug,
-      sceneType: params.sceneType ?? "monologue",
+      sceneType,
       segments: params.segments,
-    } satisfies SceneFullTtsPayload),
-  });
-  if (!response.ok) {
-    throw new Error(await extractError(response, "Failed to generate full scene audio."));
-  }
-  const data = (await response.json()) as TtsResponse;
-  if (!data.url) {
-    throw new Error("Invalid full scene audio response.");
-  }
-  return data.url;
+    } satisfies SceneFullTtsPayload,
+    "Failed to generate full scene audio.",
+  );
 }
+
+export const prefetchSentenceAudio = async (params: {
+  sceneSlug: string;
+  sentenceId: string;
+  text: string;
+  speaker?: string;
+  mode?: "normal" | "slow";
+}) => {
+  try {
+    await ensureSentenceAudio(params);
+  } catch {
+    // Non-blocking.
+  }
+};
+
+export const prefetchChunkAudio = async (params: {
+  chunkText: string;
+  chunkKey?: string;
+}) => {
+  try {
+    await ensureChunkAudio(params);
+  } catch {
+    // Non-blocking.
+  }
+};
+
+export const prefetchSceneFullAudio = async (params: {
+  sceneSlug: string;
+  sceneType?: "dialogue" | "monologue";
+  segments: Array<{ text: string; speaker?: string }>;
+}) => {
+  try {
+    await ensureSceneFullAudio(params);
+  } catch {
+    // Non-blocking.
+  }
+};
 
 export async function playSentenceAudio(params: {
   sceneSlug: string;
@@ -353,7 +661,12 @@ export async function playSceneLoopAudio(params: {
     ) {
       return { ok: true as const, url: null, stopped: true as const };
     }
-    const audio = new Audio(url);
+    const audio = ensurePlaybackAudio();
+    if (audio.src !== url) {
+      audio.src = url;
+    }
+    audio.currentTime = 0;
+    audio.load();
     audio.loop = true;
     currentAudio = audio;
     audio.onerror = () => {
@@ -381,3 +694,17 @@ export async function playSceneLoopAudio(params: {
 // Backward-compatible aliases currently used in reader code.
 export const ensureSentenceTtsFromApi = ensureSentenceAudio;
 export const ensureChunkTtsFromApi = ensureChunkAudio;
+
+export const __resetTtsTestState = async (options?: { preservePersistentCache?: boolean }) => {
+  stopTtsPlayback();
+  ttsUrlCache.clear();
+  pendingTtsUrlRequests.clear();
+  preloadedAudioUrls.clear();
+  for (const cacheKey of persistentAudioObjectUrls.keys()) {
+    revokePersistentAudioObjectUrl(cacheKey);
+  }
+  playbackAudio = null;
+  if (!options?.preservePersistentCache && typeof caches !== "undefined") {
+    await caches.delete(browserTtsCacheName);
+  }
+};

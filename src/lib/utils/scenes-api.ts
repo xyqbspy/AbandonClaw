@@ -19,6 +19,8 @@ export interface SceneListItemResponse {
   lastViewedAt: string | null;
 }
 
+let scenesListInFlightPromise: Promise<SceneListItemResponse[]> | null = null;
+
 const extractError = async (response: Response, fallback: string) => {
   let message = fallback;
   try {
@@ -34,16 +36,31 @@ const extractError = async (response: Response, fallback: string) => {
 
 export async function getScenesFromApi(options?: { noStore?: boolean }) {
   const noStore = options?.noStore === true;
-  const url = noStore ? `/api/scenes?_t=${Date.now()}` : "/api/scenes";
-  const response = await fetch(url, {
-    method: "GET",
-    cache: noStore ? "no-store" : "default",
-  });
-  if (!response.ok) {
-    throw new Error(await extractError(response, "Failed to load scenes."));
+  if (!noStore && scenesListInFlightPromise) {
+    return scenesListInFlightPromise;
   }
-  const data = (await response.json()) as { scenes?: SceneListItemResponse[] };
-  return data.scenes ?? [];
+
+  const url = noStore ? `/api/scenes?_t=${Date.now()}` : "/api/scenes";
+  const task = (async () => {
+    const response = await fetch(url, {
+      method: "GET",
+      cache: noStore ? "no-store" : "default",
+    });
+    if (!response.ok) {
+      throw new Error(await extractError(response, "Failed to load scenes."));
+    }
+    const data = (await response.json()) as { scenes?: SceneListItemResponse[] };
+    return data.scenes ?? [];
+  })();
+
+  if (noStore) {
+    return task;
+  }
+
+  scenesListInFlightPromise = task.finally(() => {
+    scenesListInFlightPromise = null;
+  });
+  return scenesListInFlightPromise;
 }
 
 export async function getSceneDetailBySlugFromApi(slug: string): Promise<Lesson> {

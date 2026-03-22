@@ -1,12 +1,12 @@
 import { isValidParsedScene } from "@/lib/server/scene-json";
-import { generateSceneVariants, getSceneVariantsBySceneId } from "@/lib/server/services/variant-service";
+import { generateSceneVariants, getSceneVariantsBySceneId } from "@/lib/server/scene/variants";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { AiCacheRow, SceneRow, SceneVariantRow } from "@/lib/server/db/types";
-import { runSeedScenesSync } from "@/lib/server/services/scene-service";
-import { listRecentAiCacheStats } from "@/lib/server/services/ai-cache-service";
+import { runSeedScenesSync } from "@/lib/server/scene/service";
+import { listRecentAiCacheStats } from "@/lib/server/ai-cache/service";
 import { NotFoundError } from "@/lib/server/errors";
 import { enrichAiExpressionLearningInfo } from "@/lib/server/phrases/service";
-import { deleteSceneTtsAudioBySlug } from "@/lib/server/services/tts-storage-service";
+import { deleteSceneTtsAudioBySlug } from "@/lib/server/tts/storage";
 import { mapLessonToParsedScene, mapParsedSceneToLesson } from "@/lib/adapters/scene-parser-adapter";
 import { normalizeParsedSceneDialogue } from "@/lib/shared/scene-dialogue";
 import { ParsedScene } from "@/lib/types/scene-parser";

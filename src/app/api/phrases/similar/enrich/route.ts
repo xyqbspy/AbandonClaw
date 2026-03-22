@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { requireCurrentProfile } from "@/lib/server/auth";
 import { toApiErrorResponse } from "@/lib/server/api-error";
+import { ValidationError } from "@/lib/server/errors";
 import { enrichAiExpressionLearningInfo } from "@/lib/server/phrases/service";
-import { parseOptionalTrimmedString } from "@/lib/server/validation";
+import { parseJsonBody, parseOptionalTrimmedString } from "@/lib/server/validation";
 
 interface EnrichPayload {
   userPhraseId?: unknown;
@@ -13,11 +14,11 @@ interface EnrichPayload {
 export async function POST(request: Request) {
   try {
     const { user } = await requireCurrentProfile();
-    const payload = (await request.json()) as EnrichPayload;
+    const payload = await parseJsonBody<EnrichPayload>(request);
 
     const userPhraseId = parseOptionalTrimmedString(payload.userPhraseId, "userPhraseId", 80);
     if (!userPhraseId) {
-      return NextResponse.json({ error: "userPhraseId is required." }, { status: 400 });
+      throw new ValidationError("userPhraseId is required.");
     }
 
     const result = await enrichAiExpressionLearningInfo({

@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireCurrentProfile } from "@/lib/server/auth";
+import { toApiErrorResponse } from "@/lib/server/api-error";
+import { ValidationError } from "@/lib/server/errors";
 import { callGlmChatCompletion } from "@/lib/server/glm-client";
 import {
   SIMILAR_EXPRESSION_GENERATE_SYSTEM_PROMPT,
@@ -7,6 +9,7 @@ import {
 } from "@/lib/server/prompts/similar-expression-prompt";
 import { normalizePhraseText } from "@/lib/shared/phrases";
 import { extractJsonCandidate } from "@/lib/server/scene-json";
+import { parseJsonBody } from "@/lib/server/validation";
 
 const ALLOWED_LABELS = new Set([
   "更口语",
@@ -51,20 +54,20 @@ const sanitizeCandidate = (
 export async function POST(request: Request) {
   try {
     await requireCurrentProfile();
-    const payload = (await request.json()) as {
+    const payload = await parseJsonBody<{
       baseExpression?: unknown;
       existingExpressions?: unknown;
-    };
+    }>(request);
 
     const baseExpression =
       typeof payload.baseExpression === "string" ? payload.baseExpression.trim() : "";
     if (!baseExpression) {
-      return NextResponse.json({ error: "baseExpression is required." }, { status: 400 });
+      throw new ValidationError("baseExpression is required.");
     }
 
     const normalizedBase = normalizePhraseText(baseExpression);
     if (!normalizedBase) {
-      return NextResponse.json({ error: "baseExpression is invalid." }, { status: 400 });
+      throw new ValidationError("baseExpression is invalid.");
     }
 
     const existingExpressions = Array.isArray(payload.existingExpressions)
@@ -85,7 +88,7 @@ export async function POST(request: Request) {
 
     const parsed = parseWithDiagnostics(rawText);
     if (!isObject(parsed) || parsed.version !== "v1" || !Array.isArray(parsed.candidates)) {
-      return NextResponse.json({ error: "Invalid similar-expression response." }, { status: 500 });
+      throw new Error("Invalid similar-expression response.");
     }
 
     const dedupe = new Set<string>();
@@ -108,11 +111,6 @@ export async function POST(request: Request) {
       { status: 200 },
     );
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Failed to generate similar expressions.";
-    return NextResponse.json(
-      { error: `Similar expression generate failed: ${message}` },
-      { status: 500 },
-    );
+    return toApiErrorResponse(error, "Similar expression generate failed.");
   }
 }

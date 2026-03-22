@@ -1,27 +1,53 @@
 import Link from "next/link";
 import { deleteSceneAction } from "@/app/(app)/admin/actions";
+import {
+  buildAdminHref,
+  readAdminNotice,
+  readAdminPositivePage,
+  readAdminStringParam,
+} from "@/app/(app)/admin/admin-page-state";
 import { SceneSentenceEditorSheet } from "@/components/admin/scene-sentence-editor-sheet";
+import { AdminNoticeCard } from "@/components/shared/admin-info-card";
+import { AdminPagination, AdminTableShell } from "@/components/shared/admin-list-shell";
+import { ConfirmButton } from "@/components/shared/confirm-action";
+import { FilterBar, FilterBarForm, FilterBarMeta } from "@/components/shared/filter-bar";
 import { PageHeader } from "@/components/shared/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { listAdminScenes } from "@/lib/server/admin/service";
 import { normalizeParsedSceneDialogue } from "@/lib/shared/scene-dialogue";
 import { ParsedScene } from "@/lib/types/scene-parser";
-import {
-  APPLE_BUTTON_BASE,
-  APPLE_BUTTON_DANGER,
-  APPLE_BUTTON_TEXT_SM,
-  APPLE_INPUT_BASE,
-  APPLE_SURFACE,
-} from "@/lib/ui/apple-style";
+import { APPLE_BUTTON_BASE, APPLE_BUTTON_DANGER, APPLE_BUTTON_TEXT_SM, APPLE_INPUT_BASE } from "@/lib/ui/apple-style";
 
-const parsePositiveInt = (value: string | undefined, fallback: number) => {
-  const num = Number(value);
-  if (!Number.isFinite(num) || num <= 0) return fallback;
-  return Math.floor(num);
-};
+const LABELS = {
+  eyebrow: "\u7ba1\u7406\u540e\u53f0",
+  title: "\u573a\u666f\u5217\u8868",
+  description:
+    "\u652f\u6301\u6309\u6807\u9898\u641c\u7d22\uff0c\u5e76\u53ef\u76f4\u63a5\u5728\u5217\u8868\u91cc\u7f16\u8f91\u53e5\u5b50\u5185\u5bb9\u3002",
+  search: "\u641c\u7d22\u6807\u9898\u6216 slug",
+  allOrigin: "\u5168\u90e8\u6765\u6e90",
+  allVisibility: "\u5168\u90e8\u53ef\u89c1\u6027",
+  public: "\u516c\u5f00",
+  private: "\u79c1\u6709",
+  submit: "\u7b5b\u9009",
+  total: "\u603b\u6570",
+  currentPage: "\u5f53\u524d\u9875",
+  guidance:
+    "\u5efa\u8bae\uff1a\u4f18\u5148\u7528\u201c\u7f16\u8f91\u53e5\u5b50\u201d\u505a\u5fae\u8c03\uff0c\u4fdd\u5b58\u540e\u4f1a\u81ea\u52a8\u6e05\u7406\u8be5\u573a\u666f\u7684\u97f3\u9891\u7f13\u5b58",
+  invalidSceneJson: "scene_json \u7ed3\u6784\u5f02\u5e38",
+  updated: "\u66f4\u65b0",
+  created: "\u521b\u5efa",
+  notEditable: "\u4e0d\u53ef\u7f16\u8f91",
+  delete: "\u5220\u9664",
+  deleteConfirm: "\u786e\u8ba4\u5220\u9664\u573a\u666f ",
+  deleteConfirmTail: " \u5417\uff1f",
+  deleteFinal:
+    "\u5220\u9664\u540e\u4f1a\u540c\u65f6\u79fb\u9664\u5173\u8054\u53d8\u4f53\u548c\u573a\u666f\u97f3\u9891\uff0c\u662f\u5426\u7ee7\u7eed\uff1f",
+  empty: "\u672a\u627e\u5230\u573a\u666f\u3002",
+  summaryPrefix: "\u663e\u793a",
+  summaryMiddle: "/ \u5171",
+} as const;
 
 export default async function AdminScenesPage({
   searchParams,
@@ -29,17 +55,13 @@ export default async function AdminScenesPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const params = await searchParams;
-  const q = typeof params.q === "string" ? params.q : "";
-  const originRaw = typeof params.origin === "string" ? params.origin : "";
-  const isPublicRaw = typeof params.isPublic === "string" ? params.isPublic : "";
-  const origin =
-    originRaw === "seed" || originRaw === "imported" ? originRaw : undefined;
-  const isPublic =
-    isPublicRaw === "true" ? true : isPublicRaw === "false" ? false : undefined;
-  const page = parsePositiveInt(
-    typeof params.page === "string" ? params.page : undefined,
-    1,
-  );
+  const q = readAdminStringParam(params, "q");
+  const originRaw = readAdminStringParam(params, "origin");
+  const isPublicRaw = readAdminStringParam(params, "isPublic");
+  const origin = originRaw === "seed" || originRaw === "imported" ? originRaw : undefined;
+  const isPublic = isPublicRaw === "true" ? true : isPublicRaw === "false" ? false : undefined;
+  const page = readAdminPositivePage(params);
+  const notice = readAdminNotice(params);
   const pageSize = 20;
   const appleButtonClassName = `${APPLE_BUTTON_BASE} ${APPLE_BUTTON_TEXT_SM}`;
 
@@ -49,6 +71,13 @@ export default async function AdminScenesPage({
     isPublic,
     page,
     pageSize,
+  });
+
+  const currentHref = buildAdminHref("/admin/scenes", {
+    q,
+    origin: originRaw,
+    isPublic: isPublicRaw,
+    page,
   });
 
   const rows = result.rows.map((row) => {
@@ -92,60 +121,50 @@ export default async function AdminScenesPage({
     }
   });
 
-  const hasPrev = result.page > 1;
-  const hasNext = result.page * result.pageSize < result.total;
-
   const buildListUrl = (nextPage: number) =>
-    `/admin/scenes?q=${encodeURIComponent(q)}&origin=${originRaw}&isPublic=${isPublicRaw}&page=${nextPage}`;
+    buildAdminHref("/admin/scenes", {
+      q,
+      origin: originRaw,
+      isPublic: isPublicRaw,
+      page: nextPage,
+    });
 
   return (
     <div className="space-y-4">
-      <PageHeader
-        eyebrow="管理后台"
-        title="场景列表"
-        description="支持按标题检索，并直接在列表里编辑句子内容。"
-      />
+      <PageHeader eyebrow={LABELS.eyebrow} title={LABELS.title} description={LABELS.description} />
 
-      <Card className={APPLE_SURFACE}>
-        <CardContent className="space-y-3 pt-4">
-          <form className="grid gap-2 sm:grid-cols-[1fr_auto_auto_auto]">
-            <Input name="q" defaultValue={q} placeholder="搜索标题或 slug" />
-            <select
-              name="origin"
-              defaultValue={originRaw}
-              className={`h-8 px-2.5 text-sm ${APPLE_INPUT_BASE}`}
-            >
-              <option value="">全部来源</option>
-              <option value="seed">seed</option>
-              <option value="imported">imported</option>
-            </select>
-            <select
-              name="isPublic"
-              defaultValue={isPublicRaw}
-              className={`h-8 px-2.5 text-sm ${APPLE_INPUT_BASE}`}
-            >
-              <option value="">全部可见性</option>
-              <option value="true">公开</option>
-              <option value="false">私有</option>
-            </select>
-            <Button type="submit" variant="ghost" className={appleButtonClassName}>
-              筛选
-            </Button>
-          </form>
+      {notice ? <AdminNoticeCard tone={notice.tone}>{notice.notice}</AdminNoticeCard> : null}
 
-          <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-            <span className="rounded-full bg-muted px-2 py-1">总数 {result.total}</span>
-            <span className="rounded-full bg-muted px-2 py-1">
-              当前页 {result.rows.length} 条
-            </span>
-            <span className="rounded-full bg-muted px-2 py-1">
-              重点建议：直接用“编辑句子”做微调，保存后会自动清理该场景音频缓存
-            </span>
-          </div>
-        </CardContent>
-      </Card>
+      <FilterBar className="space-y-3">
+        <FilterBarForm className="sm:grid-cols-[1fr_auto_auto_auto]">
+          <Input name="q" defaultValue={q} placeholder={LABELS.search} />
+          <select name="origin" defaultValue={originRaw} className={`h-8 px-2.5 text-sm ${APPLE_INPUT_BASE}`}>
+            <option value="">{LABELS.allOrigin}</option>
+            <option value="seed">seed</option>
+            <option value="imported">imported</option>
+          </select>
+          <select name="isPublic" defaultValue={isPublicRaw} className={`h-8 px-2.5 text-sm ${APPLE_INPUT_BASE}`}>
+            <option value="">{LABELS.allVisibility}</option>
+            <option value="true">{LABELS.public}</option>
+            <option value="false">{LABELS.private}</option>
+          </select>
+          <Button type="submit" variant="ghost" className={appleButtonClassName}>
+            {LABELS.submit}
+          </Button>
+        </FilterBarForm>
 
-      <div className={`overflow-x-auto rounded-lg ${APPLE_SURFACE}`}>
+        <FilterBarMeta>
+          <span className="rounded-full bg-muted px-2 py-1">
+            {LABELS.total} {result.total}
+          </span>
+          <span className="rounded-full bg-muted px-2 py-1">
+            {LABELS.currentPage} {result.rows.length} 条
+          </span>
+          <span className="rounded-full bg-muted px-2 py-1">{LABELS.guidance}</span>
+        </FilterBarMeta>
+      </FilterBar>
+
+      <AdminTableShell>
         <table className="min-w-full text-sm">
           <thead className="bg-muted/40 text-left text-xs text-muted-foreground">
             <tr>
@@ -163,15 +182,13 @@ export default async function AdminScenesPage({
                 <td className="px-3 py-3">
                   <div className="space-y-1">
                     <Link
-                      href={`/admin/scenes/${row.id}`}
+                      href={buildAdminHref(`/admin/scenes/${row.id}`, { returnTo: currentHref })}
                       className="text-sm font-medium text-foreground underline-offset-2 hover:underline"
                     >
                       {row.title}
                     </Link>
                     <p className="font-mono text-[11px] text-muted-foreground">{row.slug}</p>
-                    <p className="font-mono text-[11px] text-muted-foreground">
-                      owner: {row.created_by ?? "-"}
-                    </p>
+                    <p className="font-mono text-[11px] text-muted-foreground">owner: {row.created_by ?? "-"}</p>
                   </div>
                 </td>
                 <td className="px-3 py-3">
@@ -183,16 +200,20 @@ export default async function AdminScenesPage({
                       </p>
                     </div>
                   ) : (
-                    <p className="text-xs text-destructive">scene_json 结构异常</p>
+                    <p className="text-xs text-destructive">{LABELS.invalidSceneJson}</p>
                   )}
                 </td>
                 <td className="px-3 py-3">
                   <Badge variant="outline">{row.origin}</Badge>
                 </td>
-                <td className="px-3 py-3">{row.is_public ? "公开" : "私有"}</td>
+                <td className="px-3 py-3">{row.is_public ? LABELS.public : LABELS.private}</td>
                 <td className="px-3 py-3 whitespace-nowrap text-xs text-muted-foreground">
-                  <div>更新: {row.updated_at}</div>
-                  <div>创建: {row.created_at}</div>
+                  <div>
+                    {LABELS.updated}: {row.updated_at}
+                  </div>
+                  <div>
+                    {LABELS.created}: {row.created_at}
+                  </div>
                 </td>
                 <td className="px-3 py-3">
                   <div className="flex flex-wrap items-center gap-2">
@@ -205,18 +226,21 @@ export default async function AdminScenesPage({
                         sections={editorSections}
                       />
                     ) : (
-                      <span className="text-xs text-muted-foreground">不可编辑</span>
+                      <span className="text-xs text-muted-foreground">{LABELS.notEditable}</span>
                     )}
                     <form action={deleteSceneAction}>
                       <input type="hidden" name="sceneId" value={row.id} />
-                      <Button
+                      <input type="hidden" name="returnTo" value={currentHref} />
+                      <ConfirmButton
                         type="submit"
                         size="sm"
                         variant="ghost"
                         className={`${APPLE_BUTTON_DANGER} ${APPLE_BUTTON_TEXT_SM}`}
+                        confirmText={`${LABELS.deleteConfirm}${row.title}${LABELS.deleteConfirmTail}`}
+                        finalConfirmText={LABELS.deleteFinal}
                       >
-                        删除
-                      </Button>
+                        {LABELS.delete}
+                      </ConfirmButton>
                     </form>
                   </div>
                 </td>
@@ -225,36 +249,25 @@ export default async function AdminScenesPage({
             {rows.length === 0 ? (
               <tr>
                 <td colSpan={6} className="px-3 py-6 text-center text-muted-foreground">
-                  未找到场景。
+                  {LABELS.empty}
                 </td>
               </tr>
             ) : null}
           </tbody>
         </table>
-      </div>
+      </AdminTableShell>
 
-      <div className="flex items-center justify-between text-xs text-muted-foreground">
-        <p>
-          显示 {(result.page - 1) * result.pageSize + 1}-
-          {Math.min(result.page * result.pageSize, result.total)} / 共 {result.total}
-        </p>
-        <div className="flex items-center gap-2">
-          {hasPrev ? (
-            <Link href={buildListUrl(result.page - 1)} className={`${appleButtonClassName} px-2 py-1`}>
-              上一页
-            </Link>
-          ) : (
-            <span className={`${appleButtonClassName} px-2 py-1 opacity-40`}>上一页</span>
-          )}
-          {hasNext ? (
-            <Link href={buildListUrl(result.page + 1)} className={`${appleButtonClassName} px-2 py-1`}>
-              下一页
-            </Link>
-          ) : (
-            <span className={`${appleButtonClassName} px-2 py-1 opacity-40`}>下一页</span>
-          )}
-        </div>
-      </div>
+      <AdminPagination
+        summary={
+          <>
+            {LABELS.summaryPrefix} {(result.page - 1) * result.pageSize + 1}-
+            {Math.min(result.page * result.pageSize, result.total)} {LABELS.summaryMiddle}
+            {result.total}
+          </>
+        }
+        prevHref={result.page > 1 ? buildListUrl(result.page - 1) : null}
+        nextHref={result.page * result.pageSize < result.total ? buildListUrl(result.page + 1) : null}
+      />
     </div>
   );
 }

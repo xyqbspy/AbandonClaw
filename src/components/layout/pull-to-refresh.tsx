@@ -17,6 +17,7 @@ const shouldEnablePullRefresh = (pathname: string) => {
     "/admin/imported",
     "/admin/variants",
     "/admin/cache",
+    "/admin/tts",
   ]);
   if (exact.has(normalized)) return true;
   return false;

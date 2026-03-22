@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { requireCurrentProfile } from "@/lib/server/auth";
 import { toApiErrorResponse } from "@/lib/server/api-error";
-import { updateSceneProgress } from "@/lib/server/services/learning-service";
+import { updateSceneProgress } from "@/lib/server/learning/service";
 import {
+  parseJsonBody,
   parseOptionalNonNegativeDelta,
   parseOptionalNonNegativeInt,
   parseProgressPercent,
@@ -23,7 +24,7 @@ export async function POST(
   try {
     const { user } = await requireCurrentProfile();
     const { slug } = await context.params;
-    const payload = (await request.json()) as UpdateProgressPayload;
+    const payload = await parseJsonBody<UpdateProgressPayload>(request);
 
     const result = await updateSceneProgress(user.id, slug, {
       progressPercent:

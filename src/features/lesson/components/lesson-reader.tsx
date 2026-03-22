@@ -42,6 +42,8 @@ import {
 } from "@/lib/shared/lesson-content";
 import {
   playChunkAudio,
+  prefetchChunkAudio,
+  prefetchSentenceAudio,
   playSceneLoopAudio,
   playSentenceAudio,
   setTtsLooping,
@@ -67,6 +69,8 @@ const speakerLabel = (speaker?: string) => normalizeSpeaker(speaker);
 const TOOLBAR_WIDTH = 256;
 const appleButtonLgClassName = `${APPLE_BUTTON_BASE} ${APPLE_BUTTON_TEXT_LG}`;
 const hasSpeakerTag = (speaker?: string) => /^[A-Z]$/.test((speaker ?? "").trim().toUpperCase());
+const getSentenceSpeakText = (sentence: LessonSentence) =>
+  (sentence.tts?.trim() || sentence.audioText?.trim() || sentence.text).trim();
 
 export function LessonReader({
   lesson,
@@ -306,6 +310,47 @@ export function LessonReader({
   );
 
   useEffect(() => {
+    const anchorSentence =
+      (state.activeSentenceId
+        ? sentenceOrder.find((item) => item.id === state.activeSentenceId)
+        : null) ?? firstSentence;
+    if (!anchorSentence) return;
+
+    const anchorIndex = sentenceOrder.findIndex((item) => item.id === anchorSentence.id);
+    const candidateSentences = [
+      anchorSentence,
+      anchorIndex >= 0 ? sentenceOrder[anchorIndex + 1] ?? null : null,
+    ].filter((item): item is LessonSentence => Boolean(item));
+
+    const timer = window.setTimeout(() => {
+      for (const sentence of candidateSentences) {
+        const text = getSentenceSpeakText(sentence);
+        if (!text) continue;
+        void prefetchSentenceAudio({
+          sceneSlug: lesson.slug,
+          sentenceId: sentence.id,
+          text,
+          speaker: sentence.speaker,
+          mode: "normal",
+        });
+      }
+
+      for (const chunkText of anchorSentence.chunks.slice(0, 2)) {
+        const clean = chunkText.trim();
+        if (!clean) continue;
+        void prefetchChunkAudio({
+          chunkText: clean,
+          chunkKey: buildChunkAudioKey(clean),
+        });
+      }
+    }, 80);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [firstSentence, lesson.slug, sentenceOrder, state.activeSentenceId]);
+
+  useEffect(() => {
     // Temporary debugging aid for race/ownership validation.
     console.log("[lesson-state]", {
       activeSentenceId: state.activeSentenceId,
@@ -469,7 +514,7 @@ export function LessonReader({
             await playSentenceAudio({
               sceneSlug: lesson.slug,
               sentenceId: sentence.id,
-              text: sentence.tts?.trim() || sentence.audioText?.trim() || sentence.text,
+              text: getSentenceSpeakText(sentence),
               mode: "normal",
               speaker: sentence.speaker,
             });

@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { TtsActionButton } from "@/components/audio/tts-action-button";
 import { useTtsPlaybackState } from "@/hooks/use-tts-playback-state";
 import { normalizePhraseText } from "@/lib/shared/phrases";
-import { playChunkAudio, stopTtsPlayback } from "@/lib/utils/tts-api";
+import { playChunkAudio, prefetchChunkAudio, stopTtsPlayback } from "@/lib/utils/tts-api";
 import { generateExpressionMapFromApi } from "@/lib/utils/expression-map-api";
 import { ExpressionCluster, ExpressionMapResponse } from "@/lib/types/expression-map";
 import {
@@ -715,37 +715,6 @@ export default function ChunksPage() {
     resolveFocusMainExpressionIdForRow,
   ]);
 
-  useEffect(() => {
-    if (contentFilter !== "expression") return;
-    if (focusMainExpressionRows.length === 0) {
-      setFocusExpressionId("");
-      resetFocusAssist();
-      return;
-    }
-    const resolvedId = resolveFocusExpressionId({
-      contentFilter,
-      focusExpressionId,
-      focusMainExpressionIds: focusMainExpressionRows.map((row) => row.userPhraseId),
-      resolveFocusMainExpressionId: resolveFocusMainExpressionIdForRow,
-    });
-    if (!resolvedId) {
-      setFocusExpressionId("");
-      return;
-    }
-    if (!focusMainExpressionRows.some((row) => row.userPhraseId === resolvedId)) {
-      setFocusExpressionId(focusMainExpressionRows[0].userPhraseId);
-      return;
-    }
-    if (resolvedId !== focusExpressionId) {
-      setFocusExpressionId(resolvedId);
-    }
-  }, [contentFilter, focusExpressionId, focusMainExpressionRows, resolveFocusMainExpressionIdForRow]);
-
-  useEffect(() => {
-    resetFocusAssist();
-    setFocusRelationTab("similar");
-  }, [focusExpressionId, resetFocusAssist]);
-
   const clusterFilterExpressionLabel = useMemo(() => {
     return resolveClusterFilterExpressionLabel({
       expressionClusterFilterId,
@@ -867,6 +836,26 @@ export default function ChunksPage() {
       });
   }, [moveIntoClusterCandidates]);
 
+  const {
+    focusAssistLoading,
+    focusAssistData,
+    resetFocusAssist,
+    loadFocusAssist,
+    savingFocusCandidateKey,
+    saveFocusCandidate,
+  } = useFocusAssist({
+    expressionRows,
+    onLoadFailed: (message) => {
+      toast.error(message || zh.loadFailed);
+    },
+    onCandidateSaved: async ({ focusItem, candidate, kind }) => {
+      await loadPhrases(query, reviewFilter, contentFilter, expressionClusterFilterId, {
+        preferCache: false,
+      });
+      invalidateSavedRelations([focusItem.userPhraseId]);
+      toast.success(zh.addSelectedSimilarSuccess);
+    },
+  });
   const focusSimilarItems = useMemo(() => {
     const items: Array<{
       key: string;
@@ -974,27 +963,6 @@ export default function ChunksPage() {
     },
   });
   const {
-    focusAssistLoading,
-    focusAssistData,
-    setFocusAssistData,
-    resetFocusAssist,
-    loadFocusAssist,
-    savingFocusCandidateKey,
-    saveFocusCandidate,
-  } = useFocusAssist({
-    expressionRows,
-    onLoadFailed: (message) => {
-      toast.error(message || zh.loadFailed);
-    },
-    onCandidateSaved: async ({ focusItem, candidate, kind }) => {
-      await loadPhrases(query, reviewFilter, contentFilter, expressionClusterFilterId, {
-        preferCache: false,
-      });
-      invalidateSavedRelations([focusItem.userPhraseId]);
-      toast.success(zh.addSelectedSimilarSuccess);
-    },
-  });
-  const {
     manualExpressionAssist,
     manualAssistLoading,
     manualSelectedMap,
@@ -1018,35 +986,36 @@ export default function ChunksPage() {
       toast.error(message || zh.loadFailed);
     },
   });
-  const {
-    similarSheetOpen,
-    setSimilarSheetOpen,
-    similarSeedExpression,
-    generatingSimilarForId,
-    generatedSimilarCandidates,
-    selectedSimilarMap,
-    savingSelectedSimilar,
-    openGenerateSimilarSheet,
-    toggleCandidateSelected,
-    saveSelectedSimilarCandidates,
-    resetGeneratedSimilarSheet,
-  } = useGeneratedSimilarSheet({
-    expressionRows,
-    normalizeSimilarLabel,
-    onLoadCluster: async (clusterId) => {
-      await loadPhrases(query, reviewFilter, contentFilter, clusterId, { preferCache: false });
-    },
-    onApplyClusterFilter: applyClusterFilter,
-    onSelectAtLeastOne: () => {
-      toast.message(zh.selectAtLeastOne);
-    },
-    onSuccess: () => {
-      toast.success(zh.addSelectedSimilarSuccess);
-    },
-    onError: (message) => {
-      toast.error(message || zh.loadFailed);
-    },
-  });
+  useEffect(() => {
+    if (contentFilter !== "expression") return;
+    if (focusMainExpressionRows.length === 0) {
+      setFocusExpressionId("");
+      resetFocusAssist();
+      return;
+    }
+    const resolvedId = resolveFocusExpressionId({
+      contentFilter,
+      focusExpressionId,
+      focusMainExpressionIds: focusMainExpressionRows.map((row) => row.userPhraseId),
+      resolveFocusMainExpressionId: resolveFocusMainExpressionIdForRow,
+    });
+    if (!resolvedId) {
+      setFocusExpressionId("");
+      return;
+    }
+    if (!focusMainExpressionRows.some((row) => row.userPhraseId === resolvedId)) {
+      setFocusExpressionId(focusMainExpressionRows[0].userPhraseId);
+      return;
+    }
+    if (resolvedId !== focusExpressionId) {
+      setFocusExpressionId(resolvedId);
+    }
+  }, [contentFilter, focusExpressionId, focusMainExpressionRows, resetFocusAssist, resolveFocusMainExpressionIdForRow]);
+
+  useEffect(() => {
+    resetFocusAssist();
+    setFocusRelationTab("similar");
+  }, [focusExpressionId, resetFocusAssist]);
 
   useEffect(() => {
     const sourceItems = focusRelationTab === "contrast" ? focusContrastItems : focusSimilarItems;
@@ -1284,6 +1253,36 @@ export default function ChunksPage() {
     setExpressionClusterFilterId(next.nextClusterId);
   };
 
+  const {
+    similarSheetOpen,
+    setSimilarSheetOpen,
+    similarSeedExpression,
+    generatingSimilarForId,
+    generatedSimilarCandidates,
+    selectedSimilarMap,
+    savingSelectedSimilar,
+    openGenerateSimilarSheet,
+    toggleCandidateSelected,
+    saveSelectedSimilarCandidates,
+    resetGeneratedSimilarSheet,
+  } = useGeneratedSimilarSheet({
+    expressionRows,
+    normalizeSimilarLabel,
+    onLoadCluster: async (clusterId) => {
+      await loadPhrases(query, reviewFilter, contentFilter, clusterId, { preferCache: false });
+    },
+    onApplyClusterFilter: applyClusterFilter,
+    onSelectAtLeastOne: () => {
+      toast.message(zh.selectAtLeastOne);
+    },
+    onSuccess: () => {
+      toast.success(zh.addSelectedSimilarSuccess);
+    },
+    onError: (message) => {
+      toast.error(message || zh.loadFailed);
+    },
+  });
+
   const retryAiEnrichment = async (item: UserPhraseItemResponse) => {
     if (item.learningItemType !== "expression") return;
     if (retryingEnrichmentIds[item.userPhraseId]) return;
@@ -1346,6 +1345,34 @@ export default function ChunksPage() {
     })();
   };
 
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      const warmupItems = phrases.slice(0, 6);
+      for (const item of warmupItems) {
+        const text = item.text.trim();
+        if (text) {
+          void prefetchChunkAudio({
+            chunkText: text,
+            chunkKey: buildChunkAudioKey(text),
+          });
+        }
+
+        const exampleText =
+          item.exampleSentences[0]?.en?.trim() || item.sourceSentenceText?.trim() || "";
+        if (exampleText) {
+          void prefetchChunkAudio({
+            chunkText: exampleText,
+            chunkKey: buildChunkAudioKey(exampleText),
+          });
+        }
+      }
+    }, 120);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [phrases]);
+
   const getReviewActionHint = (status: PhraseReviewStatus) => {
     if (status === "reviewing") return zh.reviewActionReviewingHint;
     if (status === "mastered") return zh.reviewActionMasteredHint;
@@ -1383,6 +1410,41 @@ export default function ChunksPage() {
       savedRelationLoadingKey,
     ],
   );
+
+  useEffect(() => {
+    if (!focusDetailOpen || !focusDetail) return;
+
+    const timer = window.setTimeout(() => {
+      const candidateTexts = [
+        focusDetailViewModel.detailSpeakText,
+        ...(focusDetail.savedItem?.exampleSentences ?? focusDetailViewModel.activeAssistItem?.examples ?? [])
+          .map((item) => item.en?.trim())
+          .filter(Boolean),
+        ...focusDetailViewModel.similarRows.slice(0, 2).map((row) => row.text.trim()),
+        ...focusDetailViewModel.contrastRows.slice(0, 2).map((row) => row.text.trim()),
+      ];
+
+      for (const text of candidateTexts) {
+        const clean = (text ?? "").trim();
+        if (!clean) continue;
+        void prefetchChunkAudio({
+          chunkText: clean,
+          chunkKey: buildChunkAudioKey(clean),
+        });
+      }
+    }, 80);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [
+    focusDetail,
+    focusDetailOpen,
+    focusDetailViewModel.activeAssistItem,
+    focusDetailViewModel.contrastRows,
+    focusDetailViewModel.detailSpeakText,
+    focusDetailViewModel.similarRows,
+  ]);
   const focusDetailLabels = useMemo(
     () =>
       buildFocusDetailLabels({
@@ -1570,6 +1632,195 @@ export default function ChunksPage() {
     } finally {
       setSavingManual(false);
     }
+  };
+
+  const manualSheetPrimaryActionLabel = savingManual || savingManualSentence
+    ? `${
+        manualItemType === "sentence"
+          ? zh.saveSentence
+          : manualExpressionAssist
+            ? zh.saveSelectedExpressions
+            : zh.saveToLibrary
+      }...`
+    : manualItemType === "sentence"
+      ? zh.saveSentence
+      : manualExpressionAssist
+        ? zh.saveSelectedExpressions
+        : zh.saveToLibrary;
+  const manualSheetIsSaving = savingManual || savingManualSentence;
+  const similarSheetSubmitLabel = savingSelectedSimilar ? `${zh.addSelectedSimilar}...` : zh.addSelectedSimilar;
+
+  const focusDetailSheetProps = {
+    open: focusDetailOpen,
+    detail: focusDetail,
+    detailTab: focusDetailTab,
+    detailLoading: focusDetailLoading,
+    detailActionsOpen: focusDetailActionsOpen,
+    detailConfirmAction,
+    trailLength: focusDetailTrail.length,
+    canShowSiblingNav: Boolean(
+      focusDetail &&
+        focusDetail.kind !== "current" &&
+        (focusRelationTab === "contrast" ? focusContrastItems.length : focusSimilarItems.length) > 1,
+    ),
+    canShowFindRelations: focusDetailViewModel.canShowFindRelations,
+    focusAssistLoading,
+    movingIntoCluster,
+    ensuringMoveTargetCluster,
+    detachingClusterMember,
+    canSetCurrentClusterMain,
+    canMoveIntoCurrentCluster,
+    canSetStandaloneMain,
+    savingFocusCandidate: Boolean(
+      !focusExpression ||
+        !focusDetail ||
+        savingFocusCandidateKey ===
+          `${focusDetail.kind === "contrast" ? "contrast" : "similar"}:${normalizePhraseText(focusDetail.text)}`,
+    ),
+    primaryActionLabel: focusDetail?.savedItem ? getPrimaryActionLabel(focusDetail.savedItem) : undefined,
+    appleButtonClassName,
+    activeAssistItem: focusDetailViewModel.activeAssistItem,
+    isDetailSpeaking: Boolean(
+      focusDetailViewModel.detailSpeakText &&
+        (playingText === focusDetailViewModel.detailSpeakText ||
+          ttsPlaybackState.text === focusDetailViewModel.detailSpeakText),
+    ),
+    detailSpeakText: focusDetailViewModel.detailSpeakText,
+    similarRows: focusDetailViewModel.similarRows,
+    contrastRows: focusDetailViewModel.contrastRows,
+    isSavedRelatedLoading: focusDetailViewModel.isSavedRelatedLoading,
+    usageHint: focusDetailViewModel.usageHint,
+    typicalScenario: focusDetailViewModel.typicalScenario,
+    semanticFocus: focusDetailViewModel.semanticFocus,
+    reviewHint: focusDetailViewModel.reviewHint,
+    exampleCards: focusDetail
+      ? (renderExampleSentenceCards(
+          focusDetail.savedItem?.exampleSentences ?? focusDetailViewModel.activeAssistItem?.examples ?? [],
+          focusDetail.text,
+          {
+            onSpeak: handlePronounceSentence,
+            isSpeakingText: (text) =>
+              Boolean(text) &&
+              (playingText === text.trim() || ttsPlaybackState.text === text.trim()),
+          },
+        ) ?? null)
+      : null,
+    labels: focusDetailLabels,
+  };
+
+  const focusDetailSheetHandlers = {
+    onOpenChange: (open: boolean) => {
+      setFocusDetailOpen(open);
+      if (!open) {
+        const nextState = buildFocusDetailCloseState();
+        setFocusDetailActionsOpen(nextState.actionsOpen);
+        setFocusDetailTrail(nextState.trail);
+        setFocusDetailTab(nextState.tab);
+      }
+    },
+    onReopenPrevTrail: () => reopenFocusTrailItem(focusDetailTrail.length - 2),
+    onFindRelations: () => {
+      if (!focusDetail?.savedItem) return;
+      void loadFocusAssist(focusDetail.savedItem);
+    },
+    onOpenPrevSibling: () => openFocusSiblingDetail(-1),
+    onOpenNextSibling: () => openFocusSiblingDetail(1),
+    onSetDetailActionsOpen: setFocusDetailActionsOpen,
+    onRequestSetCurrentClusterMain: () => {
+      setFocusDetailActionsOpen(false);
+      setDetailConfirmAction("set-cluster-main");
+    },
+    onRequestMoveIntoCluster: () => {
+      void openMoveIntoCurrentCluster();
+    },
+    onRequestSetStandaloneMain: () => {
+      if (!focusDetail?.savedItem?.expressionClusterId) return;
+      setFocusDetailActionsOpen(false);
+      setDetailConfirmAction("set-standalone-main");
+    },
+    onPrimaryAction: () => {
+      if (!focusDetail?.savedItem) return;
+      startReviewFromCard(focusDetail.savedItem as UserPhraseItemResponse);
+      setFocusDetailOpen(false);
+    },
+    onSecondaryAction: () => {
+      if (!focusExpression || !focusDetail) return;
+      void saveFocusCandidate(
+        focusExpression,
+        {
+          text: focusDetail.text,
+          differenceLabel: focusDetail.differenceLabel ?? "相关说法",
+        },
+        focusDetail.kind === "contrast" ? "contrast" : "similar",
+      );
+    },
+    onSpeak: handlePronounceSentence,
+    onTabChange: (nextTab: "info" | "similar" | "contrast") => {
+      setFocusDetailTab(nextTab);
+      setFocusRelationTab(
+        resolveFocusRelationTabOnDetailTabChange(nextTab, focusRelationTab),
+      );
+    },
+    onOpenSimilarRow: (row: UserPhraseItemResponse) => {
+      setFocusRelationTab("similar");
+      void openFocusDetail({
+        text: row.text,
+        kind: "library-similar",
+        chainMode: "append",
+      });
+    },
+    onOpenContrastRow: (row: UserPhraseItemResponse) => {
+      setFocusRelationTab("contrast");
+      void openFocusDetail({
+        text: row.text,
+        kind: "contrast",
+        chainMode: "append",
+      });
+    },
+    onCloseConfirm: () => setDetailConfirmAction(null),
+    onConfirm: () => {
+      if (detailConfirmAction === "set-cluster-main") {
+        void setFocusDetailAsClusterMain();
+        return;
+      }
+      void detachFocusDetailFromCluster();
+    },
+  };
+
+  const moveIntoClusterSheetProps = {
+    open: moveIntoClusterOpen,
+    focusExpression,
+    groups: moveIntoClusterGroups,
+    expandedGroups: expandedMoveIntoClusterGroups,
+    selectedMap: selectedMoveIntoClusterMap,
+    submitting: movingIntoCluster,
+    appleButtonClassName,
+    labels: {
+      close: zh.close,
+      title: zh.moveIntoClusterTitle,
+      description: zh.moveIntoClusterDesc,
+      currentMain: zh.moveIntoClusterCurrentMain,
+      empty: zh.moveIntoClusterEmpty,
+      selectGroup: zh.moveIntoClusterSelectGroup,
+      selectedGroup: zh.moveIntoClusterSelectedGroup,
+      coveredByMain: zh.moveIntoClusterCoveredByMain,
+      submit: zh.moveIntoClusterSubmit,
+      mainExpression: zh.moveIntoClusterMainExpression,
+      subExpression: zh.moveIntoClusterSubExpression,
+      selected: "已选",
+      unselected: "未选",
+      covered: "已覆盖",
+    },
+    onOpenChange: (open: boolean) => {
+      setMoveIntoClusterOpen(open);
+      if (!open) {
+        resetMoveIntoClusterSelection();
+      }
+    },
+    onToggleGroupExpand: toggleMoveIntoClusterGroupExpand,
+    onToggleGroupSelect: toggleMoveIntoClusterGroupSelect,
+    onToggleCandidate: toggleMoveIntoClusterCandidate,
+    onSubmit: () => void handleMoveSelectedIntoCurrentCluster(),
   };
 
   return (
@@ -2312,32 +2563,20 @@ export default function ChunksPage() {
                 type="button"
                 variant="ghost"
                 className={appleButtonClassName}
-                disabled={savingManual || savingManualSentence}
+                disabled={manualSheetIsSaving}
                 onClick={() => void handleSaveManualExpression("save")}
               >
-                {savingManual || savingManualSentence
-                  ? `${
-                      manualItemType === "sentence"
-                        ? zh.saveSentence
-                        : manualExpressionAssist
-                          ? zh.saveSelectedExpressions
-                          : zh.saveToLibrary
-                    }...`
-                  : manualItemType === "sentence"
-                    ? zh.saveSentence
-                    : manualExpressionAssist
-                      ? zh.saveSelectedExpressions
-                      : zh.saveToLibrary}
+                {manualSheetPrimaryActionLabel}
               </Button>
               {manualItemType === "expression" ? (
                 <Button
                   type="button"
                   variant="ghost"
                   className={appleButtonClassName}
-                  disabled={savingManual || savingManualSentence}
+                  disabled={manualSheetIsSaving}
                   onClick={() => void handleSaveManualExpression("save_and_review")}
                 >
-                  {savingManual || savingManualSentence ? `${zh.saveAndReview}...` : zh.saveAndReview}
+                  {manualSheetIsSaving ? `${zh.saveAndReview}...` : zh.saveAndReview}
                 </Button>
               ) : null}
             </div>
@@ -2411,188 +2650,16 @@ export default function ChunksPage() {
                 disabled={savingSelectedSimilar || generatingSimilarForId !== null}
                 onClick={() => void saveSelectedSimilarCandidates()}
               >
-                {savingSelectedSimilar ? `${zh.addSelectedSimilar}...` : zh.addSelectedSimilar}
+                {similarSheetSubmitLabel}
               </Button>
             </div>
           </SheetFooter>
         </SheetContent>
       </Sheet>
 
-      <FocusDetailSheet
-        open={focusDetailOpen}
-        detail={focusDetail}
-        detailTab={focusDetailTab}
-        detailLoading={focusDetailLoading}
-        detailActionsOpen={focusDetailActionsOpen}
-        detailConfirmAction={detailConfirmAction}
-        trailLength={focusDetailTrail.length}
-        canShowSiblingNav={Boolean(
-          focusDetail &&
-            focusDetail.kind !== "current" &&
-            (focusRelationTab === "contrast" ? focusContrastItems.length : focusSimilarItems.length) > 1,
-        )}
-        canShowFindRelations={focusDetailViewModel.canShowFindRelations}
-        focusAssistLoading={focusAssistLoading}
-        movingIntoCluster={movingIntoCluster}
-        ensuringMoveTargetCluster={ensuringMoveTargetCluster}
-        detachingClusterMember={detachingClusterMember}
-        canSetCurrentClusterMain={canSetCurrentClusterMain}
-        canMoveIntoCurrentCluster={canMoveIntoCurrentCluster}
-        canSetStandaloneMain={canSetStandaloneMain}
-        savingFocusCandidate={Boolean(
-          !focusExpression ||
-            !focusDetail ||
-            savingFocusCandidateKey ===
-              `${focusDetail.kind === "contrast" ? "contrast" : "similar"}:${normalizePhraseText(focusDetail.text)}`,
-        )}
-        primaryActionLabel={focusDetail?.savedItem ? getPrimaryActionLabel(focusDetail.savedItem) : undefined}
-        appleButtonClassName={appleButtonClassName}
-        activeAssistItem={focusDetailViewModel.activeAssistItem}
-        isDetailSpeaking={Boolean(
-          focusDetailViewModel.detailSpeakText &&
-            (playingText === focusDetailViewModel.detailSpeakText ||
-              ttsPlaybackState.text === focusDetailViewModel.detailSpeakText),
-        )}
-        detailSpeakText={focusDetailViewModel.detailSpeakText}
-        similarRows={focusDetailViewModel.similarRows}
-        contrastRows={focusDetailViewModel.contrastRows}
-        isSavedRelatedLoading={focusDetailViewModel.isSavedRelatedLoading}
-        usageHint={focusDetailViewModel.usageHint}
-        typicalScenario={focusDetailViewModel.typicalScenario}
-        semanticFocus={focusDetailViewModel.semanticFocus}
-        reviewHint={focusDetailViewModel.reviewHint}
-        exampleCards={
-          focusDetail
-            ? (() => {
-                return (
-                  renderExampleSentenceCards(
-                    focusDetail.savedItem?.exampleSentences ?? focusDetailViewModel.activeAssistItem?.examples ?? [],
-                    focusDetail.text,
-                    {
-                      onSpeak: handlePronounceSentence,
-                      isSpeakingText: (text) =>
-                        Boolean(text) &&
-                        (playingText === text.trim() || ttsPlaybackState.text === text.trim()),
-                    },
-                  ) ?? null
-                );
-              })()
-            : null
-        }
-        labels={focusDetailLabels}
-        onOpenChange={(open) => {
-          setFocusDetailOpen(open);
-          if (!open) {
-            const nextState = buildFocusDetailCloseState();
-            setFocusDetailActionsOpen(nextState.actionsOpen);
-            setFocusDetailTrail(nextState.trail);
-            setFocusDetailTab(nextState.tab);
-          }
-        }}
-        onReopenPrevTrail={() => reopenFocusTrailItem(focusDetailTrail.length - 2)}
-        onFindRelations={() => {
-          if (!focusDetail?.savedItem) return;
-          void loadFocusAssist(focusDetail.savedItem);
-        }}
-        onOpenPrevSibling={() => openFocusSiblingDetail(-1)}
-        onOpenNextSibling={() => openFocusSiblingDetail(1)}
-        onSetDetailActionsOpen={setFocusDetailActionsOpen}
-        onRequestSetCurrentClusterMain={() => {
-          setFocusDetailActionsOpen(false);
-          setDetailConfirmAction("set-cluster-main");
-        }}
-        onRequestMoveIntoCluster={() => {
-          void openMoveIntoCurrentCluster();
-        }}
-        onRequestSetStandaloneMain={() => {
-          if (!focusDetail?.savedItem?.expressionClusterId) return;
-          setFocusDetailActionsOpen(false);
-          setDetailConfirmAction("set-standalone-main");
-        }}
-        onPrimaryAction={() => {
-          if (!focusDetail?.savedItem) return;
-          startReviewFromCard(focusDetail.savedItem as UserPhraseItemResponse);
-          setFocusDetailOpen(false);
-        }}
-        onSecondaryAction={() => {
-          if (!focusExpression || !focusDetail) return;
-          void saveFocusCandidate(
-            focusExpression,
-            {
-              text: focusDetail.text,
-              differenceLabel: focusDetail.differenceLabel ?? "相关说法",
-            },
-            focusDetail.kind === "contrast" ? "contrast" : "similar",
-          );
-        }}
-        onSpeak={handlePronounceSentence}
-        onTabChange={(nextTab) => {
-          setFocusDetailTab(nextTab);
-          setFocusRelationTab(
-            resolveFocusRelationTabOnDetailTabChange(nextTab, focusRelationTab),
-          );
-        }}
-        onOpenSimilarRow={(row) => {
-          setFocusRelationTab("similar");
-          void openFocusDetail({
-            text: row.text,
-            kind: "library-similar",
-            chainMode: "append",
-          });
-        }}
-        onOpenContrastRow={(row) => {
-          setFocusRelationTab("contrast");
-          void openFocusDetail({
-            text: row.text,
-            kind: "contrast",
-            chainMode: "append",
-          });
-        }}
-        onCloseConfirm={() => setDetailConfirmAction(null)}
-        onConfirm={() => {
-          if (detailConfirmAction === "set-cluster-main") {
-            void setFocusDetailAsClusterMain();
-            return;
-          }
-          void detachFocusDetailFromCluster();
-        }}
-      />
+      <FocusDetailSheet {...focusDetailSheetProps} {...focusDetailSheetHandlers} />
 
-      <MoveIntoClusterSheet
-        open={moveIntoClusterOpen}
-        focusExpression={focusExpression}
-        groups={moveIntoClusterGroups}
-        expandedGroups={expandedMoveIntoClusterGroups}
-        selectedMap={selectedMoveIntoClusterMap}
-        submitting={movingIntoCluster}
-        appleButtonClassName={appleButtonClassName}
-        labels={{
-          close: zh.close,
-          title: zh.moveIntoClusterTitle,
-          description: zh.moveIntoClusterDesc,
-          currentMain: zh.moveIntoClusterCurrentMain,
-          empty: zh.moveIntoClusterEmpty,
-          selectGroup: zh.moveIntoClusterSelectGroup,
-          selectedGroup: zh.moveIntoClusterSelectedGroup,
-          coveredByMain: zh.moveIntoClusterCoveredByMain,
-          submit: zh.moveIntoClusterSubmit,
-          mainExpression: zh.moveIntoClusterMainExpression,
-          subExpression: zh.moveIntoClusterSubExpression,
-          selected: "已选",
-          unselected: "未选",
-          covered: "已覆盖",
-        }}
-        onOpenChange={(open) => {
-          setMoveIntoClusterOpen(open);
-          if (!open) {
-            resetMoveIntoClusterSelection();
-          }
-        }}
-        onToggleGroupExpand={toggleMoveIntoClusterGroupExpand}
-        onToggleGroupSelect={toggleMoveIntoClusterGroupSelect}
-        onToggleCandidate={toggleMoveIntoClusterCandidate}
-        onSubmit={() => void handleMoveSelectedIntoCurrentCluster()}
-      />
+      <MoveIntoClusterSheet {...moveIntoClusterSheetProps} />
 
       <ExpressionMapSheet
         open={mapOpen}

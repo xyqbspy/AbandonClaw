@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireCurrentProfile } from "@/lib/server/auth";
 import { toApiErrorResponse } from "@/lib/server/api-error";
-import { pauseSceneLearning } from "@/lib/server/services/learning-service";
+import { pauseSceneLearning } from "@/lib/server/learning/service";
 
 export async function POST(
   _request: Request,

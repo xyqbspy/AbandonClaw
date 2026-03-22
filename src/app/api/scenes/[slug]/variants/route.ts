@@ -2,11 +2,11 @@ import { NextResponse } from "next/server";
 import { requireCurrentProfile } from "@/lib/server/auth";
 import { toApiErrorResponse } from "@/lib/server/api-error";
 import { NotFoundError } from "@/lib/server/errors";
-import { getSceneRecordBySlug } from "@/lib/server/services/scene-service";
+import { getSceneRecordBySlug } from "@/lib/server/scene/service";
 import {
   generateSceneVariants,
   getSceneVariantsBySceneId,
-} from "@/lib/server/services/variant-service";
+} from "@/lib/server/scene/variants";
 import { isValidParsedScene } from "@/lib/server/scene-json";
 import {
   parseOptionalTrimmedString,

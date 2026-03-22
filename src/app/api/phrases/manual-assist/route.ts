@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireCurrentProfile } from "@/lib/server/auth";
+import { toApiErrorResponse } from "@/lib/server/api-error";
+import { ValidationError } from "@/lib/server/errors";
 import { callGlmChatCompletion } from "@/lib/server/glm-client";
 import { extractJsonCandidate } from "@/lib/server/scene-json";
 import {
@@ -7,6 +9,7 @@ import {
   buildManualExpressionAssistUserPrompt,
   buildManualSentenceAssistUserPrompt,
 } from "@/lib/server/prompts/manual-phrase-assist-prompt";
+import { parseJsonBody } from "@/lib/server/validation";
 import { normalizePhraseText } from "@/lib/shared/phrases";
 
 const SIMILAR_LABELS = new Set([
@@ -68,16 +71,16 @@ const sanitizeCandidate = (params: {
 export async function POST(request: Request) {
   try {
     await requireCurrentProfile();
-    const payload = (await request.json()) as {
+    const payload = await parseJsonBody<{
       mode?: unknown;
       text?: unknown;
       existingExpressions?: unknown;
-    };
+    }>(request);
 
     const mode = safeTrim(payload.mode, 20);
     const text = safeTrim(payload.text, 3000);
     if (!text) {
-      return NextResponse.json({ error: "text is required." }, { status: 400 });
+      throw new ValidationError("text is required.");
     }
 
     if (mode === "sentence") {
@@ -89,7 +92,7 @@ export async function POST(request: Request) {
 
       const parsed = parseWithDiagnostics(rawText);
       if (!isObject(parsed) || parsed.version !== "v1" || !isObject(parsed.sentenceItem)) {
-        return NextResponse.json({ error: "Invalid sentence assist response." }, { status: 500 });
+        throw new Error("Invalid sentence assist response.");
       }
 
       const extractedExpressions = Array.isArray(parsed.sentenceItem.extractedExpressions)
@@ -138,7 +141,7 @@ export async function POST(request: Request) {
 
     const parsed = parseWithDiagnostics(rawText);
     if (!isObject(parsed) || parsed.version !== "v1" || !isObject(parsed.inputItem)) {
-      return NextResponse.json({ error: "Invalid expression assist response." }, { status: 500 });
+      throw new Error("Invalid expression assist response.");
     }
 
     const dedupe = new Set<string>();
@@ -181,37 +184,32 @@ export async function POST(request: Request) {
           .slice(0, 5)
       : [];
 
-      return NextResponse.json(
-        {
-          version: "v1",
-          inputItem: {
-            text,
-            translation: safeTrim(parsed.inputItem.translation, 200),
-            usageNote: safeTrim(parsed.inputItem.usageNote, 300),
-            examples: Array.isArray(parsed.inputItem.examples)
-              ? parsed.inputItem.examples
-                  .filter((item): item is Record<string, unknown> => isObject(item))
-                  .map((item) => ({
-                    en: safeTrim(item.en, 500),
-                    zh: safeTrim(item.zh, 200),
-                  }))
-                  .filter((item) => item.en && item.zh)
-                  .slice(0, 2)
-              : [],
-            semanticFocus: safeTrim(parsed.inputItem.semanticFocus, 40),
-            typicalScenario: safeTrim(parsed.inputItem.typicalScenario, 80),
-          },
+    return NextResponse.json(
+      {
+        version: "v1",
+        inputItem: {
+          text,
+          translation: safeTrim(parsed.inputItem.translation, 200),
+          usageNote: safeTrim(parsed.inputItem.usageNote, 300),
+          examples: Array.isArray(parsed.inputItem.examples)
+            ? parsed.inputItem.examples
+                .filter((item): item is Record<string, unknown> => isObject(item))
+                .map((item) => ({
+                  en: safeTrim(item.en, 500),
+                  zh: safeTrim(item.zh, 200),
+                }))
+                .filter((item) => item.en && item.zh)
+                .slice(0, 2)
+            : [],
+          semanticFocus: safeTrim(parsed.inputItem.semanticFocus, 40),
+          typicalScenario: safeTrim(parsed.inputItem.typicalScenario, 80),
+        },
         similarExpressions,
         contrastExpressions,
       },
       { status: 200 },
     );
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Failed to generate manual phrase assist.";
-    return NextResponse.json(
-      { error: `Manual phrase assist failed: ${message}` },
-      { status: 500 },
-    );
+    return toApiErrorResponse(error, "Manual phrase assist failed.");
   }
 }

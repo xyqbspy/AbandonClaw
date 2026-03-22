@@ -1,4 +1,6 @@
-﻿import { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
+import { toApiErrorResponse } from "@/lib/server/api-error";
+import { ValidationError } from "@/lib/server/errors";
 import { callGlmChatCompletion } from "@/lib/server/glm-client";
 import {
   buildSceneMutateUserPrompt,
@@ -8,6 +10,7 @@ import {
   isValidParsedScene,
   parseJsonWithFallback,
 } from "@/lib/server/scene-json";
+import { parseJsonBody } from "@/lib/server/validation";
 import { MutateSceneRequest, SceneMutateResponse } from "@/lib/types/scene-parser";
 
 const clamp = (value: number, min: number, max: number) =>
@@ -88,11 +91,11 @@ const isValidSceneMutateResponse = (
 
 export async function POST(request: Request) {
   try {
-    const payload = (await request.json()) as Partial<MutateSceneRequest>;
+    const payload = await parseJsonBody<Partial<MutateSceneRequest>>(request);
     const normalized = toValidMutatePayload(payload);
 
     if (!normalized.ok) {
-      return NextResponse.json({ error: normalized.error }, { status: 400 });
+      throw new ValidationError(normalized.error);
     }
 
     const { scene, variantCount, retainChunkRatio, theme } = normalized.value;
@@ -113,21 +116,11 @@ export async function POST(request: Request) {
     );
 
     if (!isValidSceneMutateResponse(parsed)) {
-      return NextResponse.json(
-        {
-          error: "Model output JSON does not match SceneMutateResponse basic structure.",
-        },
-        { status: 500 },
-      );
+      throw new Error("Model output JSON does not match SceneMutateResponse basic structure.");
     }
 
     return NextResponse.json(parsed, { status: 200 });
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Failed to mutate scene.";
-    return NextResponse.json(
-      { error: `Scene mutate failed: ${message}` },
-      { status: 500 },
-    );
+    return toApiErrorResponse(error, "Scene mutate failed.");
   }
 }

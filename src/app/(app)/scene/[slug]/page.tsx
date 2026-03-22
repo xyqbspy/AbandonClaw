@@ -29,10 +29,13 @@ import {
 } from "@/lib/utils/phrases-api";
 import { normalizePhraseText } from "@/lib/shared/phrases";
 import { buildChunkAudioKey } from "@/lib/shared/tts";
+import { getLessonSentences } from "@/lib/shared/lesson-content";
 import { useTtsPlaybackState } from "@/hooks/use-tts-playback-state";
 import {
   playChunkAudio,
   playSentenceAudio,
+  prefetchChunkAudio,
+  prefetchSentenceAudio,
   setTtsLooping,
   stopTtsPlayback,
 } from "@/lib/utils/tts-api";
@@ -379,6 +382,65 @@ export default function SceneDetailPage() {
     },
     [stopGeneratedAudio],
   );
+
+  useEffect(() => {
+    const warmupLesson = viewMode === "variant-study" ? activeVariantLesson : baseLesson;
+    if (!warmupLesson) return;
+
+    const timer = window.setTimeout(() => {
+      const sentences = getLessonSentences(warmupLesson).slice(0, 2);
+      for (const sentence of sentences) {
+        const text = (sentence.tts?.trim() || sentence.audioText?.trim() || sentence.text).trim();
+        if (!text) continue;
+        void prefetchSentenceAudio({
+          sceneSlug: warmupLesson.slug,
+          sentenceId: sentence.id,
+          text,
+          speaker: sentence.speaker,
+          mode: "normal",
+        });
+      }
+
+      const firstSentence = sentences[0];
+      for (const chunkText of firstSentence?.chunks.slice(0, 2) ?? []) {
+        const clean = chunkText.trim();
+        if (!clean) continue;
+        void prefetchChunkAudio({
+          chunkText: clean,
+          chunkKey: buildChunkAudioKey(clean),
+        });
+      }
+    }, 120);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [activeVariantLesson, baseLesson, viewMode]);
+
+  useEffect(() => {
+    if (!variantChunkModalOpen || !variantChunkSentence) return;
+
+    const sentenceText =
+      (variantChunkSentence.tts?.trim() ||
+        variantChunkSentence.audioText?.trim() ||
+        variantChunkSentence.text).trim();
+    if (sentenceText) {
+      void prefetchSentenceAudio({
+        sceneSlug: (baseLesson?.slug ?? sceneSlug).trim() || "scene",
+        sentenceId: variantChunkSentence.id,
+        text: sentenceText,
+        speaker: variantChunkSentence.speaker,
+        mode: "normal",
+      });
+    }
+
+    const chunkText = variantChunkDetail?.text?.trim();
+    if (!chunkText) return;
+    void prefetchChunkAudio({
+      chunkText,
+      chunkKey: buildChunkAudioKey(chunkText),
+    });
+  }, [baseLesson, sceneSlug, variantChunkDetail, variantChunkModalOpen, variantChunkSentence]);
 
   const handlePronounce = (text: string) => {
     const clean = text.trim();

@@ -148,7 +148,7 @@ export function SceneSentenceEditorSheet({
                     {section.title ? ` · ${section.title}` : ""}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    这里改的是句子内容、翻译、TTS 文本和 chunks。保存后会清掉该场景线上音频缓存。
+                    这里修改的是句子正文、翻译、TTS 文本和 chunks。保存后会清掉该场景的线上音频缓存。
                   </p>
                 </div>
 
@@ -161,7 +161,10 @@ export function SceneSentenceEditorSheet({
                     </div>
 
                     {block.sentences.map((sentence, sentenceIndex) => (
-                      <div key={sentence.sentenceId} className="space-y-2 rounded-xl border border-border/60 bg-background p-3">
+                      <div
+                        key={sentence.sentenceId}
+                        className="space-y-2 rounded-xl border border-border/60 bg-background p-3"
+                      >
                         <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                           <span>Sentence {sentenceIndex + 1}</span>
                           <span>ID: {sentence.sentenceId}</span>

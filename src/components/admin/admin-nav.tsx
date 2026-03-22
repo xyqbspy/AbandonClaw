@@ -12,6 +12,7 @@ const adminNavItems = [
   { label: "导入场景", href: "/admin/imported" },
   { label: "变体", href: "/admin/variants" },
   { label: "AI 缓存", href: "/admin/cache" },
+  { label: "TTS 缓存", href: "/admin/tts" },
 ];
 
 export function AdminNav() {

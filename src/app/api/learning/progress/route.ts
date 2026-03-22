@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireCurrentProfile } from "@/lib/server/auth";
 import { toApiErrorResponse } from "@/lib/server/api-error";
-import { listLearningProgress } from "@/lib/server/services/learning-service";
+import { listLearningProgress } from "@/lib/server/learning/service";
 import { parseOptionalStatusFilter } from "@/lib/server/validation";
 
 const parsePositiveInt = (value: string | null, fallback: number) => {

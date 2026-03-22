@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { requireCurrentProfile } from "@/lib/server/auth";
-import { parseRequiredTrimmedString } from "@/lib/server/validation";
-import { generatePersonalizedSceneForUser } from "@/lib/server/services/scene-generation-service";
+import { toApiErrorResponse } from "@/lib/server/api-error";
+import {
+  parseJsonBody,
+  parseRequiredTrimmedString,
+} from "@/lib/server/validation";
+import { generatePersonalizedSceneForUser } from "@/lib/server/scene/generation";
 
 interface GenerateScenePayload {
   promptText?: unknown;
@@ -19,7 +23,7 @@ const parseOptionalBoolean = (value: unknown, fallback: boolean) => {
 export async function POST(request: Request) {
   try {
     const { user } = await requireCurrentProfile();
-    const payload = (await request.json()) as GenerateScenePayload;
+    const payload = await parseJsonBody<GenerateScenePayload>(request);
 
     const result = await generatePersonalizedSceneForUser(user.id, {
       promptText: parseRequiredTrimmedString(payload.promptText, "promptText", 800),
@@ -34,12 +38,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json(result, { status: 200 });
   } catch (error) {
-    console.error("[scenes.generate] failed:", error);
-    return NextResponse.json(
-      {
-        error: error instanceof Error ? error.message : "Unknown error",
-      },
-      { status: 500 }
-    );
+    return toApiErrorResponse(error, "Failed to generate scene.");
   }
 }

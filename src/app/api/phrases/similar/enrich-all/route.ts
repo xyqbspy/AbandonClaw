@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { requireCurrentProfile } from "@/lib/server/auth";
 import { toApiErrorResponse } from "@/lib/server/api-error";
+import { ValidationError } from "@/lib/server/errors";
 import { enrichAiExpressionLearningInfo } from "@/lib/server/phrases/service";
-import { parseOptionalTrimmedString } from "@/lib/server/validation";
+import { parseJsonBody, parseOptionalTrimmedString } from "@/lib/server/validation";
 
 interface EnrichItemPayload {
   userPhraseId?: unknown;
@@ -17,13 +18,13 @@ interface EnrichAllPayload {
 export async function POST(request: Request) {
   try {
     const { user } = await requireCurrentProfile();
-    const payload = (await request.json()) as EnrichAllPayload;
+    const payload = await parseJsonBody<EnrichAllPayload>(request);
     if (!Array.isArray(payload.items)) {
-      return NextResponse.json({ error: "items must be an array." }, { status: 400 });
+      throw new ValidationError("items must be an array.");
     }
     const items = payload.items.slice(0, 50) as EnrichItemPayload[];
     if (items.length === 0) {
-      return NextResponse.json({ error: "items is empty." }, { status: 400 });
+      throw new ValidationError("items is empty.");
     }
 
     const results: Array<{ userPhraseId: string; status: "done" | "failed"; error?: string }> = [];

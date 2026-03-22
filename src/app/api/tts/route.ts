@@ -1,10 +1,11 @@
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { NextResponse } from "next/server";
 import { MsEdgeTTS, OUTPUT_FORMAT } from "msedge-tts";
 import { requireCurrentProfile } from "@/lib/server/auth";
 import { toApiErrorResponse } from "@/lib/server/api-error";
 import { ValidationError } from "@/lib/server/errors";
+import { parseJsonBody } from "@/lib/server/validation";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import {
   buildChunkAudioKey,
@@ -40,11 +41,19 @@ type SynthesizedAudioResult = {
   persisted: boolean;
 };
 
+type SignedUrlCacheEntry = {
+  url: string;
+  expiresAt: number;
+};
+
 const voiceJenny = "en-US-JennyNeural";
 const voiceGuy = "en-US-GuyNeural";
 const ttsStorageBucket = process.env.TTS_STORAGE_BUCKET?.trim() || "tts-audio";
 const signedUrlTtlSeconds = 60 * 60;
+const signedUrlCacheTtlMs = Math.max(60, signedUrlTtlSeconds - 60) * 1000;
 let ensureBucketPromise: Promise<void> | null = null;
+const signedUrlCache = new Map<string, SignedUrlCacheEntry>();
+const pendingSignedUrlRequests = new Map<string, Promise<string>>();
 
 const parseTtsKind = (value: unknown): TtsKind => {
   if (value === "sentence" || value === "chunk" || value === "scene_full") return value;
@@ -118,6 +127,15 @@ const ensureDir = async (filePath: string) => {
   await mkdir(path.dirname(filePath), { recursive: true });
 };
 
+const fileExists = async (filePath: string) => {
+  try {
+    await access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 const canFallbackToInlineAudio = (error: unknown) => {
   if (!error || typeof error !== "object") return false;
   const code = "code" in error ? String((error as { code?: unknown }).code ?? "") : "";
@@ -125,6 +143,24 @@ const canFallbackToInlineAudio = (error: unknown) => {
 };
 
 const toInlineAudioUrl = (buffer: Buffer) => `data:audio/mpeg;base64,${buffer.toString("base64")}`;
+
+const getCachedSignedUrl = (storagePath: string) => {
+  const cached = signedUrlCache.get(storagePath);
+  if (!cached) return null;
+  if (cached.expiresAt <= Date.now()) {
+    signedUrlCache.delete(storagePath);
+    return null;
+  }
+  return cached.url;
+};
+
+const cacheSignedUrl = (storagePath: string, url: string) => {
+  signedUrlCache.set(storagePath, {
+    url,
+    expiresAt: Date.now() + signedUrlCacheTtlMs,
+  });
+  return url;
+};
 
 const ensureTtsStorageBucket = async () => {
   if (ensureBucketPromise) return ensureBucketPromise;
@@ -155,15 +191,32 @@ const ensureTtsStorageBucket = async () => {
 };
 
 const createStorageSignedUrl = async (storagePath: string) => {
-  await ensureTtsStorageBucket();
-  const admin = createSupabaseAdminClient();
-  const { data, error } = await admin.storage
-    .from(ttsStorageBucket)
-    .createSignedUrl(storagePath, signedUrlTtlSeconds);
-  if (error || !data?.signedUrl) {
-    throw new Error(`Failed to create signed audio url: ${error?.message ?? "unknown error"}`);
+  const cached = getCachedSignedUrl(storagePath);
+  if (cached) {
+    return cached;
   }
-  return data.signedUrl;
+
+  const pending = pendingSignedUrlRequests.get(storagePath);
+  if (pending) {
+    return pending;
+  }
+
+  const task = (async () => {
+    await ensureTtsStorageBucket();
+    const admin = createSupabaseAdminClient();
+    const { data, error } = await admin.storage
+      .from(ttsStorageBucket)
+      .createSignedUrl(storagePath, signedUrlTtlSeconds);
+    if (error || !data?.signedUrl) {
+      throw new Error(`Failed to create signed audio url: ${error?.message ?? "unknown error"}`);
+    }
+    return cacheSignedUrl(storagePath, data.signedUrl);
+  })().finally(() => {
+    pendingSignedUrlRequests.delete(storagePath);
+  });
+
+  pendingSignedUrlRequests.set(storagePath, task);
+  return task;
 };
 
 const getStorageSignedUrlIfExists = async (storagePath: string) => {
@@ -330,6 +383,7 @@ const resolveAudioTarget = (payload: {
     return {
       storagePath,
       absolutePath: path.join(process.cwd(), "public", "audio", "scenes", sceneSlug, fileName),
+      publicUrl: `/audio/scenes/${sceneSlug}/${fileName}`,
       voice: voiceJenny,
       mode: "normal" as TtsMode,
     };
@@ -349,6 +403,7 @@ const resolveAudioTarget = (payload: {
     return {
       storagePath,
       absolutePath: path.join(process.cwd(), "public", "audio", "scenes", sceneSlug, "sentences", fileName),
+      publicUrl: `/audio/scenes/${sceneSlug}/sentences/${fileName}`,
       voice: resolveVoiceBySpeaker(payload.speaker),
       mode: payload.mode,
     };
@@ -365,6 +420,7 @@ const resolveAudioTarget = (payload: {
   return {
     storagePath,
     absolutePath: path.join(process.cwd(), "public", "audio", "chunks", fileName),
+    publicUrl: `/audio/chunks/${fileName}`,
     voice: voiceJenny,
     mode: "normal" as TtsMode,
   };
@@ -373,7 +429,7 @@ const resolveAudioTarget = (payload: {
 export async function POST(request: Request) {
   try {
     await requireCurrentProfile();
-    const payload = (await request.json()) as TtsRequestPayload;
+    const payload = await parseJsonBody<TtsRequestPayload>(request);
     const kind = parseTtsKind(payload.kind);
     const mode = parseTtsMode(payload.mode, payload.speed);
     const speaker = parseOptionalSpeaker(payload.speaker);

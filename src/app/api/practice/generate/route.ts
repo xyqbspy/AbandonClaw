@@ -1,4 +1,6 @@
-﻿import { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
+import { toApiErrorResponse } from "@/lib/server/api-error";
+import { ValidationError } from "@/lib/server/errors";
 import { callGlmChatCompletion } from "@/lib/server/glm-client";
 import {
   buildPracticeGenerateUserPrompt,
@@ -8,6 +10,7 @@ import {
   parseJsonWithFallback,
   isValidParsedScene,
 } from "@/lib/server/scene-json";
+import { parseJsonBody } from "@/lib/server/validation";
 import {
   PracticeExerciseType,
   PracticeGenerateRequest,
@@ -222,11 +225,11 @@ const validatePracticeGenerateResponse = (
 
 export async function POST(request: Request) {
   try {
-    const payload = (await request.json()) as Partial<PracticeGenerateRequest>;
+    const payload = await parseJsonBody<Partial<PracticeGenerateRequest>>(request);
     const normalized = toValidPayload(payload);
 
     if (!normalized.ok) {
-      return NextResponse.json({ error: normalized.error }, { status: 400 });
+      throw new ValidationError(normalized.error);
     }
 
     const { scene, exerciseCount } = normalized.value;
@@ -257,11 +260,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json(parsed, { status: 200 });
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Failed to generate practice.";
-    return NextResponse.json(
-      { error: `Practice generate failed: ${message}` },
-      { status: 500 },
-    );
+    return toApiErrorResponse(error, "Practice generate failed.");
   }
 }

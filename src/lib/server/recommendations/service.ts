@@ -1,6 +1,6 @@
 import { ParsedScene } from "@/lib/types/scene-parser";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { getSceneRecordBySlug } from "@/lib/server/services/scene-service";
+import { getSceneRecordBySlug } from "@/lib/server/scene/service";
 import { normalizePhraseText } from "@/lib/shared/phrases";
 import { ChunkRow, UserChunkRow, UserPhraseRow } from "@/lib/server/db/types";
 import { normalizeParsedSceneDialogue } from "@/lib/shared/scene-dialogue";

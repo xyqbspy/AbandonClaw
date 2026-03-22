@@ -1,16 +1,25 @@
-﻿import Link from "next/link";
+import Link from "next/link";
+import { buildAdminHref, readAdminPositivePage, readAdminStringParam } from "@/app/(app)/admin/admin-page-state";
+import { AdminPagination, AdminTableShell } from "@/components/shared/admin-list-shell";
+import { FilterBar, FilterBarForm } from "@/components/shared/filter-bar";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { listAdminVariants } from "@/lib/server/admin/service";
-import { APPLE_BUTTON_BASE, APPLE_BUTTON_TEXT_SM, APPLE_INPUT_BASE, APPLE_SURFACE } from "@/lib/ui/apple-style";
+import { APPLE_BUTTON_BASE, APPLE_BUTTON_TEXT_SM, APPLE_INPUT_BASE } from "@/lib/ui/apple-style";
 
-const parsePositiveInt = (value: string | undefined, fallback: number) => {
-  const num = Number(value);
-  if (!Number.isFinite(num) || num <= 0) return fallback;
-  return Math.floor(num);
-};
+const LABELS = {
+  eyebrow: "\u7ba1\u7406\u540e\u53f0",
+  title: "\u53d8\u4f53\u5217\u8868",
+  description: "\u67e5\u770b\u751f\u6210\u53d8\u4f53\uff0c\u5e76\u8ffd\u6eaf\u6240\u5c5e\u573a\u666f\u3002",
+  search: "\u641c\u7d22\u573a\u666f\u6807\u9898 / slug / scene_id / cache_key",
+  sortDesc: "\u6309 created_at \u5012\u5e8f",
+  sortAsc: "\u6309 created_at \u6b63\u5e8f",
+  submit: "\u7b5b\u9009",
+  empty: "\u672a\u627e\u5230\u53d8\u4f53\u3002",
+  summaryPrefix: "\u663e\u793a",
+  summaryMiddle: "/ \u5171",
+} as const;
 
 export default async function AdminVariantsPage({
   searchParams,
@@ -18,53 +27,37 @@ export default async function AdminVariantsPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const params = await searchParams;
-  const q = typeof params.q === "string" ? params.q : "";
-  const sort = params.sort === "asc" ? "asc" : "desc";
-  const page = parsePositiveInt(
-    typeof params.page === "string" ? params.page : undefined,
-    1,
-  );
+  const q = readAdminStringParam(params, "q");
+  const sort = readAdminStringParam(params, "sort") === "asc" ? "asc" : "desc";
+  const page = readAdminPositivePage(params);
   const appleButtonClassName = `${APPLE_BUTTON_BASE} ${APPLE_BUTTON_TEXT_SM}`;
 
   const result = await listAdminVariants({ page, pageSize: 30, search: q, sort });
-  const hasPrev = result.page > 1;
-  const hasNext = result.page * result.pageSize < result.total;
-
   const buildListUrl = (nextPage: number) =>
-    `/admin/variants?q=${encodeURIComponent(q)}&sort=${sort}&page=${nextPage}`;
+    buildAdminHref("/admin/variants", { q, sort, page: nextPage });
 
   return (
     <div className="space-y-4">
       <PageHeader
-        eyebrow="管理后台"
-        title="变体列表"
-        description="查看生成变体并追溯所属场景。"
+        eyebrow={LABELS.eyebrow}
+        title={LABELS.title}
+        description={LABELS.description}
       />
 
-      <Card className={APPLE_SURFACE}>
-        <CardContent className="pt-4">
-          <form className="grid gap-2 sm:grid-cols-[1fr_auto_auto]">
-            <Input
-              name="q"
-              defaultValue={q}
-              placeholder="搜索场景标题 / slug / scene_id / cache_key"
-            />
-            <select
-              name="sort"
-              defaultValue={sort}
-              className={`h-8 px-2.5 text-sm ${APPLE_INPUT_BASE}`}
-            >
-              <option value="desc">按 created_at 倒序</option>
-              <option value="asc">按 created_at 正序</option>
-            </select>
-            <Button type="submit" variant="ghost" className={appleButtonClassName}>
-              筛选
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+      <FilterBar>
+        <FilterBarForm className="sm:grid-cols-[1fr_auto_auto]">
+          <Input name="q" defaultValue={q} placeholder={LABELS.search} />
+          <select name="sort" defaultValue={sort} className={`h-8 px-2.5 text-sm ${APPLE_INPUT_BASE}`}>
+            <option value="desc">{LABELS.sortDesc}</option>
+            <option value="asc">{LABELS.sortAsc}</option>
+          </select>
+          <Button type="submit" variant="ghost" className={appleButtonClassName}>
+            {LABELS.submit}
+          </Button>
+        </FilterBarForm>
+      </FilterBar>
 
-      <div className={`overflow-x-auto rounded-lg ${APPLE_SURFACE}`}>
+      <AdminTableShell>
         <table className="min-w-full text-sm">
           <thead className="bg-muted/40 text-left text-xs text-muted-foreground">
             <tr>
@@ -87,9 +80,7 @@ export default async function AdminVariantsPage({
                   >
                     {row.scene?.title ?? row.scene_id}
                   </Link>
-                  <p className="font-mono text-xs text-muted-foreground">
-                    {row.scene?.slug ?? row.scene_id}
-                  </p>
+                  <p className="font-mono text-xs text-muted-foreground">{row.scene?.slug ?? row.scene_id}</p>
                 </td>
                 <td className="px-3 py-2">{row.variant_index}</td>
                 <td className="px-3 py-2">{row.model ?? "-"}</td>
@@ -102,37 +93,25 @@ export default async function AdminVariantsPage({
             {result.rows.length === 0 ? (
               <tr>
                 <td colSpan={7} className="px-3 py-6 text-center text-muted-foreground">
-                  未找到变体。
+                  {LABELS.empty}
                 </td>
               </tr>
             ) : null}
           </tbody>
         </table>
-      </div>
+      </AdminTableShell>
 
-      <div className="flex items-center justify-between text-xs text-muted-foreground">
-        <p>
-          显示 {(result.page - 1) * result.pageSize + 1}-
-          {Math.min(result.page * result.pageSize, result.total)} / 共 {result.total}
-        </p>
-        <div className="flex items-center gap-2">
-          {hasPrev ? (
-            <Link href={buildListUrl(result.page - 1)} className={`${appleButtonClassName} px-2 py-1`}>
-              上一页
-            </Link>
-          ) : (
-            <span className={`${appleButtonClassName} px-2 py-1 opacity-40`}>上一页</span>
-          )}
-          {hasNext ? (
-            <Link href={buildListUrl(result.page + 1)} className={`${appleButtonClassName} px-2 py-1`}>
-              下一页
-            </Link>
-          ) : (
-            <span className={`${appleButtonClassName} px-2 py-1 opacity-40`}>下一页</span>
-          )}
-        </div>
-      </div>
+      <AdminPagination
+        summary={
+          <>
+            {LABELS.summaryPrefix} {(result.page - 1) * result.pageSize + 1}-
+            {Math.min(result.page * result.pageSize, result.total)} {LABELS.summaryMiddle}
+            {result.total}
+          </>
+        }
+        prevHref={result.page > 1 ? buildListUrl(result.page - 1) : null}
+        nextHref={result.page * result.pageSize < result.total ? buildListUrl(result.page + 1) : null}
+      />
     </div>
   );
 }
-

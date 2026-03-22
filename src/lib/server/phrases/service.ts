@@ -13,7 +13,7 @@ import {
 } from "@/lib/server/db/types";
 import { normalizePhraseText } from "@/lib/shared/phrases";
 import { ValidationError } from "@/lib/server/errors";
-import { getSceneRecordBySlug } from "@/lib/server/services/scene-service";
+import { getSceneRecordBySlug } from "@/lib/server/scene/service";
 import { callGlmChatCompletion } from "@/lib/server/glm-client";
 import { extractJsonCandidate } from "@/lib/server/scene-json";
 import {

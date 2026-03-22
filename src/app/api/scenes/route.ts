@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireCurrentProfile } from "@/lib/server/auth";
 import { toApiErrorResponse } from "@/lib/server/api-error";
-import { listScenes } from "@/lib/server/services/scene-service";
+import { listScenes } from "@/lib/server/scene/service";
 
 export const dynamic = "force-dynamic";
 

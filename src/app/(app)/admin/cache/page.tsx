@@ -1,16 +1,34 @@
-﻿import Link from "next/link";
+import {
+  AdminCodeBlock,
+  AdminDetailItem,
+  AdminDetailSection,
+} from "@/components/shared/admin-detail-section";
+import { buildAdminHref, readAdminPositivePage, readAdminStringParam } from "@/app/(app)/admin/admin-page-state";
+import { AdminPagination, AdminTableShell } from "@/components/shared/admin-list-shell";
+import { FilterBar, FilterBarForm } from "@/components/shared/filter-bar";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { listAdminAiCache } from "@/lib/server/admin/service";
-import { APPLE_BUTTON_BASE, APPLE_BUTTON_TEXT_SM, APPLE_INPUT_BASE, APPLE_SURFACE } from "@/lib/ui/apple-style";
+import { APPLE_BUTTON_BASE, APPLE_BUTTON_TEXT_SM, APPLE_INPUT_BASE } from "@/lib/ui/apple-style";
 
-const parsePositiveInt = (value: string | undefined, fallback: number) => {
-  const num = Number(value);
-  if (!Number.isFinite(num) || num <= 0) return fallback;
-  return Math.floor(num);
-};
+const LABELS = {
+  eyebrow: "\u7ba1\u7406\u540e\u53f0",
+  title: "AI \u7f13\u5b58",
+  description:
+    "\u53ea\u8bfb\u67e5\u770b\u7f13\u5b58\u8bb0\u5f55\uff0c\u7528\u4e8e parse \u548c variant \u95ee\u9898\u6392\u67e5\u3002",
+  search: "\u641c\u7d22 cache_key",
+  allTypes: "\u5168\u90e8\u7c7b\u578b",
+  allStatus: "\u5168\u90e8\u72b6\u6001",
+  filter: "\u7b5b\u9009",
+  empty: "\u672a\u627e\u5230\u7f13\u5b58\u8bb0\u5f55\u3002",
+  selected: "\u5f53\u524d\u9009\u4e2d\u7f13\u5b58",
+  status: "\u72b6\u6001\uff1a",
+  meta: "meta_json\uff1a",
+  preview: "input/output \u9884\u89c8\uff1a",
+  summaryPrefix: "\u663e\u793a",
+  summaryMiddle: "/ \u5171",
+} as const;
 
 export default async function AdminCachePage({
   searchParams,
@@ -18,14 +36,11 @@ export default async function AdminCachePage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const params = await searchParams;
-  const q = typeof params.q === "string" ? params.q : "";
-  const cacheType = typeof params.cacheType === "string" ? params.cacheType : "";
-  const status = typeof params.status === "string" ? params.status : "";
-  const cacheKey = typeof params.cacheKey === "string" ? params.cacheKey : "";
-  const page = parsePositiveInt(
-    typeof params.page === "string" ? params.page : undefined,
-    1,
-  );
+  const q = readAdminStringParam(params, "q");
+  const cacheType = readAdminStringParam(params, "cacheType");
+  const status = readAdminStringParam(params, "status");
+  const cacheKey = readAdminStringParam(params, "cacheKey");
+  const page = readAdminPositivePage(params);
   const appleButtonClassName = `${APPLE_BUTTON_BASE} ${APPLE_BUTTON_TEXT_SM}`;
 
   const result = await listAdminAiCache({
@@ -35,54 +50,46 @@ export default async function AdminCachePage({
     cacheType: cacheType || undefined,
     status: status === "success" || status === "error" ? status : undefined,
   });
-  const hasPrev = result.page > 1;
-  const hasNext = result.page * result.pageSize < result.total;
-
-  const selected = cacheKey
-    ? result.rows.find((row) => row.cache_key === cacheKey) ?? null
-    : null;
-
+  const selected = cacheKey ? result.rows.find((row) => row.cache_key === cacheKey) ?? null : null;
   const buildListUrl = (nextPage: number) =>
-    `/admin/cache?q=${encodeURIComponent(q)}&cacheType=${cacheType}&status=${status}&page=${nextPage}`;
+    buildAdminHref("/admin/cache", { q, cacheType, status, page: nextPage });
 
   return (
     <div className="space-y-4">
       <PageHeader
-        eyebrow="管理后台"
-        title="AI 缓存"
-        description="只读查看缓存记录，用于 parse/variant 问题排查。"
+        eyebrow={LABELS.eyebrow}
+        title={LABELS.title}
+        description={LABELS.description}
       />
 
-      <Card className={APPLE_SURFACE}>
-        <CardContent className="pt-4">
-          <form className="grid gap-2 sm:grid-cols-[1fr_auto_auto_auto]">
-            <Input name="q" defaultValue={q} placeholder="搜索 cache_key" />
-            <select
-              name="cacheType"
-              defaultValue={cacheType}
-              className={`h-8 px-2.5 text-sm ${APPLE_INPUT_BASE}`}
-            >
-              <option value="">全部类型</option>
-              <option value="scene_parse">scene_parse</option>
-              <option value="scene_variants">scene_variants</option>
-            </select>
-            <select
-              name="status"
-              defaultValue={status}
-              className={`h-8 px-2.5 text-sm ${APPLE_INPUT_BASE}`}
-            >
-              <option value="">全部状态</option>
-              <option value="success">success</option>
-              <option value="error">error</option>
-            </select>
-            <Button type="submit" variant="ghost" className={appleButtonClassName}>
-              筛选
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+      <FilterBar>
+        <FilterBarForm className="sm:grid-cols-[1fr_auto_auto_auto]">
+          <Input name="q" defaultValue={q} placeholder={LABELS.search} />
+          <select
+            name="cacheType"
+            defaultValue={cacheType}
+            className={`h-8 px-2.5 text-sm ${APPLE_INPUT_BASE}`}
+          >
+            <option value="">{LABELS.allTypes}</option>
+            <option value="scene_parse">scene_parse</option>
+            <option value="scene_variants">scene_variants</option>
+          </select>
+          <select
+            name="status"
+            defaultValue={status}
+            className={`h-8 px-2.5 text-sm ${APPLE_INPUT_BASE}`}
+          >
+            <option value="">{LABELS.allStatus}</option>
+            <option value="success">success</option>
+            <option value="error">error</option>
+          </select>
+          <Button type="submit" variant="ghost" className={appleButtonClassName}>
+            {LABELS.filter}
+          </Button>
+        </FilterBarForm>
+      </FilterBar>
 
-      <div className={`overflow-x-auto rounded-lg ${APPLE_SURFACE}`}>
+      <AdminTableShell>
         <table className="min-w-full text-sm">
           <thead className="bg-muted/40 text-left text-xs text-muted-foreground">
             <tr>
@@ -99,14 +106,7 @@ export default async function AdminCachePage({
           <tbody>
             {result.rows.map((row) => (
               <tr key={row.id} className="align-top">
-                <td className="px-3 py-2 font-mono text-xs">
-                  <Link
-                    href={`/admin/cache?q=${encodeURIComponent(q)}&cacheType=${cacheType}&status=${status}&page=${result.page}&cacheKey=${encodeURIComponent(row.cache_key)}`}
-                    className="underline-offset-2 hover:underline"
-                  >
-                    {row.cache_key}
-                  </Link>
-                </td>
+                <td className="px-3 py-2 font-mono text-xs">{row.cache_key}</td>
                 <td className="px-3 py-2">{row.cache_type}</td>
                 <td className="px-3 py-2">{row.status}</td>
                 <td className="px-3 py-2 font-mono text-xs">{row.input_hash ?? "-"}</td>
@@ -119,74 +119,59 @@ export default async function AdminCachePage({
             {result.rows.length === 0 ? (
               <tr>
                 <td colSpan={8} className="px-3 py-6 text-center text-muted-foreground">
-                  未找到缓存记录。
+                  {LABELS.empty}
                 </td>
               </tr>
             ) : null}
           </tbody>
         </table>
-      </div>
+      </AdminTableShell>
 
       {selected ? (
-        <Card className={APPLE_SURFACE}>
-          <CardContent className="space-y-2 pt-4 text-sm">
-            <p>
-              <span className="text-muted-foreground">cache_key:</span>{" "}
-              <span className="font-mono text-xs">{selected.cache_key}</span>
-            </p>
-            <p>
-              <span className="text-muted-foreground">状态：</span> {selected.status}
-            </p>
-            <p>
-              <span className="text-muted-foreground">meta_json：</span>{" "}
-              <span className="font-mono text-xs">
-                {selected.meta_json ? JSON.stringify(selected.meta_json) : "-"}
-              </span>
-            </p>
-            <p>
-              <span className="text-muted-foreground">input/output 预览：</span>
-            </p>
-            <pre className="max-h-40 overflow-auto rounded bg-[rgb(240,240,240)] p-2 text-xs">
-              {JSON.stringify(
-                {
-                  input: selected.input_json,
-                  output:
-                    typeof selected.output_json === "object" &&
-                    selected.output_json !== null
-                      ? Object.keys(selected.output_json as Record<string, unknown>)
-                      : selected.output_json,
-                },
-                null,
-                2,
-              )}
-            </pre>
-          </CardContent>
-        </Card>
+        <AdminDetailSection title={LABELS.selected} contentClassName="space-y-3 text-sm">
+          <div className="space-y-2">
+            <AdminDetailItem
+              label="cache_key:"
+              value={<span className="font-mono text-xs">{selected.cache_key}</span>}
+            />
+            <AdminDetailItem label={LABELS.status} value={selected.status} />
+            <AdminDetailItem
+              label={LABELS.meta}
+              value={
+                <span className="font-mono text-xs">
+                  {selected.meta_json ? JSON.stringify(selected.meta_json) : "-"}
+                </span>
+              }
+            />
+            <p className="text-muted-foreground">{LABELS.preview}</p>
+          </div>
+          <AdminCodeBlock className="max-h-40">
+            {JSON.stringify(
+              {
+                input: selected.input_json,
+                output:
+                  typeof selected.output_json === "object" && selected.output_json !== null
+                    ? Object.keys(selected.output_json as Record<string, unknown>)
+                    : selected.output_json,
+              },
+              null,
+              2,
+            )}
+          </AdminCodeBlock>
+        </AdminDetailSection>
       ) : null}
 
-      <div className="flex items-center justify-between text-xs text-muted-foreground">
-        <p>
-          显示 {(result.page - 1) * result.pageSize + 1}-
-          {Math.min(result.page * result.pageSize, result.total)} / 共 {result.total}
-        </p>
-        <div className="flex items-center gap-2">
-          {hasPrev ? (
-            <Link href={buildListUrl(result.page - 1)} className={`${appleButtonClassName} px-2 py-1`}>
-              上一页
-            </Link>
-          ) : (
-            <span className={`${appleButtonClassName} px-2 py-1 opacity-40`}>上一页</span>
-          )}
-          {hasNext ? (
-            <Link href={buildListUrl(result.page + 1)} className={`${appleButtonClassName} px-2 py-1`}>
-              下一页
-            </Link>
-          ) : (
-            <span className={`${appleButtonClassName} px-2 py-1 opacity-40`}>下一页</span>
-          )}
-        </div>
-      </div>
+      <AdminPagination
+        summary={
+          <>
+            {LABELS.summaryPrefix} {(result.page - 1) * result.pageSize + 1}-
+            {Math.min(result.page * result.pageSize, result.total)} {LABELS.summaryMiddle}
+            {result.total}
+          </>
+        }
+        prevHref={result.page > 1 ? buildListUrl(result.page - 1) : null}
+        nextHref={result.page * result.pageSize < result.total ? buildListUrl(result.page + 1) : null}
+      />
     </div>
   );
 }
-

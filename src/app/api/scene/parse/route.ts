@@ -1,6 +1,9 @@
-﻿import { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
+import { toApiErrorResponse } from "@/lib/server/api-error";
+import { ValidationError } from "@/lib/server/errors";
+import { parseJsonBody } from "@/lib/server/validation";
 import { ParseSceneRequest } from "@/lib/types/scene-parser";
-import { parseImportedSceneWithCache } from "@/lib/server/services/import-parse-service";
+import { parseImportedSceneWithCache } from "@/lib/server/scene/import";
 
 const isValidPayload = (
   payload: Partial<ParseSceneRequest>,
@@ -16,15 +19,11 @@ const isValidPayload = (
 
 export async function POST(request: Request) {
   try {
-    const payload = (await request.json()) as Partial<ParseSceneRequest>;
+    const payload = await parseJsonBody<Partial<ParseSceneRequest>>(request);
 
     if (!isValidPayload(payload)) {
-      return NextResponse.json(
-        {
-          error:
-            "Invalid payload. rawText is required. sourceLanguage must be one of: en, zh, mixed.",
-        },
-        { status: 400 },
+      throw new ValidationError(
+        "Invalid payload. rawText is required. sourceLanguage must be one of: en, zh, mixed.",
       );
     }
 
@@ -42,12 +41,6 @@ export async function POST(request: Request) {
       { status: 200 },
     );
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown error";
-    return NextResponse.json(
-      {
-        error: `Scene parse failed: ${message}`,
-      },
-      { status: 500 },
-    );
+    return toApiErrorResponse(error, "Scene parse failed.");
   }
 }

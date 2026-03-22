@@ -1,17 +1,25 @@
-﻿import Link from "next/link";
+import Link from "next/link";
+import { buildAdminHref, readAdminPositivePage, readAdminStringParam } from "@/app/(app)/admin/admin-page-state";
+import { AdminPagination, AdminTableShell } from "@/components/shared/admin-list-shell";
+import { FilterBar, FilterBarForm } from "@/components/shared/filter-bar";
 import { PageHeader } from "@/components/shared/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { listAdminScenes } from "@/lib/server/admin/service";
-import { APPLE_BUTTON_BASE, APPLE_BUTTON_TEXT_SM, APPLE_INPUT_BASE, APPLE_SURFACE } from "@/lib/ui/apple-style";
+import { APPLE_BUTTON_BASE, APPLE_BUTTON_TEXT_SM } from "@/lib/ui/apple-style";
 
-const parsePositiveInt = (value: string | undefined, fallback: number) => {
-  const num = Number(value);
-  if (!Number.isFinite(num) || num <= 0) return fallback;
-  return Math.floor(num);
-};
+const LABELS = {
+  eyebrow: "\u7ba1\u7406\u540e\u53f0",
+  title: "\u5bfc\u5165\u573a\u666f",
+  description:
+    "\u5feb\u901f\u67e5\u770b imported \u5185\u5bb9\uff0c\u4fbf\u4e8e\u6392\u67e5 parse \u8d28\u91cf\u4e0e\u6e05\u7406\u3002",
+  search: "\u641c\u7d22\u6807\u9898\u6216 slug",
+  submit: "\u641c\u7d22",
+  empty: "\u672a\u627e\u5230\u5bfc\u5165\u573a\u666f\u3002",
+  summaryPrefix: "\u663e\u793a",
+  summaryMiddle: "/ \u5171",
+} as const;
 
 export default async function AdminImportedScenesPage({
   searchParams,
@@ -19,11 +27,8 @@ export default async function AdminImportedScenesPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const params = await searchParams;
-  const q = typeof params.q === "string" ? params.q : "";
-  const page = parsePositiveInt(
-    typeof params.page === "string" ? params.page : undefined,
-    1,
-  );
+  const q = readAdminStringParam(params, "q");
+  const page = readAdminPositivePage(params);
   const pageSize = 20;
   const appleButtonClassName = `${APPLE_BUTTON_BASE} ${APPLE_BUTTON_TEXT_SM}`;
 
@@ -33,29 +38,25 @@ export default async function AdminImportedScenesPage({
     page,
     pageSize,
   });
-  const hasPrev = result.page > 1;
-  const hasNext = result.page * result.pageSize < result.total;
 
   return (
     <div className="space-y-4">
       <PageHeader
-        eyebrow="管理后台"
-        title="导入场景"
-        description="快速查看 imported 内容，便于 parse 质量排查与清理。"
+        eyebrow={LABELS.eyebrow}
+        title={LABELS.title}
+        description={LABELS.description}
       />
 
-      <Card className={APPLE_SURFACE}>
-        <CardContent className="pt-4">
-          <form className="grid gap-2 sm:grid-cols-[1fr_auto]">
-            <Input name="q" defaultValue={q} placeholder="搜索标题或 slug" />
-            <Button type="submit" variant="ghost" className={appleButtonClassName}>
-              搜索
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+      <FilterBar>
+        <FilterBarForm className="sm:grid-cols-[1fr_auto]">
+          <Input name="q" defaultValue={q} placeholder={LABELS.search} />
+          <Button type="submit" variant="ghost" className={appleButtonClassName}>
+            {LABELS.submit}
+          </Button>
+        </FilterBarForm>
+      </FilterBar>
 
-      <div className={`overflow-x-auto rounded-lg ${APPLE_SURFACE}`}>
+      <AdminTableShell>
         <table className="min-w-full text-sm">
           <thead className="bg-muted/40 text-left text-xs text-muted-foreground">
             <tr>
@@ -90,43 +91,29 @@ export default async function AdminImportedScenesPage({
             {result.rows.length === 0 ? (
               <tr>
                 <td colSpan={6} className="px-3 py-6 text-center text-muted-foreground">
-                  未找到导入场景。
+                  {LABELS.empty}
                 </td>
               </tr>
             ) : null}
           </tbody>
         </table>
-      </div>
+      </AdminTableShell>
 
-      <div className="flex items-center justify-between text-xs text-muted-foreground">
-        <p>
-          显示 {(result.page - 1) * result.pageSize + 1}-
-          {Math.min(result.page * result.pageSize, result.total)} / 共 {result.total}
-        </p>
-        <div className="flex items-center gap-2">
-          {hasPrev ? (
-            <Link
-              href={`/admin/imported?q=${encodeURIComponent(q)}&page=${result.page - 1}`}
-              className={`${appleButtonClassName} px-2 py-1`}
-            >
-              上一页
-            </Link>
-          ) : (
-            <span className={`${appleButtonClassName} px-2 py-1 opacity-40`}>上一页</span>
-          )}
-          {hasNext ? (
-            <Link
-              href={`/admin/imported?q=${encodeURIComponent(q)}&page=${result.page + 1}`}
-              className={`${appleButtonClassName} px-2 py-1`}
-            >
-              下一页
-            </Link>
-          ) : (
-            <span className={`${appleButtonClassName} px-2 py-1 opacity-40`}>下一页</span>
-          )}
-        </div>
-      </div>
+      <AdminPagination
+        summary={
+          <>
+            {LABELS.summaryPrefix} {(result.page - 1) * result.pageSize + 1}-
+            {Math.min(result.page * result.pageSize, result.total)} {LABELS.summaryMiddle}
+            {result.total}
+          </>
+        }
+        prevHref={result.page > 1 ? buildAdminHref("/admin/imported", { q, page: result.page - 1 }) : null}
+        nextHref={
+          result.page * result.pageSize < result.total
+            ? buildAdminHref("/admin/imported", { q, page: result.page + 1 })
+            : null
+        }
+      />
     </div>
   );
 }
-

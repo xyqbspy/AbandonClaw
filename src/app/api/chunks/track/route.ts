@@ -6,8 +6,10 @@ import {
   trackChunksForUser,
 } from "@/lib/server/chunks/service";
 import {
+  parseJsonBody,
   parseOptionalNonNegativeInt,
   parseOptionalTrimmedString,
+  parseRequiredStringArray,
 } from "@/lib/server/validation";
 import { ValidationError } from "@/lib/server/errors";
 
@@ -30,24 +32,28 @@ const parseInteractionType = (value: unknown): ChunkInteractionType => {
 };
 
 const parseChunks = (value: unknown) => {
-  if (!Array.isArray(value)) {
-    throw new ValidationError("chunks must be a string array.");
+  try {
+    return parseRequiredStringArray(value, "chunks", {
+      maxItems: 200,
+      dedupe: false,
+    });
+  } catch (error) {
+    if (error instanceof ValidationError) {
+      if (error.message === "chunks must be an array.") {
+        throw new ValidationError("chunks must be a string array.");
+      }
+      if (error.message === "chunks is required.") {
+        throw new ValidationError("chunks must include at least one non-empty text.");
+      }
+    }
+    throw error;
   }
-  const chunks = value
-    .filter((item): item is string => typeof item === "string")
-    .map((item) => item.trim())
-    .filter(Boolean)
-    .slice(0, 200);
-  if (chunks.length === 0) {
-    throw new ValidationError("chunks must include at least one non-empty text.");
-  }
-  return chunks;
 };
 
 export async function POST(request: Request) {
   try {
     const { user } = await requireCurrentProfile();
-    const payload = (await request.json()) as TrackChunksPayload;
+    const payload = await parseJsonBody<TrackChunksPayload>(request);
     const result = await trackChunksForUser(user.id, {
       sceneSlug: parseOptionalTrimmedString(payload.sceneSlug, "sceneSlug", 200),
       sentenceIndex: parseOptionalNonNegativeInt(

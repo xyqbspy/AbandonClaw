@@ -21,6 +21,23 @@ export const parseRequiredTrimmedString = (
   return trimmed;
 };
 
+export const parseJsonBody = async <T extends Record<string, unknown>>(
+  request: Request,
+): Promise<T> => {
+  let payload: unknown;
+  try {
+    payload = await request.json();
+  } catch {
+    throw new ValidationError("Request body must be valid JSON.");
+  }
+
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    throw new ValidationError("Request body must be a JSON object.");
+  }
+
+  return payload as T;
+};
+
 export const parseOptionalTrimmedString = (
   value: unknown,
   field: string,
@@ -36,6 +53,37 @@ export const parseOptionalTrimmedString = (
     throw new ValidationError(`${field} must be <= ${maxLength} characters.`);
   }
   return trimmed;
+};
+
+export const parseRequiredStringArray = (
+  value: unknown,
+  field: string,
+  options?: {
+    maxItems?: number;
+    maxItemLength?: number;
+    dedupe?: boolean;
+  },
+) => {
+  if (!Array.isArray(value)) {
+    throw new ValidationError(`${field} must be an array.`);
+  }
+
+  const maxItems = options?.maxItems ?? 100;
+  const maxItemLength = options?.maxItemLength;
+  const dedupe = options?.dedupe !== false;
+  const items = value
+    .map((item) => String(item ?? "").trim())
+    .filter(Boolean)
+    .map((item) => (maxItemLength ? item.slice(0, maxItemLength) : item));
+
+  const normalizedItems = dedupe ? Array.from(new Set(items)) : items;
+  const slicedItems = normalizedItems.slice(0, maxItems);
+
+  if (slicedItems.length === 0) {
+    throw new ValidationError(`${field} is required.`);
+  }
+
+  return slicedItems;
 };
 
 export const parseVariantCount = (value: unknown, fallback = 3) => {

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/server/auth";
 import { toApiErrorResponse } from "@/lib/server/api-error";
-import { runSeedScenesSync } from "@/lib/server/services/scene-service";
+import { runSeedScenesSync } from "@/lib/server/scene/service";
 
 export async function POST() {
   try {

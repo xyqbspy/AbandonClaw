@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireCurrentProfile } from "@/lib/server/auth";
 import { toApiErrorResponse } from "@/lib/server/api-error";
-import { completeSceneLearning } from "@/lib/server/services/learning-service";
+import { completeSceneLearning } from "@/lib/server/learning/service";
 import { parseOptionalNonNegativeDelta } from "@/lib/server/validation";
 import {
   extractChunkTextsFromParsedScene,

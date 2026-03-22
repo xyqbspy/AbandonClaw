@@ -3,12 +3,13 @@ import { requireCurrentProfile } from "@/lib/server/auth";
 import { toApiErrorResponse } from "@/lib/server/api-error";
 import { ValidationError } from "@/lib/server/errors";
 import {
+  parseJsonBody,
   parseOptionalTrimmedString,
   parseRequiredTrimmedString,
 } from "@/lib/server/validation";
 import { SceneSourceLanguage } from "@/lib/types/scene-parser";
-import { parseImportedSceneWithCache } from "@/lib/server/services/import-parse-service";
-import { createImportedScene } from "@/lib/server/services/scene-service";
+import { parseImportedSceneWithCache } from "@/lib/server/scene/import";
+import { createImportedScene } from "@/lib/server/scene/service";
 
 interface ImportScenePayload {
   sourceText?: unknown;
@@ -24,7 +25,7 @@ export async function POST(request: Request) {
   try {
     const { user } = await requireCurrentProfile();
 
-    const payload = (await request.json()) as ImportScenePayload;
+    const payload = await parseJsonBody<ImportScenePayload>(request);
     const sourceText = parseRequiredTrimmedString(payload.sourceText, "sourceText", 8000);
     if (sourceText.length < 10) {
       throw new ValidationError("sourceText is too short.");

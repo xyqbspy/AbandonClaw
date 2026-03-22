@@ -4,9 +4,11 @@ import { toApiErrorResponse } from "@/lib/server/api-error";
 import { SavePhraseInput, savePhraseForUser } from "@/lib/server/phrases/service";
 import { trackChunksForUser } from "@/lib/server/chunks/service";
 import {
+  parseJsonBody,
   parseOptionalNonNegativeInt,
   parseOptionalTrimmedString,
 } from "@/lib/server/validation";
+import { ValidationError } from "@/lib/server/errors";
 import { normalizePhraseText } from "@/lib/shared/phrases";
 
 interface SavePhrasePayload {
@@ -108,9 +110,9 @@ const normalizeSavePayload = (payload: SavePhrasePayload): SavePhraseInput => {
 export async function POST(request: Request) {
   try {
     const { user } = await requireCurrentProfile();
-    const payload = (await request.json()) as SaveAllPayload;
+    const payload = await parseJsonBody<SaveAllPayload>(request);
     if (!Array.isArray(payload.items)) {
-      return NextResponse.json({ error: "items must be an array." }, { status: 400 });
+      throw new ValidationError("items must be an array.");
     }
     const safeTrim = (value: unknown, maxLength: number) =>
       typeof value === "string" ? value.trim().slice(0, maxLength) : "";
@@ -136,7 +138,7 @@ export async function POST(request: Request) {
       return true;
     });
     if (items.length === 0) {
-      return NextResponse.json({ error: "items is empty." }, { status: 400 });
+      throw new ValidationError("items is empty.");
     }
     const results: Array<{
       created: boolean;
