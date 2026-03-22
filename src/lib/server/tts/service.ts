@@ -42,6 +42,8 @@ type SignedUrlCacheEntry = {
   expiresAt: number;
 };
 
+type TtsResponseSource = "storage-hit" | "fresh-upload" | "inline-fallback";
+
 const voiceJenny = "en-US-JennyNeural";
 const voiceGuy = "en-US-GuyNeural";
 const signedUrlTtlSeconds = 60 * 60;
@@ -354,6 +356,7 @@ export async function generateTtsAudio(payload: TtsRequestPayload) {
 
   let responseUrl = await getStorageSignedUrlIfExists(target.storagePath);
   let cached = Boolean(responseUrl);
+  let source: TtsResponseSource = responseUrl ? "storage-hit" : "inline-fallback";
 
   if (!responseUrl) {
     const buffer =
@@ -362,14 +365,26 @@ export async function generateTtsAudio(payload: TtsRequestPayload) {
         : await synthesizeToBuffer(text, target.voice, target.mode);
 
     await tryPersistBufferToFile(target.absolutePath, buffer);
-    responseUrl = await uploadAudioToStorage(target.storagePath, buffer).catch(() =>
-      toInlineAudioUrl(buffer),
-    );
+    responseUrl = await uploadAudioToStorage(target.storagePath, buffer)
+      .then((url) => {
+        source = "fresh-upload";
+        return url;
+      })
+      .catch((error) => {
+        console.error("[tts] upload fallback", {
+          kind,
+          storagePath: target.storagePath,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        source = "inline-fallback";
+        return toInlineAudioUrl(buffer);
+      });
     cached = false;
   }
 
   return {
     url: responseUrl,
     cached,
+    source,
   };
 }

@@ -37,6 +37,7 @@ export type TtsRequestPayload = SentenceTtsPayload | ChunkTtsPayload | SceneFull
 interface TtsResponse {
   url?: string;
   cached?: boolean;
+  source?: "storage-hit" | "fresh-upload" | "inline-fallback";
   error?: string;
 }
 

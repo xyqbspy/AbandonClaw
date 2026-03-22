@@ -17,6 +17,10 @@ export async function POST(request: Request) {
       },
     });
   } catch (error) {
+    console.error("[api/tts] failed", {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
     return toApiErrorResponse(error, "Failed to generate tts audio.");
   }
 }
