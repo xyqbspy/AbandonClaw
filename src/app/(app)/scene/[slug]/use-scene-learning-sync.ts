@@ -13,8 +13,8 @@ import {
 } from "./scene-detail-learning-logic";
 import { SceneViewMode } from "./scene-detail-page-logic";
 
-type TimeoutHandle = ReturnType<typeof window.setTimeout>;
-type IntervalHandle = ReturnType<typeof window.setInterval>;
+type TimeoutHandle = number | ReturnType<typeof globalThis.setTimeout>;
+type IntervalHandle = number | ReturnType<typeof globalThis.setInterval>;
 
 type UseSceneLearningSyncDeps = {
   startSceneLearningFromApi: typeof startSceneLearningFromApi;

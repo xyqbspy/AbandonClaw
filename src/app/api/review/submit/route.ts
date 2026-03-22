@@ -9,7 +9,7 @@ import {
   parseReviewResult,
 } from "@/lib/server/validation";
 
-interface SubmitReviewPayload {
+interface SubmitReviewPayload extends Record<string, unknown> {
   userPhraseId?: unknown;
   reviewResult?: unknown;
   source?: unknown;

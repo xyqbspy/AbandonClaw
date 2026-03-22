@@ -9,6 +9,8 @@ import {
   resolveChunksNetworkFailure,
 } from "./chunks-page-load-logic";
 
+type TimerHandle = number | ReturnType<typeof globalThis.setTimeout>;
+
 type UseChunksListDataDeps = {
   getPhraseListCache: typeof getPhraseListCache;
   setPhraseListCache: typeof setPhraseListCache;
@@ -16,8 +18,8 @@ type UseChunksListDataDeps = {
   buildChunksListRequestParams: typeof buildChunksListRequestParams;
   resolveChunksCachePresentation: typeof resolveChunksCachePresentation;
   resolveChunksNetworkFailure: typeof resolveChunksNetworkFailure;
-  setTimeoutFn: (callback: () => void, delay: number) => ReturnType<typeof window.setTimeout>;
-  clearTimeoutFn: (handle: ReturnType<typeof window.setTimeout>) => void;
+  setTimeoutFn: (callback: () => void, delay: number) => TimerHandle;
+  clearTimeoutFn: (handle: TimerHandle) => void;
 };
 
 const defaultDeps: UseChunksListDataDeps = {
@@ -156,6 +158,7 @@ export const useChunksListData = ({
   return {
     loading,
     phrases,
+    setPhrases,
     total,
     listDataSource,
     loadPhrases,

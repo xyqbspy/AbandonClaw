@@ -13,7 +13,7 @@ import {
 } from "@/lib/server/validation";
 import { ValidationError } from "@/lib/server/errors";
 
-interface TrackChunksPayload {
+interface TrackChunksPayload extends Record<string, unknown> {
   sceneSlug?: unknown;
   sentenceIndex?: unknown;
   sentenceText?: unknown;

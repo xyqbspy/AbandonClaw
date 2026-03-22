@@ -9,7 +9,7 @@ import {
   parseOptionalTrimmedString,
 } from "@/lib/server/validation";
 
-interface SavePhrasePayload {
+interface SavePhrasePayload extends Record<string, unknown> {
   text?: unknown;
   learningItemType?: unknown;
   sentenceText?: unknown;

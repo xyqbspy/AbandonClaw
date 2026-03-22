@@ -123,13 +123,13 @@ test("useSavedRelations 支持按 id 失效关系缓存并重新预热", async (
     getPhraseRelationsBatchFromApi: async (userPhraseIds: string[]) => {
       requestedBatches.push(userPhraseIds);
       return {
-      rows: [
-        {
-          sourceUserPhraseId: "p1",
-          relationType: "similar" as const,
-          item: expressionRows[1],
-        },
-      ],
+        rows: [
+          {
+            sourceUserPhraseId: "p1",
+            relationType: "similar" as const,
+            item: expressionRows[1],
+          },
+        ],
       };
     },
     getPhraseRelationsFromApi: async () => ({ rows: [] }),
@@ -195,8 +195,8 @@ test("useSavedRelations 会为详情懒加载缺失关系，并在完成后清�
   assert.equal(result.current.savedRelationRowsBySourceId["detail-1"]?.length, 1);
 });
 
-test("useSavedRelations 在请求进行中不会重复拉取同一个详情关系", async () => {
-  let resolveRequest: ((value: { rows: any[] }) => void) | null = null;
+test("useSavedRelations 在请求进行中不会重复拉取同一详情关系", async () => {
+  let resolveRequest!: (value: { rows: any[] }) => void;
   const requestedIds: string[] = [];
   const deps = {
     getPhraseRelationsBatchFromApi: async () => ({ rows: [] }),
@@ -226,7 +226,7 @@ test("useSavedRelations 在请求进行中不会重复拉取同一个详情关�
 
   assert.deepEqual(requestedIds, ["detail-2"]);
 
-  resolveRequest?.({ rows: [] });
+  resolveRequest({ rows: [] });
 });
 
 test("useSavedRelations 在 onLoadFailed 回调身份变化时不会重复批量预热", async () => {

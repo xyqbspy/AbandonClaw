@@ -18,6 +18,12 @@ const originalCaches = globalThis.caches;
 const originalCreateObjectURL = globalThis.URL.createObjectURL;
 const originalRevokeObjectURL = globalThis.URL.revokeObjectURL;
 
+const getRequestUrl = (request: RequestInfo | URL) => {
+  if (typeof request === "string") return request;
+  if (request instanceof URL) return request.toString();
+  return request.url;
+};
+
 beforeEach(async () => {
   await __resetTtsTestState();
 });
@@ -34,7 +40,7 @@ afterEach(async () => {
 
 test("ensureSentenceAudio 会对同一音频请求做并发去重", async () => {
   let requestCount = 0;
-  let resolveFetch: ((value: Response) => void) | null = null;
+  let resolveFetch!: (value: Response) => void;
 
   globalThis.Audio = class {
     preload = "auto";
@@ -67,7 +73,7 @@ test("ensureSentenceAudio 会对同一音频请求做并发去重", async () => 
   await Promise.resolve();
   assert.equal(requestCount, 1);
 
-  resolveFetch?.(
+  resolveFetch(
     new Response(JSON.stringify({ url: "https://cdn.test/audio-1.mp3" }), {
       status: 200,
       headers: { "Content-Type": "application/json" },
@@ -131,14 +137,14 @@ test("ensureChunkAudio 首次成功后会优先命中浏览器本地缓存", asy
       }
       return {
         match: async (request: RequestInfo | URL) => {
-          const key = typeof request === "string" ? request : request.url;
+          const key = getRequestUrl(request);
           return bucket?.get(key)?.clone() ?? undefined;
         },
         put: async (request: RequestInfo | URL, response: Response) => {
-          const key = typeof request === "string" ? request : request.url;
+          const key = getRequestUrl(request);
           bucket?.set(key, response.clone());
         },
-      } as Cache;
+      } as unknown as Cache;
     },
     delete: async (name: string) => cacheBuckets.delete(name),
     has: async (name: string) => cacheBuckets.has(name),
@@ -204,20 +210,20 @@ test("浏览器 TTS 缓存 helper 可以列出大小并定向清理", async () =
       }
       return {
         match: async (request: RequestInfo | URL) => {
-          const key = typeof request === "string" ? request : request.url;
+          const key = getRequestUrl(request);
           return bucket?.get(key)?.clone() ?? undefined;
         },
         put: async (request: RequestInfo | URL, response: Response) => {
-          const key = typeof request === "string" ? request : request.url;
+          const key = getRequestUrl(request);
           bucket?.set(key, response.clone());
         },
         delete: async (request: RequestInfo | URL) => {
-          const key = typeof request === "string" ? request : request.url;
+          const key = getRequestUrl(request);
           return bucket?.delete(key) ?? false;
         },
         keys: async () =>
           Array.from(bucket?.keys() ?? []).map((key) => new Request(key)),
-      } as Cache;
+      } as unknown as Cache;
     },
     delete: async (name: string) => cacheBuckets.delete(name),
     has: async (name: string) => cacheBuckets.has(name),

@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { TtsActionButton } from "@/components/audio/tts-action-button";
 import { useTtsPlaybackState } from "@/hooks/use-tts-playback-state";
 import { normalizePhraseText } from "@/lib/shared/phrases";
+import { buildChunkAudioKey } from "@/lib/shared/tts";
 import { playChunkAudio, prefetchChunkAudio, stopTtsPlayback } from "@/lib/utils/tts-api";
 import { generateExpressionMapFromApi } from "@/lib/utils/expression-map-api";
 import { ExpressionCluster, ExpressionMapResponse } from "@/lib/types/expression-map";
@@ -622,7 +623,7 @@ export default function ChunksPage() {
     [],
   );
 
-  const { loading, phrases, total, listDataSource, loadPhrases } = useChunksListData({
+  const { loading, phrases, setPhrases, total, listDataSource, loadPhrases } = useChunksListData({
     query,
     reviewFilter,
     contentFilter,

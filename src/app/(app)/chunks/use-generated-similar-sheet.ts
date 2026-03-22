@@ -15,7 +15,10 @@ type UseGeneratedSimilarSheetDeps = {
   savePhraseFromApi: typeof savePhraseFromApi;
   savePhrasesBatchFromApi: typeof savePhrasesBatchFromApi;
   enrichSimilarExpressionsBatchFromApi: typeof enrichSimilarExpressionsBatchFromApi;
-  setTimeoutFn: (callback: () => void, delay: number) => ReturnType<typeof window.setTimeout>;
+  setTimeoutFn: (
+    callback: () => void,
+    delay: number,
+  ) => number | ReturnType<typeof globalThis.setTimeout>;
 };
 
 const defaultDeps: UseGeneratedSimilarSheetDeps = {
@@ -46,9 +49,12 @@ export const useGeneratedSimilarSheet = ({
   deps?: UseGeneratedSimilarSheetDeps;
 }) => {
   const [similarSheetOpen, setSimilarSheetOpen] = useState(false);
-  const [similarSeedExpression, setSimilarSeedExpression] = useState<UserPhraseItemResponse | null>(null);
+  const [similarSeedExpression, setSimilarSeedExpression] =
+    useState<UserPhraseItemResponse | null>(null);
   const [generatingSimilarForId, setGeneratingSimilarForId] = useState<string | null>(null);
-  const [generatedSimilarCandidates, setGeneratedSimilarCandidates] = useState<SimilarExpressionCandidateResponse[]>([]);
+  const [generatedSimilarCandidates, setGeneratedSimilarCandidates] = useState<
+    SimilarExpressionCandidateResponse[]
+  >([]);
   const [selectedSimilarMap, setSelectedSimilarMap] = useState<Record<string, boolean>>({});
   const [savingSelectedSimilar, setSavingSelectedSimilar] = useState(false);
 

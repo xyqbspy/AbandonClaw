@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireCurrentProfile } from "@/lib/server/auth";
+import { parseJsonBody } from "@/lib/server/validation";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import {
   ExpressionCluster,
@@ -292,7 +293,7 @@ async function buildRealUserClusters(params: {
 export async function POST(request: Request) {
   try {
     const { user } = await requireCurrentProfile();
-    const payloadRaw = (await request.json()) as unknown;
+    const payloadRaw = await parseJsonBody<Record<string, unknown>>(request);
     const parsed = parsePayload(payloadRaw);
     if (!parsed.ok) {
       return NextResponse.json({ error: parsed.error }, { status: 400 });

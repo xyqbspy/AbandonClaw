@@ -11,7 +11,7 @@ import {
 import { ValidationError } from "@/lib/server/errors";
 import { normalizePhraseText } from "@/lib/shared/phrases";
 
-interface SavePhrasePayload {
+interface SavePhrasePayload extends Record<string, unknown> {
   text?: unknown;
   learningItemType?: unknown;
   sentenceText?: unknown;
@@ -30,7 +30,7 @@ interface SavePhrasePayload {
   relationType?: unknown;
 }
 
-interface SaveAllPayload {
+interface SaveAllPayload extends Record<string, unknown> {
   items?: unknown;
 }
 

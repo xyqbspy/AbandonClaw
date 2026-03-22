@@ -11,7 +11,7 @@ import { SceneSourceLanguage } from "@/lib/types/scene-parser";
 import { parseImportedSceneWithCache } from "@/lib/server/scene/import";
 import { createImportedScene } from "@/lib/server/scene/service";
 
-interface ImportScenePayload {
+interface ImportScenePayload extends Record<string, unknown> {
   sourceText?: unknown;
   title?: unknown;
   theme?: unknown;

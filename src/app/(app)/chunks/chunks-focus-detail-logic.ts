@@ -1,4 +1,6 @@
-﻿export type FocusDetailKind =
+import { ManualExpressionAssistResponse, UserPhraseItemResponse } from "@/lib/utils/phrases-api";
+
+export type FocusDetailKind =
   | "current"
   | "library-similar"
   | "suggested-similar"
@@ -18,8 +20,8 @@ export type FocusDetailStateLike = {
   text: string;
   differenceLabel?: string | null;
   kind: FocusDetailKind;
-  savedItem: unknown | null;
-  assistItem: unknown | null;
+  savedItem: UserPhraseItemResponse | null;
+  assistItem: ManualExpressionAssistResponse["inputItem"] | null;
 };
 
 export const createFocusDetailTrailItem = ({
@@ -51,7 +53,7 @@ export const buildFocusDetailState = ({
   text: string;
   differenceLabel?: string | null;
   kind: FocusDetailKind;
-  savedItem: unknown | null;
+  savedItem: UserPhraseItemResponse | null;
 }): FocusDetailStateLike => ({
   text,
   differenceLabel: differenceLabel ?? null,

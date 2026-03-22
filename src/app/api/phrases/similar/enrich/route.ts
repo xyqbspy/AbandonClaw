@@ -5,7 +5,7 @@ import { ValidationError } from "@/lib/server/errors";
 import { enrichAiExpressionLearningInfo } from "@/lib/server/phrases/service";
 import { parseJsonBody, parseOptionalTrimmedString } from "@/lib/server/validation";
 
-interface EnrichPayload {
+interface EnrichPayload extends Record<string, unknown> {
   userPhraseId?: unknown;
   baseExpression?: unknown;
   differenceLabel?: unknown;

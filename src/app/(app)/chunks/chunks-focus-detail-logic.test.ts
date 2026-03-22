@@ -1,4 +1,4 @@
-﻿import assert from "node:assert/strict";
+import assert from "node:assert/strict";
 import test from "node:test";
 import {
   buildFocusDetailCloseState,
@@ -8,6 +8,7 @@ import {
   resolveReopenFocusTrail,
   updateFocusDetailTrail,
 } from "./chunks-focus-detail-logic";
+import { UserPhraseItemResponse } from "@/lib/utils/phrases-api";
 
 const first = createFocusDetailTrailItem({
   userPhraseId: "p1",
@@ -84,18 +85,19 @@ test("resolveReopenFocusTrail 会返回目标节点、下一段 trail 和 tab", 
 });
 
 test("buildFocusDetailState 会稳定构造 detail 状态", () => {
+  const savedItem = { userPhraseId: "p1" } as UserPhraseItemResponse;
   assert.deepEqual(
     buildFocusDetailState({
       text: "call it a day",
       differenceLabel: "接近说法",
       kind: "library-similar",
-      savedItem: { userPhraseId: "p1" },
+      savedItem,
     }),
     {
       text: "call it a day",
       differenceLabel: "接近说法",
       kind: "library-similar",
-      savedItem: { userPhraseId: "p1" },
+      savedItem,
       assistItem: null,
     },
   );

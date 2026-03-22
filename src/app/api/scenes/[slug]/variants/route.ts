@@ -9,6 +9,7 @@ import {
 } from "@/lib/server/scene/variants";
 import { isValidParsedScene } from "@/lib/server/scene-json";
 import {
+  parseJsonBody,
   parseOptionalTrimmedString,
   parseRetainChunkRatio,
   parseVariantCount,
@@ -19,7 +20,7 @@ import {
   trackChunksForUser,
 } from "@/lib/server/chunks/service";
 
-interface GenerateVariantsPayload {
+interface GenerateVariantsPayload extends Record<string, unknown> {
   variantCount?: unknown;
   retainChunkRatio?: unknown;
   theme?: unknown;
@@ -77,7 +78,7 @@ export async function POST(
       throw new NotFoundError("Scene not found.");
     }
 
-    const payload = (await request.json()) as GenerateVariantsPayload;
+    const payload = await parseJsonBody<GenerateVariantsPayload>(request);
     const sceneId = scene.row.id;
     const sourceScene = scene.row.scene_json as ParsedScene;
     const result = await generateSceneVariants({

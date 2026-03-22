@@ -2,14 +2,14 @@ import { NextResponse } from "next/server";
 import { requireCurrentProfile } from "@/lib/server/auth";
 import { toApiErrorResponse } from "@/lib/server/api-error";
 import { completeSceneLearning } from "@/lib/server/learning/service";
-import { parseOptionalNonNegativeDelta } from "@/lib/server/validation";
+import { parseJsonBody, parseOptionalNonNegativeDelta } from "@/lib/server/validation";
 import {
   extractChunkTextsFromParsedScene,
   trackChunksForUser,
 } from "@/lib/server/chunks/service";
 import { ParsedScene } from "@/lib/types/scene-parser";
 
-interface CompletePayload {
+interface CompletePayload extends Record<string, unknown> {
   studySecondsDelta?: unknown;
   savedPhraseDelta?: unknown;
 }
@@ -21,7 +21,7 @@ export async function POST(
   try {
     const { user } = await requireCurrentProfile();
     const { slug } = await context.params;
-    const payload = (await request.json()) as CompletePayload;
+    const payload = await parseJsonBody<CompletePayload>(request);
 
     const result = await completeSceneLearning(user.id, slug, {
       studySecondsDelta: parseOptionalNonNegativeDelta(

@@ -11,7 +11,7 @@ afterEach(() => {
 
 test("getScenesFromApi 会对默认列表请求做并发去重", async () => {
   let requestCount = 0;
-  let resolveFetch: ((value: Response) => void) | null = null;
+  let resolveFetch!: (value: Response) => void;
 
   globalThis.fetch = (async () => {
     requestCount += 1;
@@ -25,7 +25,7 @@ test("getScenesFromApi 会对默认列表请求做并发去重", async () => {
 
   assert.equal(requestCount, 1);
 
-  resolveFetch?.(
+  resolveFetch(
     new Response(
       JSON.stringify({
         scenes: [{ id: "scene-1", slug: "scene-1", title: "Scene 1" }],

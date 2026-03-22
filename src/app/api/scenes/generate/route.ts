@@ -7,7 +7,7 @@ import {
 } from "@/lib/server/validation";
 import { generatePersonalizedSceneForUser } from "@/lib/server/scene/generation";
 
-interface GenerateScenePayload {
+interface GenerateScenePayload extends Record<string, unknown> {
   promptText?: unknown;
   tone?: unknown;
   difficulty?: unknown;

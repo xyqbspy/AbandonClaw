@@ -9,6 +9,11 @@ afterEach(() => {
   cleanup();
 });
 
+type HookProps = {
+  viewMode: "scene" | "variant-study";
+  activeVariantId: string | null;
+};
+
 const lesson = {
   id: "scene-1",
   slug: "scene-1",
@@ -96,7 +101,7 @@ test("useSceneLearningSync 会启动学习、同步进度，并在卸载时带 p
   };
 
   const { rerender, unmount } = renderHook(
-    ({ viewMode, activeVariantId }) =>
+    ({ viewMode, activeVariantId }: HookProps) =>
       useSceneLearningSync({
         baseLesson: lesson as never,
         viewMode,
@@ -107,7 +112,7 @@ test("useSceneLearningSync 会启动学习、同步进度，并在卸载时带 p
       initialProps: {
         viewMode: "scene" as const,
         activeVariantId: null as string | null,
-      },
+      } as HookProps,
     },
   );
 

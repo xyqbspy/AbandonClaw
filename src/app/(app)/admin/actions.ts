@@ -155,7 +155,7 @@ export async function enrichAdminPhraseAction(formData: FormData) {
   await requireAdmin();
   const userPhraseId = parseRequiredIdFromForm(formData.get("userPhraseId"), "userPhraseId");
   const returnTo = normalizeAdminReturnTo(formData.get("returnTo"), "/admin/phrases");
-  let notice = ADMIN_NOTICE.phraseEnrichSubmitted;
+  let notice: string = ADMIN_NOTICE.phraseEnrichSubmitted;
   let tone: "success" | "danger" = "success";
 
   try {
@@ -186,7 +186,7 @@ export async function enrichAdminPhrasesBatchAction(formData: FormData) {
     redirect(appendAdminNotice(returnTo, ADMIN_NOTICE.batchSelectFirst, "info"));
   }
 
-  let notice = `已批量补全 ${userPhraseIds.length} 条表达。`;
+  let notice: string = `已批量补全 ${userPhraseIds.length} 条表达。`;
   let tone: "success" | "danger" = "success";
 
   try {

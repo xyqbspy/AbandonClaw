@@ -9,7 +9,7 @@ import {
   parseProgressPercent,
 } from "@/lib/server/validation";
 
-interface UpdateProgressPayload {
+interface UpdateProgressPayload extends Record<string, unknown> {
   progressPercent?: unknown;
   lastSentenceIndex?: unknown;
   lastVariantIndex?: unknown;

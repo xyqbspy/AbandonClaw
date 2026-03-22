@@ -18,7 +18,7 @@ import {
 type TtsKind = "sentence" | "chunk" | "scene_full";
 type TtsMode = "normal" | "slow";
 
-interface TtsRequestPayload {
+interface TtsRequestPayload extends Record<string, unknown> {
   kind?: unknown;
   mode?: unknown;
   speed?: unknown;

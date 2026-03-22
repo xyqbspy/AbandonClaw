@@ -5,13 +5,13 @@ import { ValidationError } from "@/lib/server/errors";
 import { enrichAiExpressionLearningInfo } from "@/lib/server/phrases/service";
 import { parseJsonBody, parseOptionalTrimmedString } from "@/lib/server/validation";
 
-interface EnrichItemPayload {
+interface EnrichItemPayload extends Record<string, unknown> {
   userPhraseId?: unknown;
   baseExpression?: unknown;
   differenceLabel?: unknown;
 }
 
-interface EnrichAllPayload {
+interface EnrichAllPayload extends Record<string, unknown> {
   items?: unknown;
 }
 
