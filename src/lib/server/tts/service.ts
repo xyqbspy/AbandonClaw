@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import { MsEdgeTTS, OUTPUT_FORMAT } from "msedge-tts";
 import { ValidationError } from "@/lib/server/errors";
@@ -184,7 +185,7 @@ const uploadAudioToStorage = async (storagePath: string, buffer: Buffer) => {
 };
 
 const synthesizeToBuffer = async (text: string, voice: string, mode: TtsMode) => {
-  const tempBaseDir = path.join(process.cwd(), ".tmp", "edge-tts");
+  const tempBaseDir = path.join(os.tmpdir(), "edge-tts");
   const tempDir = path.join(tempBaseDir, randomUUID());
   await mkdir(tempDir, { recursive: true });
 
