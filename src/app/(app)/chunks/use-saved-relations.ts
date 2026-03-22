@@ -38,7 +38,9 @@ export const useSavedRelations = ({
   onLoadFailed?: (message: string) => void;
   deps?: UseSavedRelationsDeps;
 }) => {
-  const [savedRelationCache, setSavedRelationCache] = useState<Record<string, SavedRelationCacheEntry>>({});
+  const [savedRelationCache, setSavedRelationCache] = useState<
+    Record<string, SavedRelationCacheEntry>
+  >({});
   const [savedRelationLoadingKey, setSavedRelationLoadingKey] = useState<string | null>(null);
   const [focusRelationsBootstrapDone, setFocusRelationsBootstrapDone] = useState(false);
   const pendingRelationRequestIdsRef = useRef<Set<string>>(new Set());
@@ -88,7 +90,9 @@ export const useSavedRelations = ({
       })
       .catch((error) => {
         if (cancelled) return;
-        onLoadFailedRef.current?.(error instanceof Error ? error.message : "加载表达关系失败。");
+        onLoadFailedRef.current?.(
+          error instanceof Error ? error.message : "加载表达关系失败。",
+        );
         setSavedRelationCache((current) => {
           const next = { ...current };
           for (const userPhraseId of pendingIds) {
@@ -158,7 +162,9 @@ export const useSavedRelations = ({
       })
       .catch((error) => {
         if (cancelled) return;
-        onLoadFailedRef.current?.(error instanceof Error ? error.message : "加载表达关系失败。");
+        onLoadFailedRef.current?.(
+          error instanceof Error ? error.message : "加载表达关系失败。",
+        );
         setSavedRelationCache((current) => ({
           ...current,
           [userPhraseId]: {
@@ -179,7 +185,10 @@ export const useSavedRelations = ({
   }, [contentFilter, deps, expressionViewMode, focusDetailUserPhraseId, savedRelationCache]);
 
   const savedRelationRowsBySourceId: SavedRelationRowsBySourceId = useMemo(
-    () => Object.fromEntries(Object.entries(savedRelationCache).map(([key, value]) => [key, value.rows])),
+    () =>
+      Object.fromEntries(
+        Object.entries(savedRelationCache).map(([key, value]) => [key, value.rows]),
+      ),
     [savedRelationCache],
   );
 

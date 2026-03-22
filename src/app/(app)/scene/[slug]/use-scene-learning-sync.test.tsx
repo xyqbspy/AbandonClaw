@@ -3,6 +3,8 @@ import test, { afterEach } from "node:test";
 import React from "react";
 import { cleanup, renderHook } from "@testing-library/react";
 
+import { Lesson } from "@/lib/types";
+
 import { useSceneLearningSync } from "./use-scene-learning-sync";
 
 afterEach(() => {
@@ -14,7 +16,28 @@ type HookProps = {
   activeVariantId: string | null;
 };
 
-const lesson = {
+type LearningSyncDeps = NonNullable<Parameters<typeof useSceneLearningSync>[0]["deps"]>;
+
+const buildLearningProgressResponse = () => ({
+  progress: {
+    id: "progress-1",
+    sceneId: "scene-1",
+    status: "in_progress" as const,
+    progressPercent: 0,
+    lastSentenceIndex: null,
+    lastVariantIndex: null,
+    startedAt: null,
+    lastViewedAt: null,
+    completedAt: null,
+    totalStudySeconds: 0,
+    todayStudySeconds: 0,
+    savedPhraseCount: 0,
+    createdAt: "2026-03-22T00:00:00.000Z",
+    updatedAt: "2026-03-22T00:00:00.000Z",
+  },
+});
+
+const lesson: Lesson = {
   id: "scene-1",
   slug: "scene-1",
   title: "Scene 1",
@@ -25,7 +48,7 @@ const lesson = {
   sceneType: "dialogue",
   sections: [],
   explanations: [],
-} as const;
+};
 
 test("useSceneLearningSync 会启动学习、同步进度，并在卸载时带 pause flush", async () => {
   let now = 1_000;
@@ -44,35 +67,36 @@ test("useSceneLearningSync 会启动学习、同步进度，并在卸载时带 p
   let timeoutId = 0;
   let intervalId = 0;
 
-  const deps = {
+  const deps: LearningSyncDeps = {
     startSceneLearningFromApi: async (slug: string) => {
       startCalls.push(slug);
+      return buildLearningProgressResponse();
     },
     pauseSceneLearningFromApi: async (slug: string) => {
       pauseCalls.push(slug);
+      return buildLearningProgressResponse();
     },
-    updateSceneLearningProgressFromApi: async (slug: string, payload: any) => {
-      updateCalls.push({ slug, payload });
+    updateSceneLearningProgressFromApi: async (slug: string, payload) => {
+      updateCalls.push({
+        slug,
+        payload: {
+          progressPercent: payload.progressPercent ?? 0,
+          lastVariantIndex: payload.lastVariantIndex,
+          studySecondsDelta: payload.studySecondsDelta ?? 0,
+        },
+      });
+      return buildLearningProgressResponse();
     },
     shouldFlushSceneLearningDelta: ({
       hasBaseLesson,
       learningStarted,
       studySecondsDelta,
       withPause,
-    }: {
-      hasBaseLesson: boolean;
-      learningStarted: boolean;
-      studySecondsDelta: number;
-      withPause: boolean;
     }) => Boolean(hasBaseLesson && learningStarted && (studySecondsDelta > 0 || withPause)),
     buildSceneLearningUpdatePayload: ({
       viewMode,
       activeVariantId,
       withPause,
-    }: {
-      viewMode: string;
-      activeVariantId?: string | null;
-      withPause?: boolean;
     }) => ({
       progressPercent: viewMode === "variant-study" ? 65 : 20,
       lastVariantIndex:
@@ -85,34 +109,34 @@ test("useSceneLearningSync 会启动学习、同步进度，并在卸载时带 p
     setTimeoutFn: (callback: () => void) => {
       timeoutId += 1;
       timeouts.set(timeoutId, callback);
-      return timeoutId as never;
+      return timeoutId;
     },
-    clearTimeoutFn: (handle: number) => {
-      timeouts.delete(handle);
+    clearTimeoutFn: (handle) => {
+      timeouts.delete(handle as number);
     },
     setIntervalFn: (callback: () => void) => {
       intervalId += 1;
       intervals.set(intervalId, callback);
-      return intervalId as never;
+      return intervalId;
     },
-    clearIntervalFn: (handle: number) => {
-      intervals.delete(handle);
+    clearIntervalFn: (handle) => {
+      intervals.delete(handle as number);
     },
   };
 
   const { rerender, unmount } = renderHook(
     ({ viewMode, activeVariantId }: HookProps) =>
       useSceneLearningSync({
-        baseLesson: lesson as never,
+        baseLesson: lesson,
         viewMode,
         activeVariantId,
-        deps: deps as never,
+        deps,
       }),
     {
       initialProps: {
-        viewMode: "scene" as const,
-        activeVariantId: null as string | null,
-      } as HookProps,
+        viewMode: "scene",
+        activeVariantId: null,
+      },
     },
   );
 
@@ -129,7 +153,7 @@ test("useSceneLearningSync 会启动学习、同步进度，并在卸载时带 p
   });
 
   rerender({
-    viewMode: "variant-study" as const,
+    viewMode: "variant-study",
     activeVariantId: "variant-2",
   });
   now = 5_500;

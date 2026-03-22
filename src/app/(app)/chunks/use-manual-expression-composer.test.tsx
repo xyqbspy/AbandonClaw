@@ -4,12 +4,13 @@ import React from "react";
 import { act, cleanup, renderHook } from "@testing-library/react";
 
 import { useManualExpressionComposer } from "./use-manual-expression-composer";
+import { UserPhraseItemResponse } from "@/lib/utils/phrases-api";
 
 afterEach(() => {
   cleanup();
 });
 
-const expressionRows = [
+const expressionRows: UserPhraseItemResponse[] = [
   {
     userPhraseId: "p1",
     phraseId: "phrase-1",
@@ -44,7 +45,7 @@ const expressionRows = [
     nextReviewAt: null,
     masteredAt: null,
   },
-] as any[];
+];
 
 test("useManualExpressionComposer 会加载 assist 并默认勾选 base", async () => {
   const { result } = renderHook(() =>
@@ -64,11 +65,16 @@ test("useManualExpressionComposer 会加载 assist 并默认勾选 base", async 
           similarExpressions: [],
           contrastExpressions: [],
         }),
-        savePhraseFromApi: async () => ({}) as any,
-        enrichSimilarExpressionFromApi: async () => ({}) as any,
-        savePhrasesBatchFromApi: async () => ({}) as any,
-        enrichSimilarExpressionsBatchFromApi: async () => ({}) as any,
-      } as never,
+        savePhraseFromApi: async () => ({
+          created: true,
+          phrase: { id: "phrase-1", normalized_text: "call it a day", display_text: "call it a day" },
+          userPhrase: { id: "saved-1" },
+          expressionClusterId: null,
+        }),
+        enrichSimilarExpressionFromApi: async () => ({ userPhraseId: "saved-1", status: "done" as const }),
+        savePhrasesBatchFromApi: async () => ({ items: [] }),
+        enrichSimilarExpressionsBatchFromApi: async () => ({ items: [] }),
+      },
     }),
   );
 
@@ -82,27 +88,56 @@ test("useManualExpressionComposer 会加载 assist 并默认勾选 base", async 
 
 test("useManualExpressionComposer 在无 assist 时会保存基础表达并尝试 enrich", async () => {
   const partials: string[] = [];
-  const saveCalls: any[] = [];
+  const saveCalls: Array<{ text?: string }> = [];
   const { result } = renderHook(() =>
     useManualExpressionComposer({
       expressionRows,
       onPartialEnrichFailed: (message) => partials.push(message),
       deps: {
-        generateManualExpressionAssistFromApi: async () => ({}) as any,
-        savePhraseFromApi: async (payload: any) => {
+        generateManualExpressionAssistFromApi: async () => ({
+          version: "v1",
+          inputItem: {
+            text: "unused",
+            translation: "",
+            usageNote: "",
+            examples: [],
+            semanticFocus: "",
+            typicalScenario: "",
+          },
+          similarExpressions: [],
+          contrastExpressions: [],
+        }),
+        savePhraseFromApi: async (payload) => {
           saveCalls.push(payload);
-          return { userPhrase: { id: "saved-1" } } as any;
+          return {
+            created: true,
+            phrase: { id: "phrase-2", normalized_text: "wrap it up", display_text: "wrap it up" },
+            userPhrase: { id: "saved-1" },
+            expressionClusterId: null,
+          };
         },
         enrichSimilarExpressionFromApi: async () => {
           throw new Error("boom");
         },
-        savePhrasesBatchFromApi: async () => ({}) as any,
-        enrichSimilarExpressionsBatchFromApi: async () => ({}) as any,
-      } as never,
+        savePhrasesBatchFromApi: async () => ({ items: [] }),
+        enrichSimilarExpressionsBatchFromApi: async () => ({ items: [] }),
+      },
     }),
   );
 
-  let output: any = null;
+  let output:
+    | {
+        reviewSessionExpressions: Array<{ userPhraseId: string; text: string }>;
+        usedAssist: boolean;
+        mode: "save" | "save_and_review";
+      }
+    | {
+        reviewSessionExpressions: Array<{ userPhraseId: string; text: string }>;
+        usedAssist: true;
+        mode: "save" | "save_and_review";
+        emptySelection: true;
+      }
+    | null = null;
   await act(async () => {
     output = await result.current.saveManualExpression({
       text: "wrap it up",
@@ -120,7 +155,7 @@ test("useManualExpressionComposer 在无 assist 时会保存基础表达并尝�
 });
 
 test("useManualExpressionComposer 在有 assist 时会保存 base/similar/contrast 并批量 enrich", async () => {
-  const batchPayloads: any[] = [];
+  const batchPayloads: unknown[] = [];
   const { result } = renderHook(() =>
     useManualExpressionComposer({
       expressionRows,
@@ -138,26 +173,39 @@ test("useManualExpressionComposer 在有 assist 时会保存 base/similar/contra
           similarExpressions: [{ text: "wrap it up", differenceLabel: "更偏收尾" }],
           contrastExpressions: [{ text: "keep going", differenceLabel: "继续推进" }],
         }),
-        savePhraseFromApi: async (payload: any) => {
+        savePhraseFromApi: async (payload) => {
           if (payload.text === "call it a day") {
-            return { userPhrase: { id: "base-1" }, expressionClusterId: "cluster-1" } as any;
+            return {
+              created: true,
+              phrase: { id: "phrase-1", normalized_text: "call it a day", display_text: "call it a day" },
+              userPhrase: { id: "base-1" },
+              expressionClusterId: "cluster-1",
+            };
           }
           throw new Error("unexpected single save");
         },
-        enrichSimilarExpressionFromApi: async () => ({}) as any,
-        savePhrasesBatchFromApi: async (payload: any) => {
+        enrichSimilarExpressionFromApi: async () => ({ userPhraseId: "base-1", status: "done" as const }),
+        savePhrasesBatchFromApi: async (payload) => {
           batchPayloads.push(payload);
           return {
-            items: payload.items.map((_: any, index: number) => ({
+            items: payload.items.map((_: unknown, index: number) => ({
+              created: true,
+              phrase: { id: `phrase-${index + 2}`, normalized_text: `item-${index + 1}`, display_text: `item-${index + 1}` },
               userPhrase: { id: `batch-${index + 1}` },
+              expressionClusterId: "cluster-1",
             })),
-          } as any;
+          };
         },
-        enrichSimilarExpressionsBatchFromApi: async (payload: any) => {
+        enrichSimilarExpressionsBatchFromApi: async (payload) => {
           batchPayloads.push({ enrich: payload });
-          return {} as any;
+          return {
+            items: [
+              { userPhraseId: "batch-1", status: "done" as const },
+              { userPhraseId: "batch-2", status: "done" as const },
+            ],
+          };
         },
-      } as never,
+      },
     }),
   );
 
@@ -169,7 +217,19 @@ test("useManualExpressionComposer 在有 assist 时会保存 base/similar/contra
     result.current.toggleManualSelected("keep going");
   });
 
-  let output: any = null;
+  let output:
+    | {
+        reviewSessionExpressions: Array<{ userPhraseId: string; text: string }>;
+        usedAssist: boolean;
+        mode: "save" | "save_and_review";
+      }
+    | {
+        reviewSessionExpressions: Array<{ userPhraseId: string; text: string }>;
+        usedAssist: true;
+        mode: "save" | "save_and_review";
+        emptySelection: true;
+      }
+    | null = null;
   await act(async () => {
     output = await result.current.saveManualExpression({
       text: "call it a day",
@@ -177,11 +237,17 @@ test("useManualExpressionComposer 在有 assist 时会保存 base/similar/contra
     });
   });
 
-  assert.equal(output.usedAssist, true);
-  assert.equal(output.mode, "save_and_review");
-  assert.equal(output.reviewSessionExpressions.length, 3);
+  assert.deepEqual(output, {
+    reviewSessionExpressions: [
+      { userPhraseId: "base-1", text: "call it a day" },
+      { userPhraseId: "batch-1", text: "wrap it up" },
+      { userPhraseId: "batch-1", text: "keep going" },
+    ],
+    usedAssist: true,
+    mode: "save_and_review",
+  });
   assert.equal(batchPayloads.length, 3);
-  assert.equal(batchPayloads[0].items[0].relationType, "similar");
-  assert.equal(batchPayloads[1].items[0].relationType, "contrast");
-  assert.equal(batchPayloads[2].enrich.items.length, 2);
+  assert.equal((batchPayloads[0] as { items: Array<{ relationType?: string }> }).items[0]?.relationType, "similar");
+  assert.equal((batchPayloads[1] as { items: Array<{ relationType?: string }> }).items[0]?.relationType, "contrast");
+  assert.equal((batchPayloads[2] as { enrich: { items: unknown[] } }).enrich.items.length, 2);
 });

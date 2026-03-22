@@ -3,30 +3,34 @@ import test, { afterEach } from "node:test";
 import React from "react";
 import { cleanup, renderHook, waitFor } from "@testing-library/react";
 
-import { useSceneDetailData } from "./use-scene-detail-data";
+import { Lesson } from "@/lib/types";
+
+import { UseSceneDetailDataDeps, useSceneDetailData } from "./use-scene-detail-data";
 
 afterEach(() => {
   cleanup();
 });
 
-const createLesson = (id: string, slug = id) =>
-  ({
-    id,
-    slug,
-    title: id,
-    difficulty: "Beginner",
-    estimatedMinutes: 5,
-    completionRate: 0,
-    tags: [],
-    sceneType: "dialogue",
-    sections: [],
-    explanations: [],
-  }) as const;
+type SceneDetailDataDeps = UseSceneDetailDataDeps;
+type LoadSceneDetailArgs = Parameters<SceneDetailDataDeps["loadSceneDetail"]>[0];
+
+const createLesson = (id: string, slug = id): Lesson => ({
+  id,
+  slug,
+  title: id,
+  difficulty: "Beginner",
+  estimatedMinutes: 5,
+  completionRate: 0,
+  tags: [],
+  sceneType: "dialogue",
+  sections: [],
+  explanations: [],
+});
 
 test("useSceneDetailData 会先接收缓存，再被网络结果覆盖", async () => {
   const cacheLesson = createLesson("scene-cache", "scene-a");
   const networkLesson = createLesson("scene-network", "scene-a");
-  const deps = {
+  const deps: SceneDetailDataDeps = {
     clearExpiredSceneCaches: async () => undefined,
     getSceneCache: async () => ({ found: false, isExpired: false, record: null }),
     getSceneDetailBySlugFromApi: async () => networkLesson,
@@ -35,13 +39,17 @@ test("useSceneDetailData 会先接收缓存，再被网络结果覆盖", async (
     listRecentSceneCacheKeys: async () => [],
     scheduleScenePrefetch: () => undefined,
     extractSlugFromSceneCacheKey: (key: string) => key,
-    getPrefetchDebugState: () => ({}),
-    loadSceneDetail: async ({ callbacks }: { callbacks: any }) => {
+    getPrefetchDebugState: () => ({
+      pendingKeys: [],
+      inFlightKey: null,
+      recentPrefetchedKeys: [],
+    }),
+    loadSceneDetail: async ({ callbacks }: LoadSceneDetailArgs) => {
       callbacks.onStart();
-      callbacks.onHydrateLesson(cacheLesson as never, "cache");
+      callbacks.onHydrateLesson(cacheLesson, "cache");
       callbacks.onStopLoading();
       await Promise.resolve();
-      callbacks.onHydrateLesson(networkLesson as never, "network");
+      callbacks.onHydrateLesson(networkLesson, "network");
       callbacks.onStopLoading();
     },
     getSavedNormalizedPhraseTextsFromApi: async () => [],
@@ -57,7 +65,7 @@ test("useSceneDetailData 会先接收缓存，再被网络结果覆盖", async (
     saveVariantSet: () => undefined,
   };
 
-  const { result } = renderHook(() => useSceneDetailData("scene-a", deps as never));
+  const { result } = renderHook(() => useSceneDetailData("scene-a", deps));
 
   await waitFor(() => {
     assert.equal(result.current.sceneDataSource, "cache");
@@ -80,12 +88,12 @@ test("useSceneDetailData 会忽略旧 slug 的迟到回填", async () => {
     string,
     {
       canApply: () => boolean;
-      onHydrateLesson: (lesson: never, source: "cache" | "network") => void;
+      onHydrateLesson: (lesson: Lesson, source: "cache" | "network") => void;
       onStopLoading: () => void;
     }
   >();
 
-  const deps = {
+  const deps: SceneDetailDataDeps = {
     clearExpiredSceneCaches: async () => undefined,
     getSceneCache: async () => ({ found: false, isExpired: false, record: null }),
     getSceneDetailBySlugFromApi: async () => lessons.a,
@@ -94,19 +102,12 @@ test("useSceneDetailData 会忽略旧 slug 的迟到回填", async () => {
     listRecentSceneCacheKeys: async () => [],
     scheduleScenePrefetch: () => undefined,
     extractSlugFromSceneCacheKey: (key: string) => key,
-    getPrefetchDebugState: () => ({}),
-    loadSceneDetail: async ({
-      sceneSlug,
-      callbacks,
-    }: {
-      sceneSlug: string;
-      callbacks: {
-        canApply: () => boolean;
-        onStart: () => void;
-        onHydrateLesson: (lesson: never, source: "cache" | "network") => void;
-        onStopLoading: () => void;
-      };
-    }) => {
+    getPrefetchDebugState: () => ({
+      pendingKeys: [],
+      inFlightKey: null,
+      recentPrefetchedKeys: [],
+    }),
+    loadSceneDetail: async ({ sceneSlug, callbacks }: LoadSceneDetailArgs) => {
       callbacks.onStart();
       pendingHydrates.set(sceneSlug, {
         canApply: callbacks.canApply,
@@ -128,7 +129,7 @@ test("useSceneDetailData 会忽略旧 slug 的迟到回填", async () => {
   };
 
   const { result, rerender } = renderHook(
-    ({ slug }) => useSceneDetailData(slug, deps as never),
+    ({ slug }) => useSceneDetailData(slug, deps),
     {
       initialProps: { slug: "scene-a" },
     },
@@ -142,11 +143,11 @@ test("useSceneDetailData 会忽略旧 slug 的迟到回填", async () => {
   assert.equal(second?.canApply(), true);
 
   if (first?.canApply()) {
-    first.onHydrateLesson(lessons.a as never, "network");
+    first.onHydrateLesson(lessons.a, "network");
     first.onStopLoading();
   }
 
-  second?.onHydrateLesson(lessons.b as never, "network");
+  second?.onHydrateLesson(lessons.b, "network");
   second?.onStopLoading();
 
   await waitFor(() => {

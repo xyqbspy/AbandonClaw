@@ -6,13 +6,14 @@ import { normalizeParsedSceneDialogue } from "@/lib/shared/scene-dialogue";
 import { SceneRow, UserSceneProgressRow } from "@/lib/server/db/types";
 import { getSceneVariantsBySceneId } from "@/lib/server/scene/variants";
 import { deleteSceneTtsAudioBySlug, warmLessonTtsAudio } from "@/lib/server/tts/storage";
-import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import {
   deleteObsoleteSeedScenes,
   deleteImportedSceneByOwner,
   getVisibleSceneById,
   getVisibleSceneBySlug,
   insertScene,
+  listSceneSlugsByOriginExcludingKeep,
+  listUserSceneProgressBySceneIds,
   listVisibleScenesByUserId,
   upsertSceneBySlug,
 } from "@/lib/server/scene/repository";
@@ -144,18 +145,9 @@ export async function upsertSeedScenesIfNeeded() {
     );
   }
 
-  const { data: obsoleteSeedRows, error: obsoleteSeedError } = await createSupabaseAdminClient()
-    .from("scenes")
-    .select("slug")
-    .eq("origin", "seed")
-    .not("slug", "in", `(${keepSlugs.map((slug) => `"${slug}"`).join(",")})`);
-
-  if (obsoleteSeedError) {
-    throw new Error(`Failed to list obsolete seed scenes: ${obsoleteSeedError.message}`);
-  }
-
-  for (const row of (obsoleteSeedRows ?? []) as Array<Pick<SceneRow, "slug">>) {
-    await deleteSceneTtsAudioBySlug(row.slug);
+  const obsoleteSeedSlugs = await listSceneSlugsByOriginExcludingKeep("seed", keepSlugs);
+  for (const slug of obsoleteSeedSlugs) {
+    await deleteSceneTtsAudioBySlug(slug);
   }
 
   await deleteObsoleteSeedScenes(keepSlugs);
@@ -171,23 +163,17 @@ export async function runSeedScenesSync() {
 export async function listScenes(params: { userId: string }) {
   await runSeedScenesSync();
   const rows = await listVisibleScenesByUserId(params.userId);
-  const admin = createSupabaseAdminClient();
   const variantRows = await Promise.all(
     rows.map((row) => getSceneVariantsBySceneId(row.id)),
   );
   const sceneIds = rows.map((row) => row.id);
-  const { data: progressRows, error: progressError } = await admin
-    .from("user_scene_progress")
-    .select("*")
-    .eq("user_id", params.userId)
-    .in("scene_id", sceneIds);
-
-  if (progressError) {
-    throw new Error(`Failed to list scene progress: ${progressError.message}`);
-  }
+  const progressRows = await listUserSceneProgressBySceneIds({
+    userId: params.userId,
+    sceneIds,
+  });
 
   const progressBySceneId = new Map<string, UserSceneProgressRow>();
-  for (const row of (progressRows ?? []) as UserSceneProgressRow[]) {
+  for (const row of progressRows) {
     progressBySceneId.set(row.scene_id, row);
   }
 

@@ -10,7 +10,7 @@ afterEach(() => {
 });
 
 test("useManualSentenceComposer 会生成 assist 后保存句子", async () => {
-  const saveCalls: any[] = [];
+  const saveCalls: Array<{ learningItemType?: string; sourceChunkText?: string }> = [];
   const { result } = renderHook(() =>
     useManualSentenceComposer({
       deps: {
@@ -25,17 +25,24 @@ test("useManualSentenceComposer 会生成 assist 后保存句子", async () => {
             extractedExpressions: ["call it a day"],
           },
         }),
-        savePhraseFromApi: async (payload: any) => {
+        savePhraseFromApi: async (payload) => {
           saveCalls.push(payload);
           return {
+            created: true,
+            phrase: {
+              id: "phrase-1",
+              normalized_text: "i should call it a day",
+              display_text: "I should call it a day.",
+            },
             userPhrase: { id: "sentence-1" },
-          } as any;
+            expressionClusterId: null,
+          };
         },
-      } as never,
+      },
     }),
   );
 
-  let output: any = null;
+  let output: Awaited<ReturnType<typeof result.current.saveManualSentence>> = null;
   await act(async () => {
     output = await result.current.saveManualSentence("I should call it a day.");
   });
@@ -56,8 +63,13 @@ test("useManualSentenceComposer 在失败时会上报错误", async () => {
         generateManualSentenceAssistFromApi: async () => {
           throw new Error("boom");
         },
-        savePhraseFromApi: async () => ({}) as any,
-      } as never,
+        savePhraseFromApi: async () => ({
+          created: true,
+          phrase: { id: "phrase-1", normalized_text: "x", display_text: "x" },
+          userPhrase: { id: "saved-1" },
+          expressionClusterId: null,
+        }),
+      },
     }),
   );
 

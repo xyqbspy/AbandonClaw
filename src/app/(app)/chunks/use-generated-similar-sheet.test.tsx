@@ -4,12 +4,13 @@ import React from "react";
 import { act, cleanup, renderHook } from "@testing-library/react";
 
 import { useGeneratedSimilarSheet } from "./use-generated-similar-sheet";
+import { UserPhraseItemResponse } from "@/lib/utils/phrases-api";
 
 afterEach(() => {
   cleanup();
 });
 
-const expressionRows = [
+const expressionRows: UserPhraseItemResponse[] = [
   {
     userPhraseId: "p1",
     phraseId: "phrase-1",
@@ -44,9 +45,9 @@ const expressionRows = [
     nextReviewAt: null,
     masteredAt: null,
   },
-] as any[];
+];
 
-test("useGeneratedSimilarSheet 会打开并加载候选", async () => {
+test("useGeneratedSimilarSheet 会打开并加载候选项", async () => {
   const { result } = renderHook(() =>
     useGeneratedSimilarSheet({
       expressionRows,
@@ -58,11 +59,20 @@ test("useGeneratedSimilarSheet 会打开并加载候选", async () => {
           version: "v1",
           candidates: [{ text: "wrap it up", differenceLabel: "更偏收尾" }],
         }),
-        savePhraseFromApi: async () => ({}) as any,
-        savePhrasesBatchFromApi: async () => ({}) as any,
-        enrichSimilarExpressionsBatchFromApi: async () => ({}) as any,
-        setTimeoutFn: () => 1 as never,
-      } as never,
+        savePhraseFromApi: async () => ({
+          created: true,
+          phrase: { id: "phrase-1", normalized_text: "call it a day", display_text: "call it a day" },
+          userPhrase: { id: "saved-1" },
+          expressionClusterId: "cluster-1",
+        }),
+        savePhrasesBatchFromApi: async () => ({
+          items: [],
+        }),
+        enrichSimilarExpressionsBatchFromApi: async () => ({
+          items: [],
+        }),
+        setTimeoutFn: () => 1,
+      },
     }),
   );
 
@@ -96,17 +106,22 @@ test("useGeneratedSimilarSheet 会保存选中候选并加载 cluster", async ()
           candidates: [{ text: "wrap it up", differenceLabel: "更偏收尾" }],
         }),
         savePhraseFromApi: async () => ({
+          created: true,
+          phrase: { id: "phrase-1", normalized_text: "call it a day", display_text: "call it a day" },
+          userPhrase: { id: "saved-1" },
           expressionClusterId: "cluster-1",
         }),
         savePhrasesBatchFromApi: async () => ({
-          items: [{ userPhrase: { id: "saved-2" } }],
+          items: [{ created: true, phrase: { id: "phrase-2", normalized_text: "wrap it up", display_text: "wrap it up" }, userPhrase: { id: "saved-2" }, expressionClusterId: "cluster-1" }],
         }),
-        enrichSimilarExpressionsBatchFromApi: async () => ({}),
+        enrichSimilarExpressionsBatchFromApi: async () => ({
+          items: [{ userPhraseId: "saved-2", status: "done" as const }],
+        }),
         setTimeoutFn: (callback: () => void) => {
           callback();
-          return 1 as never;
+          return 1;
         },
-      } as never,
+      },
     }),
   );
 
@@ -140,11 +155,20 @@ test("useGeneratedSimilarSheet 在未选中候选时会提示选择", async () =
           version: "v1",
           candidates: [{ text: "wrap it up", differenceLabel: "更偏收尾" }],
         }),
-        savePhraseFromApi: async () => ({}) as any,
-        savePhrasesBatchFromApi: async () => ({}) as any,
-        enrichSimilarExpressionsBatchFromApi: async () => ({}) as any,
-        setTimeoutFn: () => 1 as never,
-      } as never,
+        savePhraseFromApi: async () => ({
+          created: true,
+          phrase: { id: "phrase-1", normalized_text: "call it a day", display_text: "call it a day" },
+          userPhrase: { id: "saved-1" },
+          expressionClusterId: "cluster-1",
+        }),
+        savePhrasesBatchFromApi: async () => ({
+          items: [],
+        }),
+        enrichSimilarExpressionsBatchFromApi: async () => ({
+          items: [],
+        }),
+        setTimeoutFn: () => 1,
+      },
     }),
   );
 

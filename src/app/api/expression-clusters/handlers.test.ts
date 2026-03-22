@@ -52,7 +52,7 @@ test("move handler 缺少必填字段时返回 400", async () => {
 
   assert.equal(response.status, 400);
   assert.deepEqual(await response.json(), {
-    error: "targetClusterId and userPhraseId are required.",
+    error: "targetClusterId must be a string.",
     code: "VALIDATION_ERROR",
     details: null,
   });

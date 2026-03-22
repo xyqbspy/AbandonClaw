@@ -4,12 +4,18 @@ import React from "react";
 import { act, cleanup, renderHook } from "@testing-library/react";
 
 import { useExpressionClusterActions } from "./use-expression-cluster-actions";
+import { MoveIntoClusterCandidate } from "@/features/chunks/components/types";
+import { UserPhraseItemResponse } from "@/lib/utils/phrases-api";
 
 afterEach(() => {
   cleanup();
 });
 
-const mainRow = {
+type ClusterActionDeps = NonNullable<
+  Parameters<typeof useExpressionClusterActions>[0]["deps"]
+>;
+
+const mainRow: UserPhraseItemResponse = {
   userPhraseId: "main-1",
   phraseId: "phrase-1",
   text: "call it a day",
@@ -42,18 +48,18 @@ const mainRow = {
   lastReviewedAt: null,
   nextReviewAt: null,
   masteredAt: null,
-} as any;
+};
 
-const detailRow = {
+const detailRow: UserPhraseItemResponse = {
   ...mainRow,
   userPhraseId: "variant-1",
   text: "wrap it up",
   normalizedText: "wrap it up",
   expressionClusterRole: "variant",
   expressionClusterMainUserPhraseId: "main-1",
-} as any;
+};
 
-const candidate = {
+const candidate: MoveIntoClusterCandidate = {
   row: {
     ...mainRow,
     userPhraseId: "move-1",
@@ -67,19 +73,46 @@ const candidate = {
   sourceClusterMainText: "wind down",
   sourceClusterMemberCount: 1,
   isSourceMain: true,
-} as any;
+};
 
 const labels = {
   loadFailed: "加载失败",
   detachClusterMemberSuccess: "已设为独立主表达",
-  moveIntoClusterSelectOne: "请至少选择 1 个",
+  moveIntoClusterSelectOne: "请至少选择 1 项",
   moveIntoClusterSuccess: "已移入",
   moveIntoClusterPartialFailed: "部分失败",
 };
 
-test("useExpressionClusterActions 会 detach 后刷新并失效关系缓存", async () => {
+test("useExpressionClusterActions 会在 detach 后刷新并失效关系缓存", async () => {
   const invalidated: string[][] = [];
   const calls: string[] = [];
+  const deps: ClusterActionDeps = {
+    detachExpressionClusterMemberFromApi: async () => ({
+      clusterId: "cluster-1",
+      detachedUserPhraseId: "variant-1",
+      nextMainUserPhraseId: "main-1",
+      newClusterId: "cluster-2",
+      memberCount: 1,
+    }),
+    ensureExpressionClusterForPhraseFromApi: async () => ({
+      clusterId: "cluster-1",
+      mainUserPhraseId: "main-1",
+      created: false,
+    }),
+    moveExpressionClusterMemberFromApi: async () => ({
+      clusterId: "cluster-1",
+      movedUserPhraseId: "move-1",
+      mainUserPhraseId: "main-1",
+      memberCount: 2,
+      action: "attached_member",
+    }),
+    setExpressionClusterMainFromApi: async () => ({
+      clusterId: "cluster-1",
+      mainUserPhraseId: "main-1",
+      memberCount: 2,
+    }),
+  };
+
   const { result } = renderHook(() =>
     useExpressionClusterActions({
       focusExpression: mainRow,
@@ -90,14 +123,14 @@ test("useExpressionClusterActions 会 detach 后刷新并失效关系缓存", as
         calls.push("load");
       },
       onInvalidateSavedRelations: (ids) => invalidated.push(ids),
-      onAssignFocusMainExpression: () => {},
-      onResetMoveSelection: () => {},
-      onOpenMoveSheet: () => {},
-      onCloseMoveSheet: () => {},
+      onAssignFocusMainExpression: () => undefined,
+      onResetMoveSelection: () => undefined,
+      onOpenMoveSheet: () => undefined,
+      onCloseMoveSheet: () => undefined,
       onCloseFocusDetail: () => {
         calls.push("close-detail");
       },
-      onCloseFocusActions: () => {},
+      onCloseFocusActions: () => undefined,
       onClearDetailConfirm: () => {
         calls.push("clear-confirm");
       },
@@ -105,12 +138,7 @@ test("useExpressionClusterActions 会 detach 后刷新并失效关系缓存", as
         calls.push(message);
       },
       labels,
-      deps: {
-        detachExpressionClusterMemberFromApi: async () => ({}) as any,
-        ensureExpressionClusterForPhraseFromApi: async () => ({}) as any,
-        moveExpressionClusterMemberFromApi: async () => ({}) as any,
-        setExpressionClusterMainFromApi: async () => ({}) as any,
-      },
+      deps,
     }),
   );
 
@@ -122,21 +150,48 @@ test("useExpressionClusterActions 会 detach 后刷新并失效关系缓存", as
   assert.deepEqual(calls, ["load", "已设为独立主表达", "clear-confirm", "close-detail"]);
 });
 
-test("useExpressionClusterActions 会设置当前详情为主表达并关闭详情", async () => {
+test("useExpressionClusterActions 会将当前详情设为主表达并关闭详情", async () => {
   const assigned: string[] = [];
   const calls: string[] = [];
+  const deps: ClusterActionDeps = {
+    detachExpressionClusterMemberFromApi: async () => ({
+      clusterId: "cluster-1",
+      detachedUserPhraseId: "variant-1",
+      nextMainUserPhraseId: "main-1",
+      newClusterId: "cluster-2",
+      memberCount: 1,
+    }),
+    ensureExpressionClusterForPhraseFromApi: async () => ({
+      clusterId: "cluster-1",
+      mainUserPhraseId: "main-1",
+      created: false,
+    }),
+    moveExpressionClusterMemberFromApi: async () => ({
+      clusterId: "cluster-1",
+      movedUserPhraseId: "move-1",
+      mainUserPhraseId: "main-1",
+      memberCount: 2,
+      action: "attached_member",
+    }),
+    setExpressionClusterMainFromApi: async () => ({
+      clusterId: "cluster-1",
+      mainUserPhraseId: "variant-1",
+      memberCount: 2,
+    }),
+  };
+
   const { result } = renderHook(() =>
     useExpressionClusterActions({
       focusExpression: mainRow,
       focusDetailSavedItem: detailRow,
       moveIntoClusterCandidates: [],
       selectedMoveIntoClusterMap: {},
-      loadPhrases: async () => {},
-      onInvalidateSavedRelations: () => {},
+      loadPhrases: async () => undefined,
+      onInvalidateSavedRelations: () => undefined,
       onAssignFocusMainExpression: (item) => assigned.push(item.userPhraseId),
-      onResetMoveSelection: () => {},
-      onOpenMoveSheet: () => {},
-      onCloseMoveSheet: () => {},
+      onResetMoveSelection: () => undefined,
+      onOpenMoveSheet: () => undefined,
+      onCloseMoveSheet: () => undefined,
       onCloseFocusDetail: () => {
         calls.push("close-detail");
       },
@@ -147,12 +202,7 @@ test("useExpressionClusterActions 会设置当前详情为主表达并关闭详�
         calls.push("clear-confirm");
       },
       labels,
-      deps: {
-        detachExpressionClusterMemberFromApi: async () => ({}) as any,
-        ensureExpressionClusterForPhraseFromApi: async () => ({}) as any,
-        moveExpressionClusterMemberFromApi: async () => ({}) as any,
-        setExpressionClusterMainFromApi: async () => ({}) as any,
-      },
+      deps,
     }),
   );
 
@@ -164,40 +214,59 @@ test("useExpressionClusterActions 会设置当前详情为主表达并关闭详�
   assert.deepEqual(calls, ["close-actions", "clear-confirm", "close-detail"]);
 });
 
-test("useExpressionClusterActions 会 move 选中项并汇总成功信息", async () => {
+test("useExpressionClusterActions 会移动选中项并汇总成功信息", async () => {
   const invalidated: string[][] = [];
   const messages: string[] = [];
+  const deps: ClusterActionDeps = {
+    detachExpressionClusterMemberFromApi: async () => ({
+      clusterId: "cluster-1",
+      detachedUserPhraseId: "variant-1",
+      nextMainUserPhraseId: "main-1",
+      newClusterId: "cluster-2",
+      memberCount: 1,
+    }),
+    ensureExpressionClusterForPhraseFromApi: async () => ({
+      clusterId: "cluster-1",
+      mainUserPhraseId: "main-1",
+      created: false,
+    }),
+    moveExpressionClusterMemberFromApi: async () => ({
+      clusterId: "cluster-1",
+      movedUserPhraseId: "move-1",
+      mainUserPhraseId: "main-1",
+      memberCount: 2,
+      action: "attached_member",
+    }),
+    setExpressionClusterMainFromApi: async () => ({
+      clusterId: "cluster-1",
+      mainUserPhraseId: "main-1",
+      memberCount: 2,
+    }),
+  };
+
   const { result } = renderHook(() =>
     useExpressionClusterActions({
       focusExpression: mainRow,
       focusDetailSavedItem: detailRow,
       moveIntoClusterCandidates: [candidate],
       selectedMoveIntoClusterMap: { "move-1": true },
-      loadPhrases: async () => {},
+      loadPhrases: async () => undefined,
       onInvalidateSavedRelations: (ids) => invalidated.push(ids),
-      onAssignFocusMainExpression: () => {},
+      onAssignFocusMainExpression: () => undefined,
       onResetMoveSelection: () => {
         messages.push("reset");
       },
-      onOpenMoveSheet: () => {},
+      onOpenMoveSheet: () => undefined,
       onCloseMoveSheet: () => {
         messages.push("close-sheet");
       },
-      onCloseFocusDetail: () => {},
-      onCloseFocusActions: () => {},
-      onClearDetailConfirm: () => {},
+      onCloseFocusDetail: () => undefined,
+      onCloseFocusActions: () => undefined,
+      onClearDetailConfirm: () => undefined,
       onSuccess: (message) => messages.push(message),
       onError: (message) => messages.push(`error:${message}`),
       labels,
-      deps: {
-        detachExpressionClusterMemberFromApi: async () => ({}) as any,
-        ensureExpressionClusterForPhraseFromApi: async () => ({}) as any,
-        moveExpressionClusterMemberFromApi: async () =>
-          ({
-            action: "attached_member",
-          }) as any,
-        setExpressionClusterMainFromApi: async () => ({}) as any,
-      },
+      deps,
     }),
   );
 
@@ -206,11 +275,41 @@ test("useExpressionClusterActions 会 move 选中项并汇总成功信息", asyn
   });
 
   assert.deepEqual(invalidated, [["main-1", "move-1"]]);
-  assert.deepEqual(messages, ["已移入 1 项（1个独立表达）", "close-sheet", "reset"]);
+  assert.deepEqual(messages, ["已移入 1 项（1 个独立表达）", "close-sheet", "reset"]);
 });
 
 test("useExpressionClusterActions 会在没有 target cluster 时先 ensure 再打开选择器", async () => {
   const calls: string[] = [];
+  const deps: ClusterActionDeps = {
+    detachExpressionClusterMemberFromApi: async () => ({
+      clusterId: "cluster-1",
+      detachedUserPhraseId: "variant-1",
+      nextMainUserPhraseId: "main-1",
+      newClusterId: "cluster-2",
+      memberCount: 1,
+    }),
+    ensureExpressionClusterForPhraseFromApi: async () => {
+      calls.push("ensure");
+      return {
+        clusterId: "cluster-1",
+        mainUserPhraseId: "main-1",
+        created: true,
+      };
+    },
+    moveExpressionClusterMemberFromApi: async () => ({
+      clusterId: "cluster-1",
+      movedUserPhraseId: "move-1",
+      mainUserPhraseId: "main-1",
+      memberCount: 2,
+      action: "attached_member",
+    }),
+    setExpressionClusterMainFromApi: async () => ({
+      clusterId: "cluster-1",
+      mainUserPhraseId: "main-1",
+      memberCount: 2,
+    }),
+  };
+
   const { result } = renderHook(() =>
     useExpressionClusterActions({
       focusExpression: {
@@ -223,30 +322,22 @@ test("useExpressionClusterActions 会在没有 target cluster 时先 ensure 再�
       loadPhrases: async () => {
         calls.push("load");
       },
-      onInvalidateSavedRelations: () => {},
-      onAssignFocusMainExpression: () => {},
+      onInvalidateSavedRelations: () => undefined,
+      onAssignFocusMainExpression: () => undefined,
       onResetMoveSelection: () => {
         calls.push("reset");
       },
       onOpenMoveSheet: () => {
         calls.push("open-sheet");
       },
-      onCloseMoveSheet: () => {},
-      onCloseFocusDetail: () => {},
+      onCloseMoveSheet: () => undefined,
+      onCloseFocusDetail: () => undefined,
       onCloseFocusActions: () => {
         calls.push("close-actions");
       },
-      onClearDetailConfirm: () => {},
+      onClearDetailConfirm: () => undefined,
       labels,
-      deps: {
-        detachExpressionClusterMemberFromApi: async () => ({}) as any,
-        ensureExpressionClusterForPhraseFromApi: async () => {
-          calls.push("ensure");
-          return {} as any;
-        },
-        moveExpressionClusterMemberFromApi: async () => ({}) as any,
-        setExpressionClusterMainFromApi: async () => ({}) as any,
-      },
+      deps,
     }),
   );
 

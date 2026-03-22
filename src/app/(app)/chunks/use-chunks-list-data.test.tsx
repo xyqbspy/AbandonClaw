@@ -4,12 +4,38 @@ import React from "react";
 import { cleanup, renderHook, waitFor } from "@testing-library/react";
 
 import { useChunksListData } from "./use-chunks-list-data";
+import { PhraseListCacheRecord } from "@/lib/cache/phrase-list-cache";
+import { UserPhraseItemResponse } from "@/lib/utils/phrases-api";
 
 afterEach(() => {
   cleanup();
 });
 
-const rows = [
+type ChunksListDeps = NonNullable<Parameters<typeof useChunksListData>[0]["deps"]>;
+
+const buildCacheRecord = (items: UserPhraseItemResponse[], total: number): PhraseListCacheRecord => ({
+  schemaVersion: "phrase-list-cache-v6",
+  key: "phrase-list:v6:saved:r=all:t=expression:c=:q=burned%20out:p=1:l=100",
+  type: "phrase_list",
+  query: "burned out",
+  status: "saved",
+  reviewStatus: "all",
+  learningItemType: "expression",
+  expressionClusterId: "",
+  page: 1,
+  limit: 100,
+  data: {
+    rows: items,
+    total,
+    page: 1,
+    limit: 100,
+  },
+  cachedAt: 1,
+  lastAccessedAt: 1,
+  expiresAt: Date.now() + 60_000,
+});
+
+const rows: UserPhraseItemResponse[] = [
   {
     userPhraseId: "p1",
     phraseId: "phrase-1",
@@ -44,28 +70,26 @@ const rows = [
     nextReviewAt: null,
     masteredAt: null,
   },
-] as any[];
+];
 
 test("useChunksListData 会先展示缓存，再被网络结果覆盖", async () => {
   const timers = new Map<number, () => void>();
   let timerId = 0;
   const messages: string[] = [];
-  const deps = {
+  const deps: ChunksListDeps = {
     getPhraseListCache: async () => ({
       found: true,
-      record: { data: { rows, total: 1 } },
+      record: buildCacheRecord(rows, 1),
+      isExpired: false,
     }),
     setPhraseListCache: async () => undefined,
     getMyPhrasesFromApi: async () => ({
       rows: [...rows, { ...rows[0], userPhraseId: "p2", phraseId: "phrase-2", text: "wrap up" }],
       total: 2,
+      page: 1,
+      limit: 100,
     }),
-    buildChunksListRequestParams: ({
-      query,
-      reviewFilter,
-      contentFilter,
-      expressionClusterFilterId,
-    }: any) => ({
+    buildChunksListRequestParams: ({ query, reviewFilter, contentFilter, expressionClusterFilterId }) => ({
       query: query.trim(),
       limit: 100,
       page: 1,
@@ -74,12 +98,12 @@ test("useChunksListData 会先展示缓存，再被网络结果覆盖", async ()
       learningItemType: contentFilter,
       expressionClusterId: expressionClusterFilterId || undefined,
     }),
-    resolveChunksCachePresentation: ({ cacheFound }: { cacheFound: boolean }) => ({
+    resolveChunksCachePresentation: ({ cacheFound }) => ({
       hasCacheFallback: cacheFound,
-      nextDataSource: cacheFound ? ("cache" as const) : ("none" as const),
+      nextDataSource: cacheFound ? "cache" : "none",
       shouldStopLoading: cacheFound,
     }),
-    resolveChunksNetworkFailure: ({ error }: { error: unknown }) => ({
+    resolveChunksNetworkFailure: ({ error }) => ({
       shouldClearRows: true,
       shouldStopLoading: true,
       message: error instanceof Error ? error.message : "load failed",
@@ -87,10 +111,10 @@ test("useChunksListData 会先展示缓存，再被网络结果覆盖", async ()
     setTimeoutFn: (callback: () => void) => {
       timerId += 1;
       timers.set(timerId, callback);
-      return timerId as never;
+      return timerId;
     },
-    clearTimeoutFn: (handle: number) => {
-      timers.delete(handle);
+    clearTimeoutFn: (handle) => {
+      timers.delete(handle as number);
     },
   };
 
@@ -101,7 +125,7 @@ test("useChunksListData 会先展示缓存，再被网络结果覆盖", async ()
       contentFilter: "expression",
       expressionClusterFilterId: "",
       onLoadFailed: (message) => messages.push(message),
-      deps: deps as never,
+      deps,
     }),
   );
 
@@ -119,21 +143,16 @@ test("useChunksListData 会先展示缓存，再被网络结果覆盖", async ()
 test("useChunksListData 会忽略旧请求的迟到回填", async () => {
   const pendingRequests: Array<{
     query: string;
-    resolve: (value: { rows: any[]; total: number }) => void;
+    resolve: (value: { rows: UserPhraseItemResponse[]; total: number; page: number; limit: number }) => void;
   }> = [];
-  const deps = {
-    getPhraseListCache: async () => ({ found: false, record: null }),
+  const deps: ChunksListDeps = {
+    getPhraseListCache: async () => ({ found: false, record: null, isExpired: false }),
     setPhraseListCache: async () => undefined,
-    getMyPhrasesFromApi: async ({ query }: { query: string }) =>
-      await new Promise<{ rows: any[]; total: number }>((resolve) => {
-        pendingRequests.push({ query, resolve });
+    getMyPhrasesFromApi: async (params) =>
+      await new Promise<{ rows: UserPhraseItemResponse[]; total: number; page: number; limit: number }>((resolve) => {
+        pendingRequests.push({ query: params?.query ?? "", resolve });
       }),
-    buildChunksListRequestParams: ({
-      query,
-      reviewFilter,
-      contentFilter,
-      expressionClusterFilterId,
-    }: any) => ({
+    buildChunksListRequestParams: ({ query, reviewFilter, contentFilter, expressionClusterFilterId }) => ({
       query: query.trim(),
       limit: 100,
       page: 1,
@@ -142,9 +161,9 @@ test("useChunksListData 会忽略旧请求的迟到回填", async () => {
       learningItemType: contentFilter,
       expressionClusterId: expressionClusterFilterId || undefined,
     }),
-    resolveChunksCachePresentation: ({ cacheFound }: { cacheFound: boolean }) => ({
+    resolveChunksCachePresentation: ({ cacheFound }) => ({
       hasCacheFallback: cacheFound,
-      nextDataSource: cacheFound ? ("cache" as const) : ("none" as const),
+      nextDataSource: cacheFound ? "cache" : "none",
       shouldStopLoading: cacheFound,
     }),
     resolveChunksNetworkFailure: () => ({
@@ -153,7 +172,7 @@ test("useChunksListData 会忽略旧请求的迟到回填", async () => {
       message: "boom",
     }),
     setTimeoutFn: (callback: () => void) => window.setTimeout(callback, 1),
-    clearTimeoutFn: (handle: number) => window.clearTimeout(handle),
+    clearTimeoutFn: (handle) => window.clearTimeout(handle),
   };
 
   const { result } = renderHook(() =>
@@ -162,24 +181,24 @@ test("useChunksListData 会忽略旧请求的迟到回填", async () => {
       reviewFilter: "all",
       contentFilter: "expression",
       expressionClusterFilterId: "",
-      deps: deps as never,
+      deps,
     }),
   );
 
-  void result.current.loadPhrases("first", "all", "expression", "", {
-    preferCache: false,
-  });
-  void result.current.loadPhrases("second", "all", "expression", "", {
-    preferCache: false,
-  });
+  void result.current.loadPhrases("first", "all", "expression", "", { preferCache: false });
+  void result.current.loadPhrases("second", "all", "expression", "", { preferCache: false });
 
   pendingRequests.find((item) => item.query === "first")?.resolve({
     rows,
     total: 1,
+    page: 1,
+    limit: 100,
   });
   pendingRequests.find((item) => item.query === "second")?.resolve({
     rows: [{ ...rows[0], userPhraseId: "p2", phraseId: "phrase-2", text: "second" }],
     total: 1,
+    page: 1,
+    limit: 100,
   });
 
   await waitFor(() => {
@@ -192,18 +211,13 @@ test("useChunksListData 在无缓存且网络失败时会清空列表并上报�
   const timers = new Map<number, () => void>();
   let timerId = 0;
   const messages: string[] = [];
-  const deps = {
-    getPhraseListCache: async () => ({ found: false, record: null }),
+  const deps: ChunksListDeps = {
+    getPhraseListCache: async () => ({ found: false, record: null, isExpired: false }),
     setPhraseListCache: async () => undefined,
     getMyPhrasesFromApi: async () => {
       throw new Error("boom");
     },
-    buildChunksListRequestParams: ({
-      query,
-      reviewFilter,
-      contentFilter,
-      expressionClusterFilterId,
-    }: any) => ({
+    buildChunksListRequestParams: ({ query, reviewFilter, contentFilter, expressionClusterFilterId }) => ({
       query: query.trim(),
       limit: 100,
       page: 1,
@@ -212,18 +226,12 @@ test("useChunksListData 在无缓存且网络失败时会清空列表并上报�
       learningItemType: contentFilter,
       expressionClusterId: expressionClusterFilterId || undefined,
     }),
-    resolveChunksCachePresentation: ({ cacheFound }: { cacheFound: boolean }) => ({
+    resolveChunksCachePresentation: ({ cacheFound }) => ({
       hasCacheFallback: cacheFound,
-      nextDataSource: cacheFound ? ("cache" as const) : ("none" as const),
+      nextDataSource: cacheFound ? "cache" : "none",
       shouldStopLoading: cacheFound,
     }),
-    resolveChunksNetworkFailure: ({
-      hasCacheFallback,
-      error,
-    }: {
-      hasCacheFallback: boolean;
-      error: unknown;
-    }) => ({
+    resolveChunksNetworkFailure: ({ hasCacheFallback, error }) => ({
       shouldClearRows: !hasCacheFallback,
       shouldStopLoading: !hasCacheFallback,
       message: error instanceof Error ? error.message : "load failed",
@@ -231,10 +239,10 @@ test("useChunksListData 在无缓存且网络失败时会清空列表并上报�
     setTimeoutFn: (callback: () => void) => {
       timerId += 1;
       timers.set(timerId, callback);
-      return timerId as never;
+      return timerId;
     },
-    clearTimeoutFn: (handle: number) => {
-      timers.delete(handle);
+    clearTimeoutFn: (handle) => {
+      timers.delete(handle as number);
     },
   };
 
@@ -245,7 +253,7 @@ test("useChunksListData 在无缓存且网络失败时会清空列表并上报�
       contentFilter: "expression",
       expressionClusterFilterId: "",
       onLoadFailed: (message) => messages.push(message),
-      deps: deps as never,
+      deps,
     }),
   );
 
@@ -259,23 +267,18 @@ test("useChunksListData 在无缓存且网络失败时会清空列表并上报�
   assert.deepEqual(messages, ["boom"]);
 });
 
-test("useChunksListData 在 onLoadFailed 回调身份变化时不会重复自动请求", async () => {
+test("useChunksListData 在 onLoadFailed 回调变化时不会重复自动请求", async () => {
   const timers = new Map<number, () => void>();
   let timerId = 0;
   const requestedQueries: string[] = [];
-  const deps = {
-    getPhraseListCache: async () => ({ found: false, record: null }),
+  const deps: ChunksListDeps = {
+    getPhraseListCache: async () => ({ found: false, record: null, isExpired: false }),
     setPhraseListCache: async () => undefined,
-    getMyPhrasesFromApi: async ({ query }: { query: string }) => {
-      requestedQueries.push(query);
-      return { rows, total: 1 };
+    getMyPhrasesFromApi: async (params) => {
+      requestedQueries.push(params?.query ?? "");
+      return { rows, total: 1, page: 1, limit: 100 };
     },
-    buildChunksListRequestParams: ({
-      query,
-      reviewFilter,
-      contentFilter,
-      expressionClusterFilterId,
-    }: any) => ({
+    buildChunksListRequestParams: ({ query, reviewFilter, contentFilter, expressionClusterFilterId }) => ({
       query: query.trim(),
       limit: 100,
       page: 1,
@@ -284,12 +287,12 @@ test("useChunksListData 在 onLoadFailed 回调身份变化时不会重复自动
       learningItemType: contentFilter,
       expressionClusterId: expressionClusterFilterId || undefined,
     }),
-    resolveChunksCachePresentation: ({ cacheFound }: { cacheFound: boolean }) => ({
+    resolveChunksCachePresentation: ({ cacheFound }) => ({
       hasCacheFallback: cacheFound,
-      nextDataSource: cacheFound ? ("cache" as const) : ("none" as const),
+      nextDataSource: cacheFound ? "cache" : "none",
       shouldStopLoading: cacheFound,
     }),
-    resolveChunksNetworkFailure: ({ error }: { error: unknown }) => ({
+    resolveChunksNetworkFailure: ({ error }) => ({
       shouldClearRows: true,
       shouldStopLoading: true,
       message: error instanceof Error ? error.message : "load failed",
@@ -297,10 +300,10 @@ test("useChunksListData 在 onLoadFailed 回调身份变化时不会重复自动
     setTimeoutFn: (callback: () => void) => {
       timerId += 1;
       timers.set(timerId, callback);
-      return timerId as never;
+      return timerId;
     },
-    clearTimeoutFn: (handle: number) => {
-      timers.delete(handle);
+    clearTimeoutFn: (handle) => {
+      timers.delete(handle as number);
     },
   };
 
@@ -312,7 +315,7 @@ test("useChunksListData 在 onLoadFailed 回调身份变化时不会重复自动
         contentFilter: "expression",
         expressionClusterFilterId: "",
         onLoadFailed,
-        deps: deps as never,
+        deps,
       }),
     {
       initialProps: { onLoadFailed: () => undefined },

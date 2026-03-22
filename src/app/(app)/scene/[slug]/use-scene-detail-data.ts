@@ -22,7 +22,7 @@ import {
 import { loadSceneDetail } from "./scene-detail-load-orchestrator";
 import { syncSceneVariantsFromDb } from "./scene-detail-generation-logic";
 
-type UseSceneDetailDataDeps = {
+export type UseSceneDetailDataDeps = {
   clearExpiredSceneCaches: typeof clearExpiredSceneCaches;
   getSceneCache: typeof getSceneCache;
   getSceneDetailBySlugFromApi: typeof getSceneDetailBySlugFromApi;
@@ -39,6 +39,11 @@ type UseSceneDetailDataDeps = {
   getSceneGeneratedState: typeof getSceneGeneratedState;
   syncSceneVariantsFromDb: typeof syncSceneVariantsFromDb;
   saveVariantSet: typeof saveVariantSet;
+};
+
+export type UseSceneDetailDataOptions = {
+  initialLesson?: Lesson | null;
+  deps?: UseSceneDetailDataDeps;
 };
 
 const defaultDeps: UseSceneDetailDataDeps = {
@@ -62,13 +67,20 @@ const defaultDeps: UseSceneDetailDataDeps = {
 
 export const useSceneDetailData = (
   sceneSlug: string,
-  deps: UseSceneDetailDataDeps = defaultDeps,
+  depsOrOptions: UseSceneDetailDataDeps | UseSceneDetailDataOptions = defaultDeps,
 ) => {
-  const [baseLesson, setBaseLesson] = useState<Lesson | null>(null);
+  const options =
+    "clearExpiredSceneCaches" in depsOrOptions
+      ? { deps: depsOrOptions, initialLesson: null }
+      : depsOrOptions;
+  const deps = options.deps ?? defaultDeps;
+  const initialLesson = options.initialLesson ?? null;
+
+  const [baseLesson, setBaseLesson] = useState<Lesson | null>(initialLesson);
   const [sceneDataSource, setSceneDataSource] = useState<"none" | "cache" | "network">(
-    "none",
+    initialLesson ? "network" : "none",
   );
-  const [sceneLoading, setSceneLoading] = useState(true);
+  const [sceneLoading, setSceneLoading] = useState(!initialLesson);
   const [loadErrorMessage, setLoadErrorMessage] = useState<string | null>(null);
   const [savedPhraseTextSet, setSavedPhraseTextSet] = useState<Set<string>>(new Set());
   const [generatedState, setGeneratedState] = useState<SceneGeneratedState>({
@@ -98,6 +110,13 @@ export const useSceneDetailData = (
     const requestToken = activeLoadTokenRef.current + 1;
     activeLoadTokenRef.current = requestToken;
     const requestSlug = normalizeSceneSlug(sceneSlug);
+    if (initialLesson && normalizeSceneSlug(initialLesson.slug) === requestSlug) {
+      setBaseLesson(initialLesson);
+      setSceneDataSource("network");
+      setSceneLoading(false);
+      setLoadErrorMessage(null);
+      return;
+    }
     let cancelled = false;
 
     const canApply = () =>
@@ -152,7 +171,7 @@ export const useSceneDetailData = (
     return () => {
       cancelled = true;
     };
-  }, [deps, sceneSlug]);
+  }, [deps, initialLesson, sceneSlug]);
 
   useEffect(() => {
     if (process.env.NODE_ENV !== "development") return;

@@ -1,14 +1,25 @@
-﻿import assert from "node:assert/strict";
+import assert from "node:assert/strict";
 import test from "node:test";
 
-import { ensureSceneExpressionMapData, generateScenePracticeSet, generateSceneVariantSet, syncSceneVariantsFromDb } from "./scene-detail-generation-logic";
+import { Lesson } from "@/lib/types";
 
-const baseLesson = {
+import {
+  ensureSceneExpressionMapData,
+  generateScenePracticeSet,
+  generateSceneVariantSet,
+  syncSceneVariantsFromDb,
+} from "./scene-detail-generation-logic";
+
+const baseLesson: Lesson = {
   id: "scene-1",
   slug: "scene-1",
   title: "Scene 1",
+  difficulty: "Beginner",
+  estimatedMinutes: 5,
+  completionRate: 0,
+  tags: [],
   sceneType: "dialogue",
-  sourceType: "original",
+  sourceType: "custom",
   sections: [
     {
       id: "section-1",
@@ -23,7 +34,16 @@ const baseLesson = {
               translation: "",
               chunks: ["How are you"],
               chunkDetails: [
-                { text: "How are you", translation: "", usageNote: "" },
+                {
+                  text: "How are you",
+                  translation: "",
+                  grammarLabel: "",
+                  meaningInSentence: "",
+                  usageNote: "",
+                  examples: [],
+                  start: 0,
+                  end: 11,
+                },
               ],
             },
           ],
@@ -31,15 +51,16 @@ const baseLesson = {
       ],
     },
   ],
-} as any;
+  explanations: [],
+};
 
-const variantLesson = {
-  ...(baseLesson as any),
+const variantLesson: Lesson = {
+  ...baseLesson,
   id: "variant-1",
   slug: "variant-1",
   title: "Variant 1",
   sourceType: "variant",
-} as never;
+};
 
 test("syncSceneVariantsFromDb 会在已有本地变体时直接跳过", async () => {
   const result = await syncSceneVariantsFromDb({
@@ -75,17 +96,26 @@ test("generateScenePracticeSet 会生成基于来源 lesson 的练习集", async
     baseLesson,
     sourceLesson: variantLesson,
     deps: {
-      mapLessonToParsedScene: (lesson) => ({ lessonId: lesson.id }) as never,
+      mapLessonToParsedScene: (lesson) => ({
+        id: lesson.id,
+        slug: lesson.slug,
+        title: lesson.title,
+        type: "dialogue",
+        sections: [],
+      }),
       practiceGenerateFromApi: async () => [
         {
           id: "exercise-1",
+          type: "translation_prompt",
+          inputMode: "typing",
+          sceneId: variantLesson.id,
+          sentenceId: "sentence-1",
           prompt: "Prompt",
-          answer: "Answer",
-          choices: [],
-          explanation: "",
-          type: "translation",
+          answer: {
+            text: "Answer",
+          },
         },
-      ] as never,
+      ],
       nowIso: () => "2026-03-22T00:00:00.000Z",
       createId: () => "practice-fixed",
     },
@@ -114,19 +144,19 @@ test("generateSceneVariantSet 会生成稳定的变体集", async () => {
 
 test("ensureSceneExpressionMapData 会在变体集未变化时复用缓存", async () => {
   const cachedExpressionMap = {
-    version: "v1",
+    version: "v1" as const,
     sourceSceneId: "scene-1",
     clusters: [],
-  } as any;
+  };
   const latestVariantSet = {
     id: "variant-set-1",
     sourceSceneId: "scene-1",
     sourceSceneTitle: "Scene 1",
     reusedChunks: [],
     variants: [],
-    status: "generated",
+    status: "generated" as const,
     createdAt: "2026-03-22T00:00:00.000Z",
-  } as never;
+  };
 
   const result = await ensureSceneExpressionMapData({
     baseLesson,
@@ -157,12 +187,12 @@ test("ensureSceneExpressionMapData 会在缓存失效时重新生成表达地图
       {
         id: "variant-item-1",
         lesson: variantLesson,
-        status: "unviewed",
+        status: "unviewed" as const,
       },
     ],
-    status: "generated",
+    status: "generated" as const,
     createdAt: "2026-03-22T00:00:00.000Z",
-  } as never;
+  };
 
   const result = await ensureSceneExpressionMapData({
     baseLesson,

@@ -4,12 +4,15 @@ import React from "react";
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 
 import { useFocusAssist } from "./use-focus-assist";
+import { UserPhraseItemResponse } from "@/lib/utils/phrases-api";
 
 afterEach(() => {
   cleanup();
 });
 
-const expressionRows = [
+type FocusAssistDeps = NonNullable<Parameters<typeof useFocusAssist>[0]["deps"]>;
+
+const expressionRows: UserPhraseItemResponse[] = [
   {
     userPhraseId: "p1",
     phraseId: "phrase-1",
@@ -44,12 +47,12 @@ const expressionRows = [
     nextReviewAt: null,
     masteredAt: null,
   },
-] as any[];
+];
 
 test("useFocusAssist 会加载主表达 assist 数据", async () => {
-  const deps = {
+  const deps: FocusAssistDeps = {
     generateManualExpressionAssistFromApi: async () => ({
-      version: "v1" as const,
+      version: "v1",
       inputItem: {
         text: "call it a day",
         translation: "今天先到这里",
@@ -64,13 +67,16 @@ test("useFocusAssist 会加载主表达 assist 数据", async () => {
     savePhraseFromApi: async () => {
       throw new Error("should not run");
     },
-    enrichSimilarExpressionFromApi: async () => ({ userPhraseId: "x", status: "done" as const }),
+    enrichSimilarExpressionFromApi: async () => ({
+      userPhraseId: "x",
+      status: "done",
+    }),
   };
 
   const { result } = renderHook(() =>
     useFocusAssist({
       expressionRows,
-      deps: deps as never,
+      deps,
     }),
   );
 
@@ -85,10 +91,15 @@ test("useFocusAssist 会加载主表达 assist 数据", async () => {
 });
 
 test("useFocusAssist 会保存候选并执行后续回调", async () => {
-  const savedPayloads: any[] = [];
-  const deps = {
+  const savedPayloads: Array<Parameters<FocusAssistDeps["savePhraseFromApi"]>[0]> = [];
+  const callbackPayloads: Array<{
+    savedUserPhraseId: string;
+    kind: "similar" | "contrast";
+  }> = [];
+
+  const deps: FocusAssistDeps = {
     generateManualExpressionAssistFromApi: async () => ({
-      version: "v1" as const,
+      version: "v1",
       inputItem: {
         text: "",
         translation: "",
@@ -100,7 +111,7 @@ test("useFocusAssist 会保存候选并执行后续回调", async () => {
       similarExpressions: [],
       contrastExpressions: [],
     }),
-    savePhraseFromApi: async (payload: any) => {
+    savePhraseFromApi: async (payload) => {
       savedPayloads.push(payload);
       return {
         created: true,
@@ -109,16 +120,21 @@ test("useFocusAssist 会保存候选并执行后续回调", async () => {
         expressionClusterId: "cluster-1",
       };
     },
-    enrichSimilarExpressionFromApi: async () => ({ userPhraseId: "saved-2", status: "done" as const }),
+    enrichSimilarExpressionFromApi: async () => ({
+      userPhraseId: "saved-2",
+      status: "done",
+    }),
   };
-  const callbackPayloads: any[] = [];
 
   const { result } = renderHook(() =>
     useFocusAssist({
       expressionRows,
-      deps: deps as never,
+      deps,
       onCandidateSaved: async (payload) => {
-        callbackPayloads.push(payload);
+        callbackPayloads.push({
+          savedUserPhraseId: payload.savedUserPhraseId,
+          kind: payload.kind,
+        });
       },
     }),
   );
@@ -137,25 +153,28 @@ test("useFocusAssist 会保存候选并执行后续回调", async () => {
   assert.equal(result.current.savingFocusCandidateKey, null);
   assert.equal(savedPayloads[0]?.relationType, "similar");
   assert.equal(savedPayloads[0]?.expressionClusterId, "cluster-1");
-  assert.equal(callbackPayloads[0]?.savedUserPhraseId, "saved-2");
+  assert.deepEqual(callbackPayloads, [{ savedUserPhraseId: "saved-2", kind: "similar" }]);
 });
 
 test("useFocusAssist 在失败时会回调错误并清理 loading key", async () => {
   const messages: string[] = [];
-  const deps = {
+  const deps: FocusAssistDeps = {
     generateManualExpressionAssistFromApi: async () => {
       throw new Error("boom");
     },
     savePhraseFromApi: async () => {
       throw new Error("save failed");
     },
-    enrichSimilarExpressionFromApi: async () => ({ userPhraseId: "x", status: "done" as const }),
+    enrichSimilarExpressionFromApi: async () => ({
+      userPhraseId: "x",
+      status: "done",
+    }),
   };
 
   const { result } = renderHook(() =>
     useFocusAssist({
       expressionRows,
-      deps: deps as never,
+      deps,
       onLoadFailed: (message) => messages.push(message),
     }),
   );

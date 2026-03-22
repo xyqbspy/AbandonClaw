@@ -199,13 +199,15 @@ export const useExpressionClusterActions = ({
         ]);
 
         const summary = [
-          mergedClusterCount ? `${mergedClusterCount}个整簇` : "",
-          movedMemberCount ? `${movedMemberCount}个子表达` : "",
-          attachedMemberCount ? `${attachedMemberCount}个独立表达` : "",
+          mergedClusterCount ? `${mergedClusterCount} 个整组` : "",
+          movedMemberCount ? `${movedMemberCount} 个子表达` : "",
+          attachedMemberCount ? `${attachedMemberCount} 个独立表达` : "",
         ]
           .filter(Boolean)
-          .join("、");
-        onSuccess?.(`${labels.moveIntoClusterSuccess} ${successCount} 项${summary ? `（${summary}）` : ""}`);
+          .join("，");
+        onSuccess?.(
+          `${labels.moveIntoClusterSuccess} ${successCount} 项${summary ? `（${summary}）` : ""}`,
+        );
         setMoveIntoClusterOpen(false);
         onCloseMoveSheet();
         onResetMoveSelection();

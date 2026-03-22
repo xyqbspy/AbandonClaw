@@ -4,12 +4,16 @@ import React from "react";
 import { act, cleanup, renderHook } from "@testing-library/react";
 
 import { useFocusDetailController } from "./use-focus-detail-controller";
+import { UserPhraseItemResponse } from "@/lib/utils/phrases-api";
 
 afterEach(() => {
   cleanup();
 });
 
-const rows = [
+type SimilarItems = Parameters<typeof useFocusDetailController>[0]["focusSimilarItems"];
+type ContrastItems = Parameters<typeof useFocusDetailController>[0]["focusContrastItems"];
+
+const rows: UserPhraseItemResponse[] = [
   {
     userPhraseId: "main-1",
     phraseId: "phrase-1",
@@ -112,39 +116,42 @@ const rows = [
     nextReviewAt: null,
     masteredAt: null,
   },
-] as any[];
+];
 
 const buildHook = (focusRelationTab: "similar" | "contrast" = "similar") => {
   const setFocusIds: string[] = [];
+  const focusSimilarItems: SimilarItems = [
+    {
+      key: "saved:similar-1",
+      text: "wrap it up",
+      differenceLabel: "更偏收尾",
+      kind: "library-similar",
+      savedItem: rows[1],
+    },
+    {
+      key: "ai:wind-down",
+      text: "wind down",
+      differenceLabel: "更偏慢慢停下来",
+      kind: "suggested-similar",
+      savedItem: null,
+    },
+  ];
+  const focusContrastItems: ContrastItems = [
+    {
+      key: "contrast:keep-going",
+      text: "keep going",
+      differenceLabel: "继续推进",
+      kind: "contrast",
+      savedItem: rows[2],
+    },
+  ];
+
   const result = renderHook(() =>
     useFocusDetailController({
       phraseByNormalized: new Map(rows.map((row) => [row.normalizedText, row])),
       expressionRows: rows,
-      focusSimilarItems: [
-        {
-          key: "saved:similar-1",
-          text: "wrap it up",
-          differenceLabel: "更偏收尾",
-          kind: "library-similar" as const,
-          savedItem: rows[1],
-        },
-        {
-          key: "ai:wind-down",
-          text: "wind down",
-          differenceLabel: "更偏慢慢停下来",
-          kind: "suggested-similar" as const,
-          savedItem: null,
-        },
-      ],
-      focusContrastItems: [
-        {
-          key: "contrast:keep-going",
-          text: "keep going",
-          differenceLabel: "继续推进",
-          kind: "contrast" as const,
-          savedItem: rows[2],
-        },
-      ],
+      focusSimilarItems,
+      focusContrastItems,
       focusRelationTab,
       resolveFocusMainExpressionIdForRow: (userPhraseId: string) =>
         userPhraseId === "similar-1" ? "main-1" : userPhraseId,
@@ -178,7 +185,7 @@ test("useFocusDetailController 会打开详情并为已保存项切换主表达"
   assert.deepEqual(setFocusIds, ["main-1"]);
 });
 
-test("useFocusDetailController 会在兄弟项之间循环切换，并追加 trail", () => {
+test("useFocusDetailController 会在兄弟项之间循环切换，并追踪 trail", () => {
   const { result } = buildHook();
 
   act(() => {

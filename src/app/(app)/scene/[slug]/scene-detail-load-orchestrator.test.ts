@@ -1,10 +1,25 @@
-﻿import assert from "node:assert/strict";
+import assert from "node:assert/strict";
 import test from "node:test";
+
+import { Lesson } from "@/lib/types";
 
 import { loadSceneDetail } from "./scene-detail-load-orchestrator";
 
+const createLesson = (id: string, slug = id, title = id): Lesson => ({
+  id,
+  slug,
+  title,
+  difficulty: "Beginner",
+  estimatedMinutes: 5,
+  completionRate: 0,
+  tags: [],
+  sceneType: "dialogue",
+  sections: [],
+  explanations: [],
+});
+
 test("loadSceneDetail 命中新鲜缓存时只回填缓存，不再请求网络", async () => {
-  const lesson = { id: "scene-1", slug: "scene-1", title: "Scene 1" } as never;
+  const lesson = createLesson("scene-1", "scene-1", "Scene 1");
   const events: Array<unknown[]> = [];
 
   await loadSceneDetail({
@@ -44,11 +59,11 @@ test("loadSceneDetail 命中新鲜缓存时只回填缓存，不再请求网络"
 });
 
 test("loadSceneDetail 在过期缓存后会继续请求网络并调度预取", async () => {
-  const cacheLesson = { id: "cached", slug: "scene-1", title: "Cached" } as never;
-  const networkLesson = { id: "fresh", slug: "scene-1", title: "Fresh" } as never;
+  const cacheLesson = createLesson("cached", "scene-1", "Cached");
+  const networkLesson = createLesson("fresh", "scene-1", "Fresh");
   const events: Array<unknown[]> = [];
   const prefetchCalls: Array<{ slugs: string[]; currentSlug: string }> = [];
-  const cacheWrites: Array<{ slug: string; lesson: unknown }> = [];
+  const cacheWrites: Array<{ slug: string; lesson: Lesson }> = [];
 
   await loadSceneDetail({
     sceneSlug: "scene-1",

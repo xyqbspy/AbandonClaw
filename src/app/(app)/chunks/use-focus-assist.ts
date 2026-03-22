@@ -39,7 +39,8 @@ export const useFocusAssist = ({
   deps?: UseFocusAssistDeps;
 }) => {
   const [focusAssistLoading, setFocusAssistLoading] = useState(false);
-  const [focusAssistData, setFocusAssistData] = useState<ManualExpressionAssistResponse | null>(null);
+  const [focusAssistData, setFocusAssistData] =
+    useState<ManualExpressionAssistResponse | null>(null);
   const [savingFocusCandidateKey, setSavingFocusCandidateKey] = useState<string | null>(null);
 
   const resetFocusAssist = useCallback(() => {
@@ -83,7 +84,8 @@ export const useFocusAssist = ({
           sourceNote: kind === "similar" ? "focus-similar-ai" : "focus-contrast-ai",
           sourceSentenceText: focusItem.sourceSentenceText ?? undefined,
           sourceChunkText: candidate.text,
-          expressionClusterId: kind === "similar" ? focusItem.expressionClusterId ?? undefined : undefined,
+          expressionClusterId:
+            kind === "similar" ? focusItem.expressionClusterId ?? undefined : undefined,
           relationSourceUserPhraseId: focusItem.userPhraseId,
           relationType: kind,
         });

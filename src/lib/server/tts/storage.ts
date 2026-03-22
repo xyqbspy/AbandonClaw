@@ -3,19 +3,21 @@ import path from "node:path";
 import { MsEdgeTTS, OUTPUT_FORMAT } from "msedge-tts";
 import { getLessonBlocks, getLessonSentences } from "@/lib/shared/lesson-content";
 import {
+  getTtsStorageSignedUrlIfExists,
+  listTtsStorageFiles,
+  removeTtsStorageFiles,
+  uploadTtsAudioToStorage,
+} from "@/lib/server/tts/repo";
+import {
   buildChunkAudioKey,
   buildSceneFullAudioKey,
   buildSentenceAudioKey,
   mergeSceneFullSegments,
 } from "@/lib/shared/tts";
 import { Lesson } from "@/lib/types";
-import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 const voiceJenny = "en-US-JennyNeural";
 const voiceGuy = "en-US-GuyNeural";
-const ttsStorageBucket = process.env.TTS_STORAGE_BUCKET?.trim() || "tts-audio";
-const signedUrlTtlSeconds = 60 * 60;
-let ensureBucketPromise: Promise<void> | null = null;
 
 const resolveVoiceBySpeaker = (speaker?: string) => {
   if (speaker?.trim().toUpperCase() === "B") return voiceGuy;
@@ -25,122 +27,15 @@ const resolveVoiceBySpeaker = (speaker?: string) => {
 const getSentenceReadText = (sentence: Lesson["sections"][number]["blocks"][number]["sentences"][number]) =>
   (sentence.tts?.trim() || sentence.audioText?.trim() || sentence.text).trim();
 
-const ensureTtsStorageBucket = async () => {
-  if (ensureBucketPromise) return ensureBucketPromise;
-
-  ensureBucketPromise = (async () => {
-    const admin = createSupabaseAdminClient();
-    const { data, error } = await admin.storage.listBuckets();
-    if (error) {
-      throw new Error(`Failed to list storage buckets: ${error.message}`);
-    }
-
-    const bucketExists = (data ?? []).some((bucket) => bucket.name === ttsStorageBucket);
-    if (bucketExists) return;
-
-    const { error: createError } = await admin.storage.createBucket(ttsStorageBucket, {
-      public: false,
-      fileSizeLimit: "20MB",
-    });
-    if (createError && !createError.message.toLowerCase().includes("already exists")) {
-      throw new Error(`Failed to create storage bucket: ${createError.message}`);
-    }
-  })().catch((error) => {
-    ensureBucketPromise = null;
-    throw error;
-  });
-
-  return ensureBucketPromise;
-};
-
-export const createTtsStorageSignedUrl = async (storagePath: string) => {
-  await ensureTtsStorageBucket();
-  const admin = createSupabaseAdminClient();
-  const { data, error } = await admin.storage
-    .from(ttsStorageBucket)
-    .createSignedUrl(storagePath, signedUrlTtlSeconds);
-  if (error || !data?.signedUrl) {
-    throw new Error(`Failed to create signed audio url: ${error?.message ?? "unknown error"}`);
-  }
-  return data.signedUrl;
-};
-
-export const getTtsStorageSignedUrlIfExists = async (storagePath: string) => {
-  try {
-    return await createTtsStorageSignedUrl(storagePath);
-  } catch (error) {
-    const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
-    if (
-      message.includes("not found") ||
-      message.includes("object not found") ||
-      message.includes("no such") ||
-      message.includes("404")
-    ) {
-      return null;
-    }
-    throw error;
-  }
-};
-
-export const uploadTtsAudioToStorage = async (storagePath: string, buffer: Buffer, upsert = false) => {
-  await ensureTtsStorageBucket();
-  const admin = createSupabaseAdminClient();
-  const { error } = await admin.storage.from(ttsStorageBucket).upload(storagePath, buffer, {
-    contentType: "audio/mpeg",
-    upsert,
-  });
-  if (error && !(upsert === false && error.message.toLowerCase().includes("already exists"))) {
-    throw new Error(`Failed to upload audio to storage: ${error.message}`);
-  }
-  return createTtsStorageSignedUrl(storagePath);
-};
-
-const listStorageFiles = async (prefix: string) => {
-  await ensureTtsStorageBucket();
-  const admin = createSupabaseAdminClient();
-  const pageSize = 100;
-  const files: string[] = [];
-  let offset = 0;
-
-  while (true) {
-    const { data, error } = await admin.storage.from(ttsStorageBucket).list(prefix, {
-      limit: pageSize,
-      offset,
-      sortBy: { column: "name", order: "asc" },
-    });
-
-    if (error) {
-      const message = error.message.toLowerCase();
-      if (message.includes("not found") || message.includes("404")) {
-        return files;
-      }
-      throw new Error(`Failed to list storage files: ${error.message}`);
-    }
-
-    const rows = data ?? [];
-    for (const row of rows) {
-      if (row.id) {
-        files.push(`${prefix}/${row.name}`);
-      }
-    }
-
-    if (rows.length < pageSize) {
-      return files;
-    }
-    offset += rows.length;
-  }
-};
-
 export const deleteSceneTtsAudioBySlug = async (sceneSlug: string) => {
   const slug = sceneSlug.trim();
   if (!slug) return { deletedFiles: 0 };
 
-  const admin = createSupabaseAdminClient();
   const rootPrefix = `scenes/${slug}`;
   const sentencePrefix = `${rootPrefix}/sentences`;
   const files = [
-    ...(await listStorageFiles(rootPrefix)).filter((filePath) => !filePath.startsWith(`${sentencePrefix}/`)),
-    ...(await listStorageFiles(sentencePrefix)),
+    ...(await listTtsStorageFiles(rootPrefix)).filter((filePath) => !filePath.startsWith(`${sentencePrefix}/`)),
+    ...(await listTtsStorageFiles(sentencePrefix)),
   ];
 
   if (files.length === 0) {
@@ -148,14 +43,7 @@ export const deleteSceneTtsAudioBySlug = async (sceneSlug: string) => {
   }
 
   const uniqueFiles = Array.from(new Set(files));
-  const chunkSize = 100;
-  for (let index = 0; index < uniqueFiles.length; index += chunkSize) {
-    const batch = uniqueFiles.slice(index, index + chunkSize);
-    const { error } = await admin.storage.from(ttsStorageBucket).remove(batch);
-    if (error) {
-      throw new Error(`Failed to delete scene audio from storage: ${error.message}`);
-    }
-  }
+  await removeTtsStorageFiles(uniqueFiles);
 
   return { deletedFiles: uniqueFiles.length };
 };

@@ -274,9 +274,9 @@ let SceneDetailPageModule: React.ComponentType | null = null;
 
 function getSceneDetailPage() {
   if (!SceneDetailPageModule) {
-    const pageModulePath = localRequire.resolve("./page");
+    const pageModulePath = localRequire.resolve("./scene-detail-page");
     delete localRequire.cache[pageModulePath];
-    const imported = localRequire("./page") as { default: React.ComponentType };
+    const imported = localRequire("./scene-detail-page") as { default: React.ComponentType };
     SceneDetailPageModule = imported.default;
   }
   return SceneDetailPageModule;

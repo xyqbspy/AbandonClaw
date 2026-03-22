@@ -1,4 +1,4 @@
-import { SceneRow } from "@/lib/server/db/types";
+import { SceneRow, UserSceneProgressRow } from "@/lib/server/db/types";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 export async function upsertSceneBySlug(row: Partial<SceneRow> & { slug: string }) {
@@ -93,4 +93,40 @@ export async function deleteObsoleteSeedScenes(keepSlugs: string[]) {
   if (error) {
     throw new Error(`Failed to delete obsolete seed scenes: ${error.message}`);
   }
+}
+
+export async function listSceneSlugsByOriginExcludingKeep(origin: SceneRow["origin"], keepSlugs: string[]) {
+  const admin = createSupabaseAdminClient();
+  let query = admin.from("scenes").select("slug").eq("origin", origin);
+
+  if (keepSlugs.length > 0) {
+    query = query.not("slug", "in", `(${keepSlugs.map((slug) => `"${slug}"`).join(",")})`);
+  }
+
+  const { data, error } = await query;
+  if (error) {
+    throw new Error(`Failed to list scene slugs: ${error.message}`);
+  }
+
+  return ((data ?? []) as Array<Pick<SceneRow, "slug">>).map((row) => row.slug);
+}
+
+export async function listUserSceneProgressBySceneIds(params: {
+  userId: string;
+  sceneIds: string[];
+}) {
+  if (params.sceneIds.length === 0) return [] as UserSceneProgressRow[];
+
+  const admin = createSupabaseAdminClient();
+  const { data, error } = await admin
+    .from("user_scene_progress")
+    .select("*")
+    .eq("user_id", params.userId)
+    .in("scene_id", params.sceneIds);
+
+  if (error) {
+    throw new Error(`Failed to list scene progress: ${error.message}`);
+  }
+
+  return (data ?? []) as UserSceneProgressRow[];
 }
