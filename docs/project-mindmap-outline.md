@@ -1,0 +1,157 @@
+# AbandonClaw 项目脑图导入大纲
+
+这份文件是给 Markdown 大纲导入脑图工具用的。
+
+- AbandonClaw
+  - 产品主线
+    - Today
+      - 今日入口
+      - 继续学习
+      - 今日复习
+      - 今日输出
+    - Scene
+      - 场景学习主线
+      - 阅读语境
+      - 提取 chunk
+      - 保存表达
+      - 生成练习
+      - 生成变体
+      - 表达地图
+      - 学习进度同步
+    - Chunks
+      - 表达资产库
+      - 搜索筛选
+      - 详情视图
+      - AI 补全
+      - Similar / Contrast
+      - Expression Cluster
+      - 复习入口
+  - 页面结构
+    - App Router
+      - Today 路由
+        - src/app/(app)/today
+      - Scene 路由
+        - src/app/(app)/scene/[slug]
+      - Chunks 路由
+        - src/app/(app)/chunks
+      - Scenes 路由
+        - src/app/(app)/scenes
+    - 页面拆分规范
+      - page.tsx 只做编排
+      - selectors 做派生逻辑
+      - controller 做动作判断
+      - actions 做数据构造
+      - components 做展示
+  - Scene 重点
+    - 入口
+      - scene/[slug]/page.tsx
+      - scene-detail-page.tsx
+    - 核心 Hook
+      - use-scene-detail-data
+      - use-scene-detail-actions
+      - use-scene-detail-route-state
+      - use-scene-learning-sync
+      - use-scene-detail-playback
+    - 视图模式
+      - scene
+      - practice
+      - variants
+      - variant-study
+      - expression-map
+    - 数据能力
+      - scene cache
+      - related prefetch
+      - saved phrase sync
+    - 生成能力
+      - practice generate
+      - variants generate
+      - expression map generate
+    - 学习同步
+      - start
+      - progress
+      - complete
+      - pause
+  - Chunks 重点
+    - 页面角色
+      - 表达工作台
+      - 不只是列表页
+    - 列表系统
+      - use-chunks-list-data
+      - chunks-page-load-logic
+      - phrases/mine API
+      - phrase list cache
+    - 路由状态
+      - query
+      - review
+      - content
+      - cluster
+    - 详情系统
+      - focus detail sheet
+      - related expressions
+      - AI candidates
+    - 结构化能力
+      - expression clusters
+      - ensure
+      - merge
+      - move
+      - detach
+      - set main
+    - 主动沉淀
+      - 手动记录 expression
+      - 手动记录 sentence
+      - manual assist
+      - similar generate
+      - enrich
+  - Today 重点
+    - 页面定位
+      - 聚合入口
+      - 不是内容生产页
+    - 数据来源
+      - learning dashboard
+      - scene list
+      - review summary
+      - phrase summary
+    - selector 逻辑
+      - continue learning
+      - today tasks
+      - recommended scenes
+  - 服务层
+    - Scene Service
+      - seed scenes
+      - list scenes
+      - get scene
+      - import scene
+      - delete imported scene
+      - warm tts
+    - Learning Service
+      - start scene learning
+      - update progress
+      - complete scene
+      - pause scene
+      - continue learning
+      - today tasks
+      - overview
+    - Chunks Service
+      - track user chunks
+      - candidate chunks
+    - Expression Clusters Service
+      - cluster relation management
+  - 数据闭环
+    - Today 分发任务
+    - Scene 执行学习
+    - Chunks 沉淀资产
+    - Learning Service 聚合统计
+    - Today 再次编排入口
+  - 数据与缓存
+    - scene-cache
+    - scene-list-cache
+    - phrase-list-cache
+    - learning-dashboard-cache
+    - cache first + network refresh
+  - 数据库演进
+    - init auth scenes cache
+    - learning loop mvp
+    - user chunks
+    - review loop
+    - phrase relations
+    - expression clusters

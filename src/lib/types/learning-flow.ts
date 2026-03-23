@@ -4,6 +4,15 @@ import { PracticeExercise } from "@/lib/types/scene-parser";
 export type GeneratedSetStatus = "generated" | "completed";
 export type VariantItemStatus = "unviewed" | "viewed" | "completed";
 
+export interface PracticeSetSessionState {
+  activeExerciseIndex: number;
+  answerMap: Record<string, string>;
+  resultMap: Record<string, "correct" | "incorrect" | null>;
+  attemptCountMap: Record<string, number>;
+  incorrectCountMap: Record<string, number>;
+  updatedAt: string;
+}
+
 export interface PracticeSet {
   id: string;
   sourceSceneId: string;
@@ -15,6 +24,7 @@ export interface PracticeSet {
   status: GeneratedSetStatus;
   createdAt: string;
   completedAt?: string;
+  sessionState?: PracticeSetSessionState;
 }
 
 export interface VariantSetItem {

@@ -1,7 +1,7 @@
 ﻿import assert from "node:assert/strict";
 import test, { afterEach } from "node:test";
 import React from "react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { ScenePracticeView } from "./scene-practice-view";
 import { sceneViewLabels } from "./scene-view-labels";
 import { PracticeSet } from "@/lib/types/learning-flow";
@@ -9,6 +9,9 @@ import { PracticeSet } from "@/lib/types/learning-flow";
 afterEach(() => {
   cleanup();
 });
+
+const hasTextContent = (text: string) => (_content: string, element: Element | null) =>
+  Boolean(element?.textContent?.includes(text));
 
 const practiceSet: PracticeSet = {
   id: "practice-1",
@@ -18,12 +21,35 @@ const practiceSet: PracticeSet = {
   exercises: [
     {
       id: "exercise-1",
-      type: "typing",
+      type: "chunk_cloze",
       inputMode: "typing",
       sceneId: "scene-1",
       sentenceId: "sentence-1",
-      prompt: "Use call it a day",
-      answer: { text: "I should call it a day." },
+      chunkId: "chunk-1",
+      prompt: "补全句子中的表达",
+      answer: {
+        text: "call it a day",
+        acceptedAnswers: ["call it a day"],
+      },
+      cloze: {
+        displayText: "I should ____ now.",
+      },
+    },
+    {
+      id: "exercise-2",
+      type: "chunk_cloze",
+      inputMode: "typing",
+      sceneId: "scene-1",
+      sentenceId: "sentence-2",
+      chunkId: "chunk-2",
+      prompt: "补全第二句中的表达",
+      answer: {
+        text: "take it easy",
+        acceptedAnswers: ["take it easy"],
+      },
+      cloze: {
+        displayText: "You should ____ tonight.",
+      },
     },
   ],
   status: "generated",
@@ -43,17 +69,19 @@ test("ScenePracticeView 点击答案按钮会触发切换回调", () => {
       onBack={() => undefined}
       onDelete={() => undefined}
       onComplete={() => undefined}
+      onReviewScene={() => undefined}
+      onOpenVariants={() => undefined}
       onToggleAnswer={(exerciseId) => {
         toggledId = exerciseId;
       }}
     />,
   );
 
-  fireEvent.click(screen.getByRole("button", { name: "Show Answer" }));
+  fireEvent.click(screen.getByRole("button", { name: "显示答案" }));
   assert.equal(toggledId, "exercise-1");
 });
 
-test("ScenePracticeView 在答案已显示时会渲染答案文本和 Hide Answer", () => {
+test("ScenePracticeView 在答案已显示时会渲染答案文本和隐藏答案按钮", () => {
   render(
     <ScenePracticeView
       practiceSet={practiceSet}
@@ -64,12 +92,50 @@ test("ScenePracticeView 在答案已显示时会渲染答案文本和 Hide Answe
       onBack={() => undefined}
       onDelete={() => undefined}
       onComplete={() => undefined}
+      onReviewScene={() => undefined}
+      onOpenVariants={() => undefined}
       onToggleAnswer={() => undefined}
     />,
   );
 
-  assert.ok(screen.getByText("I should call it a day."));
-  assert.ok(screen.getByRole("button", { name: "Hide Answer" }));
+  assert.ok(screen.getByText("call it a day"));
+  assert.ok(screen.getByRole("button", { name: "隐藏答案" }));
+});
+
+test("ScenePracticeView 支持填空题输入并判断正确", async () => {
+  render(
+    <ScenePracticeView
+      practiceSet={practiceSet}
+      showAnswerMap={{}}
+      appleButtonSmClassName="btn"
+      appleDangerButtonSmClassName="danger"
+      labels={sceneViewLabels.practice}
+      onBack={() => undefined}
+      onDelete={() => undefined}
+      onComplete={() => undefined}
+      onReviewScene={() => undefined}
+      onOpenVariants={() => undefined}
+      onToggleAnswer={() => undefined}
+    />,
+  );
+
+  assert.ok(screen.getByText("I should ____ now."));
+  assert.ok(screen.getAllByText(hasTextContent("当前题目：1/2")).length >= 1);
+
+  fireEvent.change(screen.getByPlaceholderText("输入你认为正确的表达"), {
+    target: { value: "call it a day" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "检查答案" }));
+
+  await waitFor(() => {
+    assert.ok(screen.getAllByText(hasTextContent("答题进度：1/2")).length >= 1);
+    assert.ok(screen.getAllByText(hasTextContent("当前题目：2/2")).length >= 1);
+    assert.ok(screen.getByText("You should ____ tonight."));
+    assert.equal(
+      screen.getByRole("button", { name: sceneViewLabels.practice.complete }).hasAttribute("disabled"),
+      true,
+    );
+  });
 });
 
 test("ScenePracticeView 在来源为 variant 时会展示变体与原场景说明", () => {
@@ -88,6 +154,8 @@ test("ScenePracticeView 在来源为 variant 时会展示变体与原场景说�
       onBack={() => undefined}
       onDelete={() => undefined}
       onComplete={() => undefined}
+      onReviewScene={() => undefined}
+      onOpenVariants={() => undefined}
       onToggleAnswer={() => undefined}
     />,
   );
@@ -114,6 +182,8 @@ test("ScenePracticeView 在空态下会禁用删除和完成按钮", () => {
       onComplete={() => {
         completeCount += 1;
       }}
+      onReviewScene={() => undefined}
+      onOpenVariants={() => undefined}
       onToggleAnswer={() => undefined}
     />,
   );
@@ -143,6 +213,8 @@ test("ScenePracticeView 在练习已完成时会禁用完成按钮", () => {
       onBack={() => undefined}
       onDelete={() => undefined}
       onComplete={() => undefined}
+      onReviewScene={() => undefined}
+      onOpenVariants={() => undefined}
       onToggleAnswer={() => undefined}
     />,
   );
@@ -151,4 +223,328 @@ test("ScenePracticeView 在练习已完成时会禁用完成按钮", () => {
     screen.getByRole("button", { name: sceneViewLabels.practice.complete }).hasAttribute("disabled"),
     true,
   );
+});
+
+test("ScenePracticeView 在未全部答对前会禁用完成按钮", () => {
+  render(
+    <ScenePracticeView
+      practiceSet={practiceSet}
+      showAnswerMap={{}}
+      appleButtonSmClassName="btn"
+      appleDangerButtonSmClassName="danger"
+      labels={sceneViewLabels.practice}
+      onBack={() => undefined}
+      onDelete={() => undefined}
+      onComplete={() => undefined}
+      onReviewScene={() => undefined}
+      onOpenVariants={() => undefined}
+      onToggleAnswer={() => undefined}
+    />,
+  );
+
+  assert.ok(screen.getAllByText(hasTextContent("答题进度：0/2")).length >= 1);
+  assert.ok(screen.getByText("请先完成并答对当前练习。"));
+  assert.equal(
+    screen.getByRole("button", { name: sceneViewLabels.practice.complete }).hasAttribute("disabled"),
+    true,
+  );
+});
+
+test("ScenePracticeView 全部答对后才解锁完成按钮", async () => {
+  render(
+    <ScenePracticeView
+      practiceSet={practiceSet}
+      showAnswerMap={{}}
+      appleButtonSmClassName="btn"
+      appleDangerButtonSmClassName="danger"
+      labels={sceneViewLabels.practice}
+      onBack={() => undefined}
+      onDelete={() => undefined}
+      onComplete={() => undefined}
+      onReviewScene={() => undefined}
+      onOpenVariants={() => undefined}
+      onToggleAnswer={() => undefined}
+    />,
+  );
+
+  fireEvent.change(screen.getByPlaceholderText("输入你认为正确的表达"), {
+    target: { value: "call it a day" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "检查答案" }));
+
+  fireEvent.change(screen.getByPlaceholderText("输入你认为正确的表达"), {
+    target: { value: "take it easy" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "检查答案" }));
+
+  await waitFor(() => {
+    assert.ok(screen.getAllByText(hasTextContent("答题进度：2/2")).length >= 1);
+    assert.ok(screen.getAllByText(hasTextContent("已完成当前练习作答，可以标记完成。")).length >= 1);
+    assert.equal(
+      screen.getByRole("button", { name: sceneViewLabels.practice.complete }).hasAttribute("disabled"),
+      false,
+    );
+  });
+});
+
+test("ScenePracticeView 会统计整组和当前题的尝试次数", async () => {
+  render(
+    <ScenePracticeView
+      practiceSet={practiceSet}
+      showAnswerMap={{}}
+      appleButtonSmClassName="btn"
+      appleDangerButtonSmClassName="danger"
+      labels={sceneViewLabels.practice}
+      onBack={() => undefined}
+      onDelete={() => undefined}
+      onComplete={() => undefined}
+      onReviewScene={() => undefined}
+      onOpenVariants={() => undefined}
+      onToggleAnswer={() => undefined}
+    />,
+  );
+
+  assert.ok(screen.getAllByText(hasTextContent("已提交次数：0")).length >= 1);
+  assert.ok(screen.getAllByText(hasTextContent("错误次数：0")).length >= 1);
+  assert.ok(screen.getByText("当前题已尝试：0 次"));
+  assert.ok(screen.getByText("当前题错误：0 次"));
+
+  fireEvent.change(screen.getByPlaceholderText("输入你认为正确的表达"), {
+    target: { value: "wrong answer" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "检查答案" }));
+
+  await waitFor(() => {
+    assert.ok(screen.getByText("还不对，再试一次"));
+    assert.ok(screen.getAllByText(hasTextContent("已提交次数：1")).length >= 1);
+    assert.ok(screen.getAllByText(hasTextContent("错误次数：1")).length >= 1);
+    assert.ok(screen.getByText("当前题已尝试：1 次"));
+    assert.ok(screen.getByText("当前题错误：1 次"));
+  });
+
+  fireEvent.change(screen.getByPlaceholderText("输入你认为正确的表达"), {
+    target: { value: "call it a day" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "检查答案" }));
+
+  await waitFor(() => {
+    assert.ok(screen.getAllByText(hasTextContent("已提交次数：2")).length >= 1);
+    assert.ok(screen.getAllByText(hasTextContent("错误次数：1")).length >= 1);
+    assert.ok(screen.getByText("You should ____ tonight."));
+    assert.ok(screen.getByText("当前题已尝试：0 次"));
+    assert.ok(screen.getByText("当前题错误：0 次"));
+  });
+});
+
+test("ScenePracticeView 会回填已保存的练习进度", () => {
+  render(
+    <ScenePracticeView
+      practiceSet={{
+        ...practiceSet,
+        sessionState: {
+          activeExerciseIndex: 1,
+          answerMap: {
+            "exercise-1": "call it a day",
+            "exercise-2": "take it easy",
+          },
+          resultMap: {
+            "exercise-1": "correct",
+            "exercise-2": null,
+          },
+          attemptCountMap: {
+            "exercise-1": 2,
+            "exercise-2": 1,
+          },
+          incorrectCountMap: {
+            "exercise-1": 1,
+            "exercise-2": 0,
+          },
+          updatedAt: "2026-03-23T08:00:00.000Z",
+        },
+      }}
+      showAnswerMap={{}}
+      appleButtonSmClassName="btn"
+      appleDangerButtonSmClassName="danger"
+      labels={sceneViewLabels.practice}
+      onBack={() => undefined}
+      onDelete={() => undefined}
+      onComplete={() => undefined}
+      onReviewScene={() => undefined}
+      onOpenVariants={() => undefined}
+      onToggleAnswer={() => undefined}
+    />,
+  );
+
+  assert.ok(screen.getAllByText(hasTextContent("当前题目：2/2")).length >= 1);
+  assert.ok(screen.getByText("You should ____ tonight."));
+  assert.ok(screen.getByDisplayValue("take it easy"));
+  assert.ok(screen.getAllByText(hasTextContent("答题进度：1/2")).length >= 1);
+  assert.ok(screen.getAllByText(hasTextContent("已提交次数：3")).length >= 1);
+  assert.ok(screen.getAllByText(hasTextContent("错误次数：1")).length >= 1);
+  assert.ok(screen.getByText("当前题已尝试：1 次"));
+  assert.ok(screen.getByText("当前题错误：0 次"));
+});
+
+test("ScenePracticeView 全部完成后会显示练习总结和错题表达", async () => {
+  render(
+    <ScenePracticeView
+      practiceSet={practiceSet}
+      showAnswerMap={{}}
+      appleButtonSmClassName="btn"
+      appleDangerButtonSmClassName="danger"
+      labels={sceneViewLabels.practice}
+      onBack={() => undefined}
+      onDelete={() => undefined}
+      onComplete={() => undefined}
+      onReviewScene={() => undefined}
+      onOpenVariants={() => undefined}
+      onToggleAnswer={() => undefined}
+    />,
+  );
+
+  fireEvent.change(screen.getByPlaceholderText("输入你认为正确的表达"), {
+    target: { value: "wrong answer" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "检查答案" }));
+
+  fireEvent.change(screen.getByPlaceholderText("输入你认为正确的表达"), {
+    target: { value: "call it a day" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "检查答案" }));
+
+  fireEvent.change(screen.getByPlaceholderText("输入你认为正确的表达"), {
+    target: { value: "take it easy" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "检查答案" }));
+
+  await waitFor(() => {
+    assert.ok(screen.getByText("练习总结"));
+    assert.ok(screen.getAllByText(hasTextContent("答对题数")).length >= 1);
+    assert.ok(screen.getAllByText(hasTextContent("2/2")).length >= 1);
+    assert.ok(screen.getAllByText(hasTextContent("总提交次数")).length >= 1);
+    assert.ok(screen.getAllByText(hasTextContent("3")).length >= 1);
+    assert.ok(screen.getAllByText(hasTextContent("总错误次数")).length >= 1);
+    assert.ok(screen.getAllByText(hasTextContent("1")).length >= 1);
+    assert.ok(screen.getByText("本轮出错的表达"));
+    assert.ok(screen.getByText("chunk-1 - 补全句子中的表达"));
+    assert.ok(screen.getByText("建议先回看这些表达对应的场景句子，再做一轮练习。"));
+  });
+});
+
+test("ScenePracticeView 无错题完成时会显示无错题总结", async () => {
+  render(
+    <ScenePracticeView
+      practiceSet={practiceSet}
+      showAnswerMap={{}}
+      appleButtonSmClassName="btn"
+      appleDangerButtonSmClassName="danger"
+      labels={sceneViewLabels.practice}
+      onBack={() => undefined}
+      onDelete={() => undefined}
+      onComplete={() => undefined}
+      onReviewScene={() => undefined}
+      onOpenVariants={() => undefined}
+      onToggleAnswer={() => undefined}
+    />,
+  );
+
+  fireEvent.change(screen.getByPlaceholderText("输入你认为正确的表达"), {
+    target: { value: "call it a day" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "检查答案" }));
+
+  fireEvent.change(screen.getByPlaceholderText("输入你认为正确的表达"), {
+    target: { value: "take it easy" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "检查答案" }));
+
+  await waitFor(() => {
+    assert.ok(screen.getByText("练习总结"));
+    assert.ok(screen.getByText("本轮没有错题，做得很好。"));
+    assert.ok(screen.getByText("这一轮已经比较稳了，可以继续去做变体训练。"));
+    assert.ok(screen.getByRole("button", { name: "进入变体训练" }));
+  });
+});
+
+test("ScenePracticeView 总结区动作按钮会触发对应回调", async () => {
+  let reviewCount = 0;
+  let variantsCount = 0;
+
+  render(
+    <ScenePracticeView
+      practiceSet={practiceSet}
+      showAnswerMap={{}}
+      appleButtonSmClassName="btn"
+      appleDangerButtonSmClassName="danger"
+      labels={sceneViewLabels.practice}
+      onBack={() => undefined}
+      onDelete={() => undefined}
+      onComplete={() => undefined}
+      onReviewScene={() => {
+        reviewCount += 1;
+      }}
+      onOpenVariants={() => {
+        variantsCount += 1;
+      }}
+      onToggleAnswer={() => undefined}
+    />,
+  );
+
+  fireEvent.change(screen.getByPlaceholderText("输入你认为正确的表达"), {
+    target: { value: "wrong answer" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "检查答案" }));
+  fireEvent.change(screen.getByPlaceholderText("输入你认为正确的表达"), {
+    target: { value: "call it a day" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "检查答案" }));
+  fireEvent.change(screen.getByPlaceholderText("输入你认为正确的表达"), {
+    target: { value: "take it easy" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "检查答案" }));
+
+  await waitFor(() => {
+    assert.ok(screen.getByRole("button", { name: "回到场景复习" }));
+  });
+
+  fireEvent.click(screen.getByRole("button", { name: "回到场景复习" }));
+  assert.equal(reviewCount, 1);
+
+  cleanup();
+
+  render(
+    <ScenePracticeView
+      practiceSet={practiceSet}
+      showAnswerMap={{}}
+      appleButtonSmClassName="btn"
+      appleDangerButtonSmClassName="danger"
+      labels={sceneViewLabels.practice}
+      onBack={() => undefined}
+      onDelete={() => undefined}
+      onComplete={() => undefined}
+      onReviewScene={() => {
+        reviewCount += 1;
+      }}
+      onOpenVariants={() => {
+        variantsCount += 1;
+      }}
+      onToggleAnswer={() => undefined}
+    />,
+  );
+
+  fireEvent.change(screen.getByPlaceholderText("输入你认为正确的表达"), {
+    target: { value: "call it a day" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "检查答案" }));
+  fireEvent.change(screen.getByPlaceholderText("输入你认为正确的表达"), {
+    target: { value: "take it easy" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "检查答案" }));
+
+  await waitFor(() => {
+    assert.ok(screen.getByRole("button", { name: "进入变体训练" }));
+  });
+
+  fireEvent.click(screen.getByRole("button", { name: "进入变体训练" }));
+  assert.equal(variantsCount, 1);
 });

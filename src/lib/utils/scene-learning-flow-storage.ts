@@ -1,5 +1,6 @@
 ﻿import {
   PracticeSet,
+  PracticeSetSessionState,
   SceneGeneratedState,
   VariantItemStatus,
   VariantSet,
@@ -85,6 +86,30 @@ export const savePracticeSet = (practiceSet: PracticeSet) => {
   });
 };
 
+export const updatePracticeSetSession = (
+  sceneId: string,
+  practiceSetId: string,
+  sessionState: PracticeSetSessionState,
+) => {
+  const store = getStore();
+  const items = store.practiceByScene[sceneId] ?? [];
+  const nextItems = items.map((item) =>
+    item.id === practiceSetId
+      ? {
+          ...item,
+          sessionState,
+        }
+      : item,
+  );
+  setStore({
+    ...store,
+    practiceByScene: {
+      ...store.practiceByScene,
+      [sceneId]: nextItems,
+    },
+  });
+};
+
 export const saveVariantSet = (variantSet: VariantSet) => {
   const store = getStore();
   const items = store.variantByScene[variantSet.sourceSceneId] ?? [];
@@ -108,6 +133,7 @@ export const markPracticeSetCompleted = (sceneId: string, practiceSetId: string)
           ...item,
           status: "completed" as const,
           completedAt: now,
+          sessionState: undefined,
         }
       : item,
   );

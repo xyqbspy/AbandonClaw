@@ -249,6 +249,8 @@ export default function SceneDetailClientPage({
         onBack={() => setViewModeWithRoute("scene")}
         onDelete={handleDeletePracticeSet}
         onComplete={handleMarkPracticeComplete}
+        onReviewScene={() => setViewModeWithRoute("scene")}
+        onOpenVariants={() => setViewModeWithRoute("variants")}
         onToggleAnswer={(exerciseId) =>
           setShowAnswerMap((prev) => ({
             ...prev,
