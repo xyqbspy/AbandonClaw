@@ -17,7 +17,7 @@ import {
   hashPayload,
   setAiCache,
 } from "@/lib/server/ai-cache/service";
-import { ValidationError } from "@/lib/server/errors";
+import { SceneParseError, ValidationError } from "@/lib/server/errors";
 
 const SCENE_PARSE_PROMPT_VERSION = "scene-parse-v3-block-rules";
 
@@ -138,7 +138,12 @@ export async function parseImportedSceneWithCache(params: {
     });
     parseResult = tryParseSceneFromModelOutput(repairedRawText);
     if (!parseResult.ok) {
-      throw new Error(`Scene parse model output invalid after retry. ${parseResult.error}`);
+      throw new SceneParseError("场景解析失败，请稍后重试，或稍微简化/整理原文后再导入。", {
+        stage: "scene_import_retry_failed",
+        parseError: parseResult.error,
+        model,
+        promptVersion: SCENE_PARSE_PROMPT_VERSION,
+      });
     }
   }
 

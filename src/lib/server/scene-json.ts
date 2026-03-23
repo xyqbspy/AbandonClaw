@@ -62,20 +62,171 @@ const normalizeJsonLikeText = (value: string) =>
 const stripInvalidControlChars = (value: string) =>
   value.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "");
 
-const removeJsonComments = (value: string) =>
-  value
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/(^|[^:\\])\/\/.*$/gm, "$1");
+const removeJsonComments = (value: string) => {
+  let result = "";
+  let inString = false;
+  let escaped = false;
+  let inLineComment = false;
+  let inBlockComment = false;
+
+  for (let i = 0; i < value.length; i += 1) {
+    const char = value[i];
+    const nextChar = value[i + 1] ?? "";
+
+    if (inLineComment) {
+      if (char === "\n") {
+        inLineComment = false;
+        result += char;
+      }
+      continue;
+    }
+
+    if (inBlockComment) {
+      if (char === "*" && nextChar === "/") {
+        inBlockComment = false;
+        i += 1;
+      }
+      continue;
+    }
+
+    if (inString) {
+      result += char;
+      if (escaped) {
+        escaped = false;
+      } else if (char === "\\") {
+        escaped = true;
+      } else if (char === '"') {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (char === '"') {
+      inString = true;
+      result += char;
+      continue;
+    }
+
+    if (char === "/" && nextChar === "/") {
+      inLineComment = true;
+      i += 1;
+      continue;
+    }
+
+    if (char === "/" && nextChar === "*") {
+      inBlockComment = true;
+      i += 1;
+      continue;
+    }
+
+    result += char;
+  }
+
+  return result;
+};
 
 const removeTrailingCommas = (value: string) =>
   value.replace(/,\s*([}\]])/g, "$1");
 
+const findNextNonWhitespaceChar = (value: string, startIndex: number) => {
+  for (let i = startIndex; i < value.length; i += 1) {
+    const char = value[i];
+    if (!/\s/.test(char)) return char;
+  }
+  return "";
+};
+
+const escapeInvalidStringContent = (value: string) => {
+  let result = "";
+  let inString = false;
+  let escaped = false;
+  let stringCanBeKey = false;
+
+  for (let i = 0; i < value.length; i += 1) {
+    const char = value[i];
+
+    if (!inString) {
+      result += char;
+      if (char === '"') {
+        inString = true;
+        const previousNonWhitespace = (() => {
+          for (let j = i - 1; j >= 0; j -= 1) {
+            if (!/\s/.test(value[j])) return value[j];
+          }
+          return "";
+        })();
+        stringCanBeKey =
+          previousNonWhitespace === "{" ||
+          previousNonWhitespace === "," ||
+          previousNonWhitespace === "";
+      }
+      continue;
+    }
+
+    if (escaped) {
+      result += char;
+      escaped = false;
+      continue;
+    }
+
+    if (char === "\\") {
+      result += char;
+      escaped = true;
+      continue;
+    }
+
+    if (char === '"') {
+      const nextNonWhitespace = findNextNonWhitespaceChar(value, i + 1);
+      const looksLikeClosingQuote =
+        !nextNonWhitespace ||
+        nextNonWhitespace === "," ||
+        nextNonWhitespace === "}" ||
+        nextNonWhitespace === "]" ||
+        (nextNonWhitespace === ":" && stringCanBeKey);
+
+      if (looksLikeClosingQuote) {
+        result += char;
+        inString = false;
+        stringCanBeKey = false;
+      } else {
+        result += '\\"';
+      }
+      continue;
+    }
+
+    if (char === "\n") {
+      result += "\\n";
+      continue;
+    }
+
+    if (char === "\r") {
+      result += "\\r";
+      continue;
+    }
+
+    if (char === "\t") {
+      result += "\\t";
+      continue;
+    }
+
+    result += char;
+  }
+
+  return result;
+};
+
 const tryParseWithRepairs = (candidate: string) => {
   const seeds = [
     candidate,
+    escapeInvalidStringContent(candidate),
     removeTrailingCommas(candidate),
+    removeTrailingCommas(escapeInvalidStringContent(candidate)),
     removeTrailingCommas(removeJsonComments(candidate)),
+    removeTrailingCommas(removeJsonComments(escapeInvalidStringContent(candidate))),
     removeTrailingCommas(removeJsonComments(stripInvalidControlChars(candidate))),
+    removeTrailingCommas(
+      removeJsonComments(stripInvalidControlChars(escapeInvalidStringContent(candidate))),
+    ),
   ];
   const tried = new Set<string>();
   for (const seed of seeds) {

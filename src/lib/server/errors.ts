@@ -45,6 +45,13 @@ export class ValidationError extends AppError {
   }
 }
 
+export class SceneParseError extends AppError {
+  constructor(message: string, details?: Record<string, unknown>) {
+    super({ message, status: 422, code: "SCENE_PARSE_ERROR", details });
+    this.name = "SceneParseError";
+  }
+}
+
 export const isAppError = (error: unknown): error is AppError =>
   error instanceof AppError;
 
