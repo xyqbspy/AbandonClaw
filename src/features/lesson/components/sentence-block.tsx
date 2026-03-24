@@ -18,6 +18,8 @@ const speakerBadgeClassName = (speaker?: string) => {
 };
 
 const speakerLabel = (speaker?: string) => normalizeSpeaker(speaker) || "A";
+const getSentenceSpeakText = (sentence: LessonSentence) =>
+  (sentence.tts?.trim() || sentence.audioText?.trim() || sentence.text).trim();
 
 export function SentenceBlock({
   sentence,
@@ -93,7 +95,7 @@ export function SentenceBlock({
             className="h-auto px-0 text-muted-foreground hover:text-foreground"
             onClick={(event) => {
               event.stopPropagation();
-              onPronounce?.(sentence.audioText ?? sentence.text);
+              onPronounce?.(getSentenceSpeakText(sentence));
             }}
           />
         </div>

@@ -1,7 +1,16 @@
-﻿export type ScenePracticeViewLabels = {
+import {
+  PRACTICE_ASSESSMENT_FEEDBACK,
+  PRACTICE_SENTENCE_MILESTONE_LABELS,
+  PRACTICE_SENTENCE_UPGRADE_MESSAGES,
+  SCENE_PRACTICE_STAGE_TITLE,
+} from "@/lib/shared/scene-training-copy";
+
+export type ScenePracticeViewLabels = {
   back: string;
   delete: string;
   complete: string;
+  practiceEntryTitle: string;
+  practiceModePrefix: string;
   basedOnVariantPrefix: string;
   basedOnScenePrefix: string;
   practiceHint: string;
@@ -14,6 +23,9 @@
   resetAnswer: string;
   correct: string;
   incorrect: string;
+  keywordFeedback: string;
+  structureFeedback: string;
+  completeFeedback: string;
   clozePrompt: string;
   answerLabel: string;
   progressLabel: string;
@@ -21,6 +33,19 @@
   totalIncorrectLabel: string;
   readyToComplete: string;
   completeAllTypingFirst: string;
+  sentenceMilestoneTitle: string;
+  sentenceMilestoneKeyword: string;
+  sentenceMilestoneStructure: string;
+  sentenceMilestoneComplete: string;
+  moduleMilestoneLabel: string;
+  latestMilestoneLabel: string;
+  noMilestoneYet: string;
+  sentenceUpgradeKeyword: string;
+  sentenceUpgradeStructure: string;
+  sentenceUpgradeComplete: string;
+  moduleUnlockedPrefix: string;
+  moduleCompletedPrefix: string;
+  allModulesCompletedToast: string;
   currentQuestionLabel: string;
   currentAttemptsLabel: string;
   currentIncorrectLabel: string;
@@ -72,10 +97,12 @@ export const sceneViewLabels: SceneViewLabels = {
   practice: {
     back: "返回原场景",
     delete: "删除当前练习",
-    complete: "标记为已完成",
+    complete: "完成本轮练习",
+    practiceEntryTitle: "开始练习",
+    practiceModePrefix: "当前题型：",
     basedOnVariantPrefix: "当前练习基于：",
     basedOnScenePrefix: "来源场景：",
-    practiceHint: "这组练习基于当前场景生成，用来帮助你回忆、填空和改写核心表达。",
+    practiceHint: "练习阶段和题型已经拆开。首发先从填空开始，后面会逐步补上半句复现、整句复现和全文默写。",
     empty: "还没有可查看的练习集。",
     chunkPrefix: "chunk:",
     showAnswer: "显示答案",
@@ -85,18 +112,34 @@ export const sceneViewLabels: SceneViewLabels = {
     resetAnswer: "重做",
     correct: "回答正确",
     incorrect: "还不对，再试一次",
+    keywordFeedback: "关键表达抓到了，再把句子骨架补完整。",
+    structureFeedback: "句子骨架已经对上了，再把小词和细节补齐。",
+    completeFeedback: "已经完整复现，可以进入下一题。",
     clozePrompt: "把空缺的表达补完整",
     answerLabel: "参考答案",
     progressLabel: "答题进度",
     totalAttemptsLabel: "已提交次数",
     totalIncorrectLabel: "错误次数",
-    readyToComplete: "已完成当前练习作答，可以标记完成。",
-    completeAllTypingFirst: "请先完成并答对当前练习。",
+    readyToComplete: "首发练习的所有题型都已完成，可以完成本轮练习。",
+    completeAllTypingFirst: "请先完成当前题型，并按顺序解锁后续练习。",
+    sentenceMilestoneTitle: "本轮升级反馈",
+    sentenceMilestoneKeyword: "已抓到关键词",
+    sentenceMilestoneStructure: "已搭好骨架",
+    sentenceMilestoneComplete: "已完整复现",
+    moduleMilestoneLabel: "题型里程碑",
+    latestMilestoneLabel: "最近升级",
+    noMilestoneYet: "先完成几次主动提取，系统会开始记录你的升级路径。",
+    sentenceUpgradeKeyword: "这句已经抓到关键表达了。",
+    sentenceUpgradeStructure: "这句已经升到骨架复现。",
+    sentenceUpgradeComplete: "这句已经完整复现了。",
+    moduleUnlockedPrefix: "已解锁下一层题型：",
+    moduleCompletedPrefix: "已完成当前题型：",
+    allModulesCompletedToast: "四层练习都接住了，可以完成本轮练习。",
     currentQuestionLabel: "当前题目",
     currentAttemptsLabel: "当前题已尝试",
     currentIncorrectLabel: "当前题错误",
     currentCompletedLabel: "当前题已答对",
-    summaryTitle: "练习总结",
+    summaryTitle: "本轮练习总结",
     summaryCompleted: "答对题数",
     summaryAttempts: "总提交次数",
     summaryIncorrect: "总错误次数",

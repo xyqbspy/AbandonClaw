@@ -163,6 +163,7 @@ export function LessonReader({
   const [detailVisible, setDetailVisible] = useState(interactionMode !== "training");
   const [trainingPromptSentenceId, setTrainingPromptSentenceId] = useState<string | null>(null);
   const [practicedSentenceIds, setPracticedSentenceIds] = useState<Set<string>>(new Set());
+  const [trainingSentenceId, setTrainingSentenceId] = useState<string | null>(null);
   const [activeBlockId, setActiveBlockId] = useState<string | null>(
     isDialogueScene ? firstBlock?.id ?? null : null,
   );
@@ -225,6 +226,22 @@ export function LessonReader({
         : null,
     [blockOrder, state.activeSentenceId],
   );
+  const currentTrainingSentence = useMemo(
+    () =>
+      trainingSentenceId
+        ? (getSentenceById(lesson, trainingSentenceId) ?? null)
+        : null,
+    [lesson, trainingSentenceId],
+  );
+  const currentTrainingSentenceOwnerBlock = useMemo(
+    () =>
+      trainingSentenceId
+        ? (blockOrder.find((block) =>
+            block.sentences.some((sentence) => sentence.id === trainingSentenceId),
+          ) ?? null)
+        : null,
+    [blockOrder, trainingSentenceId],
+  );
 
   const mobileDisplaySentence = useMemo<LessonSentence | null>(() => {
     if (isDialogueScene) return currentSentence;
@@ -260,6 +277,7 @@ export function LessonReader({
     setDetailVisible(interactionMode !== "training");
     setTrainingPromptSentenceId(null);
     setPracticedSentenceIds(new Set());
+    setTrainingSentenceId(null);
   }, [interactionMode, lesson.id]);
 
   const currentSection = useMemo(() => {
@@ -551,6 +569,7 @@ export function LessonReader({
         setActiveBlockId(blockId);
       }
       if (isTrainingMode) {
+        setTrainingSentenceId(sentenceId);
         setDetailVisible(false);
         setTrainingPromptSentenceId(null);
         return;
@@ -558,16 +577,6 @@ export function LessonReader({
       if (isMobile) setSheetOpen(true);
     },
     [dispatchAction, isMobile, isTrainingMode, setSheetOpen],
-  );
-
-  const handleBlockTap = useCallback(
-    (block: LessonBlock) => {
-      const anchorSentenceId = block.sentences[0]?.id;
-      if (!anchorSentenceId) return;
-      setActiveBlockId(block.id);
-      handleSentenceTap(anchorSentenceId, block.id);
-    },
-    [handleSentenceTap],
   );
 
   const toggleDialogueBlockTranslation = useCallback((blockId: string) => {
@@ -587,6 +596,26 @@ export function LessonReader({
       dispatchAction({ type: "SELECTION_CLEARED" });
       setMobileActiveGroup(group);
       if (isTrainingMode) {
+        setTrainingSentenceId(anchorSentenceId);
+        setDetailVisible(false);
+        setTrainingPromptSentenceId(null);
+        return;
+      }
+      setSheetOpen(true);
+    },
+    [dispatchAction, isTrainingMode, setSheetOpen],
+  );
+
+  const handleMobileSentenceTap = useCallback(
+    (sentenceId: string, group: MobileSentenceGroup) => {
+      dispatchAction({
+        type: "SENTENCE_CONTEXT_SET",
+        payload: { sentenceId },
+      });
+      dispatchAction({ type: "SELECTION_CLEARED" });
+      setMobileActiveGroup(group);
+      if (isTrainingMode) {
+        setTrainingSentenceId(sentenceId);
         setDetailVisible(false);
         setTrainingPromptSentenceId(null);
         return;
@@ -775,6 +804,7 @@ export function LessonReader({
   ]);
 
   useEffect(() => {
+    if (isTrainingMode) return;
     if (state.selectionState) return;
     const normalizedActiveChunk = state.activeChunkKey?.trim().toLowerCase() ?? "";
     const firstChunk = relatedChunks[0]?.trim();
@@ -817,6 +847,7 @@ export function LessonReader({
     findSentenceById,
     isDialogueScene,
     isMobile,
+    isTrainingMode,
     mobileActiveGroup,
     relatedChunks,
     state.activeChunkKey,
@@ -889,25 +920,30 @@ export function LessonReader({
   );
 
   const handlePracticeSentence = useCallback(() => {
-    if (!currentSentence) return;
-    handlePronounce(getSentenceSpeakText(currentSentence));
-    setTrainingPromptSentenceId(currentSentence.id);
-  }, [currentSentence, handlePronounce]);
+    if (!currentTrainingSentence) return;
+    handlePronounce(getSentenceSpeakText(currentTrainingSentence));
+    setTrainingPromptSentenceId(currentTrainingSentence.id);
+  }, [currentTrainingSentence, handlePronounce]);
 
   const handleConfirmSentencePractice = useCallback(() => {
-    if (!currentSentence) return;
+    if (!currentTrainingSentence) return;
     setPracticedSentenceIds((prev) => {
       const next = new Set(prev);
-      next.add(currentSentence.id);
+      next.add(currentTrainingSentence.id);
       return next;
     });
     setTrainingPromptSentenceId(null);
     onSentencePracticeComplete?.({
       lesson,
-      sentence: currentSentence,
-      blockId: currentSentenceOwnerBlock?.id,
+      sentence: currentTrainingSentence,
+      blockId: currentTrainingSentenceOwnerBlock?.id,
     });
-  }, [currentSentence, currentSentenceOwnerBlock?.id, lesson, onSentencePracticeComplete]);
+  }, [
+    currentTrainingSentence,
+    currentTrainingSentenceOwnerBlock?.id,
+    lesson,
+    onSentencePracticeComplete,
+  ]);
 
   const resolveSentenceIdForChunk = useCallback(
     (chunk: string) => {
@@ -1009,12 +1045,11 @@ export function LessonReader({
           >
             <article
               className={cn(
-                "cursor-pointer rounded-lg px-3 py-2.5 transition-colors",
+                "rounded-lg px-3 py-2.5 transition-colors",
                 "hover:bg-muted/20",
                 isBlockActive && "ring-1 ring-primary/35",
                 primarySpeaker ? LESSON_DIALOGUE_A_BG_CLASS : LESSON_DIALOGUE_B_BG_CLASS,
               )}
-              onClick={() => handleBlockTap(block)}
             >
               <div className="mb-1">
                 <Badge
@@ -1097,7 +1132,6 @@ export function LessonReader({
     },
     [
       activeBlockId,
-      handleBlockTap,
       handleSentenceTap,
       playBlockTts,
       isSentencePlaying,
@@ -1386,23 +1420,32 @@ export function LessonReader({
                             </div>
                           </div>
 
-                          <div
-                            ref={(node) => {
-                              for (const sentence of group) {
-                                sentenceNodeMapRef.current[sentence.id] = node;
-                              }
-                            }}
-                            className="cursor-pointer transition-colors"
-                            onClick={() => handleMobileGroupTap(groupContext)}
-                          >
-                            <p
-                            className={cn(
-                              "text-[16px] leading-[1.72] font-normal tracking-[0.01em] text-foreground/95",
-                              groupSelected && "text-primary",
-                            )}
-                          >
-                            {groupText}
-                            </p>
+                          <div className="space-y-1.5">
+                            {group.map((sentence) => {
+                              const sentenceSelected = sentence.id === state.activeSentenceId;
+                              return (
+                                <div
+                                  key={sentence.id}
+                                  ref={(node) => {
+                                    sentenceNodeMapRef.current[sentence.id] = node;
+                                  }}
+                                  className="transition-colors"
+                                >
+                                  <p
+                                    data-sentence-id={sentence.id}
+                                    data-sentence-text={sentence.text}
+                                    data-sentence-translation={sentence.translation}
+                                    className={cn(
+                                      "cursor-pointer text-[16px] leading-[1.72] font-normal tracking-[0.01em] text-foreground/95",
+                                      sentenceSelected && "text-primary",
+                                    )}
+                                    onClick={() => handleMobileSentenceTap(sentence.id, groupContext)}
+                                  >
+                                    {sentence.text}
+                                  </p>
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
                       </div>
@@ -1488,64 +1531,64 @@ export function LessonReader({
         )}
       </div>
 
-      {isTrainingMode && currentSentence ? (
+      {isTrainingMode && currentTrainingSentence ? (
         <div className="sticky bottom-4 z-20 lg:col-span-1">
           <div className="rounded-2xl border border-black/8 bg-white/95 px-4 py-3 shadow-[0_10px_30px_rgba(0,0,0,0.08)] backdrop-blur">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <div className="min-w-0 space-y-1">
                 <p className="text-xs tracking-[0.08em] text-muted-foreground">当前训练句</p>
                 <p className="line-clamp-2 text-sm font-medium leading-6 text-foreground">
-                  {currentSentence.text}
+                  {currentTrainingSentence.text}
                 </p>
-                {practicedSentenceIds.has(currentSentence.id) ? (
+                {practicedSentenceIds.has(currentTrainingSentence.id) ? (
                   <p className="text-xs text-[rgb(21,128,61)]">这句已经练过了</p>
                 ) : null}
-                {trainingPromptSentenceId === currentSentence.id ? (
+                {trainingPromptSentenceId === currentTrainingSentence.id ? (
                   <p className="text-xs text-muted-foreground">先跟读或复述一遍，再点“我练过了”。</p>
-                ) : practicedSentenceIds.has(currentSentence.id) ? (
+                ) : practicedSentenceIds.has(currentTrainingSentence.id) ? (
                   <p className="text-xs text-muted-foreground">如果想再巩固一次，可以直接再练一遍。</p>
                 ) : (
                   <p className="text-xs text-muted-foreground">先听一句，再自己跟读或复述一遍。</p>
                 )}
               </div>
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center">
                 <TtsActionButton
-                  active={isSentencePlaying(currentSentence.id, "normal")}
-                  loading={isSentenceLoading(currentSentence.id, "normal")}
+                  active={isSentencePlaying(currentTrainingSentence.id, "normal")}
+                  loading={isSentenceLoading(currentTrainingSentence.id, "normal")}
                   variant="ghost"
                   size="sm"
-                  className={appleButtonSmClassName}
+                  className={`${appleButtonSmClassName} w-full justify-center whitespace-nowrap sm:w-auto`}
                   iconClassName="size-4"
-                  onClick={() => handlePronounce(getSentenceSpeakText(currentSentence))}
+                  onClick={() => handlePronounce(getSentenceSpeakText(currentTrainingSentence))}
                 />
                 <LoopActionButton
                   active={isSceneLooping}
                   loading={isSceneLoopLoading}
                   variant="ghost"
                   size="sm"
-                  className={appleButtonSmClassName}
+                  className={`${appleButtonSmClassName} w-full justify-center whitespace-nowrap sm:w-auto`}
                   iconClassName="size-4"
                   onClick={toggleSceneLoopPlayback}
                 />
                 <button
                   type="button"
-                  className={`${appleButtonSmClassName} px-3 py-1.5`}
-                  onClick={() => openDetailForSentence(currentSentence.id)}
+                  className={`${appleButtonSmClassName} w-full justify-center whitespace-nowrap px-3 py-1.5 sm:w-auto`}
+                  onClick={() => openDetailForSentence(currentTrainingSentence.id)}
                 >
                   看解释
                 </button>
                 <button
                   type="button"
-                  className={`${appleButtonSmClassName} px-3 py-1.5`}
+                  className={`${appleButtonSmClassName} w-full justify-center whitespace-nowrap px-3 py-1.5 sm:w-auto`}
                   onClick={
-                    trainingPromptSentenceId === currentSentence.id
+                    trainingPromptSentenceId === currentTrainingSentence.id
                       ? handleConfirmSentencePractice
                       : handlePracticeSentence
                   }
                 >
-                  {trainingPromptSentenceId === currentSentence.id
+                  {trainingPromptSentenceId === currentTrainingSentence.id
                     ? "我练过了"
-                    : practicedSentenceIds.has(currentSentence.id)
+                    : practicedSentenceIds.has(currentTrainingSentence.id)
                       ? "再练一次"
                       : "练这句"}
                 </button>

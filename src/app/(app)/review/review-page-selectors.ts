@@ -1,5 +1,5 @@
 import { UserPhraseItemResponse } from "@/lib/utils/phrases-api";
-import { DueReviewItemResponse } from "@/lib/utils/review-api";
+import { DueReviewItemResponse, DueScenePracticeReviewItemResponse } from "@/lib/utils/review-api";
 
 export const buildFallbackExampleSentence = (expression: string) =>
   `I can use "${expression}" in a real sentence.`;
@@ -113,3 +113,11 @@ export const resolveReviewHints = ({
       ? labels.manualTrainingHintSubtle
       : labels.trainingHintSubtle,
 });
+
+export const buildScenePracticeReviewItemKey = (
+  item: Pick<DueScenePracticeReviewItemResponse, "sceneSlug" | "sentenceId" | "exerciseId">,
+) => `${item.sceneSlug}:${item.sentenceId ?? item.exerciseId}`;
+
+export const buildScenePracticeReviewKeySet = (
+  items: Array<Pick<DueScenePracticeReviewItemResponse, "sceneSlug" | "sentenceId" | "exerciseId">>,
+) => new Set(items.map((item) => buildScenePracticeReviewItemKey(item)));

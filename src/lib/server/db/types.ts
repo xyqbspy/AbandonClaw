@@ -70,6 +70,17 @@ export type SceneTrainingStep =
   | "practice_sentence"
   | "scene_practice"
   | "done";
+export type ScenePracticeMode =
+  | "cloze"
+  | "guided_recall"
+  | "sentence_recall"
+  | "full_dictation";
+export type ScenePracticeRunStatus = "in_progress" | "completed" | "abandoned";
+export type ScenePracticeAssessmentLevel =
+  | "incorrect"
+  | "keyword"
+  | "structure"
+  | "complete";
 
 export interface UserSceneProgressRow {
   id: string;
@@ -112,6 +123,42 @@ export interface UserSceneSessionRow {
   last_active_at: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface UserScenePracticeRunRow {
+  id: string;
+  user_id: string;
+  scene_id: string;
+  session_id: string | null;
+  practice_set_id: string;
+  source_type: "original" | "variant";
+  source_variant_id: string | null;
+  status: ScenePracticeRunStatus;
+  current_mode: ScenePracticeMode;
+  completed_modes: string[];
+  started_at: string;
+  completed_at: string | null;
+  last_active_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UserScenePracticeAttemptRow {
+  id: string;
+  run_id: string;
+  user_id: string;
+  scene_id: string;
+  session_id: string | null;
+  practice_set_id: string;
+  mode: ScenePracticeMode;
+  exercise_id: string;
+  sentence_id: string | null;
+  user_answer: string;
+  assessment_level: ScenePracticeAssessmentLevel;
+  is_correct: boolean;
+  attempt_index: number;
+  metadata_json: unknown;
+  created_at: string;
 }
 
 export interface UserDailyLearningStatsRow {

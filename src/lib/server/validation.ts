@@ -182,3 +182,52 @@ export const parseReviewResult = (value: unknown): ReviewResult => {
   }
   throw new ValidationError("reviewResult must be one of again/hard/good.");
 };
+
+export const parsePracticeMode = (value: unknown) => {
+  if (
+    value === "cloze" ||
+    value === "guided_recall" ||
+    value === "sentence_recall" ||
+    value === "full_dictation"
+  ) {
+    return value;
+  }
+  throw new ValidationError(
+    "mode must be one of cloze/guided_recall/sentence_recall/full_dictation.",
+  );
+};
+
+export const parsePracticeAssessmentLevel = (value: unknown) => {
+  if (
+    value === "incorrect" ||
+    value === "keyword" ||
+    value === "structure" ||
+    value === "complete"
+  ) {
+    return value;
+  }
+  throw new ValidationError(
+    "assessmentLevel must be one of incorrect/keyword/structure/complete.",
+  );
+};
+
+export const parseSourceType = (value: unknown) => {
+  if (value === "original" || value === "variant") return value;
+  throw new ValidationError("sourceType must be one of original/variant.");
+};
+
+export const parseOptionalBoolean = (value: unknown, fieldName: string) => {
+  if (value == null) return undefined;
+  if (typeof value !== "boolean") {
+    throw new ValidationError(`${fieldName} must be a boolean.`);
+  }
+  return value;
+};
+
+export const parseOptionalJsonObject = (value: unknown, fieldName: string) => {
+  if (value == null) return undefined;
+  if (typeof value !== "object" || Array.isArray(value)) {
+    throw new ValidationError(`${fieldName} must be an object.`);
+  }
+  return value as Record<string, unknown>;
+};

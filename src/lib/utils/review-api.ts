@@ -16,6 +16,22 @@ export interface DueReviewItemResponse {
   nextReviewAt: string | null;
 }
 
+export interface DueScenePracticeReviewItemResponse {
+  sceneSlug: string;
+  sceneTitle: string;
+  exerciseId: string;
+  sentenceId: string | null;
+  sourceMode: "cloze" | "guided_recall" | "sentence_recall" | "full_dictation";
+  recommendedMode: "cloze" | "guided_recall" | "sentence_recall" | "full_dictation";
+  assessmentLevel: "incorrect" | "keyword" | "structure" | "complete";
+  expectedAnswer: string | null;
+  promptText: string | null;
+  displayText: string | null;
+  hint: string | null;
+  latestAnswer: string;
+  reviewedAt: string;
+}
+
 export interface ReviewSummaryResponse {
   dueReviewCount: number;
   reviewedTodayCount: number;
@@ -40,7 +56,11 @@ export async function getDueReviewItemsFromApi(limit = 20) {
   if (!response.ok) {
     throw await toApiError(response, "加载待复习列表失败。");
   }
-  return (await response.json()) as { rows: DueReviewItemResponse[]; total: number };
+  return (await response.json()) as {
+    rows: DueReviewItemResponse[];
+    total: number;
+    scenePracticeRows: DueScenePracticeReviewItemResponse[];
+  };
 }
 
 export async function submitPhraseReviewFromApi(payload: {

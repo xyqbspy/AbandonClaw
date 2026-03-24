@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireCurrentProfile } from "@/lib/server/auth";
 import { toApiErrorResponse } from "@/lib/server/api-error";
-import { getDueReviewItems } from "@/lib/server/review/service";
+import { getDueReviewItems, getDueScenePracticeReviewItems } from "@/lib/server/review/service";
 import { ValidationError } from "@/lib/server/errors";
 
 const parseLimit = (raw: string | null) => {
@@ -18,8 +18,11 @@ export async function GET(request: Request) {
     const { user } = await requireCurrentProfile();
     const { searchParams } = new URL(request.url);
     const limit = parseLimit(searchParams.get("limit"));
-    const rows = await getDueReviewItems(user.id, { limit });
-    return NextResponse.json({ rows, total: rows.length }, { status: 200 });
+    const [rows, scenePracticeRows] = await Promise.all([
+      getDueReviewItems(user.id, { limit }),
+      getDueScenePracticeReviewItems(user.id, { limit: Math.min(limit, 6) }),
+    ]);
+    return NextResponse.json({ rows, total: rows.length, scenePracticeRows }, { status: 200 });
   } catch (error) {
     return toApiErrorResponse(error, "Failed to load due review items.");
   }

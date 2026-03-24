@@ -18,6 +18,70 @@ const practiceSet: PracticeSet = {
   sourceSceneId: "scene-1",
   sourceSceneTitle: "Coffee Chat",
   sourceType: "original",
+  modules: [
+    {
+      mode: "cloze",
+      modeLabel: "填空练习",
+      title: "开始练习",
+      exercises: [
+        {
+          id: "exercise-1",
+          type: "chunk_cloze",
+          inputMode: "typing",
+          sceneId: "scene-1",
+          sentenceId: "sentence-1",
+          chunkId: "chunk-1",
+          prompt: "补全句子中的表达",
+          answer: {
+            text: "call it a day",
+            acceptedAnswers: ["call it a day"],
+          },
+          cloze: {
+            displayText: "I should ____ now.",
+          },
+        },
+        {
+          id: "exercise-2",
+          type: "chunk_cloze",
+          inputMode: "typing",
+          sceneId: "scene-1",
+          sentenceId: "sentence-2",
+          chunkId: "chunk-2",
+          prompt: "补全第二句中的表达",
+          answer: {
+            text: "take it easy",
+            acceptedAnswers: ["take it easy"],
+          },
+          cloze: {
+            displayText: "You should ____ tonight.",
+          },
+        },
+      ],
+    },
+    {
+      mode: "guided_recall",
+      modeLabel: "半句复现",
+      title: "开始练习",
+      exercises: [
+        {
+          id: "guided-1",
+          type: "typing",
+          inputMode: "typing",
+          sceneId: "scene-1",
+          sentenceId: "sentence-3",
+          prompt: "看到前半句，补出后半句",
+          hint: "慢一点，别着急。",
+          answer: {
+            text: "slow down a little tonight.",
+            acceptedAnswers: ["slow down a little tonight."],
+          },
+          cloze: {
+            displayText: "Maybe you should ____",
+          },
+        },
+      ],
+    },
+  ],
   exercises: [
     {
       id: "exercise-1",
@@ -55,6 +119,43 @@ const practiceSet: PracticeSet = {
   status: "generated",
   createdAt: "2026-03-21T00:00:00.000Z",
 };
+
+test("ScenePracticeView 填空完成后会解锁半句复现模块", async () => {
+  render(
+    <ScenePracticeView
+      practiceSet={practiceSet}
+      showAnswerMap={{}}
+      appleButtonSmClassName="btn"
+      appleDangerButtonSmClassName="danger"
+      labels={sceneViewLabels.practice}
+      onBack={() => undefined}
+      onDelete={() => undefined}
+      onComplete={() => undefined}
+      onReviewScene={() => undefined}
+      onOpenVariants={() => undefined}
+      onToggleAnswer={() => undefined}
+    />,
+  );
+
+  const guidedRecallButton = screen.getByRole("button", { name: /半句复现/ });
+  assert.equal(guidedRecallButton.hasAttribute("disabled"), true);
+
+  fireEvent.change(screen.getByPlaceholderText("输入你认为正确的表达"), {
+    target: { value: "call it a day" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "检查答案" }));
+
+  fireEvent.change(screen.getByPlaceholderText("输入你认为正确的表达"), {
+    target: { value: "take it easy" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "检查答案" }));
+
+  await waitFor(() => {
+    assert.ok(screen.getByText("当前题型已完成，继续进入“半句复现”。"));
+    const enabledGuidedRecallButton = screen.getByRole("button", { name: /半句复现/ });
+    assert.equal(enabledGuidedRecallButton.hasAttribute("disabled"), false);
+  });
+});
 
 test("ScenePracticeView 点击答案按钮会触发切换回调", () => {
   let toggledId = "";

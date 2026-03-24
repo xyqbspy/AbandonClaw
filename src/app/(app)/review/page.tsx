@@ -1,14 +1,21 @@
 ﻿"use client";
 
-import { ReactNode, useEffect, useRef, useState } from "react";
-import { toast } from "sonner";
+import { ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { getReviewPageCache, setReviewPageCache } from "@/lib/cache/review-page-cache";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PracticeAssessmentLevel, PracticeMode } from "@/lib/types/learning-flow";
+import {
+  completeScenePracticeRunFromApi,
+  markScenePracticeModeCompleteFromApi,
+  recordScenePracticeAttemptFromApi,
+  startScenePracticeRunFromApi,
+} from "@/lib/utils/learning-api";
 import { getMyPhrasesFromApi } from "@/lib/utils/phrases-api";
 import { readReviewSession } from "@/lib/utils/review-session";
 import {
+  DueScenePracticeReviewItemResponse,
   DueReviewItemResponse,
   getDueReviewItemsFromApi,
   getReviewSummaryFromApi,
@@ -16,10 +23,35 @@ import {
 } from "@/lib/utils/review-api";
 import {
   buildFallbackExampleSentence,
+  buildScenePracticeReviewItemKey,
+  buildScenePracticeReviewKeySet,
   mergePrioritizedReviewItems,
   resolveReviewHints,
   resolveReviewSourceLabel,
 } from "./review-page-selectors";
+import {
+  buildAcceptedPracticeAnswers,
+  getPracticeAssessment,
+  isPracticeAssessmentComplete,
+} from "@/lib/shared/scene-practice-assessment";
+import {
+  assessmentLabelMap,
+  buildReviewInlinePracticeSetId,
+  getInlinePracticeFeedback,
+  getInlinePracticePlaceholder,
+  getReviewModeAccentClassName,
+  reviewModeLabelMap,
+} from "./review-page-messages";
+import {
+  notifyInlinePracticeCompleted,
+  notifyInlinePracticeFailed,
+  notifyInlinePracticeMissingAnswer,
+  notifyInlinePracticeMissingExpectedAnswer,
+  notifyInlinePracticeRecorded,
+  notifyPhraseReviewSubmitted,
+  notifyReviewLoadFailed,
+  notifyReviewSubmitFailed,
+} from "./review-page-notify";
 import { reviewPageLabels as zh } from "./review-page-labels";
 
 const REVIEW_LIMIT = 20;
@@ -32,6 +64,14 @@ export default function ReviewPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [items, setItems] = useState<DueReviewItemResponse[]>([]);
+  const [scenePracticeItems, setScenePracticeItems] = useState<DueScenePracticeReviewItemResponse[]>([]);
+  const [scenePracticeAnswerMap, setScenePracticeAnswerMap] = useState<Record<string, string>>({});
+  const [scenePracticeAssessmentMap, setScenePracticeAssessmentMap] = useState<
+    Record<string, PracticeAssessmentLevel | null>
+  >({});
+  const [scenePracticeSubmittingMap, setScenePracticeSubmittingMap] = useState<Record<string, boolean>>(
+    {},
+  );
   const [isSessionReview, setIsSessionReview] = useState(false);
   const [sessionSource, setSessionSource] = useState<string | null>(null);
   const [showReference, setShowReference] = useState(false);
@@ -100,6 +140,7 @@ export default function ReviewPage() {
       if (!canApply()) return;
 
       const dueRows = due.rows;
+      setScenePracticeItems(due.scenePracticeRows ?? []);
       if (prioritizedIds.length === 0) {
         setItems(dueRows);
         setSummary(nextSummary);
@@ -131,7 +172,7 @@ export default function ReviewPage() {
         REVIEW_LIMIT,
       );
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : zh.loadFailed);
+      notifyReviewLoadFailed(error instanceof Error ? error.message : zh.loadFailed);
     } finally {
       if (canApply()) setLoading(false);
     }
@@ -150,6 +191,24 @@ export default function ReviewPage() {
   const exampleSentence = current
     ? current.sourceSentenceText?.trim() || buildFallbackExampleSentence(current.text)
     : "";
+  const scenePracticeKeySet = useMemo(
+    () => buildScenePracticeReviewKeySet(scenePracticeItems),
+    [scenePracticeItems],
+  );
+  useEffect(() => {
+    setScenePracticeAnswerMap((prev) => {
+      const nextEntries = Object.entries(prev).filter(([key]) => scenePracticeKeySet.has(key));
+      return nextEntries.length === Object.keys(prev).length ? prev : Object.fromEntries(nextEntries);
+    });
+    setScenePracticeAssessmentMap((prev) => {
+      const nextEntries = Object.entries(prev).filter(([key]) => scenePracticeKeySet.has(key));
+      return nextEntries.length === Object.keys(prev).length ? prev : Object.fromEntries(nextEntries);
+    });
+    setScenePracticeSubmittingMap((prev) => {
+      const nextEntries = Object.entries(prev).filter(([key]) => scenePracticeKeySet.has(key));
+      return nextEntries.length === Object.keys(prev).length ? prev : Object.fromEntries(nextEntries);
+    });
+  }, [scenePracticeKeySet]);
   const sourceLabel = resolveReviewSourceLabel({
     isSessionReview,
     sessionSource,
@@ -192,11 +251,98 @@ export default function ReviewPage() {
         },
         REVIEW_LIMIT,
       );
-      toast.success(zh.submitOk);
+      notifyPhraseReviewSubmitted(zh);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : zh.submitFailed);
+      notifyReviewSubmitFailed(error instanceof Error ? error.message : zh.submitFailed);
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const submitInlineScenePractice = async (item: DueScenePracticeReviewItemResponse) => {
+    const itemKey = buildScenePracticeReviewItemKey(item);
+    const answer = scenePracticeAnswerMap[itemKey]?.trim() ?? "";
+    if (!answer) {
+      notifyInlinePracticeMissingAnswer(zh);
+      return;
+    }
+
+    const expectedAnswer = item.expectedAnswer?.trim() ?? "";
+    if (!expectedAnswer) {
+      notifyInlinePracticeMissingExpectedAnswer(zh);
+      return;
+    }
+
+    const acceptedAnswers = buildAcceptedPracticeAnswers(expectedAnswer);
+    const assessment = getPracticeAssessment({
+      mode: item.recommendedMode as PracticeMode,
+      expected: expectedAnswer,
+      answer,
+      acceptedAnswers,
+    });
+
+    setScenePracticeAssessmentMap((prev) => ({
+      ...prev,
+      [itemKey]: assessment,
+    }));
+    setScenePracticeSubmittingMap((prev) => ({
+      ...prev,
+      [itemKey]: true,
+    }));
+
+    const practiceSetId = buildReviewInlinePracticeSetId(item);
+
+    try {
+      await startScenePracticeRunFromApi(item.sceneSlug, {
+        practiceSetId,
+        mode: item.recommendedMode,
+        sourceType: "original",
+      });
+
+      await recordScenePracticeAttemptFromApi(item.sceneSlug, {
+        practiceSetId,
+        mode: item.recommendedMode,
+        sourceType: "original",
+        exerciseId: item.exerciseId,
+        sentenceId: item.sentenceId,
+        userAnswer: answer,
+        assessmentLevel: assessment,
+        isCorrect: isPracticeAssessmentComplete(assessment),
+        metadata: {
+          prompt: item.promptText,
+          displayText: item.displayText,
+          expectedAnswer,
+          hint: item.hint,
+          reviewSourceMode: item.sourceMode,
+          reviewRecommendedMode: item.recommendedMode,
+          reviewInline: true,
+        },
+      });
+
+      if (isPracticeAssessmentComplete(assessment)) {
+        await markScenePracticeModeCompleteFromApi(item.sceneSlug, {
+          practiceSetId,
+          mode: item.recommendedMode,
+        });
+        await completeScenePracticeRunFromApi(item.sceneSlug, {
+          practiceSetId,
+        });
+        setScenePracticeItems((prev) =>
+          prev.filter(
+            (currentItem) => buildScenePracticeReviewItemKey(currentItem) !== itemKey,
+          ),
+        );
+        notifyInlinePracticeCompleted(zh);
+      } else {
+        notifyInlinePracticeRecorded(zh);
+      }
+    } catch (error) {
+      notifyInlinePracticeFailed(error instanceof Error ? error.message : zh.practiceInlineFailed);
+    } finally {
+      setScenePracticeSubmittingMap((prev) => ({
+        ...prev,
+        [itemKey]: false,
+      }));
     }
   };
 
@@ -217,6 +363,192 @@ export default function ReviewPage() {
           {loading ? "..." : summary?.reviewAccuracy == null ? zh.dash : `${summary.reviewAccuracy}%`}
         </p>
       </div>
+
+      {!loading && scenePracticeItems.length > 0 ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">场景练习待复习</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              这里会优先展示你最近在场景练习里只做到“关键词”或“骨架”的句子，方便继续按推荐题型回练。
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {scenePracticeItems.map((item) => (
+              (() => {
+                const itemKey = buildScenePracticeReviewItemKey(item);
+                const inlineAssessment = scenePracticeAssessmentMap[itemKey];
+                const inlineFeedback = getInlinePracticeFeedback(inlineAssessment, zh);
+                const inlineAnswer = scenePracticeAnswerMap[itemKey] ?? "";
+                const isSubmittingInline = scenePracticeSubmittingMap[itemKey] === true;
+                const placeholder = getInlinePracticePlaceholder(item.recommendedMode as PracticeMode, zh);
+                const modeAccentClassName = getReviewModeAccentClassName(
+                  item.recommendedMode as PracticeMode,
+                );
+
+                return (
+                  <div
+                    key={`${item.sceneSlug}-${item.sentenceId ?? item.exerciseId}-${item.reviewedAt}`}
+                    className="rounded-lg border border-black/6 bg-muted/40 p-3"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-sm font-medium text-foreground">{item.sceneTitle}</p>
+                      <p className="text-xs text-muted-foreground">
+                        当前评估：
+                        {assessmentLabelMap[item.assessmentLevel as keyof typeof assessmentLabelMap] ??
+                          item.assessmentLevel}{" "}
+                        · 建议题型：{reviewModeLabelMap[item.recommendedMode]}
+                      </p>
+                    </div>
+                    {item.displayText ? (
+                      <p className="mt-2 text-sm text-foreground">{item.displayText}</p>
+                    ) : null}
+                    {item.promptText ? (
+                      <p className="mt-1 text-xs text-muted-foreground">提示：{item.promptText}</p>
+                    ) : null}
+                    {item.latestAnswer ? (
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        你上次的答案：{item.latestAnswer}
+                      </p>
+                    ) : null}
+                    {item.expectedAnswer ? (
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        参考目标：{item.expectedAnswer}
+                      </p>
+                    ) : null}
+
+                    <div className="mt-3 rounded-lg bg-background p-3">
+                      <div className="space-y-2">
+                        <p className="text-xs text-muted-foreground">{zh.practiceAgain}</p>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-xs text-muted-foreground">{zh.practiceModePrefix}</span>
+                          <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${modeAccentClassName}`}>
+                            {reviewModeLabelMap[item.recommendedMode]}
+                          </span>
+                        </div>
+                        {item.promptText ? (
+                          <div className="rounded-md bg-muted/60 p-2">
+                            <p className="text-[11px] text-muted-foreground">{zh.practicePromptPrefix}</p>
+                            <p className="mt-1 text-sm text-foreground">{item.promptText}</p>
+                          </div>
+                        ) : null}
+                        {item.hint ? (
+                          <p className="text-xs text-muted-foreground">
+                            {zh.practiceHintPrefix}：{item.hint}
+                          </p>
+                        ) : null}
+                      </div>
+                      {item.recommendedMode === "full_dictation" ? (
+                        <textarea
+                          className="mt-2 min-h-28 w-full rounded-md border border-black/10 bg-white px-3 py-2 text-sm outline-none transition focus:border-primary"
+                          placeholder={placeholder}
+                          value={inlineAnswer}
+                          onChange={(event) => {
+                            const nextValue = event.target.value;
+                            setScenePracticeAnswerMap((prev) => ({
+                              ...prev,
+                              [itemKey]: nextValue,
+                            }));
+                            if (scenePracticeAssessmentMap[itemKey]) {
+                              setScenePracticeAssessmentMap((prev) => ({
+                                ...prev,
+                                [itemKey]: null,
+                              }));
+                            }
+                          }}
+                        />
+                      ) : (
+                        <input
+                          className="mt-2 h-11 w-full rounded-md border border-black/10 bg-white px-3 text-sm outline-none transition focus:border-primary"
+                          placeholder={placeholder}
+                          value={inlineAnswer}
+                          onChange={(event) => {
+                            const nextValue = event.target.value;
+                            setScenePracticeAnswerMap((prev) => ({
+                              ...prev,
+                              [itemKey]: nextValue,
+                            }));
+                            if (scenePracticeAssessmentMap[itemKey]) {
+                              setScenePracticeAssessmentMap((prev) => ({
+                                ...prev,
+                                [itemKey]: null,
+                              }));
+                            }
+                          }}
+                        />
+                      )}
+                      {inlineFeedback ? (
+                        <p
+                          className={`mt-2 text-xs ${
+                            inlineAssessment === "complete"
+                              ? "text-emerald-600"
+                              : inlineAssessment === "structure"
+                                ? "text-sky-700"
+                                : inlineAssessment === "keyword"
+                                  ? "text-amber-700"
+                                  : "text-rose-600"
+                          }`}
+                        >
+                          {inlineFeedback}
+                        </p>
+                      ) : null}
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          disabled={isSubmittingInline}
+                          onClick={() => void submitInlineScenePractice(item)}
+                        >
+                          {zh.practiceCheck}
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          disabled={isSubmittingInline}
+                          onClick={() => {
+                            setScenePracticeAnswerMap((prev) => ({
+                              ...prev,
+                              [itemKey]: "",
+                            }));
+                            setScenePracticeAssessmentMap((prev) => ({
+                              ...prev,
+                              [itemKey]: null,
+                            }));
+                          }}
+                        >
+                          {zh.practiceReset}
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() => {
+                          window.location.assign(`/scene/${item.sceneSlug}?view=practice`);
+                        }}
+                      >
+                        回到场景继续练
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          window.location.assign(`/scene/${item.sceneSlug}`);
+                        }}
+                      >
+                        {zh.openSourceScene}
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })()
+            ))}
+          </CardContent>
+        </Card>
+      ) : null}
 
       {loading ? (
         <p className="text-sm text-muted-foreground">{zh.queueLoading}</p>
@@ -255,6 +587,20 @@ export default function ReviewPage() {
                 <p className="mt-1 text-sm">{exampleSentence}</p>
                 {current.usageNote ? (
                   <p className="mt-2 text-xs text-muted-foreground">{current.usageNote}</p>
+                ) : null}
+                {current.sourceSceneSlug ? (
+                  <div className="mt-3">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        window.location.assign(`/scene/${current.sourceSceneSlug}`);
+                      }}
+                    >
+                      {zh.openSourceScene}
+                    </Button>
+                  </div>
                 ) : null}
               </div>
             ) : null}

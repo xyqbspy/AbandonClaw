@@ -3,7 +3,10 @@ import {
   PhraseReviewLogRow,
   PhraseReviewResult,
   PhraseRow,
+  ScenePracticeAssessmentLevel,
+  ScenePracticeMode,
   UserDailyLearningStatsRow,
+  UserScenePracticeAttemptRow,
   UserPhraseReviewStatus,
   UserPhraseRow,
 } from "@/lib/server/db/types";
@@ -38,6 +41,43 @@ export interface SubmitPhraseReviewInput {
   reviewResult: PhraseReviewResult;
   source?: string;
 }
+
+export interface DueScenePracticeReviewItem {
+  sceneSlug: string;
+  sceneTitle: string;
+  exerciseId: string;
+  sentenceId: string | null;
+  sourceMode: ScenePracticeMode;
+  recommendedMode: ScenePracticeMode;
+  assessmentLevel: ScenePracticeAssessmentLevel;
+  expectedAnswer: string | null;
+  promptText: string | null;
+  displayText: string | null;
+  hint: string | null;
+  latestAnswer: string;
+  reviewedAt: string;
+}
+
+const practiceAssessmentPriority: Record<ScenePracticeAssessmentLevel, number> = {
+  incorrect: 0,
+  keyword: 1,
+  structure: 2,
+  complete: 3,
+};
+
+const toRecommendedPracticeMode = (
+  assessmentLevel: ScenePracticeAssessmentLevel,
+  sourceMode: ScenePracticeMode,
+): ScenePracticeMode => {
+  if (assessmentLevel === "structure") return "sentence_recall";
+  if (assessmentLevel === "keyword") return sourceMode === "cloze" ? "guided_recall" : sourceMode;
+  if (assessmentLevel === "incorrect") {
+    if (sourceMode === "full_dictation") return "sentence_recall";
+    if (sourceMode === "sentence_recall") return "guided_recall";
+    return sourceMode;
+  }
+  return sourceMode;
+};
 
 async function loadClusterIdByUserPhraseId(userId: string, userPhraseIds: string[]) {
   const uniqueIds = Array.from(new Set(userPhraseIds.map((item) => item.trim()).filter(Boolean)));
@@ -148,6 +188,79 @@ export async function getDueReviewItems(userId: string, params?: { limit?: numbe
     rows.map((row) => row.id),
   );
   return rows.map((row) => mapDueItem(row, clusterIdByPhraseId.get(row.id) ?? null));
+}
+
+export async function getDueScenePracticeReviewItems(
+  userId: string,
+  params?: { limit?: number },
+) {
+  const admin = createSupabaseAdminClient();
+  const limit = Math.min(20, Math.max(1, Math.floor(params?.limit ?? 6)));
+  const { data, error } = await admin
+    .from("user_scene_practice_attempts")
+    .select("*, scene:scenes!inner(slug,title)")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(180);
+
+  if (error) {
+    throw new Error(`Failed to load scene practice review items: ${error.message}`);
+  }
+
+  const rows = (data ?? []) as Array<
+    UserScenePracticeAttemptRow & {
+      scene: { slug: string; title: string } | Array<{ slug: string; title: string }> | null;
+    }
+  >;
+
+  const latestByKey = new Map<
+    string,
+    UserScenePracticeAttemptRow & {
+      scene: { slug: string; title: string } | Array<{ slug: string; title: string }> | null;
+    }
+  >();
+  for (const row of rows) {
+    const key = `${row.scene_id}:${row.sentence_id ?? row.exercise_id}`;
+    if (!latestByKey.has(key)) {
+      latestByKey.set(key, row);
+    }
+  }
+
+  const candidates: DueScenePracticeReviewItem[] = [];
+  for (const row of latestByKey.values()) {
+    if (row.assessment_level === "complete") continue;
+    const scene = Array.isArray(row.scene) ? (row.scene[0] ?? null) : row.scene;
+    if (!scene) continue;
+    const metadata =
+      row.metadata_json && typeof row.metadata_json === "object" && !Array.isArray(row.metadata_json)
+        ? (row.metadata_json as Record<string, unknown>)
+        : {};
+    candidates.push({
+      sceneSlug: scene.slug,
+      sceneTitle: scene.title,
+      exerciseId: row.exercise_id,
+      sentenceId: row.sentence_id,
+      sourceMode: row.mode,
+      recommendedMode: toRecommendedPracticeMode(row.assessment_level, row.mode),
+      assessmentLevel: row.assessment_level,
+      expectedAnswer:
+        typeof metadata.expectedAnswer === "string" ? metadata.expectedAnswer : null,
+      promptText: typeof metadata.prompt === "string" ? metadata.prompt : null,
+      displayText: typeof metadata.displayText === "string" ? metadata.displayText : null,
+      hint: typeof metadata.hint === "string" ? metadata.hint : null,
+      latestAnswer: row.user_answer,
+      reviewedAt: row.created_at,
+    });
+  }
+
+  candidates.sort((left, right) => {
+    const severityDelta =
+      practiceAssessmentPriority[left.assessmentLevel] - practiceAssessmentPriority[right.assessmentLevel];
+    if (severityDelta !== 0) return severityDelta;
+    return right.reviewedAt.localeCompare(left.reviewedAt);
+  });
+
+  return candidates.slice(0, limit);
 }
 
 export async function getUserPhraseReviewBuckets(userId: string) {

@@ -77,6 +77,55 @@ export interface UpdateSceneLearningProgressPayload {
   savedPhraseDelta?: number;
 }
 
+export interface ScenePracticeRunResponse {
+  run: {
+    id: string;
+    sceneId: string;
+    sessionId: string | null;
+    practiceSetId: string;
+    sourceType: "original" | "variant";
+    sourceVariantId: string | null;
+    status: "in_progress" | "completed" | "abandoned";
+    currentMode: "cloze" | "guided_recall" | "sentence_recall" | "full_dictation";
+    completedModes: Array<"cloze" | "guided_recall" | "sentence_recall" | "full_dictation">;
+    startedAt: string;
+    completedAt: string | null;
+    lastActiveAt: string;
+    createdAt: string;
+    updatedAt: string;
+  };
+}
+
+export interface ScenePracticeAttemptResponse extends ScenePracticeRunResponse {
+  attempt: {
+    id: string;
+    runId: string;
+    sceneId: string;
+    sessionId: string | null;
+    practiceSetId: string;
+    mode: "cloze" | "guided_recall" | "sentence_recall" | "full_dictation";
+    exerciseId: string;
+    sentenceId: string | null;
+    userAnswer: string;
+    assessmentLevel: "incorrect" | "keyword" | "structure" | "complete";
+    isCorrect: boolean;
+    attemptIndex: number;
+    metadata: Record<string, unknown> | null;
+    createdAt: string;
+  };
+}
+
+export interface ScenePracticeSnapshotResponse {
+  run: ScenePracticeRunResponse["run"] | null;
+  latestAttempt: ScenePracticeAttemptResponse["attempt"] | null;
+  summary: {
+    completedModeCount: number;
+    totalAttemptCount: number;
+    correctAttemptCount: number;
+    latestAssessmentLevel: "incorrect" | "keyword" | "structure" | "complete" | null;
+  };
+}
+
 const withDashboardCacheInvalidation = async <T>(task: () => Promise<T>) => {
   const result = await task();
   void clearLearningDashboardCache().catch(() => {
@@ -173,6 +222,132 @@ export async function recordSceneTrainingEventFromApi(
       throw await toApiError(response, "记录场景训练步骤失败。");
     }
     return (await response.json()) as SceneLearningProgressResponse;
+  });
+}
+
+export async function startScenePracticeRunFromApi(
+  sceneSlug: string,
+  payload: {
+    practiceSetId: string;
+    mode: "cloze" | "guided_recall" | "sentence_recall" | "full_dictation";
+    sourceType: "original" | "variant";
+    sourceVariantId?: string | null;
+  },
+) {
+  return withDashboardCacheInvalidation(async () => {
+    const response = await fetch(`/api/learning/scenes/${encodeURIComponent(sceneSlug)}/practice/run`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      throw await toApiError(response, "启动场景练习失败。");
+    }
+    return (await response.json()) as ScenePracticeRunResponse;
+  });
+}
+
+export async function getScenePracticeSnapshotFromApi(
+  sceneSlug: string,
+  params?: {
+    practiceSetId?: string;
+  },
+) {
+  const search = new URLSearchParams();
+  if (params?.practiceSetId) search.set("practiceSetId", params.practiceSetId);
+  const query = search.toString();
+  const response = await fetch(
+    `/api/learning/scenes/${encodeURIComponent(sceneSlug)}/practice/run${query ? `?${query}` : ""}`,
+    { method: "GET" },
+  );
+  if (!response.ok) {
+    throw await toApiError(response, "读取练习进度失败。");
+  }
+  return (await response.json()) as ScenePracticeSnapshotResponse;
+}
+
+export async function recordScenePracticeAttemptFromApi(
+  sceneSlug: string,
+  payload: {
+    practiceSetId: string;
+    mode: "cloze" | "guided_recall" | "sentence_recall" | "full_dictation";
+    sourceType: "original" | "variant";
+    sourceVariantId?: string | null;
+    exerciseId: string;
+    sentenceId?: string | null;
+    userAnswer: string;
+    assessmentLevel: "incorrect" | "keyword" | "structure" | "complete";
+    isCorrect: boolean;
+    metadata?: Record<string, unknown>;
+  },
+) {
+  return withDashboardCacheInvalidation(async () => {
+    const response = await fetch(
+      `/api/learning/scenes/${encodeURIComponent(sceneSlug)}/practice/attempt`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      },
+    );
+    if (!response.ok) {
+      throw await toApiError(response, "记录练习作答失败。");
+    }
+    return (await response.json()) as ScenePracticeAttemptResponse;
+  });
+}
+
+export async function markScenePracticeModeCompleteFromApi(
+  sceneSlug: string,
+  payload: {
+    practiceSetId: string;
+    mode: "cloze" | "guided_recall" | "sentence_recall" | "full_dictation";
+    nextMode?: "cloze" | "guided_recall" | "sentence_recall" | "full_dictation";
+  },
+) {
+  return withDashboardCacheInvalidation(async () => {
+    const response = await fetch(
+      `/api/learning/scenes/${encodeURIComponent(sceneSlug)}/practice/mode-complete`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      },
+    );
+    if (!response.ok) {
+      throw await toApiError(response, "更新练习模块状态失败。");
+    }
+    return (await response.json()) as ScenePracticeRunResponse;
+  });
+}
+
+export async function completeScenePracticeRunFromApi(
+  sceneSlug: string,
+  payload: {
+    practiceSetId: string;
+  },
+) {
+  return withDashboardCacheInvalidation(async () => {
+    const response = await fetch(
+      `/api/learning/scenes/${encodeURIComponent(sceneSlug)}/practice/complete`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      },
+    );
+    if (!response.ok) {
+      throw await toApiError(response, "完成练习 run 失败。");
+    }
+    return (await response.json()) as ScenePracticeRunResponse;
   });
 }
 

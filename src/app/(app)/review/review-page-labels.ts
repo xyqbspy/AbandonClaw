@@ -1,3 +1,5 @@
+import { PRACTICE_ASSESSMENT_FEEDBACK } from "@/lib/shared/scene-training-copy";
+
 export type ReviewPageLabels = {
   loadFailed: string;
   submitFailed: string;
@@ -37,6 +39,26 @@ export type ReviewPageLabels = {
   fromSelected: string;
   sourcePrefix: string;
   defaultHint: string;
+  openSourceScene: string;
+  practiceAgain: string;
+  practiceModePrefix: string;
+  practicePromptPrefix: string;
+  practiceHintPrefix: string;
+  practiceInputPlaceholder: string;
+  practiceGuidedRecallPlaceholder: string;
+  practiceSentenceRecallPlaceholder: string;
+  practiceFullDictationPlaceholder: string;
+  practiceCheck: string;
+  practiceReset: string;
+  practiceKeywordFeedback: string;
+  practiceStructureFeedback: string;
+  practiceCompleteFeedback: string;
+  practiceIncorrectFeedback: string;
+  practiceMissingAnswer: string;
+  practiceMissingExpectedAnswer: string;
+  practiceInlineCompleted: string;
+  practiceInlineRecorded: string;
+  practiceInlineFailed: string;
 };
 
 export const reviewPageLabels: ReviewPageLabels = {
@@ -78,4 +100,24 @@ export const reviewPageLabels: ReviewPageLabels = {
   fromSelected: "来自你的选中表达",
   sourcePrefix: "来源",
   defaultHint: "正在进行当前到期表达复习。",
+  openSourceScene: "查看原场景",
+  practiceAgain: "当场再练一次",
+  practiceModePrefix: "当前练法",
+  practicePromptPrefix: "这次提示",
+  practiceHintPrefix: "补充提醒",
+  practiceInputPlaceholder: "直接在这里复现这句或补全表达",
+  practiceGuidedRecallPlaceholder: "根据提示，把后半句补出来",
+  practiceSentenceRecallPlaceholder: "试着完整复现这一句",
+  practiceFullDictationPlaceholder: "根据提示，整段默写你记得的内容",
+  practiceCheck: "检查这次复现",
+  practiceReset: "清空",
+  practiceKeywordFeedback: "这次已经抓到关键表达了，继续把句子骨架补完整。",
+  practiceStructureFeedback: "这次骨架已经对上了，再把细节补齐就能过。",
+  practiceCompleteFeedback: "这次已经完整复现，说明复习接住了。",
+  practiceIncorrectFeedback: "这次还不稳，先看原场景，再回来试一次。",
+  practiceMissingAnswer: "先输入这次的复现内容。",
+  practiceMissingExpectedAnswer: "这条复习项缺少参考目标，暂时无法直接练习。",
+  practiceInlineCompleted: "这句已经接住了，已从待复习里移除。",
+  practiceInlineRecorded: "已记录这次复习结果。",
+  practiceInlineFailed: "提交场景复习失败。",
 };
