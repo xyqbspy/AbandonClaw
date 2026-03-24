@@ -149,7 +149,7 @@ function SceneTrainingCoachFloatingEntry({
     moved: boolean;
     activated: boolean;
     cancelled: boolean;
-    timer: ReturnType<typeof window.setTimeout> | null;
+    timer: number | null;
   }>({
     pointerId: null,
     startX: 0,
