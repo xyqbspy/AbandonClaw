@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Search } from "lucide-react";
-import { toast } from "sonner";
 import { TtsActionButton } from "@/components/audio/tts-action-button";
 import { useTtsPlaybackState } from "@/hooks/use-tts-playback-state";
 import { normalizePhraseText } from "@/lib/shared/phrases";
@@ -43,7 +42,6 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { MoveIntoClusterSheet } from "@/features/chunks/components/move-into-cluster-sheet";
-import { buildFocusDetailLabels } from "@/features/chunks/components/focus-detail-labels";
 import { FocusDetailSheet } from "@/features/chunks/components/focus-detail-sheet";
 import { ExpressionMapSheet } from "@/features/chunks/components/expression-map-sheet";
 import { buildExpressionMapViewModel } from "@/features/chunks/components/expression-map-selectors";
@@ -68,9 +66,7 @@ import {
 import {
   buildSavedFocusDetailState,
   buildFocusDetailClosePayload,
-  buildFocusDetailOpenRowAction,
   buildFocusDetailSheetState,
-  buildFocusDetailTabChangeState,
   buildGeneratedSimilarSheetState,
   buildManualSheetState,
   buildMoveIntoClusterOpenChangeState,
@@ -91,269 +87,48 @@ import { useSavedRelations } from "./use-saved-relations";
 import { useFocusDetailController } from "./use-focus-detail-controller";
 import { ChunksListView } from "./chunks-list-view";
 
-const zh = {
-  loadFailed: "\u52a0\u8f7d\u8868\u8fbe\u5931\u8d25\u3002",
-  loading: "\u52a0\u8f7d\u4e2d...",
-  total: "\u5171",
-  items: "\u6761",
-  eyebrow: "Expression",
-  title: "Expression Library",
-  desc: "\u5728\u8fd9\u91cc\u7ba1\u7406\u4f60\u7684\u5df2\u4fdd\u5b58\u8868\u8fbe\uff0c\u5e76\u4ece\u8868\u8fbe\u7ec4\u76f4\u63a5\u8fdb\u5165\u590d\u4e60\u3002",
-  searchPlaceholder: "\u641c\u7d22\u5df2\u4fdd\u5b58\u8868\u8fbe",
-  addExpression: "\u6dfb\u52a0\u5b66\u4e60\u5185\u5bb9",
-  manualAddTitle: "\u6dfb\u52a0\u5b66\u4e60\u5185\u5bb9",
-  manualAddDesc: "\u53ea\u586b\u8868\u8fbe\u4e5f\u53ef\u4ee5\uff0c\u4fdd\u5b58\u540e\u4f1a\u81ea\u52a8\u8865\u5168\u4e2d\u6587\u91ca\u4e49\u3001\u8bed\u5883\u4f8b\u53e5\u548c\u4f7f\u7528\u63d0\u793a\u3002",
-  itemTypeLabel: "\u8bb0\u5f55\u7c7b\u578b",
-  itemTypeExpression: "\u8bb0\u5f55\u8868\u8fbe",
-  itemTypeSentence: "\u8bb0\u5f55\u53e5\u5b50",
-  contentTabExpression: "\u8868\u8fbe",
-  contentTabSentence: "\u53e5\u5b50",
-  viewModeList: "\u5217\u8868\u6a21\u5f0f",
-  viewModeFocus: "\u4e3b\u8868\u8fbe\u6a21\u5f0f",
-  focusModeTitle: "\u4e3b\u8868\u8fbe\u5b66\u4e60\u89c6\u56fe",
-  focusModeDesc: "\u56f4\u7ed5\u4e00\u4e2a\u4e3b\u8868\u8fbe\uff0c\u4e00\u6b21\u770b\u540c\u7c7b\u3001\u5bf9\u7167\u548c\u5b66\u4e60\u4fe1\u606f\u3002",
-  focusLibrarySimilar: "\u5df2\u5728\u5e93\u540c\u7c7b",
-  focusSuggestedSimilar: "AI \u540c\u7c7b\u5019\u9009",
-  focusContrast: "AI \u5bf9\u7167\u8868\u8fbe",
-  focusEmptySimilar: "\u6682\u65e0\u53ef\u7528\u540c\u7c7b\u8868\u8fbe",
-  focusLoading: "\u6b63\u5728\u8865\u5168\u4e3b\u8868\u8fbe\u89c6\u56fe...",
-  focusTabSimilar: "\u540c\u7c7b\u8868\u8fbe",
-  focusTabContrast: "\u5bf9\u7167\u8868\u8fbe",
-  focusExpand: "\u5c55\u5f00",
-  focusCollapse: "\u6536\u8d77",
-  focusRelatedEmpty: "\u6682\u65e0\u76f8\u5173\u8868\u8fbe",
-  addThisExpression: "\u52a0\u5165\u8868\u8fbe\u5e93",
-  addingThisExpression: "\u52a0\u5165\u4e2d",
-  addedThisExpression: "\u5df2\u52a0\u5165",
-  completeAssist: "\u5b8c\u6210",
-  detailTitle: "\u8868\u8fbe\u8be6\u60c5",
-  detailLoading: "\u6b63\u5728\u52a0\u8f7d\u8868\u8fbe\u8be6\u60c5...",
-  detailOpenAsMain: "\u8bbe\u4e3a\u672c\u7c07\u4e3b\u8868\u8fbe",
-  detailOpenAsMainConfirmTitle: "\u8bbe\u7f6e\u4e3a\u672c\u7c07\u4e3b\u8868\u8fbe\uff1f",
-  detailOpenAsMainConfirmDesc:
-    "\u8fd9\u4f1a\u628a\u8be5\u8868\u8fbe\u8bbe\u4e3a\u5f53\u524d\u8868\u8fbe\u7c07\u7684\u4e3b\u8868\u8fbe\uff0c\u4e0d\u4f1a\u62c6\u51fa\u6210\u72ec\u7acb\u8868\u8fbe\u3002",
-  detailCandidateBadge: "AI \u5019\u9009",
-  detailFindRelations: "\u67e5\u627e\u540c\u7c7b / \u5bf9\u7167\u8868\u8fbe",
-  detailRelationsDesc:
-    "\u9700\u8981\u65f6\u518d\u4e3b\u52a8\u67e5\u627e\uff0c\u67e5\u627e\u540e\u4f1a\u65b0\u589e AI \u540c\u7c7b \u548c AI \u5bf9\u7167 \u6807\u7b7e\u9875\u3002",
-  openCurrentDetail: "\u67e5\u770b\u8fd9\u4e00\u7ec4",
-  detailTabInfo: "\u8be6\u60c5",
-  detailTabSavedSimilar: "\u540c\u7c7b\u8868\u8fbe",
-  detailTabSuggested: "AI \u540c\u7c7b",
-  detailTabContrast: "\u5bf9\u7167\u8868\u8fbe",
-  detailMoreActions: "\u66f4\u591a\u64cd\u4f5c",
-  detailManualAddRelated: "\u6dfb\u52a0\u5173\u8054\u8868\u8fbe",
-  detailRegenerateAudio: "\u91cd\u65b0\u751f\u6210\u97f3\u9891",
-  detailRetryEnrichment: "\u8865\u5168\u5f53\u524dchunk",
-  detailSimilarHint: "\u8fd9\u4e00\u7ec4\u8868\u8fbe\u610f\u601d\u63a5\u8fd1\uff0c\u53ef\u4ee5\u653e\u5728\u4e00\u8d77\u5bf9\u6bd4\u7740\u5b66\u3002",
-  detailContrastHint: "\u8fd9\u4e9b\u8868\u8fbe\u548c\u5f53\u524d\u8bf4\u6cd5\u5f62\u6210\u5bf9\u7167\uff0c\u9002\u5408\u653e\u5728\u4e00\u8d77\u533a\u5206\u3002",
-  detailPrev: "\u4e0a\u4e00\u6761",
-  detailNext: "\u4e0b\u4e00\u6761",
-  detailBackToCurrent: "\u8fd4\u56de",
-  detailNoAiSimilar: "\u8fd8\u6ca1\u6709 AI \u540c\u7c7b\u5019\u9009\uff0c\u53ef\u5148\u5728\u8be6\u60c5\u91cc\u70b9\u300c\u67e5\u627e\u540c\u7c7b / \u5bf9\u7167\u8868\u8fbe\u300d\u3002",
-  expressionTextLabel: "\u8868\u8fbe",
-  expressionTextPlaceholder: "call it a day",
-  sentenceLabel: "\u53e5\u5b50",
-  sentencePlaceholder: "I think I should call it a day.",
-  translationLabel: "\u4e2d\u6587\u91ca\u4e49\uff08\u53ef\u9009\uff09",
-  translationPlaceholder: "\u4eca\u5929\u5148\u5230\u8fd9\u91cc / \u6536\u5de5",
-  sourceSentenceLabel: "\u4f8b\u53e5 / \u8bed\u5883\uff08\u53ef\u9009\uff09",
-  sentenceMainLabel: "\u53e5\u5b50",
-  sentenceMainPlaceholder: "I was exhausted, so I decided to call it a day.",
-  usageNoteLabel: "\u4f7f\u7528\u63d0\u793a\uff08\u53ef\u9009\uff09",
-  usageNotePlaceholder:
-    "\u4f8b\u5982\uff1a\u9002\u5408\u4ec0\u4e48\u65f6\u5019\u7528\uff1f\u8bed\u6c14\u4e0a\u6709\u4ec0\u4e48\u611f\u89c9\uff1f",
-  sourceNoteLabel: "\u8bb0\u5f55\u6765\u6e90\uff08\u53ef\u9009\uff09",
-  findMoreRelated: "\u627e\u66f4\u591a\u540c\u7c7b / \u5bf9\u7167\u8868\u8fbe",
-  generatingSuggestions: "\u6b63\u5728\u751f\u6210\u5019\u9009...",
-  currentInputCard: "\u5f53\u524d\u8f93\u5165",
-  similarExpressionsAuto: "\u540c\u7c7b\u8868\u8fbe",
-  contrastExpressionsAuto: "\u5bf9\u7167\u8868\u8fbe",
-  noContrastExpressions: "\u6682\u65e0\u660e\u663e\u5bf9\u7167\u8868\u8fbe",
-  saveSelectedExpressions: "\u5c06\u52fe\u9009\u9879\u52a0\u5165\u8868\u8fbe\u5e93",
-  sentenceAutoHint: "\u53ea\u8f93\u5165\u82f1\u6587\u53e5\u5b50\u5373\u53ef\uff0c\u4fdd\u5b58\u65f6\u4f1a\u81ea\u52a8\u8865\u5168\u7ffb\u8bd1\u548c\u5b66\u4e60\u4fe1\u606f\u3002",
-  sourceNotePlaceholder:
-    "\u4f8b\u5982\uff1a\u4f60\u662f\u5728\u54ea\u91cc\u770b\u5230\u5b83\u7684\uff1f\u64ad\u5ba2 / \u89c6\u9891 / \u670b\u53cb\u804a\u5929",
-  saveToLibrary: "\u4fdd\u5b58\u5230\u8868\u8fbe\u5e93",
-  saveAndReview: "\u4fdd\u5b58\u5e76\u52a0\u5165\u590d\u4e60",
-  saveSentence: "\u4fdd\u5b58\u53e5\u5b50",
-  saveSentenceReview: "\u4fdd\u5b58\u53e5\u5b50",
-  saveSuccess: "\u5df2\u52a0\u5165\u8868\u8fbe\u5e93\uff0c\u5e76\u81ea\u52a8\u8865\u5168\u5b66\u4e60\u4fe1\u606f",
-  saveSentenceSuccess: "\u5df2\u4fdd\u5b58\u53e5\u5b50\u5230\u5b66\u4e60\u5e93",
-  saveReviewSuccess: "\u5df2\u52a0\u5165\u8868\u8fbe\u5e93\uff0c\u6b63\u5728\u5f00\u59cb\u590d\u4e60",
-  saveDuplicateSuccess: "\u8fd9\u4e2a\u8868\u8fbe\u5df2\u5728\u8868\u8fbe\u5e93\u91cc\uff0c\u5df2\u66f4\u65b0\u8bb0\u5f55\u5e76\u8865\u5168\u5b66\u4e60\u4fe1\u606f",
-  saveSentenceDuplicateSuccess: "\u8fd9\u53e5\u5185\u5bb9\u5df2\u5728\u5b66\u4e60\u5e93\u91cc\uff0c\u5df2\u66f4\u65b0\u8bb0\u5f55",
-  saveDuplicateReviewSuccess:
-    "\u8fd9\u4e2a\u8868\u8fbe\u5df2\u5728\u8868\u8fbe\u5e93\u91cc\uff0c\u6b63\u5728\u5f00\u59cb\u590d\u4e60",
-  autoEnrichStarted: "\u5df2\u4fdd\u5b58\uff0c\u6b63\u5728\u81ea\u52a8\u8865\u5168\u4e2d\u6587\u91ca\u4e49\u548c\u4f8b\u53e5...",
-  autoEnrichFailedKeepSaved: "\u5df2\u4fdd\u5b58\uff0c\u4f46\u81ea\u52a8\u8865\u5168\u5931\u8d25\uff0c\u53ef\u7a0d\u540e\u70b9\u201c\u91cd\u8bd5\u8865\u5168\u201d\u3002",
-  sourceNoteDisplay: "\u8bb0\u5f55\u6765\u6e90",
-  manualRecorded: "\u624b\u52a8\u8bb0\u5f55",
-  sentenceUnit: "\u53e5\u5b50\u5355\u5143",
-  sentenceUnitHint: "\u8fd9\u662f\u4e00\u6761\u8bed\u5883\u53e5\u5b50\uff0c\u53ef\u4ece\u4e2d\u63d0\u70bc\u8868\u8fbe\u3002",
-  sentenceSource: "\u53e5\u5b50\u6765\u6e90",
-  sentenceSourceFallback: "\u624b\u52a8\u8bb0\u5f55\u7684\u53e5\u5b50",
-  sentenceExpressions: "\u8fd9\u53e5\u91cc\u503c\u5f97\u8bb0\u7684\u8868\u8fbe",
-  sentenceNoExpressions: "\u6682\u65e0\u6807\u8bb0\u8868\u8fbe\uff0c\u53ef\u4ece\u8fd9\u53e5\u7ee7\u7eed\u8bb0\u5f55\u3002",
-  sentenceExpressionsHint: "\u70b9\u51fb\u300c\u4fdd\u5b58\u8fd9\u4e2a\u8868\u8fbe\u300d\uff0c\u76f4\u63a5\u52a0\u5165\u8868\u8fbe\u5e93\u3002",
-  sentenceRecordExpression: "\u81ea\u5df1\u9009\u4e00\u6bb5\u6765\u8bb0\u5f55",
-  sentenceSaveExpression: "\u4fdd\u5b58\u8fd9\u4e2a\u8868\u8fbe",
-  sentenceSavedExpression: "\u5df2\u4fdd\u5b58",
-  sentenceRecordHint: "\u4ece\u8fd9\u53e5\u91cc\u62c6\u51fa\u4e00\u6bb5\u503c\u5f97\u8bb0\u7684\u8868\u8fbe",
-  sentenceRecordFormHint: "\u53ef\u9009\uff1a\u4ece\u8fd9\u53e5\u91cc\u63d0\u53d6\u4e00\u6bb5\u503c\u5f97\u8bb0\u7684\u8868\u8fbe\u3002",
-  sentenceOpenExpressionComposer: "\u5df2\u6253\u5f00\u300c\u8bb0\u5f55\u8868\u8fbe\u300d",
-  sentenceExpressionSaved: "\u5df2\u4fdd\u5b58\u5230\u8868\u8fbe\u5e93",
-  missingExpression: "\u8bf7\u8f93\u5165\u8868\u8fbe\u6587\u672c",
-  missingSentence: "\u8bf7\u8f93\u5165\u53e5\u5b50\u5185\u5bb9",
-  tabs: {
-    all: "\u5168\u90e8",
-    saved: "\u5f85\u590d\u4e60",
-    reviewing: "\u7ec3\u4e60\u4e2d",
-    mastered: "\u5df2\u638c\u63e1",
-  },
-  listLoading: "\u8868\u8fbe\u52a0\u8f7d\u4e2d...",
-  emptyTitle: "\u6682\u65e0\u8868\u8fbe",
-  emptyDesc: "\u5148\u4ece\u573a\u666f\u4e2d\u6536\u85cf\u4e00\u4e9b\u8868\u8fbe\uff0c\u8fd9\u91cc\u4f1a\u6210\u4e3a\u4f60\u7684\u590d\u4e60\u5165\u53e3\u3002",
-  noTranslation: "\u6682\u65e0\u7ffb\u8bd1",
-  expressionUnit: "\u8868\u8fbe\u5355\u5143",
-  sourceSentence: "\u4f8b\u53e5",
-  noSourceSentence: "\u6682\u65e0\u53e5\u5b50\u4e0a\u4e0b\u6587",
-  usageHint: "\u4f7f\u7528\u63d0\u793a",
-  learningInfoPending: "\u5b66\u4e60\u4fe1\u606f\u751f\u6210\u4e2d",
-  learningInfoPendingHint: "\u6b63\u5728\u8865\u5168\u7ffb\u8bd1\u3001\u4f8b\u53e5\u548c\u4f7f\u7528\u63d0\u793a\uff0c\u7a0d\u540e\u4f1a\u53d8\u6210\u5b8c\u6574\u5b66\u4e60\u5361\u3002",
-  learningInfoFailed: "\u5b66\u4e60\u4fe1\u606f\u6682\u672a\u751f\u6210\uff0c\u53ef\u7a0d\u540e\u518d\u770b\u3002",
-  retryEnrichment: "\u91cd\u8bd5\u8865\u5168",
-  retryEnrichmentSuccess: "\u5df2\u5b8c\u6210\u8865\u5168",
-  retryEnrichmentFailed: "\u8865\u5168\u5931\u8d25\uff0c\u53ef\u518d\u8bd5\u4e00\u6b21",
-  semanticFocusLabel: "\u8bed\u4e49\u4fa7\u91cd",
-  typicalScenarioLabel: "\u5178\u578b\u573a\u666f",
-  semanticFocusPending: "\u6b63\u5728\u8865\u5168",
-  typicalScenarioPending: "\u6b63\u5728\u8865\u5168",
-  usageHintFallback: "\u8bd5\u7740\u628a\u8fd9\u4e2a\u8868\u8fbe\u653e\u8fdb\u4f60\u81ea\u5df1\u7684\u4e00\u53e5\u8bdd\u91cc\u3002",
-  reviewStage: "\u5f53\u524d\u9636\u6bb5",
-  reviewStageSavedHint: "\u5148\u8fc7\u4e00\u8f6e\uff0c\u5efa\u7acb\u719f\u6089\u611f\u3002",
-  reviewStageReviewingHint: "\u7ee7\u7eed\u5de9\u56fa\uff0c\u628a\u5b83\u7528\u987a\u53e3\u3002",
-  reviewStageMasteredHint: "\u5df2\u8fdb\u5165\u638c\u63e1\u9636\u6bb5\uff0c\u5076\u5c14\u56de\u770b\u5373\u53ef\u3002",
-  reviewActionSavedHint: "\u5148\u8fc7\u4e00\u8f6e\uff0c\u5efa\u7acb\u719f\u6089\u611f",
-  reviewActionReviewingHint: "\u8d81\u8fd8\u8bb0\u5f97\uff0c\u7ee7\u7eed\u5de9\u56fa",
-  reviewActionMasteredHint: "\u5076\u5c14\u56de\u770b\uff0c\u9632\u6b62\u751f\u758f",
-  startReview: "\u5f00\u59cb\u590d\u4e60",
-  continueReview: "\u7ee7\u7eed\u590d\u4e60",
-  revisitOne: "\u518d\u770b\u4e00\u904d",
-  reviewFamily: "\u590d\u4e60\u8fd9\u7ec4",
-  sentenceReviewPending: "\u53e5\u5b50\u590d\u4e60\u5f85\u5f00\u653e",
-  openMap: "\u76f8\u5173\u8868\u8fbe",
-  mapPending: "\u76f8\u5173\u8868\u8fbe\u751f\u6210\u4e2d",
-  mapUnavailable: "\u6682\u65e0\u76f8\u5173\u8868\u8fbe",
-  sourceScene: "\u6765\u6e90\u573a\u666f",
-  expandDetail: "\u67e5\u770b\u89e3\u6790",
-  collapseDetail: "\u6536\u8d77",
-  inThisSentence: "\u5728\u8fd9\u53e5\u91cc",
-  commonUsage: "\u5e38\u89c1\u7528\u6cd5",
-  speakSentence: "\u6717\u8bfb",
-  stopSpeaking: "\u505c\u6b62",
-  speechUnsupported: "\u5f53\u524d\u6d4f\u89c8\u5668\u4e0d\u652f\u6301\u53d1\u97f3",
-  reviewStartFeedback: "\u5df2\u5f00\u59cb\u590d\u4e60\u8fd9\u4e2a\u8868\u8fbe",
-  reviewFamilyFeedback: "\u5df2\u5f00\u59cb\u590d\u4e60\u8fd9\u7ec4\u8868\u8fbe",
-  openMapFeedback: "\u5df2\u6253\u5f00\u76f8\u5173\u8868\u8fbe",
-  mapTitle: "\u8868\u8fbe\u5730\u56fe",
-  mapDesc: "\u67e5\u770b\u8be5\u8868\u8fbe\u7684\u76f8\u5173\u8bf4\u6cd5\uff0c\u53ef\u4ee5\u76f4\u63a5\u7ec4\u961f\u590d\u4e60\u6216\u52a0\u5165\u590d\u4e60\u6c60\u3002",
-  mapLoading: "\u8868\u8fbe\u5730\u56fe\u751f\u6210\u4e2d...",
-  mapFailed: "\u751f\u6210\u8868\u8fbe\u5730\u56fe\u5931\u8d25\u3002",
-  mapEmpty: "\u6682\u65e0\u53ef\u7528\u8868\u8fbe\u7ec4\u3002",
-  centerExpression: "\u4e2d\u5fc3\u8868\u8fbe",
-  relatedExpressions: "\u76f8\u5173\u8868\u8fbe",
-  clusterMeaning: "\u7c07\u542b\u4e49",
-  practiceCluster: "\u7ec3\u8fd9\u4e2a\u8868\u8fbe\u7c07",
-  addCluster: "\u5c06\u8fd9\u4e2a\u7c07\u52a0\u5165\u590d\u4e60",
-  addClusterSuccess: "\u8be5\u8868\u8fbe\u7c07\u5df2\u52a0\u5165\u590d\u4e60\u6c60\u3002",
-  clusterEmpty: "\u8be5\u8868\u8fbe\u7c07\u6682\u65e0\u8868\u8fbe\u3002",
-  statusUnknown: "\u672a\u52a0\u5165\u590d\u4e60",
-  diffSame: "\u4e2d\u5fc3\u8868\u8fbe",
-  diffRelated: "\u76f8\u5173\u8868\u8fbe",
-  diffColloquial: "\u66f4\u53e3\u8bed",
-  diffSpecific: "\u66f4\u5177\u4f53",
-  diffRecoverRoutine: "\u66f4\u504f\u6062\u590d\u89c4\u5f8b",
-  diffRestart: "\u66f4\u504f\u91cd\u65b0\u5f00\u59cb",
-  mapLimitedPrefix: "\u4ec5\u5c55\u793a\u6700\u76f8\u5173\u7684",
-  mapLimitedSuffix: "\u6761",
-  similarExpressions: "\u540c\u7c7b\u8868\u8fbe",
-  showSimilar: "\u5c55\u5f00\u540c\u7c7b\u8868\u8fbe",
-  hideSimilar: "\u6536\u8d77\u540c\u7c7b\u8868\u8fbe",
-  similarEmpty: "\u6682\u65e0\u5df2\u5efa\u7acb\u7684\u540c\u7c7b\u8868\u8fbe\u3002",
-  viewAllSimilar: "\u67e5\u770b\u66f4\u591a\u540c\u7c7b\u8868\u8fbe",
-  findMoreSimilar: "\u627e\u66f4\u591a\u540c\u7c7b\u8868\u8fbe",
-  expandSimilar: "\u6269\u5c55\u540c\u7c7b\u8868\u8fbe",
-  generatingSimilar: "\u540c\u7c7b\u8868\u8fbe\u751f\u6210\u4e2d",
-  generatedSimilarTitle: "AI \u5019\u9009\u540c\u7c7b\u8868\u8fbe",
-  generatedSimilarDesc:
-    "\u5148\u52fe\u9009\u4f60\u8981\u7684\u5019\u9009\uff0c\u518d\u52a0\u5165\u8868\u8fbe\u5e93\u5e76\u5efa\u7acb\u540c\u7c7b\u5173\u8054\u3002",
-  noGeneratedSimilar: "\u6682\u672a\u751f\u6210\u5230\u5408\u9002\u5019\u9009\uff0c\u53ef\u518d\u8bd5\u4e00\u6b21\u3002",
-  addSelectedSimilar: "\u52a0\u5165\u8868\u8fbe\u5e93\u5e76\u5efa\u7acb\u540c\u7c7b\u5173\u8054",
-  addSelectedSimilarSuccess: "\u5df2\u52a0\u5165\u9009\u4e2d\u5019\u9009\u5e76\u5efa\u7acb\u540c\u7c7b\u5173\u8054\u3002",
-  selectAtLeastOne: "\u8bf7\u81f3\u5c11\u9009\u62e9 1 \u4e2a\u5019\u9009\u3002",
-  viewingClusterFilter: "\u6b63\u5728\u67e5\u770b\u8fd9\u4e00\u7ec4\u540c\u7c7b\u8868\u8fbe",
-  filteredClusterPrefix: "\u5df2\u7b5b\u9009\uff1a",
-  filteredClusterSuffix: "\u8fd9\u4e2a\u8868\u8fbe\u7c07",
-  mergeCluster: "\u5408\u5e76\u5230\u5f53\u524d\u4e3b\u7c07",
-  mergeClusterSuccess: "\u5df2\u5408\u5e76\u8868\u8fbe\u7c07",
-  moveIntoCluster: "\u79fb\u5165\u5f53\u524d\u8868\u8fbe\u7c07",
-  moveIntoClusterTitle: "\u79fb\u5165\u5f53\u524d\u8868\u8fbe\u7c07",
-  quickAddRelatedTitle: "\u6dfb\u52a0\u5173\u8054\u8868\u8fbe",
-  quickAddRelatedDesc: "\u76f4\u63a5\u628a\u4f60\u624b\u52a8\u60f3\u5230\u7684\u8868\u8fbe\u6302\u5230\u5f53\u524d\u4e3b\u8868\u8fbe\u4e0a\uff0c\u4fdd\u5b58\u540e\u4f1a\u81ea\u52a8\u8865\u5168\u5b66\u4e60\u4fe1\u606f\u3002",
-  quickAddTargetLabel: "\u5f53\u524d\u4e3b\u8868\u8fbe",
-  quickAddCopyTarget: "\u70b9\u51fb\u590d\u5236",
-  quickAddCopySuccess: "\u5df2\u590d\u5236\u5f53\u524d\u4e3b\u8868\u8fbe\u3002",
-  quickAddCopyFailed: "\u590d\u5236\u5931\u8d25\uff0c\u8bf7\u7a0d\u540e\u518d\u8bd5\u3002",
-  quickAddTextLabel: "\u5173\u8054\u8868\u8fbe",
-  quickAddTextPlaceholder: "get through the day",
-  quickAddRelationTypeLabel: "\u5173\u8054\u7c7b\u578b",
-  quickAddSimilar: "\u540c\u7c7b",
-  quickAddContrast: "\u5bf9\u7167",
-  quickAddSubmit: "\u4fdd\u5b58\u5173\u8054\u8868\u8fbe",
-  quickAddSuccessSimilar: "\u5df2\u52a0\u5165\u540c\u7c7b\u8868\u8fbe\u5e76\u5efa\u7acb\u5173\u8054\u3002",
-  quickAddSuccessContrast: "\u5df2\u52a0\u5165\u5bf9\u7167\u8868\u8fbe\u5e76\u5efa\u7acb\u5173\u8054\u3002",
-  quickAddDuplicateCurrent: "\u4e0d\u80fd\u628a\u5f53\u524d\u4e3b\u8868\u8fbe\u91cd\u590d\u52a0\u5165\u4e3a\u5173\u8054\u9879\u3002",
-  quickAddDuplicateSimilar: "\u8fd9\u6761\u540c\u7c7b\u8868\u8fbe\u5df2\u5728\u5f53\u524d\u5217\u8868\u91cc\u4e86\u3002",
-  quickAddDuplicateContrast: "\u8fd9\u6761\u5bf9\u7167\u8868\u8fbe\u5df2\u5728\u5f53\u524d\u5217\u8868\u91cc\u4e86\u3002",
-  quickAddExistingLibraryHint: "\u8fd9\u6761\u8868\u8fbe\u5df2\u5728\u8868\u8fbe\u5e93\u91cc\uff0c\u4fdd\u5b58\u540e\u4f1a\u76f4\u63a5\u4e0e\u5f53\u524d\u4e3b\u8868\u8fbe\u5efa\u7acb\u5173\u8054\u3002",
-  regenerateAudioSuccess: "\u5df2\u91cd\u65b0\u751f\u6210\u5f53\u524d\u8be6\u60c5\u7684\u97f3\u9891\u3002",
-  regenerateAudioFailed: "\u91cd\u65b0\u751f\u6210\u97f3\u9891\u5931\u8d25\uff0c\u8bf7\u7a0d\u540e\u518d\u8bd5\u3002",
-  moveIntoClusterDesc:
-    "\u53ef\u4ee5\u4e00\u6b21\u52fe\u9009\u591a\u4e2a\u8868\u8fbe\u6216\u5176\u5b50\u8868\u8fbe\uff0c\u7edf\u4e00\u79fb\u5165\u5f53\u524d\u4e3b\u8868\u8fbe\u6240\u5728\u7684\u7c07\u3002",
-  moveIntoClusterCurrentMain: "\u5f53\u524d\u76ee\u6807\u4e3b\u8868\u8fbe",
-  moveIntoClusterSourceCluster: "\u6765\u6e90\u8868\u8fbe\u7c07",
-  moveIntoClusterStandalone: "\u72ec\u7acb\u8868\u8fbe",
-  moveIntoClusterSubExpression: "\u5b50\u8868\u8fbe",
-  moveIntoClusterMainExpression: "\u4e3b\u8868\u8fbe",
-  moveIntoClusterExpand: "\u5c55\u5f00",
-  moveIntoClusterCollapse: "\u6536\u8d77",
-  moveIntoClusterMemberCountSuffix: "\u4e2a\u8868\u8fbe",
-  moveIntoClusterEmpty: "\u6682\u65e0\u53ef\u79fb\u5165\u7684\u8868\u8fbe\u3002",
-  moveIntoClusterSelectOne: "\u8bf7\u81f3\u5c11\u9009\u62e9 1 \u4e2a\u8981\u79fb\u5165\u7684\u8868\u8fbe\u3002",
-  moveIntoClusterSelectGroup: "\u5168\u9009",
-  moveIntoClusterSelectedGroup: "\u5df2\u5168\u9009",
-  moveIntoClusterCoveredByMain: "\u968f\u6574\u7c07\u4e00\u8d77\u79fb\u5165",
-  moveIntoClusterDisabledHint: "\u5f53\u524d\u6ca1\u6709\u53ef\u79fb\u5165\u7684\u5176\u4ed6\u8868\u8fbe\u3002",
-  moveIntoClusterSubmit: "\u786e\u8ba4\u79fb\u5165",
-  moveIntoClusterSuccess: "\u5df2\u79fb\u5165",
-  moveIntoClusterPartialFailed: "\u90e8\u5206\u79fb\u5165\u5931\u8d25",
-  detachClusterMember: "\u8bbe\u7f6e\u4e3a\u72ec\u7acb\u4e3b\u8868\u8fbe",
-  detachClusterMemberSuccess: "\u5df2\u8bbe\u7f6e\u4e3a\u72ec\u7acb\u4e3b\u8868\u8fbe",
-  detachClusterMemberConfirmTitle: "\u8bbe\u7f6e\u4e3a\u72ec\u7acb\u4e3b\u8868\u8fbe\uff1f",
-  detachClusterMemberConfirmDesc:
-    "\u8fd9\u4f1a\u5c06\u8be5\u8868\u8fbe\u79fb\u51fa\u5f53\u524d\u8868\u8fbe\u7c07\uff0c\u5e76\u6210\u4e3a\u4e00\u4e2a\u72ec\u7acb\u4e3b\u8868\u8fbe\u3002",
-  confirmCancel: "\u53d6\u6d88",
-  confirmContinue: "\u786e\u8ba4",
-  clearClusterFilter: "\u8fd4\u56de\u5168\u90e8\u8868\u8fbe",
-  diffGentle: "\u66f4\u6e29\u548c",
-  diffOverdoReminder: "\u66f4\u504f\u63d0\u9192\u522b\u505a\u8fc7\u5934",
-  diffIntense: "\u66f4\u5f3a\u70c8",
-  diffDirectPrediction: "\u66f4\u504f\u76f4\u63a5\u9884\u6d4b",
-  diffEvidenceBased: "\u66f4\u504f\u6709\u8ff9\u8c61",
-  diffTiredState: "\u66f4\u5e38\u7528\u4e8e\u75b2\u60eb\u72b6\u6001",
-  close: "\u5173\u95ed",
-};
+import { buildChunksFocusDetailLabels } from "./chunks-focus-detail-messages";
+import {
+  notifyChunksFocusDetailCandidateSaved,
+  notifyChunksFocusDetailCopyTargetFailed,
+  notifyChunksFocusDetailCopyTargetSuccess,
+  notifyChunksFocusDetailMissingExpression,
+  notifyChunksFocusDetailNoSourceSentence,
+  notifyChunksFocusDetailQuickAddFailed,
+  notifyChunksFocusDetailQuickAddSucceeded,
+  notifyChunksFocusDetailQuickAddValidation,
+  notifyChunksFocusDetailRegenerateAudioFailed,
+  notifyChunksFocusDetailRegenerateAudioSuccess,
+  notifyChunksFocusDetailRetryEnrichmentFailed,
+  notifyChunksFocusDetailRetryEnrichmentSuccess,
+} from "./chunks-focus-detail-notify";
+import {
+  buildChunksFocusDetailInteractionPresentation,
+  buildChunksFocusDetailSheetPresentation,
+} from "./chunks-focus-detail-presenters";
+import { chunksPageMessages as zh } from "./chunks-page-messages";
+import {
+  notifyChunksActionMessage,
+  notifyChunksActionSucceeded,
+  notifyChunksExpressionComposerOpened,
+  notifyChunksExpressionMapOpened,
+  notifyChunksLoadFailed,
+  notifyChunksMissingExpression,
+  notifyChunksMissingSentence,
+  notifyChunksNoSourceSentence,
+  notifyChunksQuickAddCopyFailed,
+  notifyChunksQuickAddCopySuccess,
+  notifyChunksRegenerateAudioFailed,
+  notifyChunksRegenerateAudioSuccess,
+  notifyChunksRetryEnrichmentFailed,
+  notifyChunksRetryEnrichmentSuccess,
+  notifyChunksReviewFamilyStarted,
+  notifyChunksReviewStarted,
+  notifyChunksSelectAtLeastOne,
+  notifyChunksSentenceExpressionSaved,
+  notifyChunksSentenceReviewPending,
+  notifyChunksSpeechUnsupported,
+} from "./chunks-page-notify";
 
 const reviewStatusLabel: Record<PhraseReviewStatus, string> = {
   saved: zh.tabs.saved,
@@ -685,7 +460,7 @@ export default function ChunksPage() {
     contentFilter,
     expressionClusterFilterId,
     onLoadFailed: (message) => {
-      toast.error(message || zh.loadFailed);
+      notifyChunksLoadFailed(message);
     },
   });
 
@@ -904,14 +679,14 @@ export default function ChunksPage() {
   } = useFocusAssist({
     expressionRows,
     onLoadFailed: (message) => {
-      toast.error(message || zh.loadFailed);
+      notifyChunksLoadFailed(message);
     },
     onCandidateSaved: async ({ focusItem, candidate, kind }) => {
       await loadPhrases(query, reviewFilter, contentFilter, expressionClusterFilterId, {
         preferCache: false,
       });
       invalidateSavedRelations([focusItem.userPhraseId]);
-      toast.success(zh.addSelectedSimilarSuccess);
+      notifyChunksFocusDetailCandidateSaved(zh.addSelectedSimilarSuccess);
     },
   });
   const focusSimilarItems = useMemo(() => {
@@ -988,7 +763,7 @@ export default function ChunksPage() {
     resolveFocusMainExpressionIdForRow,
     onSetFocusExpressionId: setFocusExpressionId,
     onLoadFailed: (message) => {
-      toast.error(message || zh.loadFailed);
+      notifyChunksLoadFailed(message);
     },
   });
   const openFocusDetail = useCallback(
@@ -1018,7 +793,7 @@ export default function ChunksPage() {
     expressionRows,
     focusDetailUserPhraseId: focusDetail?.savedItem?.userPhraseId ?? null,
     onLoadFailed: (message) => {
-      toast.error(message || zh.loadFailed);
+      notifyChunksLoadFailed(message);
     },
   });
   const {
@@ -1034,15 +809,15 @@ export default function ChunksPage() {
   } = useManualExpressionComposer({
     expressionRows,
     onError: (message) => {
-      toast.error(message || zh.loadFailed);
+      notifyChunksLoadFailed(message);
     },
     onPartialEnrichFailed: () => {
-      toast.error(zh.autoEnrichFailedKeepSaved);
+      notifyChunksLoadFailed(zh.autoEnrichFailedKeepSaved);
     },
   });
   const { savingManualSentence, saveManualSentence } = useManualSentenceComposer({
     onError: (message) => {
-      toast.error(message || zh.loadFailed);
+      notifyChunksLoadFailed(message);
     },
   });
   useEffect(() => {
@@ -1096,13 +871,13 @@ export default function ChunksPage() {
 
   const startReviewFromCard = (item: UserPhraseItemResponse) => {
     if (item.learningItemType === "sentence") {
-      toast.message(zh.sentenceReviewPending);
+      notifyChunksSentenceReviewPending();
       return;
     }
     if (item.reviewStatus === "mastered" && item.expressionClusterId) {
       const clusterRows = phrases.filter((row) => row.expressionClusterId === item.expressionClusterId);
       if (clusterRows.length > 0) {
-        toast.success(zh.reviewFamilyFeedback);
+        notifyChunksReviewFamilyStarted();
         startReviewSession({
           router,
           source: "expression-library-card",
@@ -1111,7 +886,7 @@ export default function ChunksPage() {
         return;
       }
     }
-    toast.success(zh.reviewStartFeedback);
+    notifyChunksReviewStarted();
     startReviewSession({
       router,
       source: "expression-library-card",
@@ -1124,7 +899,7 @@ export default function ChunksPage() {
     setManualText("");
     resetManualExpressionComposer();
     setAddSheetOpen(true);
-    toast.message(zh.sentenceOpenExpressionComposer);
+    notifyChunksExpressionComposerOpened();
   };
 
   const saveExpressionFromSentence = async (item: UserPhraseItemResponse, expression: string) => {
@@ -1143,9 +918,9 @@ export default function ChunksPage() {
         translation: item.translation ?? undefined,
       });
       setSavedSentenceExpressionKeys((prev) => ({ ...prev, [key]: true }));
-      toast.success(zh.sentenceExpressionSaved);
+      notifyChunksSentenceExpressionSaved();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : zh.loadFailed);
+      notifyChunksLoadFailed(error instanceof Error ? error.message : null);
     } finally {
       setSavingSentenceExpressionKey(null);
     }
@@ -1225,10 +1000,10 @@ export default function ChunksPage() {
       setDetailConfirmAction(null);
     },
     onSuccess: (message) => {
-      toast.success(message);
+      notifyChunksActionSucceeded(message);
     },
     onError: (message) => {
-      toast.error(message || zh.loadFailed);
+      notifyChunksLoadFailed(message);
     },
     labels: {
       loadFailed: zh.loadFailed,
@@ -1266,7 +1041,7 @@ export default function ChunksPage() {
 
       setMapData(response);
       setActiveClusterId(response.clusters[0]?.id ?? null);
-      toast.success(zh.openMapFeedback);
+      notifyChunksExpressionMapOpened();
     } catch (error) {
       setMapError(error instanceof Error ? error.message : zh.mapFailed);
     } finally {
@@ -1300,7 +1075,7 @@ export default function ChunksPage() {
       setReviewFilter("all");
     }
     if (sourceExpressionText) {
-      toast.message(`${zh.filteredClusterPrefix} ${sourceExpressionText} ${zh.filteredClusterSuffix}`);
+      notifyChunksActionMessage(`${zh.filteredClusterPrefix} ${sourceExpressionText} ${zh.filteredClusterSuffix}`);
     }
   };
 
@@ -1332,13 +1107,13 @@ export default function ChunksPage() {
     },
     onApplyClusterFilter: applyClusterFilter,
     onSelectAtLeastOne: () => {
-      toast.message(zh.selectAtLeastOne);
+      notifyChunksSelectAtLeastOne();
     },
     onSuccess: () => {
-      toast.success(zh.addSelectedSimilarSuccess);
+      notifyChunksActionSucceeded(zh.addSelectedSimilarSuccess);
     },
     onError: (message) => {
-      toast.error(message || zh.loadFailed);
+      notifyChunksLoadFailed(message);
     },
   });
 
@@ -1358,14 +1133,14 @@ export default function ChunksPage() {
         userPhraseId: item.userPhraseId,
         baseExpression: item.text,
       });
-      toast.success(zh.retryEnrichmentSuccess);
+      notifyChunksFocusDetailRetryEnrichmentSuccess();
     } catch (error) {
       setPhrases((prev) =>
         prev.map((row) =>
           row.userPhraseId === item.userPhraseId ? { ...row, aiEnrichmentStatus: "failed" } : row,
         ),
       );
-      toast.error(error instanceof Error ? error.message : zh.retryEnrichmentFailed);
+      notifyChunksFocusDetailRetryEnrichmentFailed(error instanceof Error ? error.message : null);
     } finally {
       setRetryingEnrichmentIds((prev) => ({ ...prev, [item.userPhraseId]: false }));
       void loadPhrases(query, reviewFilter, contentFilter, expressionClusterFilterId, {
@@ -1399,7 +1174,7 @@ export default function ChunksPage() {
       try {
         await playChunkAudio({ chunkText: text });
       } catch (error) {
-        toast.error(error instanceof Error ? error.message : zh.speechUnsupported);
+        notifyChunksSpeechUnsupported(error instanceof Error ? error.message : null);
       } finally {
         setPlayingText((prev) => (prev === text ? null : prev));
       }
@@ -1529,54 +1304,7 @@ export default function ChunksPage() {
     focusDetailViewModel.detailSpeakText,
     focusDetailViewModel.similarRows,
   ]);
-  const focusDetailLabels = useMemo(
-    () =>
-      buildFocusDetailLabels({
-        detailTitle: zh.detailTitle,
-        detailBackToCurrent: zh.detailBackToCurrent,
-        detailFindRelations: zh.detailFindRelations,
-        detailPrev: zh.detailPrev,
-        detailNext: zh.detailNext,
-        detailMoreActions: zh.detailMoreActions,
-        detailManualAddRelated: zh.detailManualAddRelated,
-        detailRegenerateAudio: zh.detailRegenerateAudio,
-        detailRetryEnrichment: zh.detailRetryEnrichment,
-        detailOpenAsMain: zh.detailOpenAsMain,
-        moveIntoCluster: zh.moveIntoCluster,
-        detachClusterMember: zh.detachClusterMember,
-        addThisExpression: zh.addThisExpression,
-        addingThisExpression: zh.addingThisExpression,
-        addedThisExpression: zh.addedThisExpression,
-        completeAssist: zh.completeAssist,
-        confirmCancel: zh.confirmCancel,
-        confirmContinue: zh.confirmContinue,
-        detailOpenAsMainConfirmTitle: zh.detailOpenAsMainConfirmTitle,
-        detailOpenAsMainConfirmDesc: zh.detailOpenAsMainConfirmDesc,
-        detachClusterMemberConfirmTitle: zh.detachClusterMemberConfirmTitle,
-        detachClusterMemberConfirmDesc: zh.detachClusterMemberConfirmDesc,
-        detailCandidateBadge: zh.detailCandidateBadge,
-        noTranslation: zh.noTranslation,
-        detailLoading: zh.detailLoading,
-        detailTabInfo: zh.detailTabInfo,
-        detailTabSavedSimilar: zh.detailTabSavedSimilar,
-        detailTabContrast: zh.detailTabContrast,
-        commonUsage: zh.commonUsage,
-        typicalScenarioLabel: zh.typicalScenarioLabel,
-        semanticFocusLabel: zh.semanticFocusLabel,
-        reviewStage: zh.reviewStage,
-        usageHintFallback: zh.usageHintFallback,
-        typicalScenarioPending: zh.typicalScenarioPending,
-        semanticFocusPending: zh.semanticFocusPending,
-        sourceSentence: zh.sourceSentence,
-        noSourceSentence: zh.noSourceSentence,
-        detailSimilarHint: zh.detailSimilarHint,
-        focusEmptySimilar: zh.focusEmptySimilar,
-        detailContrastHint: zh.detailContrastHint,
-        noContrastExpressions: zh.noContrastExpressions,
-        speakSentence: zh.speakSentence,
-      }),
-    [],
-  );
+  const focusDetailLabels = useMemo(() => buildChunksFocusDetailLabels(zh), []);
 
   const handlePracticeCluster = () => {
     if (!activeCluster) return;
@@ -1637,9 +1365,9 @@ export default function ChunksPage() {
           preferCache: false,
         });
       }
-      toast.success(zh.addClusterSuccess);
+      notifyChunksActionSucceeded(zh.addClusterSuccess);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : zh.loadFailed);
+      notifyChunksLoadFailed(error instanceof Error ? error.message : null);
     } finally {
       setAddingCluster(false);
     }
@@ -1702,12 +1430,12 @@ export default function ChunksPage() {
 
     const text = quickAddRelatedText.trim();
     if (!text) {
-      toast.error(zh.missingExpression);
+      notifyChunksFocusDetailMissingExpression();
       return;
     }
     if (savingQuickAddRelated) return;
     if (quickAddRelatedValidationMessage) {
-      toast.message(quickAddRelatedValidationMessage);
+      notifyChunksFocusDetailQuickAddValidation(quickAddRelatedValidationMessage);
       return;
     }
 
@@ -1739,13 +1467,13 @@ export default function ChunksPage() {
       setFocusDetailActionsOpen(false);
       setQuickAddRelatedOpen(false);
       resetQuickAddRelatedForm();
-      toast.success(
+      notifyChunksFocusDetailQuickAddSucceeded(
         quickAddRelatedType === "similar"
           ? zh.quickAddSuccessSimilar
           : zh.quickAddSuccessContrast,
       );
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : zh.loadFailed);
+      notifyChunksFocusDetailQuickAddFailed(error instanceof Error ? error.message : null);
     } finally {
       setSavingQuickAddRelated(false);
     }
@@ -1757,9 +1485,9 @@ export default function ChunksPage() {
 
     try {
       await navigator.clipboard.writeText(text);
-      toast.success(zh.quickAddCopySuccess);
+      notifyChunksFocusDetailCopyTargetSuccess();
     } catch {
-      toast.error(zh.quickAddCopyFailed);
+      notifyChunksFocusDetailCopyTargetFailed();
     }
   };
 
@@ -1776,7 +1504,7 @@ export default function ChunksPage() {
     const uniqueTexts = Array.from(new Set(candidateTexts));
 
     if (uniqueTexts.length === 0) {
-      toast.message(zh.noSourceSentence);
+      notifyChunksFocusDetailNoSourceSentence();
       return;
     }
 
@@ -1789,9 +1517,9 @@ export default function ChunksPage() {
         })),
       );
       setFocusDetailActionsOpen(false);
-      toast.success(zh.regenerateAudioSuccess);
+      notifyChunksFocusDetailRegenerateAudioSuccess();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : zh.regenerateAudioFailed);
+      notifyChunksFocusDetailRegenerateAudioFailed(error instanceof Error ? error.message : null);
     } finally {
       setRegeneratingDetailAudio(false);
     }
@@ -1801,11 +1529,11 @@ export default function ChunksPage() {
     const text = manualText.trim();
     const sentenceText = manualSentence.trim();
     if (manualItemType === "expression" && !text) {
-      toast.error(zh.missingExpression);
+      notifyChunksMissingExpression();
       return;
     }
     if (manualItemType === "sentence" && !sentenceText) {
-      toast.error(zh.missingSentence);
+      notifyChunksMissingSentence();
       return;
     }
     if (savingManual) return;
@@ -1829,7 +1557,7 @@ export default function ChunksPage() {
           return;
         }
         if (result.emptySelection) {
-          toast.message(zh.selectAtLeastOne);
+          notifyChunksSelectAtLeastOne();
           return;
         }
         reviewSessionExpressions = result.reviewSessionExpressions;
@@ -1844,7 +1572,7 @@ export default function ChunksPage() {
         preferCache: false,
       });
       if (mode === "save_and_review" && manualItemType === "expression") {
-        toast.success(zh.saveReviewSuccess);
+        notifyChunksActionSucceeded(zh.saveReviewSuccess);
         startReviewSession({
           router,
           source: "expression-library-manual-add",
@@ -1852,9 +1580,9 @@ export default function ChunksPage() {
         });
       } else {
         if (manualItemType === "sentence") {
-          toast.success(zh.saveSentenceSuccess);
+          notifyChunksActionSucceeded(zh.saveSentenceSuccess);
         } else {
-          toast.success(
+          notifyChunksActionSucceeded(
             manualExpressionAssist ? zh.addSelectedSimilarSuccess : zh.saveSuccess,
           );
         }
@@ -1863,7 +1591,7 @@ export default function ChunksPage() {
       setAddSheetOpen(false);
       resetManualForm();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : zh.loadFailed);
+      notifyChunksLoadFailed(error instanceof Error ? error.message : null);
     } finally {
       setSavingManual(false);
     }
@@ -1912,6 +1640,33 @@ export default function ChunksPage() {
     ttsPlaybackText: ttsPlaybackState.text,
     detailSpeakText: focusDetailViewModel.detailSpeakText,
   });
+  const focusDetailSheetPresentation = buildChunksFocusDetailSheetPresentation({
+    focusDetail,
+    focusExpression,
+    focusAssistData,
+    savingFocusCandidateKeys,
+    focusAssistLoading,
+    savingQuickAddRelated,
+    regeneratingDetailAudio,
+    retryingEnrichmentIds,
+    movingIntoCluster,
+    ensuringMoveTargetCluster,
+    detachingClusterMember,
+    canSetCurrentClusterMain,
+    canMoveIntoCurrentCluster,
+    canSetStandaloneMain,
+    primaryActionLabel: focusDetail?.savedItem
+      ? getPrimaryActionLabel(focusDetail.savedItem)
+      : undefined,
+    appleButtonClassName,
+    focusDetailSheetState,
+    focusDetailViewModel,
+  });
+  const focusDetailInteractions = buildChunksFocusDetailInteractionPresentation({
+    focusRelationTab,
+    focusExpression,
+    defaultDifferenceLabel: "相关说法",
+  });
 
   const focusDetailSheetProps = {
     open: focusDetailOpen,
@@ -1920,45 +1675,7 @@ export default function ChunksPage() {
     detailLoading: focusDetailLoading,
     detailActionsOpen: focusDetailActionsOpen,
     detailConfirmAction,
-    trailLength: focusDetailSheetState.trailLength,
-    canShowSiblingNav: focusDetailSheetState.canShowSiblingNav,
-    canShowFindRelations: focusDetailSheetState.canShowFindRelations,
-    canShowManualAddRelated:
-      Boolean(focusDetail?.savedItem) &&
-      Boolean(focusExpression) &&
-      normalizePhraseText(focusDetail?.text ?? "") === normalizePhraseText(focusExpression?.text ?? ""),
-    canShowRegenerateAudio: Boolean(focusDetail),
-    canShowRetryEnrichment: Boolean(focusDetail?.savedItem),
-    canCompleteAssist:
-      Boolean(focusAssistData) &&
-      Boolean(focusDetail?.savedItem) &&
-      Boolean(focusExpression) &&
-      normalizePhraseText(focusDetail?.text ?? "") === normalizePhraseText(focusExpression?.text ?? ""),
-    completeAssistDisabled: savingFocusCandidateKeys.length > 0,
-    focusAssistLoading,
-    openingManualAddRelated: savingQuickAddRelated,
-    regeneratingAudio: regeneratingDetailAudio,
-    retryingEnrichment: Boolean(
-      focusDetail?.savedItem && retryingEnrichmentIds[focusDetail.savedItem.userPhraseId],
-    ),
-    movingIntoCluster,
-    ensuringMoveTargetCluster,
-    detachingClusterMember,
-    canSetCurrentClusterMain,
-    canMoveIntoCurrentCluster,
-    canSetStandaloneMain,
-    primaryActionLabel: focusDetail?.savedItem ? getPrimaryActionLabel(focusDetail.savedItem) : undefined,
-    appleButtonClassName,
-    activeAssistItem: focusDetailViewModel.activeAssistItem,
-    isDetailSpeaking: focusDetailSheetState.isDetailSpeaking,
-    detailSpeakText: focusDetailViewModel.detailSpeakText,
-    similarRows: focusDetailViewModel.similarRows,
-    contrastRows: focusDetailViewModel.contrastRows,
-    isSavedRelatedLoading: focusDetailViewModel.isSavedRelatedLoading,
-    usageHint: focusDetailViewModel.usageHint,
-    typicalScenario: focusDetailViewModel.typicalScenario,
-    semanticFocus: focusDetailViewModel.semanticFocus,
-    reviewHint: focusDetailViewModel.reviewHint,
+    ...focusDetailSheetPresentation,
     savingFocusCandidateKeys,
     completedFocusCandidateKeys,
     exampleCards: focusDetail
@@ -2036,49 +1753,36 @@ export default function ChunksPage() {
     },
     onSpeak: handlePronounceSentence,
     onTabChange: (nextTab: "info" | "similar" | "contrast") => {
-      const nextState = buildFocusDetailTabChangeState({
-        nextTab,
-        focusRelationTab,
-      });
+      const nextState = focusDetailInteractions.buildTabChangeAction(nextTab);
       setFocusDetailTab(nextState.nextTab);
       setFocusRelationTab(nextState.nextRelationTab);
     },
     onOpenSimilarRow: (row: FocusDetailRelatedItem) => {
-      const nextAction = buildFocusDetailOpenRowAction({
-        row,
-        kind: row.kind,
-      });
+      const nextAction = focusDetailInteractions.buildOpenSimilarRowAction(row);
       setFocusRelationTab(nextAction.nextRelationTab);
       void openFocusDetail(nextAction.detailInput);
     },
     onOpenContrastRow: (row: FocusDetailRelatedItem) => {
-      const nextAction = buildFocusDetailOpenRowAction({
-        row,
-        kind: "contrast",
-      });
+      const nextAction = focusDetailInteractions.buildOpenContrastRowAction(row);
       setFocusRelationTab(nextAction.nextRelationTab);
       void openFocusDetail(nextAction.detailInput);
     },
     onSaveSimilarRow: (row: FocusDetailRelatedItem) => {
-      if (!focusExpression || row.savedItem) return;
+      const nextAction = focusDetailInteractions.buildSaveSimilarRowAction(row);
+      if (!nextAction) return;
       void saveFocusCandidate(
-        focusExpression,
-        {
-          text: row.text,
-          differenceLabel: row.differenceLabel ?? "鐩稿叧璇存硶",
-        },
-        "similar",
+        nextAction.focusExpression,
+        nextAction.candidate,
+        nextAction.relationKind,
       );
     },
     onSaveContrastRow: (row: FocusDetailRelatedItem) => {
-      if (!focusExpression || row.savedItem) return;
+      const nextAction = focusDetailInteractions.buildSaveContrastRowAction(row);
+      if (!nextAction) return;
       void saveFocusCandidate(
-        focusExpression,
-        {
-          text: row.text,
-          differenceLabel: row.differenceLabel ?? "鐩稿叧璇存硶",
-        },
-        "contrast",
+        nextAction.focusExpression,
+        nextAction.candidate,
+        nextAction.relationKind,
       );
     },
     onCloseConfirm: () => setDetailConfirmAction(null),

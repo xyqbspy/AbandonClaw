@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test, { afterEach } from "node:test";
+import test, { afterEach, beforeEach } from "node:test";
 import { PracticeSet } from "@/lib/types/learning-flow";
 import {
   getLatestPracticeSet,
@@ -7,6 +7,24 @@ import {
   savePracticeSet,
   updatePracticeSetSession,
 } from "./scene-learning-flow-storage";
+
+const createLocalStorageMock = () => {
+  const store = new Map<string, string>();
+  return {
+    getItem(key: string) {
+      return store.has(key) ? store.get(key)! : null;
+    },
+    setItem(key: string, value: string) {
+      store.set(key, value);
+    },
+    removeItem(key: string) {
+      store.delete(key);
+    },
+    clear() {
+      store.clear();
+    },
+  };
+};
 
 const practiceSet: PracticeSet = {
   id: "practice-storage-1",
@@ -37,6 +55,15 @@ const practiceSet: PracticeSet = {
 
 afterEach(() => {
   window.localStorage.clear();
+});
+
+beforeEach(() => {
+  Object.defineProperty(globalThis, "window", {
+    configurable: true,
+    value: {
+      localStorage: createLocalStorageMock(),
+    },
+  });
 });
 
 test("scene learning flow storage 会持久化练习过程", () => {

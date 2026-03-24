@@ -296,6 +296,7 @@ const mockedModules = {
   },
   "@/lib/utils/learning-api": {
     completeSceneLearningFromApi: async () => currentLearningState,
+    getScenePracticeSnapshotFromApi: async () => null,
     pauseSceneLearningFromApi: async () => currentLearningState,
     startSceneLearningFromApi: async () => currentLearningState,
     updateSceneLearningProgressFromApi: async () => currentLearningState,
@@ -419,6 +420,9 @@ nodeModule.Module.prototype.require = function patchedRequire(
 
 let SceneDetailPageModule: React.ComponentType<{ initialLesson?: Lesson | null }> | null = null;
 
+const hasTextContent = (text: string) => (_content: string, element: Element | null) =>
+  Boolean(element?.textContent?.includes(text));
+
 function getSceneDetailPage() {
   if (!SceneDetailPageModule) {
     const pageModulePath = localRequire.resolve("./scene-detail-page");
@@ -495,10 +499,10 @@ test("SceneDetailPage 涓诲満鏅〉榛樿鍙樉绀哄浘鏍囧叆鍙�
   await revealTrainingPanel();
 
   screen.getByText("本轮训练");
-  screen.getByRole("button", { name: "先听这段" });
-  assert.equal(screen.queryByRole("button", { name: "先学习一个短语" }), null);
-  assert.equal(screen.queryByRole("button", { name: "完成场景" }), null);
-  assert.equal(screen.queryByRole("button", { name: "开始变体训练" }), null);
+  screen.getByText("当前步骤");
+  screen.getAllByText("听熟这段");
+  screen.getByText("训练步骤");
+  assert.equal(screen.queryByRole("button", { name: "去练变体" }), null);
 });
 
 test("SceneDetailPage 记录整段播放和打开表达后，会更新入口步骤文字", async () => {
@@ -550,7 +554,8 @@ test("SceneDetailPage 鏈疆瀹屾垚鍚庢墠鏄剧ず鍙樹綋鍏ュ彛", a
   await screen.findByTestId("scene-training-fab");
   assert.equal(screen.queryByRole("button", { name: "开始变体训练" }), null);
   await revealTrainingPanel();
-  screen.getByRole("button", { name: "去练变体" });
+  screen.getAllByText("解锁变体");
+  assert.ok(screen.getAllByText(hasTextContent("下一步：本轮训练已完成")).length >= 1);
 });
 
 test("SceneDetailPage 鍦?variants 瑙嗗浘鎵撳紑琛ㄨ揪鍦板浘鏃朵細鐢熸垚鏁版嵁骞惰烦鍒?expression-map 璺敱", async () => {

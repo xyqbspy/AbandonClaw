@@ -7,7 +7,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --import tsx --import ./src/test/setup-dom.ts --test src/**/*.test.ts src/**/*.test.tsx",
+    "test": "pnpm run test:unit",
+    "test:unit": "node --import tsx --test src/**/*.test.ts",
+    "test:interaction": "node --import tsx --import ./src/test/setup-dom.ts --test src/**/*.test.tsx",
+    "test:all": "pnpm run test:unit && pnpm run test:interaction",
     "phrases:infer-relations": "npx tsx scripts/infer-missing-phrase-relations.ts",
     "phrases:backfill-relation-families": "npx tsx scripts/backfill-phrase-relation-families.ts",
     "phrases:enrich-missing": "npx tsx scripts/enrich-missing-phrases.ts",
@@ -41,11 +44,18 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "aria-query": "5.3.2",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
-    "jsdom": "^29.0.1",
+    "jsdom": "^26.1.0",
+    "react-is": "^19.2.4",
     "tailwindcss": "^4",
     "tsx": "^4.21.0",
     "typescript": "^5"
+  },
+  "pnpm": {
+    "overrides": {
+      "aria-query": "5.3.2"
+    }
   }
 }

@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   buildFocusDetailClosePayload,
   buildFocusDetailOpenRowAction,
+  buildFocusDetailSaveRowAction,
   buildSavedFocusDetailState,
   buildFocusDetailSecondaryActionInput,
   buildClusterFilterChange,
@@ -399,6 +400,77 @@ test("buildFocusDetailSecondaryActionInput 会稳定生成保存候选参数", (
         savedItem: null,
         assistItem: null,
       },
+      defaultDifferenceLabel: "相关说法",
+    }),
+    {
+      focusExpression,
+      candidate: {
+        text: "keep going",
+        differenceLabel: "继续推进",
+      },
+      relationKind: "contrast",
+    },
+  );
+});
+
+test("buildFocusDetailSaveRowAction 会稳定生成保存 similar/contrast 的输入", () => {
+  const focusExpression = createPhrase({
+    userPhraseId: "main-1",
+    text: "call it a day",
+  });
+
+  assert.equal(
+    buildFocusDetailSaveRowAction({
+      focusExpression: null,
+      row: {
+        text: "wrap it up",
+      },
+      relationKind: "similar",
+      defaultDifferenceLabel: "相关说法",
+    }),
+    null,
+  );
+
+  assert.equal(
+    buildFocusDetailSaveRowAction({
+      focusExpression,
+      row: {
+        text: "wrap it up",
+        savedItem: { userPhraseId: "saved-1" },
+      },
+      relationKind: "similar",
+      defaultDifferenceLabel: "相关说法",
+    }),
+    null,
+  );
+
+  assert.deepEqual(
+    buildFocusDetailSaveRowAction({
+      focusExpression,
+      row: {
+        text: "wrap it up",
+      },
+      relationKind: "similar",
+      defaultDifferenceLabel: "相关说法",
+    }),
+    {
+      focusExpression,
+      candidate: {
+        text: "wrap it up",
+        differenceLabel: "相关说法",
+      },
+      relationKind: "similar",
+    },
+  );
+
+  assert.deepEqual(
+    buildFocusDetailSaveRowAction({
+      focusExpression,
+      row: {
+        text: "keep going",
+        differenceLabel: "继续推进",
+      },
+      relationKind: "contrast",
       defaultDifferenceLabel: "相关说法",
     }),
     {

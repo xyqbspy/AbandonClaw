@@ -13,6 +13,30 @@ afterEach(() => {
 const hasTextContent = (text: string) => (_content: string, element: Element | null) =>
   Boolean(element?.textContent?.includes(text));
 
+const fillCurrentAnswer = (value: string) => {
+  fireEvent.change(screen.getByPlaceholderText("输入你认为正确的表达"), {
+    target: { value },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "检查答案" }));
+};
+
+async function completeClozeModule() {
+  fillCurrentAnswer("call it a day");
+  fillCurrentAnswer("take it easy");
+  await waitFor(() => {
+    assert.ok(screen.getByText("当前题型已完成，继续进入“半句复现”。"));
+  });
+}
+
+async function completeAllModules() {
+  await completeClozeModule();
+  fireEvent.click(screen.getByRole("button", { name: /半句复现/ }));
+  fillCurrentAnswer("slow down a little tonight.");
+  await waitFor(() => {
+    assert.ok(screen.getByText("本轮练习总结"));
+  });
+}
+
 const practiceSet: PracticeSet = {
   id: "practice-1",
   sourceSceneId: "scene-1",
@@ -229,7 +253,7 @@ test("ScenePracticeView 支持填空题输入并判断正确", async () => {
   fireEvent.click(screen.getByRole("button", { name: "检查答案" }));
 
   await waitFor(() => {
-    assert.ok(screen.getAllByText(hasTextContent("答题进度：1/2")).length >= 1);
+    assert.ok(screen.getAllByText(hasTextContent("答题进度：1/3")).length >= 1);
     assert.ok(screen.getAllByText(hasTextContent("当前题目：2/2")).length >= 1);
     assert.ok(screen.getByText("You should ____ tonight."));
     assert.equal(
@@ -343,8 +367,8 @@ test("ScenePracticeView 在未全部答对前会禁用完成按钮", () => {
     />,
   );
 
-  assert.ok(screen.getAllByText(hasTextContent("答题进度：0/2")).length >= 1);
-  assert.ok(screen.getByText("请先完成并答对当前练习。"));
+  assert.ok(screen.getAllByText(hasTextContent("答题进度：0/3")).length >= 1);
+  assert.ok(screen.getByText("请先完成当前题型，并按顺序解锁后续练习。"));
   assert.equal(
     screen.getByRole("button", { name: sceneViewLabels.practice.complete }).hasAttribute("disabled"),
     true,
@@ -368,19 +392,11 @@ test("ScenePracticeView 全部答对后才解锁完成按钮", async () => {
     />,
   );
 
-  fireEvent.change(screen.getByPlaceholderText("输入你认为正确的表达"), {
-    target: { value: "call it a day" },
-  });
-  fireEvent.click(screen.getByRole("button", { name: "检查答案" }));
-
-  fireEvent.change(screen.getByPlaceholderText("输入你认为正确的表达"), {
-    target: { value: "take it easy" },
-  });
-  fireEvent.click(screen.getByRole("button", { name: "检查答案" }));
+  await completeAllModules();
 
   await waitFor(() => {
-    assert.ok(screen.getAllByText(hasTextContent("答题进度：2/2")).length >= 1);
-    assert.ok(screen.getAllByText(hasTextContent("已完成当前练习作答，可以标记完成。")).length >= 1);
+    assert.ok(screen.getAllByText(hasTextContent("答题进度：3/3")).length >= 1);
+    assert.ok(screen.getAllByText(hasTextContent("首发练习的所有题型都已完成，可以完成本轮练习。")).length >= 1);
     assert.equal(
       screen.getByRole("button", { name: sceneViewLabels.practice.complete }).hasAttribute("disabled"),
       false,
@@ -444,6 +460,7 @@ test("ScenePracticeView 会回填已保存的练习进度", () => {
         ...practiceSet,
         sessionState: {
           activeExerciseIndex: 1,
+          activeMode: "cloze",
           answerMap: {
             "exercise-1": "call it a day",
             "exercise-2": "take it easy",
@@ -479,7 +496,7 @@ test("ScenePracticeView 会回填已保存的练习进度", () => {
   assert.ok(screen.getAllByText(hasTextContent("当前题目：2/2")).length >= 1);
   assert.ok(screen.getByText("You should ____ tonight."));
   assert.ok(screen.getByDisplayValue("take it easy"));
-  assert.ok(screen.getAllByText(hasTextContent("答题进度：1/2")).length >= 1);
+  assert.ok(screen.getAllByText(hasTextContent("答题进度：1/3")).length >= 1);
   assert.ok(screen.getAllByText(hasTextContent("已提交次数：3")).length >= 1);
   assert.ok(screen.getAllByText(hasTextContent("错误次数：1")).length >= 1);
   assert.ok(screen.getByText("当前题已尝试：1 次"));
@@ -503,27 +520,18 @@ test("ScenePracticeView 全部完成后会显示练习总结和错题表达", as
     />,
   );
 
-  fireEvent.change(screen.getByPlaceholderText("输入你认为正确的表达"), {
-    target: { value: "wrong answer" },
-  });
-  fireEvent.click(screen.getByRole("button", { name: "检查答案" }));
-
-  fireEvent.change(screen.getByPlaceholderText("输入你认为正确的表达"), {
-    target: { value: "call it a day" },
-  });
-  fireEvent.click(screen.getByRole("button", { name: "检查答案" }));
-
-  fireEvent.change(screen.getByPlaceholderText("输入你认为正确的表达"), {
-    target: { value: "take it easy" },
-  });
-  fireEvent.click(screen.getByRole("button", { name: "检查答案" }));
+  fillCurrentAnswer("wrong answer");
+  fillCurrentAnswer("call it a day");
+  fillCurrentAnswer("take it easy");
+  fireEvent.click(screen.getByRole("button", { name: /半句复现/ }));
+  fillCurrentAnswer("slow down a little tonight.");
 
   await waitFor(() => {
-    assert.ok(screen.getByText("练习总结"));
+    assert.ok(screen.getByText("本轮练习总结"));
     assert.ok(screen.getAllByText(hasTextContent("答对题数")).length >= 1);
-    assert.ok(screen.getAllByText(hasTextContent("2/2")).length >= 1);
+    assert.ok(screen.getAllByText(hasTextContent("3/3")).length >= 1);
     assert.ok(screen.getAllByText(hasTextContent("总提交次数")).length >= 1);
-    assert.ok(screen.getAllByText(hasTextContent("3")).length >= 1);
+    assert.ok(screen.getAllByText(hasTextContent("4")).length >= 1);
     assert.ok(screen.getAllByText(hasTextContent("总错误次数")).length >= 1);
     assert.ok(screen.getAllByText(hasTextContent("1")).length >= 1);
     assert.ok(screen.getByText("本轮出错的表达"));
@@ -549,18 +557,10 @@ test("ScenePracticeView 无错题完成时会显示无错题总结", async () =>
     />,
   );
 
-  fireEvent.change(screen.getByPlaceholderText("输入你认为正确的表达"), {
-    target: { value: "call it a day" },
-  });
-  fireEvent.click(screen.getByRole("button", { name: "检查答案" }));
-
-  fireEvent.change(screen.getByPlaceholderText("输入你认为正确的表达"), {
-    target: { value: "take it easy" },
-  });
-  fireEvent.click(screen.getByRole("button", { name: "检查答案" }));
+  await completeAllModules();
 
   await waitFor(() => {
-    assert.ok(screen.getByText("练习总结"));
+    assert.ok(screen.getByText("本轮练习总结"));
     assert.ok(screen.getByText("本轮没有错题，做得很好。"));
     assert.ok(screen.getByText("这一轮已经比较稳了，可以继续去做变体训练。"));
     assert.ok(screen.getByRole("button", { name: "进入变体训练" }));
@@ -591,18 +591,11 @@ test("ScenePracticeView 总结区动作按钮会触发对应回调", async () =>
     />,
   );
 
-  fireEvent.change(screen.getByPlaceholderText("输入你认为正确的表达"), {
-    target: { value: "wrong answer" },
-  });
-  fireEvent.click(screen.getByRole("button", { name: "检查答案" }));
-  fireEvent.change(screen.getByPlaceholderText("输入你认为正确的表达"), {
-    target: { value: "call it a day" },
-  });
-  fireEvent.click(screen.getByRole("button", { name: "检查答案" }));
-  fireEvent.change(screen.getByPlaceholderText("输入你认为正确的表达"), {
-    target: { value: "take it easy" },
-  });
-  fireEvent.click(screen.getByRole("button", { name: "检查答案" }));
+  fillCurrentAnswer("wrong answer");
+  fillCurrentAnswer("call it a day");
+  fillCurrentAnswer("take it easy");
+  fireEvent.click(screen.getByRole("button", { name: /半句复现/ }));
+  fillCurrentAnswer("slow down a little tonight.");
 
   await waitFor(() => {
     assert.ok(screen.getByRole("button", { name: "回到场景复习" }));
@@ -633,14 +626,7 @@ test("ScenePracticeView 总结区动作按钮会触发对应回调", async () =>
     />,
   );
 
-  fireEvent.change(screen.getByPlaceholderText("输入你认为正确的表达"), {
-    target: { value: "call it a day" },
-  });
-  fireEvent.click(screen.getByRole("button", { name: "检查答案" }));
-  fireEvent.change(screen.getByPlaceholderText("输入你认为正确的表达"), {
-    target: { value: "take it easy" },
-  });
-  fireEvent.click(screen.getByRole("button", { name: "检查答案" }));
+  await completeAllModules();
 
   await waitFor(() => {
     assert.ok(screen.getByRole("button", { name: "进入变体训练" }));

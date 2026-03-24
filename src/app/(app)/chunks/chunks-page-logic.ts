@@ -321,6 +321,40 @@ export const buildFocusDetailSecondaryActionInput = ({
   };
 };
 
+export const buildFocusDetailSaveRowAction = ({
+  focusExpression,
+  row,
+  relationKind,
+  defaultDifferenceLabel,
+}: {
+  focusExpression: UserPhraseItemResponse | null;
+  row: {
+    text: string;
+    differenceLabel?: string | null;
+    savedItem?: unknown | null;
+  };
+  relationKind: "similar" | "contrast";
+  defaultDifferenceLabel: string;
+}): {
+  focusExpression: UserPhraseItemResponse;
+  candidate: {
+    text: string;
+    differenceLabel: string;
+  };
+  relationKind: "similar" | "contrast";
+} | null => {
+  if (!focusExpression || row.savedItem) return null;
+
+  return {
+    focusExpression,
+    candidate: {
+      text: row.text,
+      differenceLabel: row.differenceLabel ?? defaultDifferenceLabel,
+    },
+    relationKind,
+  };
+};
+
 export const buildSavedFocusDetailState = ({
   focusDetail,
   matchedSavedItem,

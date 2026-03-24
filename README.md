@@ -73,6 +73,24 @@ This creates:
   - fallback to GLM call
   - write back to DB
 
+## 5.1) Testing
+
+Run:
+
+```bash
+pnpm test
+pnpm run test:unit
+pnpm run test:interaction
+pnpm run test:all
+pnpm run build
+```
+
+Notes:
+- `pnpm test` defaults to unit tests only.
+- `*.test.ts` is for pure unit tests.
+- `*.test.tsx` is for DOM / interaction tests.
+- See [test.md](./test.md) for the project testing conventions.
+
 ## 6) Auth Flow
 
 - Middleware refreshes Supabase SSR session for:
