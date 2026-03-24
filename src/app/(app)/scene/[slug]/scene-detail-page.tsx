@@ -50,6 +50,7 @@ export default function SceneDetailClientPage({
   const searchParams = useSearchParams();
   const sceneSlug = params?.slug ?? "";
   const onRouteChangeRef = useRef<() => void>(() => undefined);
+  const [baseEncounteredChunkKeys, setBaseEncounteredChunkKeys] = useState<Set<string>>(new Set());
   const [viewResetVersion, setViewResetVersion] = useState(0);
   const {
     baseLesson,
@@ -91,8 +92,10 @@ export default function SceneDetailClientPage({
     expressionMapLoading,
     expressionMapError,
     expressionMap,
+    sceneCompleting,
     canGeneratePractice,
     handleGeneratePractice,
+    handleCompleteBaseScene,
     handleMarkPracticeComplete,
     handleMarkVariantSetComplete,
     handleOpenVariant,
@@ -139,8 +142,25 @@ export default function SceneDetailClientPage({
   onRouteChangeRef.current = () => {
     resetRouteScopedState();
     resetChunkDetailState();
+    setBaseEncounteredChunkKeys(new Set());
     setViewResetVersion((current) => current + 1);
   };
+
+  const handleBaseChunkEncounter = useCallback(
+    (payload: { lesson: Lesson; sentence: import("@/lib/types").LessonSentence; chunkText: string }) => {
+      if (payload.lesson.slug !== baseLesson?.slug) return;
+      const key = `${payload.lesson.slug}:${payload.sentence.id}:${payload.chunkText.trim().toLowerCase()}`;
+      setBaseEncounteredChunkKeys((prev) => {
+        if (prev.has(key)) return prev;
+        const next = new Set(prev);
+        next.add(key);
+        return next;
+      });
+    },
+    [baseLesson?.slug],
+  );
+
+  const canCompleteBaseScene = baseEncounteredChunkKeys.size > 0;
 
   const savePhraseForScene = useCallback(
     async (payload: SavePhrasePayload) => {
@@ -344,6 +364,14 @@ export default function SceneDetailClientPage({
       <button
         type="button"
         className={`${appleButtonLgClassName} px-3 py-1.5 disabled:opacity-60`}
+        onClick={handleCompleteBaseScene}
+        disabled={sceneCompleting || !canCompleteBaseScene}
+      >
+        {sceneCompleting ? "完成中..." : canCompleteBaseScene ? "完成场景" : "先学习一个短语"}
+      </button>
+      <button
+        type="button"
+        className={`${appleButtonLgClassName} px-3 py-1.5 disabled:opacity-60`}
         onClick={handlePracticeToolClick}
         disabled={practiceLoading}
       >
@@ -377,6 +405,7 @@ export default function SceneDetailClientPage({
       savedPhraseTexts={Array.from(savedPhraseTextSet)}
       onSavePhrase={savePhraseForScene}
       onReviewPhrase={savePhraseForScene}
+      onChunkEncounter={handleBaseChunkEncounter}
       chunkDetailSheet={chunkDetailSheet}
     />
   );

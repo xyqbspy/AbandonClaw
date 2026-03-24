@@ -122,9 +122,31 @@ const mockedModules = {
     useSearchParams: () => searchParamsMock,
   },
   "@/features/lesson/components/lesson-reader": {
-    LessonReader: ({ headerTools }: { headerTools?: React.ReactNode }) => (
+    LessonReader: ({
+      headerTools,
+      onChunkEncounter,
+    }: {
+      headerTools?: React.ReactNode;
+      onChunkEncounter?: (payload: {
+        lesson: Lesson;
+        sentence: { id: string; text: string };
+        chunkText: string;
+      }) => void;
+    }) => (
       <div>
         <div>lesson-reader</div>
+        <button
+          type="button"
+          onClick={() =>
+            onChunkEncounter?.({
+              lesson: baseLesson,
+              sentence: { id: "sentence-1", text: "Sentence" },
+              chunkText: "call it a day",
+            })
+          }
+        >
+          encounter-chunk
+        </button>
         {headerTools}
       </div>
     ),
@@ -418,6 +440,29 @@ test("SceneDetailPage 切回 scene 后会清空表达地图缓存并在下次重
   await screen.findByText("variants-view");
   fireEvent.click(screen.getByRole("button", { name: "open-map" }));
   await waitFor(() => {
-    assert.equal(ensureExpressionMapCalls.length, 2);
+  assert.equal(ensureExpressionMapCalls.length, 2);
+});
+
+test("SceneDetailPage 主场景完成按钮会在学过 chunk 后解锁", async () => {
+  currentSearchParams = new URLSearchParams();
+  currentGeneratedState = {
+    latestPracticeSet: null,
+    latestVariantSet: null,
+    practiceStatus: "idle",
+    variantStatus: "idle",
+  };
+
+  const SceneDetailPage = getSceneDetailPage();
+  render(<SceneDetailPage initialLesson={baseLesson} />);
+
+  const completeButton = await screen.findByRole("button", { name: "先学习一个短语" });
+  assert.equal(completeButton.hasAttribute("disabled"), true);
+
+  fireEvent.click(screen.getByRole("button", { name: "encounter-chunk" }));
+
+  await waitFor(() => {
+    const unlockedButton = screen.getByRole("button", { name: "完成场景" });
+    assert.equal(unlockedButton.hasAttribute("disabled"), false);
   });
+});
 });

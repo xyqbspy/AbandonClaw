@@ -1,6 +1,6 @@
 ﻿import { useState } from "react";
 import { Languages } from "lucide-react";
-import { LessonSentence, SelectionChunkLayer } from "@/lib/types";
+import { LessonBlock, LessonSentence, SelectionChunkLayer } from "@/lib/types";
 import { TtsActionButton } from "@/components/audio/tts-action-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -40,8 +40,8 @@ const appleButtonClassName = `${APPLE_BUTTON_BASE} ${APPLE_BUTTON_TEXT_SM}`;
 const hasChinese = (value?: string) => /[\u4e00-\u9fff]/.test((value ?? "").trim());
 
 export function SelectionDetailPanel({
+  currentBlock,
   currentSentence,
-  blockSentences = [],
   chunkDetail,
   relatedChunks,
   loading,
@@ -51,6 +51,7 @@ export function SelectionDetailPanel({
   onReview,
   saved = false,
   onPronounce,
+  onPronounceBlock,
   onSelectRelated,
   hoveredChunkKey,
   onHoverChunk,
@@ -58,10 +59,9 @@ export function SelectionDetailPanel({
   loadingChunkKey,
   showSpeaker: _showSpeaker = true,
   sentenceSectionLabel = "当前句子",
-  onSelectSentence,
 }: {
+  currentBlock?: LessonBlock | null;
   currentSentence: LessonSentence | null;
-  blockSentences?: LessonSentence[];
   chunkDetail: SelectionChunkLayer | null;
   relatedChunks: string[];
   loading: boolean;
@@ -71,6 +71,7 @@ export function SelectionDetailPanel({
   onReview: () => void;
   saved?: boolean;
   onPronounce: (text: string) => void;
+  onPronounceBlock: () => void;
   onSelectRelated: (chunk: string) => void;
   hoveredChunkKey: string | null;
   onHoverChunk: (chunkKey: string | null) => void;
@@ -78,11 +79,27 @@ export function SelectionDetailPanel({
   loadingChunkKey?: string | null;
   showSpeaker?: boolean;
   sentenceSectionLabel?: string;
-  onSelectSentence?: (sentenceId: string) => void;
 }) {
   const [exampleTranslationOpenMap, setExampleTranslationOpenMap] = useState<Record<string, boolean>>({});
   const panelSurfaceClassName = "overflow-hidden border-0 bg-white shadow-none";
   void _showSpeaker;
+  const blockText = currentBlock?.sentences.map((sentence) => sentence.text).join(" ");
+  const blockTranslation =
+    currentBlock?.translation?.trim() ||
+    currentBlock?.sentences
+      .map((sentence) => sentence.translation?.trim())
+      .filter(Boolean)
+      .join(" ");
+  const blockSpeakText =
+    currentBlock?.tts?.trim() ||
+    currentBlock?.sentences
+      .map((sentence) => sentence.tts?.trim() || sentence.audioText?.trim() || sentence.text)
+      .filter(Boolean)
+      .join(" ") ||
+    currentSentence?.tts?.trim() ||
+    currentSentence?.audioText?.trim() ||
+    currentSentence?.text ||
+    "";
 
   return (
     <div className="sticky top-20 hidden space-y-4 lg:block">
@@ -106,35 +123,19 @@ export function SelectionDetailPanel({
                 LESSON_DETAIL_BLOCK_BG_CLASS,
               )}
             >
-              {highlightSelected(currentSentence.text, chunkDetail?.text)}
+              {currentBlock && currentBlock.sentences.length > 1
+                ? blockText
+                : highlightSelected(currentSentence.text, chunkDetail?.text)}
             </div>
             <div className={cn("rounded-lg px-0 py-2", LESSON_DETAIL_BLOCK_BG_CLASS)}>
-              <p className="text-xs tracking-[0.08em] text-muted-foreground">整句翻译</p>
-              <p className="mt-1 text-sm">{currentSentence.translation}</p>
+              <p className="text-xs tracking-[0.08em] text-muted-foreground">
+                {currentBlock && currentBlock.sentences.length > 1 ? "整段翻译" : "整句翻译"}
+              </p>
+              <p className="mt-1 text-sm">{blockTranslation || currentSentence.translation}</p>
             </div>
-            {blockSentences.length > 1 ? (
-              <div className="mt-1 flex flex-wrap gap-2">
-                {blockSentences.map((sentence, index) => {
-                  const active = sentence.id === currentSentence.id;
-                  return (
-                    <button
-                      key={sentence.id}
-                      type="button"
-                      className={cn(
-                        LESSON_CHIP_BASE_CLASS,
-                        active ? LESSON_CHIP_ACTIVE_CLASS : LESSON_CHIP_INACTIVE_CLASS,
-                      )}
-                      onClick={() => onSelectSentence?.(sentence.id)}
-                    >
-                      {`句子${index + 1}`}
-                    </button>
-                  );
-                })}
-              </div>
-            ) : null}
             <TtsActionButton
-              active={speakingText === currentSentence.text}
-              loading={loadingText === currentSentence.text}
+              active={speakingText === blockSpeakText}
+              loading={loadingText === blockSpeakText}
               size="sm"
               variant="ghost"
               className={cn(
@@ -142,7 +143,7 @@ export function SelectionDetailPanel({
                 appleButtonClassName,
               )}
               iconClassName="size-4"
-              onClick={() => onPronounce(currentSentence.text)}
+              onClick={onPronounceBlock}
             />
           </CardContent>
         ) : (
@@ -212,13 +213,25 @@ export function SelectionDetailPanel({
                 <div>
                   <p className="text-xs tracking-[0.08em] text-muted-foreground">已选短语</p>
                   {isLongChunk(chunkDetail.text) ? (
-                    <div className={cn("mt-1 rounded-lg px-3 py-2 text-sm leading-6 break-words", LESSON_DETAIL_BLOCK_BG_CLASS)}>
+                    <div
+                      className={cn(
+                        "mt-1 inline-flex max-w-full rounded-2xl px-3 py-2 text-sm leading-6 break-words",
+                        LESSON_CHIP_BASE_CLASS,
+                        LESSON_CHIP_ACTIVE_CLASS,
+                      )}
+                    >
                       {chunkDetail.text}
                     </div>
                   ) : (
-                    <div className="mt-1 flex items-center gap-2">
-                      <Badge>{chunkDetail.text}</Badge>
-                    </div>
+                    <span
+                      className={cn(
+                        "mt-1 inline-flex items-center",
+                        LESSON_CHIP_BASE_CLASS,
+                        LESSON_CHIP_ACTIVE_CLASS,
+                      )}
+                    >
+                      {chunkDetail.text}
+                    </span>
                   )}
                 </div>
 

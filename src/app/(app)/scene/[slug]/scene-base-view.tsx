@@ -21,6 +21,7 @@ export function SceneBaseView({
   savedPhraseTexts,
   onSavePhrase,
   onReviewPhrase,
+  onChunkEncounter,
   chunkDetailSheet,
 }: {
   lesson: Lesson;
@@ -30,6 +31,11 @@ export function SceneBaseView({
   savedPhraseTexts: string[];
   onSavePhrase: (payload: SavePhrasePayload) => Promise<{ created: boolean }>;
   onReviewPhrase: (payload: SavePhrasePayload) => Promise<{ created: boolean }>;
+  onChunkEncounter?: (payload: {
+    lesson: Lesson;
+    sentence: import("@/lib/types").LessonSentence;
+    chunkText: string;
+  }) => void;
   chunkDetailSheet: ReactNode;
 }) {
   return (
@@ -43,6 +49,7 @@ export function SceneBaseView({
         savedPhraseTexts={savedPhraseTexts}
         onSavePhrase={onSavePhrase}
         onReviewPhrase={onReviewPhrase}
+        onChunkEncounter={onChunkEncounter}
       />
       {chunkDetailSheet}
     </div>

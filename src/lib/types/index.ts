@@ -114,6 +114,8 @@ export interface DailyTask {
   durationMinutes: number;
   done: boolean;
   actionHref: string;
+  status?: "up_next" | "available" | "locked" | "done";
+  actionLabel?: string;
 }
 
 export interface ReviewItem {

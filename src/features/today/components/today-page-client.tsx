@@ -197,6 +197,7 @@ export function TodayPageClient({ displayName }: { displayName: string }) {
       <TodayTaskList
         tasks={dailyTasks}
         onStartTask={(task) => {
+          if (task.status === "locked") return;
           if (task.id === "task-review") {
             startReviewSession({ router, source: "today-task" });
             return;

@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { Languages } from "lucide-react";
 import { TtsActionButton } from "@/components/audio/tts-action-button";
-import { LessonSentence, SelectionChunkLayer } from "@/lib/types";
+import { LessonBlock, LessonSentence, SelectionChunkLayer } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -26,8 +26,8 @@ const appleButtonClassName = `${APPLE_BUTTON_BASE} ${APPLE_BUTTON_TEXT_SM}`;
 const hasChinese = (value?: string) => /[\u4e00-\u9fff]/.test((value ?? "").trim());
 
 export function SelectionDetailSheet({
+  currentBlock,
   currentSentence,
-  blockSentences = [],
   chunkDetail,
   relatedChunks,
   open,
@@ -39,7 +39,7 @@ export function SelectionDetailSheet({
   onReview,
   saved = false,
   onPronounce,
-  onLoopSentence,
+  onPronounceBlock,
   onSelectRelated,
   hoveredChunkKey,
   onHoverChunk,
@@ -48,10 +48,9 @@ export function SelectionDetailSheet({
   showSentenceSection = true,
   showSpeaker = true,
   sentenceSectionLabel = "当前句子",
-  onSelectSentence,
 }: {
+  currentBlock?: LessonBlock | null;
   currentSentence: LessonSentence | null;
-  blockSentences?: LessonSentence[];
   chunkDetail: SelectionChunkLayer | null;
   relatedChunks: string[];
   open: boolean;
@@ -63,7 +62,7 @@ export function SelectionDetailSheet({
   onReview: () => void;
   saved?: boolean;
   onPronounce: (text: string) => void;
-  onLoopSentence: (text: string) => void;
+  onPronounceBlock: () => void;
   onSelectRelated: (chunk: string) => void;
   hoveredChunkKey: string | null;
   onHoverChunk: (chunkKey: string | null) => void;
@@ -72,7 +71,6 @@ export function SelectionDetailSheet({
   showSentenceSection?: boolean;
   showSpeaker?: boolean;
   sentenceSectionLabel?: string;
-  onSelectSentence?: (sentenceId: string) => void;
 }) {
   const [showSentenceTranslation, setShowSentenceTranslation] = useState(false);
   const [exampleTranslationOpenMap, setExampleTranslationOpenMap] = useState<Record<string, boolean>>({});
@@ -81,6 +79,23 @@ export function SelectionDetailSheet({
     () => (hasChunk ? "短语解析" : "点击下方短语查看解析与例句"),
     [hasChunk],
   );
+  const blockText = currentBlock?.sentences.map((sentence) => sentence.text).join(" ");
+  const blockTranslation =
+    currentBlock?.translation?.trim() ||
+    currentBlock?.sentences
+      .map((sentence) => sentence.translation?.trim())
+      .filter(Boolean)
+      .join(" ");
+  const blockSpeakText =
+    currentBlock?.tts?.trim() ||
+    currentBlock?.sentences
+      .map((sentence) => sentence.tts?.trim() || sentence.audioText?.trim() || sentence.text)
+      .filter(Boolean)
+      .join(" ") ||
+    currentSentence?.tts?.trim() ||
+    currentSentence?.audioText?.trim() ||
+    currentSentence?.text ||
+    "";
 
   const toggleExampleTranslation = useCallback((example: string) => {
     setExampleTranslationOpenMap((prev) => ({
@@ -138,12 +153,12 @@ export function SelectionDetailSheet({
                         {showSentenceTranslation ? "收起" : "翻译"}
                       </button>
                       <TtsActionButton
-                        active={speakingText === currentSentence.text}
-                        loading={loadingText === currentSentence.text}
+                        active={speakingText === blockSpeakText}
+                        loading={loadingText === blockSpeakText}
                         variant="ghost"
                         size="sm"
                         className="h-auto px-0 text-xs text-muted-foreground hover:text-foreground"
-                        onClick={() => onLoopSentence(currentSentence.text)}
+                        onClick={onPronounceBlock}
                       />
                     </div>
                   ) : null}
@@ -151,7 +166,9 @@ export function SelectionDetailSheet({
                 {currentSentence ? (
                   <>
                     <div className={cn("mt-1 rounded-lg px-0 py-2", LESSON_DETAIL_BLOCK_BG_CLASS)}>
-                      <p className="text-sm leading-7 break-words">{currentSentence.text}</p>
+                      <p className="text-sm leading-7 break-words">
+                        {currentBlock && currentBlock.sentences.length > 1 ? blockText : currentSentence.text}
+                      </p>
                     </div>
                     <div
                       className={cn(
@@ -161,28 +178,10 @@ export function SelectionDetailSheet({
                           : "mt-0.5 grid-rows-[0fr] opacity-0",
                       )}
                     >
-                      <p className={cn("min-h-0 rounded-lg px-0 py-2 text-sm leading-6", LESSON_DETAIL_BLOCK_BG_CLASS)}>{currentSentence.translation}</p>
+                      <p className={cn("min-h-0 rounded-lg px-0 py-2 text-sm leading-6", LESSON_DETAIL_BLOCK_BG_CLASS)}>
+                        {blockTranslation || currentSentence.translation}
+                      </p>
                     </div>
-                    {blockSentences.length > 1 ? (
-                      <div className="mt-1 flex flex-wrap gap-2">
-                        {blockSentences.map((sentence, index) => {
-                          const active = sentence.id === currentSentence.id;
-                          return (
-                            <button
-                              key={sentence.id}
-                              type="button"
-                              className={cn(
-                                LESSON_CHIP_BASE_CLASS,
-                                active ? LESSON_CHIP_ACTIVE_CLASS : LESSON_CHIP_INACTIVE_CLASS,
-                              )}
-                              onClick={() => onSelectSentence?.(sentence.id)}
-                            >
-                              {`句子${index + 1}`}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    ) : null}
 
                     <div className="mt-3 space-y-2">
                       <p className="text-xs tracking-[0.08em] text-muted-foreground">
@@ -245,11 +244,25 @@ export function SelectionDetailSheet({
                 {chunkDetail ? (
                   <div key={`mobile-chunk-${chunkDetail.text}`} className="space-y-3 animate-in fade-in-0 slide-in-from-bottom-1 duration-200">
                     {isLongChunk(chunkDetail.text) ? (
-                      <p className={cn("rounded-lg px-3 py-2 text-sm leading-6 break-words", LESSON_DETAIL_BLOCK_BG_CLASS)}>
+                      <p
+                        className={cn(
+                          "inline-flex max-w-full rounded-2xl px-3 py-2 text-sm leading-6 break-words",
+                          LESSON_CHIP_BASE_CLASS,
+                          LESSON_CHIP_ACTIVE_CLASS,
+                        )}
+                      >
                         {chunkDetail.text}
                       </p>
                     ) : (
-                      <Badge>{chunkDetail.text}</Badge>
+                      <span
+                        className={cn(
+                          "inline-flex items-center",
+                          LESSON_CHIP_BASE_CLASS,
+                          LESSON_CHIP_ACTIVE_CLASS,
+                        )}
+                      >
+                        {chunkDetail.text}
+                      </span>
                     )}
                     <div>
                       <p className="text-xs tracking-[0.08em] text-muted-foreground">中文释义</p>

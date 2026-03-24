@@ -201,6 +201,31 @@ test("useSceneDetailActions 会生成 practice 并切到 practice 视图", async
   assert.equal(result.current.practiceLoading, false);
 });
 
+test("useSceneDetailActions 会支持主场景直接完成学习", async () => {
+  const useSceneDetailActions = getUseSceneDetailActions();
+
+  const { result } = renderHook(() =>
+    useSceneDetailActions({
+      baseLesson: lesson,
+      latestPracticeSet: null,
+      latestVariantSet: null,
+      activeVariantId: null,
+      setActiveVariantId: (variantId) => activeVariantCalls.push(variantId),
+      setViewModeWithRoute: (viewMode, variantId) => viewModeCalls.push({ viewMode, variantId }),
+      refreshGeneratedState: (sceneKey) => refreshCalls.push(sceneKey),
+    }),
+  );
+
+  await act(async () => {
+    result.current.handleCompleteBaseScene();
+  });
+
+  await waitFor(() => {
+    assert.deepEqual(completeCalls, ["scene-1"]);
+    assert.equal(result.current.sceneCompleting, false);
+  });
+});
+
 test("useSceneDetailActions 删除当前激活变体后会清空激活项并回退 variants", () => {
   const useSceneDetailActions = getUseSceneDetailActions();
   window.confirm = () => currentConfirmResult;

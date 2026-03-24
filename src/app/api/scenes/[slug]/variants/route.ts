@@ -102,7 +102,7 @@ export async function POST(
           sceneId,
           sceneSlug: scene.row.slug,
           chunks: sourceChunks,
-          interactionType: "practice",
+          interactionType: "encounter",
         });
       } catch (trackError) {
         console.warn("[user-chunks] variant tracking failed", trackError);

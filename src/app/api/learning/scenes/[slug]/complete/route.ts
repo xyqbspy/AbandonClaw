@@ -42,7 +42,7 @@ export async function POST(
           sceneId: result.scene.id,
           sceneSlug: result.scene.slug,
           chunks: chunkTexts,
-          interactionType: "practice",
+          interactionType: "encounter",
         });
       } catch (trackError) {
         console.warn("[user-chunks] complete-scene tracking failed", trackError);

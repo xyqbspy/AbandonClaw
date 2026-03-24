@@ -74,8 +74,8 @@ const normalizeBlock = (block: ParsedSceneBlock, index: number, fallbackType: Sc
   if (!Array.isArray(block.sentences)) {
     throw new Error(`Invalid scene structure: block(${block.id || index + 1}) missing sentences[]`);
   }
-  if (block.sentences.length > 2) {
-    throw new Error(`Invalid scene structure: block(${block.id || index + 1}) has more than 2 sentences.`);
+  if (block.sentences.length === 0) {
+    throw new Error(`Invalid scene structure: block(${block.id || index + 1}) must include at least 1 sentence.`);
   }
   const blockType = block.type || fallbackType;
   if (blockType === "dialogue" && (!block.speaker || !String(block.speaker).trim())) {

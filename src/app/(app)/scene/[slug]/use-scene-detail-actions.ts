@@ -46,6 +46,7 @@ export function useSceneDetailActions({
 }: UseSceneDetailActionsArgs) {
   const [practiceLoading, setPracticeLoading] = useState(false);
   const [variantsLoading, setVariantsLoading] = useState(false);
+  const [sceneCompleting, setSceneCompleting] = useState(false);
   const [practiceError, setPracticeError] = useState<string | null>(null);
   const [variantsError, setVariantsError] = useState<string | null>(null);
   const [showAnswerMap, setShowAnswerMap] = useState<Record<string, boolean>>({});
@@ -130,19 +131,41 @@ export function useSceneDetailActions({
     if (!baseLesson || !latestPracticeSet) return;
     markPracticeSetCompleted(baseLesson.id, latestPracticeSet.id);
     refreshGeneratedState(baseLesson.id);
-    void completeSceneLearningFromApi(baseLesson.slug).catch(() => {
-      // Non-blocking.
-    });
+    setSceneCompleting(true);
+    void completeSceneLearningFromApi(baseLesson.slug)
+      .catch(() => {
+        // Non-blocking.
+      })
+      .finally(() => {
+        setSceneCompleting(false);
+      });
   }, [baseLesson, latestPracticeSet, refreshGeneratedState]);
 
   const handleMarkVariantSetComplete = useCallback(() => {
     if (!baseLesson || !latestVariantSet) return;
     markVariantSetCompleted(baseLesson.id, latestVariantSet.id);
     refreshGeneratedState(baseLesson.id);
-    void completeSceneLearningFromApi(baseLesson.slug).catch(() => {
-      // Non-blocking.
-    });
+    setSceneCompleting(true);
+    void completeSceneLearningFromApi(baseLesson.slug)
+      .catch(() => {
+        // Non-blocking.
+      })
+      .finally(() => {
+        setSceneCompleting(false);
+      });
   }, [baseLesson, latestVariantSet, refreshGeneratedState]);
+
+  const handleCompleteBaseScene = useCallback(() => {
+    if (!baseLesson || sceneCompleting) return;
+    setSceneCompleting(true);
+    void completeSceneLearningFromApi(baseLesson.slug)
+      .catch(() => {
+        // Non-blocking.
+      })
+      .finally(() => {
+        setSceneCompleting(false);
+      });
+  }, [baseLesson, sceneCompleting]);
 
   const handleOpenVariant = useCallback(
     (variantId: string) => {
@@ -277,6 +300,7 @@ export function useSceneDetailActions({
       expressionMapLoading,
       expressionMapError,
       expressionMap,
+      sceneCompleting,
       canGeneratePractice,
       canGenerateVariants,
     }),
@@ -289,6 +313,7 @@ export function useSceneDetailActions({
       expressionMapLoading,
       expressionMapError,
       expressionMap,
+      sceneCompleting,
       canGeneratePractice,
       canGenerateVariants,
     ],
@@ -300,6 +325,7 @@ export function useSceneDetailActions({
     resetRouteScopedState,
     handleGeneratePractice,
     handleGenerateVariants,
+    handleCompleteBaseScene,
     handleMarkPracticeComplete,
     handleMarkVariantSetComplete,
     handleOpenVariant,

@@ -91,17 +91,21 @@ test("buildTodayTasks 会生成稳定的三类任务", () => {
     continueLearning,
     labels: {
       taskSceneTitle: "完成一个场景学习",
-      taskSceneDesc: "选择一个场景并开始学习。",
+      taskSceneDesc: "选择一个场景开始学习，读完主场景后可直接完成。",
       taskReviewTitle: "进行一次短时复习",
-      taskOutputTitle: "输出练习",
+      taskOutputTitle: "沉淀表达",
     },
   });
 
   assert.equal(tasks.length, 3);
   assert.equal(tasks[0].actionHref, "/scene/coffee-chat");
+  assert.equal(tasks[0].status, "up_next");
+  assert.equal(tasks[1].status, "done");
+  assert.equal(tasks[2].status, "locked");
   assert.match(tasks[0].description, /Coffee Chat/);
-  assert.match(tasks[1].description, /当前待复习 6 条/);
-  assert.match(tasks[2].description, /今日已累计保存 4 条表达/);
+  assert.match(tasks[0].description, /完成本轮场景学习/);
+  assert.match(tasks[1].description, /先完成一个场景学习/);
+  assert.match(tasks[2].description, /先完成今天的场景输入/);
 });
 
 test("getRecommendedScenes 会按顺序截取推荐场景", () => {

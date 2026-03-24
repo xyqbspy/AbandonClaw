@@ -19,7 +19,7 @@ import { normalizePhraseText } from "@/lib/shared/phrases";
 import { ParsedScene } from "@/lib/types/scene-parser";
 import { normalizeParsedSceneDialogue } from "@/lib/shared/scene-dialogue";
 
-const SCENE_GENERATE_PROMPT_VERSION = "scene-generate-v1";
+const SCENE_GENERATE_PROMPT_VERSION = "scene-generate-v2-turn-first";
 const DEFAULT_SENTENCE_COUNT = 10;
 const MAX_RELATED_VARIANTS = 2;
 
@@ -29,18 +29,24 @@ interface RelatedChunkVariant {
   knownChunkText: string | null;
 }
 
-interface GeneratedSceneDraftLine {
-  speaker: "A" | "B";
+interface GeneratedSceneDraftSentence {
   text: string;
   translation: string;
   tts?: string;
+}
+
+interface GeneratedSceneDraftTurn {
+  speaker: string;
+  translation?: string;
+  tts?: string;
+  sentences: GeneratedSceneDraftSentence[];
 }
 
 interface GeneratedSceneDraft {
   version: "v1";
   title: string;
   theme?: string;
-  dialogue: GeneratedSceneDraftLine[];
+  turns: GeneratedSceneDraftTurn[];
 }
 
 export interface GeneratePersonalizedSceneInput {
@@ -60,14 +66,16 @@ const toOptionalTrimmed = (value: unknown, maxLength: number) => {
   if (!trimmed) return undefined;
   return trimmed.slice(0, maxLength);
 };
+
 const hasChinese = (value: string) => /[\u4e00-\u9fff]/.test(value);
+
 const normalizeGeneratedSceneTitle = (title: string | undefined, promptText: string) => {
   const baseTitle = toOptionalTrimmed(title, 90) ?? "Daily Conversation";
   if (hasChinese(baseTitle)) return baseTitle;
 
   const promptFirstLine = promptText.split(/\r?\n/)[0]?.trim() ?? "";
   const zhHint = hasChinese(promptFirstLine)
-    ? promptFirstLine.replace(/[。！？!?]+$/g, "").slice(0, 16)
+    ? promptFirstLine.replace(/[。！？?]+$/g, "").slice(0, 16)
     : "场景练习";
   return `${baseTitle}（${zhHint || "场景练习"}）`;
 };
@@ -112,11 +120,10 @@ const sceneTextContainsExpression = (sceneText: string, expressionText: string) 
   return normalizedScene.includes(normalizedExpression);
 };
 
-const isDraftLine = (value: unknown): value is GeneratedSceneDraftLine => {
+const isDraftSentence = (value: unknown): value is GeneratedSceneDraftSentence => {
   if (!value || typeof value !== "object") return false;
   const row = value as Record<string, unknown>;
   return (
-    (row.speaker === "A" || row.speaker === "B") &&
     typeof row.text === "string" &&
     row.text.trim().length > 0 &&
     typeof row.translation === "string" &&
@@ -124,64 +131,93 @@ const isDraftLine = (value: unknown): value is GeneratedSceneDraftLine => {
   );
 };
 
+const isDraftTurn = (value: unknown): value is GeneratedSceneDraftTurn => {
+  if (!value || typeof value !== "object") return false;
+  const row = value as Record<string, unknown>;
+  if (typeof row.speaker !== "string" || !row.speaker.trim()) return false;
+  if (!Array.isArray(row.sentences)) return false;
+  if (row.sentences.length === 0 || row.sentences.length > 3) return false;
+  return row.sentences.every(isDraftSentence);
+};
+
 const isGeneratedSceneDraft = (value: unknown): value is GeneratedSceneDraft => {
   if (!value || typeof value !== "object") return false;
   const row = value as Record<string, unknown>;
   if (row.version !== "v1") return false;
   if (typeof row.title !== "string" || !row.title.trim()) return false;
-  if (!Array.isArray(row.dialogue)) return false;
-  if (row.dialogue.length < 6 || row.dialogue.length > 14) return false;
-  return row.dialogue.every(isDraftLine);
+  if (!Array.isArray(row.turns) || row.turns.length === 0) return false;
+  if (!row.turns.every(isDraftTurn)) return false;
+  const sentenceCount = row.turns.reduce(
+    (sum, turn) => sum + turn.sentences.length,
+    0,
+  );
+  return sentenceCount >= 6 && sentenceCount <= 14;
 };
 
 const toDraftSourceText = (draft: GeneratedSceneDraft) =>
-  draft.dialogue
-    .map((line) => {
-      const text = line.text.trim();
-      return `${line.speaker}: ${text}`;
-    })
+  draft.turns
+    .flatMap((turn) =>
+      turn.sentences.map((sentence) => `${turn.speaker.trim().toUpperCase()}: ${sentence.text.trim()}`),
+    )
     .join("\n");
 
-const mergeDraftDialogueIntoParsedScene = (
+export const mergeDraftDialogueIntoParsedScene = (
   parsedScene: ParsedScene,
   draft: GeneratedSceneDraft | null,
 ) => {
   const normalized = normalizeParsedSceneDialogue(parsedScene);
   if (!draft) return normalized;
 
-  let draftCursor = 0;
-  const nextSections = normalized.sections.map((section) => ({
-    ...section,
-    blocks: section.blocks.map((block) => {
-      const firstSentence = block.sentences[0];
-      const draftLine = draft.dialogue[draftCursor];
-      draftCursor += block.sentences.length;
-      if (!draftLine || !firstSentence) return block;
-      const nextFirstSentence = {
-        ...firstSentence,
-        text: draftLine.text.trim() || firstSentence.text,
-        translation: draftLine.translation.trim() || firstSentence.translation,
-        tts: (draftLine.tts?.trim() || draftLine.text || firstSentence.text).trim(),
-      };
+  const parsedSentences = normalized.sections
+    .flatMap((section) => section.blocks)
+    .flatMap((block) => block.sentences);
+
+  let sentenceCursor = 0;
+  const nextBlocks = draft.turns.map((turn, turnIndex) => {
+    const sentences = turn.sentences.map((draftSentence, sentenceIndex) => {
+      const parsedSentence = parsedSentences[sentenceCursor];
+      sentenceCursor += 1;
       return {
-        ...block,
-        type: "dialogue" as const,
-        speaker: draftLine.speaker,
-        translation: nextFirstSentence.translation,
-        tts: nextFirstSentence.tts,
-        sentences: [
-          nextFirstSentence,
-          ...block.sentences.slice(1),
-        ],
+        id: parsedSentence?.id || `sentence-${turnIndex + 1}-${sentenceIndex + 1}`,
+        text: draftSentence.text.trim(),
+        translation: draftSentence.translation.trim(),
+        tts: (draftSentence.tts?.trim() || draftSentence.text).trim(),
+        chunks: parsedSentence?.chunks ?? [],
       };
-    }),
-  }));
+    });
+
+    return {
+      id: `block-${turnIndex + 1}`,
+      type: "dialogue" as const,
+      speaker: turn.speaker.trim().toUpperCase(),
+      translation:
+        turn.translation?.trim() ||
+        sentences
+          .map((sentence) => sentence.translation.trim())
+          .filter(Boolean)
+          .join(" "),
+      tts:
+        turn.tts?.trim() ||
+        sentences
+          .map((sentence) => sentence.tts?.trim() || sentence.text)
+          .filter(Boolean)
+          .join(" "),
+      sentences,
+    };
+  });
 
   return normalizeParsedSceneDialogue({
     ...normalized,
     type: "dialogue",
     title: draft.title.trim() || normalized.title,
-    sections: nextSections,
+    sections: [
+      {
+        id: normalized.sections[0]?.id || "section-1",
+        title: normalized.sections[0]?.title,
+        summary: normalized.sections[0]?.summary,
+        blocks: nextBlocks,
+      },
+    ],
   });
 };
 
@@ -201,6 +237,9 @@ const getPromptFromCache = (cacheOutput: unknown) => {
       typeof row.generatedTheme === "string" && row.generatedTheme.trim()
         ? row.generatedTheme.trim()
         : undefined,
+    generatedDialogueDraft: isGeneratedSceneDraft(row.generatedDialogueDraft)
+      ? row.generatedDialogueDraft
+      : null,
     knownChunksUsed: Array.isArray(row.knownChunksUsed)
       ? row.knownChunksUsed.filter((item): item is string => typeof item === "string")
       : [],
@@ -396,9 +435,7 @@ export async function generatePersonalizedSceneForUser(
       generatedSourceText = cachedValue.generatedSourceText;
       generatedTitle = cachedValue.generatedTitle;
       generatedTheme = cachedValue.generatedTheme;
-      const row = cached.output_json as Record<string, unknown>;
-      const cachedDraft = row.generatedDialogueDraft;
-      generatedDialogueDraft = isGeneratedSceneDraft(cachedDraft) ? cachedDraft : null;
+      generatedDialogueDraft = cachedValue.generatedDialogueDraft;
     } else {
       generatedSourceText = "";
     }
@@ -445,7 +482,8 @@ export async function generatePersonalizedSceneForUser(
     console.log("[scene.generate] parsed ok", {
       runId,
       title: parsed.title,
-      lineCount: parsed.dialogue.length,
+      turnCount: parsed.turns.length,
+      sentenceCount: parsed.turns.reduce((sum, turn) => sum + turn.sentences.length, 0),
     });
 
     generatedSourceText = toDraftSourceText(parsed);

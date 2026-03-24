@@ -12,7 +12,7 @@ Rules:
 - scene.type must be "dialogue" or "monologue".
 - sections must be non-empty.
 - each section must include blocks.
-- each block must include 1-2 sentences only.
+- each block must include at least 1 sentence.
 - block.type must equal scene.type.
 - dialogue blocks must include speaker.
 - monologue blocks may omit speaker; if included, use only "A".
@@ -26,7 +26,7 @@ Rules:
 - sentence.text.slice(chunk.start, chunk.end) must equal chunk.text exactly.
 - chunk.translation, chunk.meaningInSentence, chunk.usageNote, chunk.examples[].zh should be concise natural Chinese.
 - each chunk should include at least 2 examples when possible.
-- if a block has 2 sentences, block.translation should be a natural block-level translation, not a mechanical sentence-by-sentence concatenation.
+- if a block has multiple sentences, block.translation should be a natural block-level translation, not a mechanical sentence-by-sentence concatenation.
 - prefer concise, learnable, reusable chunks.`;
 
 
@@ -50,21 +50,21 @@ Dialogue rules:
 6) Each dialogue block is one speaking turn.
 7) Speaker changes => must start a new block.
 8) Dialogue blocks must include speaker (A/B/C/D...).
-9) Default: one sentence per dialogue block.
-10) If the same speaker has two tightly connected sentences said in one breath, they may be merged into one block.
-11) Max 2 sentences per dialogue block.
+9) Same speaker may keep 1-3 consecutive sentences in one block when they clearly belong to one speaking intent.
+10) Must start a new block when speaker changes, intent changes, topic shifts, or the response clearly becomes a new turn.
+11) Prefer natural speaking turns instead of splitting every sentence mechanically.
 
 Monologue / opinion / story / news rules:
 12) Default: one sentence per block.
-13) Adjacent two sentences may be merged only when they clearly express one complete point, one causal chain, or one narrative beat.
+13) Adjacent 2-3 sentences may be merged only when they clearly express one complete point, one causal chain, or one narrative beat.
 14) Must split when there is a semantic turn, time shift, conclusion shift, or action-goal shift.
-15) Max 2 sentences per monologue block.
+15) Prefer 1-3 sentences per monologue block.
 16) Monologue blocks may omit speaker; if speaker is present, use only "A".
 
 Block-level rules:
 17) Prefer setting block.translation and block.tts for block-level rendering.
 18) If a block has 1 sentence, block.translation may be similar to the sentence translation.
-19) If a block has 2 sentences, block.translation should be a natural whole-block translation, not a mechanical concatenation.
+19) If a block has multiple sentences, block.translation should be a natural whole-block translation, not a mechanical concatenation.
 
 Sentence-level rules:
 20) Every sentence must include translation and tts.

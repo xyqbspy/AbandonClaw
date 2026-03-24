@@ -34,6 +34,7 @@ import { SelectionDetailSheet } from "@/features/lesson/components/selection-det
 import { SelectionToolbar } from "@/features/lesson/components/selection-toolbar";
 import { normalizePhraseText } from "@/lib/shared/phrases";
 import { buildChunkAudioKey } from "@/lib/shared/tts";
+import { trackChunksFromApi } from "@/lib/utils/chunks-api";
 import {
   getLessonBlocks,
   getLessonSentences,
@@ -80,6 +81,7 @@ export function LessonReader({
   savedPhraseTexts,
   onSavePhrase,
   onReviewPhrase,
+  onChunkEncounter,
 }: {
   lesson: Lesson;
   headerTools?: ReactNode;
@@ -104,6 +106,11 @@ export function LessonReader({
     sourceSentenceText?: string;
     sourceChunkText?: string;
   }) => Promise<{ created?: boolean } | void> | { created?: boolean } | void;
+  onChunkEncounter?: (payload: {
+    lesson: Lesson;
+    sentence: LessonSentence;
+    chunkText: string;
+  }) => void;
 }) {
   const difficultyLabel =
     lesson.difficulty === "Beginner"
@@ -118,6 +125,7 @@ export function LessonReader({
     lesson.sceneType === "dialogue" ||
     blockOrder.some((block) => (block.kind ?? lesson.sceneType ?? "monologue") === "dialogue") ||
     hasDialogueLikeSpeakers;
+  const firstBlock = blockOrder[0] ?? null;
 
   const firstSentence = getFirstSentence(lesson) ?? null;
   const isMobile = useMobile();
@@ -126,6 +134,7 @@ export function LessonReader({
   const suppressSelectionClearRef = useRef(false);
   const sentenceNodeMapRef = useRef<Record<string, HTMLDivElement | null>>({});
   const sentenceLoopRef = useRef<string | null>(null);
+  const trackedEncounterKeysRef = useRef<Set<string>>(new Set());
   const [sheetOpen, setSheetOpen] = useState(false);
   const [dialogueBlockTranslationOpenMap, setDialogueBlockTranslationOpenMap] =
     useState<Record<string, boolean>>({});
@@ -134,6 +143,9 @@ export function LessonReader({
   const [mobileActiveGroup, setMobileActiveGroup] =
     useState<MobileSentenceGroup | null>(null);
   const [localSavedPhraseTexts, setLocalSavedPhraseTexts] = useState<Set<string>>(new Set());
+  const [activeBlockId, setActiveBlockId] = useState<string | null>(
+    isDialogueScene ? firstBlock?.id ?? null : null,
+  );
   const [state, dispatch] = useReducer(interactionReducer, {
     activeSentenceId: firstSentence?.id ?? null,
     activeChunkKey: null,
@@ -142,7 +154,6 @@ export function LessonReader({
   });
 
   const dispatchAction = useCallback((action: InteractionAction) => {
-    console.log("[lesson-action]", action.type, action);
     dispatch(action);
   }, []);
 
@@ -159,6 +170,10 @@ export function LessonReader({
     () => getLessonSentences(lesson),
     [lesson],
   );
+  const sentenceIndexMap = useMemo(
+    () => new Map(sentenceOrder.map((sentence, index) => [sentence.id, index])),
+    [sentenceOrder],
+  );
 
   const currentSentence = useMemo(
     () =>
@@ -168,13 +183,17 @@ export function LessonReader({
     [lesson, state.activeSentenceId],
   );
   const currentBlock = useMemo(
-    () =>
-      state.activeSentenceId
+    () => {
+      if (isDialogueScene && activeBlockId) {
+        return blockOrder.find((block) => block.id === activeBlockId) ?? null;
+      }
+      return state.activeSentenceId
         ? (blockOrder.find((block) =>
             block.sentences.some((sentence) => sentence.id === state.activeSentenceId),
           ) ?? null)
-        : null,
-    [blockOrder, state.activeSentenceId],
+        : null;
+    },
+    [activeBlockId, blockOrder, isDialogueScene, state.activeSentenceId],
   );
 
   const mobileDisplaySentence = useMemo<LessonSentence | null>(() => {
@@ -189,6 +208,23 @@ export function LessonReader({
       audioText: mobileActiveGroup.text,
     };
   }, [currentSentence, isDialogueScene, isMobile, mobileActiveGroup]);
+
+  useEffect(() => {
+    if (!isDialogueScene || !state.activeSentenceId) return;
+    const ownerBlock = blockOrder.find((block) =>
+      block.sentences.some((sentence) => sentence.id === state.activeSentenceId),
+    );
+    if (ownerBlock && ownerBlock.id !== activeBlockId) {
+      setActiveBlockId(ownerBlock.id);
+    }
+  }, [activeBlockId, blockOrder, isDialogueScene, state.activeSentenceId]);
+
+  useEffect(() => {
+    if (!isDialogueScene) return;
+    if (!activeBlockId && firstBlock?.id) {
+      setActiveBlockId(firstBlock.id);
+    }
+  }, [activeBlockId, firstBlock?.id, isDialogueScene]);
 
   const currentSection = useMemo(() => {
     if (!state.activeSentenceId) return lesson.sections[0] ?? null;
@@ -378,28 +414,6 @@ export function LessonReader({
     };
   }, [firstSentence, lesson.slug, sentenceOrder, state.activeSentenceId]);
 
-  useEffect(() => {
-    // Temporary debugging aid for race/ownership validation.
-    console.log("[lesson-state]", {
-      activeSentenceId: state.activeSentenceId,
-      selectionText: state.selectionState?.text ?? null,
-      activeChunkKey: state.activeChunkKey,
-      hoveredChunkKey: state.hoveredChunkKey,
-      explanationRenderSource: state.activeChunkKey
-        ? `activeChunk:${state.activeChunkKey}`
-        : "neutral",
-    });
-  }, [
-    state.activeSentenceId,
-    state.selectionState?.text,
-    state.activeChunkKey,
-    state.hoveredChunkKey,
-  ]);
-
-  useEffect(() => {
-    console.log("[mobile-sheet-state]", { isMobile, sheetOpen });
-  }, [isMobile, sheetOpen]);
-
   const findSentenceById = useCallback(
     (sentenceId: string) => getSentenceById(lesson, sentenceId),
     [lesson],
@@ -428,6 +442,9 @@ export function LessonReader({
     (sentenceId: string, chunkText: string) => {
       const sentence = findSentenceById(sentenceId);
       if (!sentence) return;
+      const ownerBlock = blockOrder.find((block) =>
+        block.sentences.some((item) => item.id === sentenceId),
+      );
 
       const realChunk = findMatchingChunkInSentence(sentence, chunkText);
       if (!realChunk) {
@@ -441,24 +458,60 @@ export function LessonReader({
         type: "CHUNK_ACTIVATED",
         payload: { sentenceId: sentence.id, chunkKey: realChunk },
       });
+      if (process.env.NODE_ENV !== "test") {
+        const encounterKey = `${lesson.slug}:${sentence.id}:${realChunk.trim().toLowerCase()}`;
+        if (!trackedEncounterKeysRef.current.has(encounterKey)) {
+          trackedEncounterKeysRef.current.add(encounterKey);
+          void trackChunksFromApi({
+            sceneSlug: lesson.slug,
+            sentenceIndex: sentenceIndexMap.get(sentence.id),
+            sentenceText: sentence.text,
+            chunks: [realChunk],
+            interactionType: "encounter",
+          }).catch(() => {
+            trackedEncounterKeysRef.current.delete(encounterKey);
+          });
+        }
+      }
+      onChunkEncounter?.({
+        lesson,
+        sentence,
+        chunkText: realChunk,
+      });
+      if (ownerBlock) {
+        setActiveBlockId(ownerBlock.id);
+      }
       if (isMobile) setSheetOpen(true);
       window.setTimeout(() => {
         suppressSelectionClearRef.current = false;
       }, 80);
     },
-    [dispatchAction, findSentenceById, isMobile, setSheetOpen],
+    [blockOrder, dispatchAction, findSentenceById, isMobile, lesson, lesson.slug, onChunkEncounter, sentenceIndexMap, setSheetOpen],
   );
 
   const handleSentenceTap = useCallback(
-    (sentenceId: string) => {
+    (sentenceId: string, blockId?: string) => {
       dispatchAction({
         type: "SENTENCE_CONTEXT_SET",
         payload: { sentenceId },
       });
       dispatchAction({ type: "SELECTION_CLEARED" });
+      if (blockId) {
+        setActiveBlockId(blockId);
+      }
       if (isMobile) setSheetOpen(true);
     },
     [dispatchAction, isMobile, setSheetOpen],
+  );
+
+  const handleBlockTap = useCallback(
+    (block: LessonBlock) => {
+      const anchorSentenceId = block.sentences[0]?.id;
+      if (!anchorSentenceId) return;
+      setActiveBlockId(block.id);
+      handleSentenceTap(anchorSentenceId, block.id);
+    },
+    [handleSentenceTap],
   );
 
   const toggleDialogueBlockTranslation = useCallback((blockId: string) => {
@@ -470,10 +523,6 @@ export function LessonReader({
 
   const handleMobileGroupTap = useCallback(
     (group: MobileSentenceGroup) => {
-      console.log("[mobile-tap] sentence-group", {
-        groupKey: group.key,
-        sentenceIds: group.sentenceIds,
-      });
       const anchorSentenceId = group.sentenceIds[0];
       dispatchAction({
         type: "SENTENCE_CONTEXT_SET",
@@ -663,6 +712,55 @@ export function LessonReader({
     state.activeSentenceId,
   ]);
 
+  useEffect(() => {
+    if (state.selectionState) return;
+    const normalizedActiveChunk = state.activeChunkKey?.trim().toLowerCase() ?? "";
+    const firstChunk = relatedChunks[0]?.trim();
+    if (!firstChunk) return;
+
+    const hasActiveChunkInCurrentContext = relatedChunks.some(
+      (chunk) => chunk.trim().toLowerCase() === normalizedActiveChunk,
+    );
+    if (hasActiveChunkInCurrentContext) return;
+
+    const targetSentenceId = (() => {
+      if (isDialogueScene && currentBlock) {
+        return (
+          currentBlock.sentences.find((sentence) =>
+            sentence.chunks.some((chunk) => chunk.trim().toLowerCase() === firstChunk.toLowerCase()),
+          )?.id ?? currentBlock.sentences[0]?.id
+        );
+      }
+      if (isMobile && !isDialogueScene && mobileActiveGroup) {
+        return (
+          mobileActiveGroup.sentenceIds.find((id) => {
+            const sentence = findSentenceById(id);
+            return sentence?.chunks.some((chunk) => chunk.trim().toLowerCase() === firstChunk.toLowerCase());
+          }) ?? mobileActiveGroup.sentenceIds[0]
+        );
+      }
+      return currentSentence?.id ?? null;
+    })();
+
+    if (!targetSentenceId) return;
+
+    dispatchAction({
+      type: "CHUNK_ACTIVATED",
+      payload: { sentenceId: targetSentenceId, chunkKey: firstChunk },
+    });
+  }, [
+    currentBlock,
+    currentSentence?.id,
+    dispatchAction,
+    findSentenceById,
+    isDialogueScene,
+    isMobile,
+    mobileActiveGroup,
+    relatedChunks,
+    state.activeChunkKey,
+    state.selectionState,
+  ]);
+
   const handleSave = useCallback(async () => {
     const payload = buildPhrasePayload();
     if (!payload) return;
@@ -785,6 +883,7 @@ export function LessonReader({
         (playbackState.kind === "sentence" &&
           playbackState.sentenceId === blockPlaybackId) ||
         block.sentences.some((sentence) => isSentencePlaying(sentence.id));
+      const isBlockActive = activeBlockId === block.id;
 
       return (
         <div
@@ -802,10 +901,12 @@ export function LessonReader({
           >
             <article
               className={cn(
-                "rounded-lg px-3 py-2.5 transition-colors",
+                "cursor-pointer rounded-lg px-3 py-2.5 transition-colors",
                 "hover:bg-muted/20",
+                isBlockActive && "ring-1 ring-primary/35",
                 primarySpeaker ? LESSON_DIALOGUE_A_BG_CLASS : LESSON_DIALOGUE_B_BG_CLASS,
               )}
+              onClick={() => handleBlockTap(block)}
             >
               <div className="mb-1">
                 <Badge
@@ -832,8 +933,12 @@ export function LessonReader({
                         className={cn(
                           "cursor-pointer text-[1.03rem] leading-relaxed text-foreground/95",
                           isSentencePlaying(sentence.id) && "text-primary",
+                          sentence.id === state.activeSentenceId && "text-primary",
                         )}
-                        onClick={() => handleSentenceTap(sentence.id)}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          handleSentenceTap(sentence.id, block.id);
+                        }}
                       >
                         {sentence.text}
                       </p>
@@ -849,7 +954,10 @@ export function LessonReader({
                     "inline-flex cursor-pointer items-center gap-1 transition-colors hover:text-foreground",
                     isBlockSpeaking && "text-primary",
                   )}
-                  onClick={() => toggleDialogueBlockTranslation(block.id)}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    toggleDialogueBlockTranslation(block.id);
+                  }}
                 >
                   <Languages className="size-3.5" />
                   翻译
@@ -861,7 +969,8 @@ export function LessonReader({
                   variant="ghost"
                   size="sm"
                   className="h-auto px-0 text-inherit hover:text-foreground"
-                  onClick={() => {
+                  onClick={(event) => {
+                    event.stopPropagation();
                     void playBlockTts(block);
                   }}
                 />
@@ -879,6 +988,8 @@ export function LessonReader({
       );
     },
     [
+      activeBlockId,
+      handleBlockTap,
       handleSentenceTap,
       playBlockTts,
       isSentencePlaying,
@@ -1032,7 +1143,11 @@ export function LessonReader({
                       onClick={toggleSceneLoopPlayback}
                     />
                     <TtsActionButton
-                      loading={isChunkLoading(currentSentence?.text ?? lesson.title)}
+                      loading={
+                        currentSentence
+                          ? isSentenceLoading(currentSentence.id, "normal")
+                          : false
+                      }
                       variant="outline"
                       className="cursor-pointer transition-all duration-150 hover:border-primary/40 hover:bg-accent"
                       onClick={() =>
@@ -1263,8 +1378,8 @@ export function LessonReader({
         )}
       >
         <SelectionDetailPanel
+          currentBlock={isDialogueScene ? currentBlock : null}
           currentSentence={mobileDisplaySentence}
-          blockSentences={isDialogueScene ? (currentBlock?.sentences ?? []) : []}
           chunkDetail={chunkDetail}
           relatedChunks={relatedChunks}
           showSpeaker={isDialogueScene}
@@ -1276,6 +1391,19 @@ export function LessonReader({
           onReview={handleAddReview}
           saved={chunkSaved}
           onPronounce={handlePronounce}
+          onPronounceBlock={() => {
+            if (currentBlock) {
+              void playBlockTts(currentBlock);
+              return;
+            }
+            if (mobileDisplaySentence) {
+              handlePronounce(
+                mobileDisplaySentence.tts?.trim() ||
+                  mobileDisplaySentence.audioText?.trim() ||
+                  mobileDisplaySentence.text,
+              );
+            }
+          }}
           onSelectRelated={(chunk) => {
             const targetSentenceId = resolveSentenceIdForChunk(chunk);
             if (!targetSentenceId) return;
@@ -1287,13 +1415,12 @@ export function LessonReader({
           }
           playingChunkKey={playbackState.kind === "chunk" ? (playbackState.text ?? null) : null}
           loadingChunkKey={loadingChunkKey}
-          onSelectSentence={(sentenceId) => handleSentenceTap(sentenceId)}
         />
       </div>
 
       <SelectionDetailSheet
+        currentBlock={isDialogueScene ? currentBlock : null}
         currentSentence={mobileDisplaySentence}
-        blockSentences={isDialogueScene ? (currentBlock?.sentences ?? []) : []}
         chunkDetail={chunkDetail}
         relatedChunks={relatedChunks}
         open={sheetOpen}
@@ -1307,7 +1434,19 @@ export function LessonReader({
         onReview={handleAddReview}
         saved={chunkSaved}
         onPronounce={handlePronounce}
-        onLoopSentence={handleLoopSentence}
+        onPronounceBlock={() => {
+          if (currentBlock) {
+            void playBlockTts(currentBlock);
+            return;
+          }
+          if (mobileDisplaySentence) {
+            handlePronounce(
+              mobileDisplaySentence.tts?.trim() ||
+                mobileDisplaySentence.audioText?.trim() ||
+                mobileDisplaySentence.text,
+            );
+          }
+        }}
         onSelectRelated={(chunk) => {
           const targetSentenceId = resolveSentenceIdForChunk(chunk);
           if (!targetSentenceId) return;
@@ -1319,7 +1458,6 @@ export function LessonReader({
         }
         playingChunkKey={playbackState.kind === "chunk" ? (playbackState.text ?? null) : null}
         loadingChunkKey={loadingChunkKey}
-        onSelectSentence={(sentenceId) => handleSentenceTap(sentenceId)}
       />
     </div>
   );

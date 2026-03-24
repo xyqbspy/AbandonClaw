@@ -6,6 +6,7 @@ import { buildChunkAudioKey } from "@/lib/shared/tts";
 import { getLessonSentences } from "@/lib/shared/lesson-content";
 import { Lesson, LessonSentence, SelectionChunkLayer } from "@/lib/types";
 import { VariantSet } from "@/lib/types/learning-flow";
+import { trackChunksFromApi } from "@/lib/utils/chunks-api";
 import {
   playChunkAudio,
   playSentenceAudio,
@@ -39,6 +40,7 @@ export function useSceneDetailPlayback({
     useState<LessonSentence | null>(null);
   const [variantChunkRelatedChunks, setVariantChunkRelatedChunks] = useState<string[]>([]);
   const [variantChunkHoveredKey, setVariantChunkHoveredKey] = useState<string | null>(null);
+  const [trackedChunkKeys, setTrackedChunkKeys] = useState<Record<string, true>>({});
   const playbackState = useTtsPlaybackState();
   const effectiveSpeakingText = playbackState.text ?? null;
 
@@ -235,8 +237,29 @@ export function useSceneDetailPlayback({
       setVariantChunkDetail(detail);
       setVariantChunkRelatedChunks(relatedChunks);
       setVariantChunkModalOpen(true);
+      if (process.env.NODE_ENV !== "test") {
+        const allSentences = getLessonSentences(context.lesson);
+        const sentenceIndex = allSentences.findIndex((item) => item.id === context.sentence.id);
+        const encounterKey = `${context.lesson.slug}:${context.sentence.id}:${chunk.trim().toLowerCase()}`;
+        if (!trackedChunkKeys[encounterKey]) {
+          setTrackedChunkKeys((prev) => ({ ...prev, [encounterKey]: true }));
+          void trackChunksFromApi({
+            sceneSlug: context.lesson.slug,
+            sentenceIndex: sentenceIndex >= 0 ? sentenceIndex : undefined,
+            sentenceText: context.sentence.text,
+            chunks: [chunk],
+            interactionType: "encounter",
+          }).catch(() => {
+            setTrackedChunkKeys((prev) => {
+              const next = { ...prev };
+              delete next[encounterKey];
+              return next;
+            });
+          });
+        }
+      }
     },
-    [baseLesson, latestVariantSet],
+    [baseLesson, latestVariantSet, trackedChunkKeys],
   );
 
   const handleOpenVariantChunk = useCallback(

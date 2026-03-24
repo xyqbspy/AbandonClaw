@@ -41,9 +41,9 @@ export const todayPageLabels: TodayPageLabels = {
   estimatedMinutes: "预计时间",
   minute: "分钟",
   taskSceneTitle: "完成一个场景学习",
-  taskSceneDesc: "选择一个场景并开始学习。",
+  taskSceneDesc: "选择一个场景开始学习，读完主场景后可直接完成。",
   taskReviewTitle: "进行一次短时复习",
-  taskOutputTitle: "输出练习",
+  taskOutputTitle: "沉淀表达",
   userFallback: "学习者",
   day: "天",
 };

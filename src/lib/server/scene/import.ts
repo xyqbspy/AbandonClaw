@@ -19,7 +19,7 @@ import {
 } from "@/lib/server/ai-cache/service";
 import { SceneParseError, ValidationError } from "@/lib/server/errors";
 
-const SCENE_PARSE_PROMPT_VERSION = "scene-parse-v3-block-rules";
+const SCENE_PARSE_PROMPT_VERSION = "scene-parse-v4-turn-first";
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
   Boolean(value) && typeof value === "object";
@@ -74,7 +74,7 @@ IMPORTANT:
 - scene.type must be "dialogue" or "monologue".
 - scene.sections must be non-empty.
 - Every section must have blocks.
-- Every block must have 1-2 sentences.
+- Every block must have at least 1 sentence.
 - Every sentence must have chunks.
 - Every chunk must include id, key, text, start, end.
 - Do not add explanation before or after JSON.`;

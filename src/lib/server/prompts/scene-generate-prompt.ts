@@ -35,12 +35,12 @@ ${input.promptText}
 
 Constraints:
 1) Generate one coherent scenario with clear context and goal.
-2) Use 6-14 short conversational lines. Target line count: ${input.sentenceCount}.
+2) Use 6-14 short conversational sentences in total. Target sentence count: ${input.sentenceCount}.
 3) Keep language natural spoken English, not academic.
 4) Difficulty should be ${input.difficulty ?? "medium"}.
 5) Tone should be ${input.tone ?? "natural"}.
 6) Keep total length compact and suitable for memorization.
-7) Keep lines practical for repetition and role-play.
+7) Keep sentences practical for repetition and role-play.
 8) Avoid irrelevant topic drifting.
 9) If reuseKnownChunks is true, naturally reuse some suitable known chunks, but never force.
 10) If a known chunk does not fit the context, skip it.
@@ -48,10 +48,11 @@ Constraints:
 12) You may optionally introduce 1-2 related chunk variants from the same expression cluster to support familiar-expression transfer.
 13) Do not replace all known chunks with new variants.
 14) Keep dialogue natural and realistic; variant use should feel organic.
-15) Block-splitting intent (for downstream parser):
-   - default one line = one block.
-   - speaker change implies a new block.
-   - same speaker can have up to 2 consecutive lines only when tightly connected as one thought.
+15) Turn design intent:
+   - each turn is one speaking block.
+   - speaker change implies a new turn.
+   - same speaker may have 1-3 short sentences inside one turn when they belong to one speaking intent.
+   - do not split one natural speaking turn into many tiny one-sentence turns without reason.
 16) title must be bilingual in this format: English title（中文标题）.
 
 reuseKnownChunks: ${input.reuseKnownChunks ? "true" : "false"}
@@ -65,18 +66,35 @@ Return JSON with this exact shape:
   "version": "v1",
   "title": "short English title（中文标题）",
   "theme": "optional short theme",
-  "dialogue": [
-    {"speaker": "A", "text": "...", "translation": "...", "tts": "..."},
-    {"speaker": "B", "text": "...", "translation": "...", "tts": "..."}
+  "turns": [
+    {
+      "speaker": "A",
+      "translation": "...",
+      "tts": "...",
+      "sentences": [
+        {"text": "...", "translation": "...", "tts": "..."}
+      ]
+    },
+    {
+      "speaker": "B",
+      "translation": "...",
+      "tts": "...",
+      "sentences": [
+        {"text": "...", "translation": "...", "tts": "..."}
+      ]
+    }
   ]
 }
 
-Rules for dialogue:
-- dialogue length must be between 6 and 14.
-- each line text should be concise.
+Rules for turns:
+- total sentence count across all turns must be between 6 and 14.
+- each turn must have 1-3 sentences.
+- each sentence text should be concise.
 - speaker should use uppercase labels such as A/B/C/D when needed.
-- translation must be concise natural Chinese.
-- tts should be clean, no emoji/symbol noise, usually same as text.
+- every sentence.translation must be concise natural Chinese.
+- every sentence.tts should be clean, no emoji/symbol noise, usually same as text.
+- turn.translation should summarize the full turn naturally in Chinese.
+- turn.tts should be the full-turn readout text.
 
 Return pure JSON only.`;
 }
