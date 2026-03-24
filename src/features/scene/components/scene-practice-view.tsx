@@ -15,6 +15,10 @@ type ScenePracticeViewProps = {
   onBack: () => void;
   onDelete: () => void;
   onComplete: () => void;
+  onSentencePracticed?: (payload: {
+    exerciseId: string;
+    sentenceId?: string | null;
+  }) => void;
   onReviewScene: () => void;
   onOpenVariants: () => void;
   onToggleAnswer: (exerciseId: string) => void;
@@ -36,6 +40,7 @@ export function ScenePracticeView({
   onBack,
   onDelete,
   onComplete,
+  onSentencePracticed,
   onReviewScene,
   onOpenVariants,
   onToggleAnswer,
@@ -305,6 +310,7 @@ export function ScenePracticeView({
                         acceptedAnswers.includes(normalizeAnswer(currentAnswer))
                           ? "correct"
                           : "incorrect";
+                      const wasAlreadyCorrect = resultMap[activeExercise.id] === "correct";
 
                       setAttemptCountMap((prev) => ({
                         ...prev,
@@ -321,6 +327,13 @@ export function ScenePracticeView({
                           [activeExercise.id]: (prev[activeExercise.id] ?? 0) + 1,
                         }));
                         return;
+                      }
+
+                      if (!wasAlreadyCorrect) {
+                        onSentencePracticed?.({
+                          exerciseId: activeExercise.id,
+                          sentenceId: activeExercise.sentenceId,
+                        });
                       }
 
                       focusNextTypingInput(activeExercise.id);

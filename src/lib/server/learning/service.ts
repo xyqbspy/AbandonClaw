@@ -1,9 +1,12 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import {
   LearningStatus,
+  SceneMasteryStage,
   SceneRow,
+  SceneTrainingStep,
   UserDailyLearningStatsRow,
   UserSceneProgressRow,
+  UserSceneSessionRow,
 } from "@/lib/server/db/types";
 import { getSceneRecordBySlug } from "@/lib/server/scene/service";
 import { getUserPhraseSummary } from "@/lib/server/phrases/service";
@@ -16,14 +19,45 @@ const todayDate = () => new Date().toISOString().slice(0, 10);
 const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value));
 
+const TRAINING_STEP_RANK: Record<SceneTrainingStep, number> = {
+  listen: 1,
+  focus_expression: 2,
+  practice_sentence: 3,
+  scene_practice: 4,
+  done: 5,
+};
+
+const MASTERY_STAGE_RANK: Record<SceneMasteryStage, number> = {
+  listening: 1,
+  focus: 2,
+  sentence_practice: 3,
+  scene_practice: 4,
+  variant_unlocked: 5,
+  mastered: 6,
+};
+
+const MASTERY_STAGE_PERCENT: Record<SceneMasteryStage, number> = {
+  listening: 20,
+  focus: 35,
+  sentence_practice: 60,
+  scene_practice: 80,
+  variant_unlocked: 85,
+  mastered: 100,
+};
+
 const toLearningSchemaErrorMessage = (context: string, originalMessage: string) =>
-  `Learning schema is not up to date (${context}): ${originalMessage}. Run supabase/sql/20260316_phase3_learning_loop_mvp.sql first.`;
+  `Learning schema is not up to date (${context}): ${originalMessage}. Run supabase/sql/20260324_phase16_scene_training_station_mvp.sql after earlier learning migrations.`;
 
 const throwLearningQueryError = (
   context: string,
   error: { message: string; code?: string | null },
 ) => {
-  if (error.code === "42703" || error.message.includes("column user_scene_progress.")) {
+  if (
+    error.code === "42703" ||
+    error.code === "42P01" ||
+    error.message.includes("user_scene_progress.") ||
+    error.message.includes("user_scene_sessions")
+  ) {
     throw new Error(toLearningSchemaErrorMessage(context, error.message));
   }
   throw new Error(`Failed to ${context}: ${error.message}`);
@@ -34,20 +68,45 @@ export interface SceneProgressView {
   sceneId: string;
   status: LearningStatus;
   progressPercent: number;
+  masteryStage: SceneMasteryStage;
+  masteryPercent: number;
+  focusedExpressionCount: number;
+  practicedSentenceCount: number;
+  scenePracticeCount: number;
+  variantUnlockedAt: string | null;
   lastSentenceIndex: number | null;
   lastVariantIndex: number | null;
   startedAt: string | null;
   lastViewedAt: string | null;
   completedAt: string | null;
+  lastPracticedAt: string | null;
   totalStudySeconds: number;
-  // Phase3 note: today_study_seconds is a lightweight mirror for write-side convenience.
-  // Dashboard/statistics should use user_daily_learning_stats as the source of truth.
   todayStudySeconds: number;
-  // Phase3 placeholder: saved_phrase_count is currently progress-level aggregation,
-  // and will be replaced by the dedicated phrase system in a later phase.
   savedPhraseCount: number;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface SceneSessionView {
+  id: string;
+  sceneId: string;
+  currentStep: SceneTrainingStep;
+  selectedBlockId: string | null;
+  fullPlayCount: number;
+  openedExpressionCount: number;
+  practicedSentenceCount: number;
+  scenePracticeCompleted: boolean;
+  isDone: boolean;
+  startedAt: string;
+  endedAt: string | null;
+  lastActiveAt: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SceneLearningStateResponse {
+  progress: SceneProgressView;
+  session: SceneSessionView | null;
 }
 
 export interface ContinueLearningItem {
@@ -55,6 +114,8 @@ export interface ContinueLearningItem {
   title: string;
   subtitle: string | null;
   progressPercent: number;
+  masteryStage: SceneMasteryStage;
+  masteryPercent: number;
   lastViewedAt: string | null;
   lastSentenceIndex: number | null;
   estimatedMinutes: number | null;
@@ -86,19 +147,65 @@ export interface LearningOverview {
   reviewAccuracy: number | null;
 }
 
+export type SceneTrainingEvent =
+  | "full_play"
+  | "open_expression"
+  | "practice_sentence"
+  | "scene_practice_complete";
+
+const chooseHigherTrainingStep = (
+  current: SceneTrainingStep | null | undefined,
+  next: SceneTrainingStep,
+) => {
+  if (!current) return next;
+  return TRAINING_STEP_RANK[current] >= TRAINING_STEP_RANK[next] ? current : next;
+};
+
+const chooseHigherMasteryStage = (
+  current: SceneMasteryStage | null | undefined,
+  next: SceneMasteryStage,
+) => {
+  if (!current) return next;
+  return MASTERY_STAGE_RANK[current] >= MASTERY_STAGE_RANK[next] ? current : next;
+};
+
 const toProgressView = (row: UserSceneProgressRow): SceneProgressView => ({
   id: row.id,
   sceneId: row.scene_id,
   status: row.status,
   progressPercent: Number(row.progress_percent ?? 0),
+  masteryStage: row.mastery_stage ?? "listening",
+  masteryPercent: Number(row.mastery_percent ?? 0),
+  focusedExpressionCount: row.focused_expression_count ?? 0,
+  practicedSentenceCount: row.practiced_sentence_count ?? 0,
+  scenePracticeCount: row.scene_practice_count ?? 0,
+  variantUnlockedAt: row.variant_unlocked_at,
   lastSentenceIndex: row.last_sentence_index,
   lastVariantIndex: row.last_variant_index,
   startedAt: row.started_at,
   lastViewedAt: row.last_viewed_at,
   completedAt: row.completed_at,
+  lastPracticedAt: row.last_practiced_at,
   totalStudySeconds: row.total_study_seconds,
   todayStudySeconds: row.today_study_seconds,
   savedPhraseCount: row.saved_phrase_count,
+  createdAt: row.created_at,
+  updatedAt: row.updated_at,
+});
+
+const toSessionView = (row: UserSceneSessionRow): SceneSessionView => ({
+  id: row.id,
+  sceneId: row.scene_id,
+  currentStep: row.current_step,
+  selectedBlockId: row.selected_block_id,
+  fullPlayCount: row.full_play_count,
+  openedExpressionCount: row.opened_expression_count,
+  practicedSentenceCount: row.practiced_sentence_count,
+  scenePracticeCompleted: row.scene_practice_completed,
+  isDone: row.is_done,
+  startedAt: row.started_at,
+  endedAt: row.ended_at,
+  lastActiveAt: row.last_active_at,
   createdAt: row.created_at,
   updatedAt: row.updated_at,
 });
@@ -120,7 +227,23 @@ async function getProgressByUserAndScene(userId: string, sceneId: string) {
     .eq("scene_id", sceneId)
     .maybeSingle<UserSceneProgressRow>();
   if (error) {
-    throw new Error(`Failed to read user_scene_progress: ${error.message}`);
+    throwLearningQueryError("read user_scene_progress", error);
+  }
+  return data ?? null;
+}
+
+async function getLatestSessionByUserAndScene(userId: string, sceneId: string) {
+  const admin = createSupabaseAdminClient();
+  const { data, error } = await admin
+    .from("user_scene_sessions")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("scene_id", sceneId)
+    .order("last_active_at", { ascending: false, nullsFirst: false })
+    .limit(1)
+    .maybeSingle<UserSceneSessionRow>();
+  if (error) {
+    throwLearningQueryError("read user_scene_sessions", error);
   }
   return data ?? null;
 }
@@ -178,14 +301,21 @@ async function upsertProgress(
     scene_id: sceneId,
     status: existing?.status ?? "not_started",
     progress_percent: existing?.progress_percent ?? 0,
+    mastery_stage: existing?.mastery_stage ?? "listening",
+    mastery_percent: existing?.mastery_percent ?? 0,
     last_sentence_index: existing?.last_sentence_index ?? null,
     last_variant_index: existing?.last_variant_index ?? null,
     started_at: existing?.started_at ?? null,
     last_viewed_at: existing?.last_viewed_at ?? null,
     completed_at: existing?.completed_at ?? null,
+    variant_unlocked_at: existing?.variant_unlocked_at ?? null,
+    last_practiced_at: existing?.last_practiced_at ?? null,
     total_study_seconds: existing?.total_study_seconds ?? 0,
     today_study_seconds: existing?.today_study_seconds ?? 0,
     saved_phrase_count: existing?.saved_phrase_count ?? 0,
+    focused_expression_count: existing?.focused_expression_count ?? 0,
+    practiced_sentence_count: existing?.practiced_sentence_count ?? 0,
+    scene_practice_count: existing?.scene_practice_count ?? 0,
     ...patch,
   };
 
@@ -196,10 +326,125 @@ async function upsertProgress(
     .single<UserSceneProgressRow>();
 
   if (error || !data) {
-    throw new Error(`Failed to upsert user_scene_progress: ${error?.message ?? "unknown error"}`);
+    throwLearningQueryError("upsert user_scene_progress", {
+      message: error?.message ?? "unknown error",
+      code: error?.code,
+    });
   }
-  return { existing, row: data };
+  return { existing, row: data as UserSceneProgressRow };
 }
+
+async function upsertSession(
+  userId: string,
+  sceneId: string,
+  patch: Partial<UserSceneSessionRow>,
+  existing?: UserSceneSessionRow | null,
+) {
+  const admin = createSupabaseAdminClient();
+  const current = existing ?? (await getLatestSessionByUserAndScene(userId, sceneId));
+  const timestamp = nowIso();
+  const next = {
+    id: current?.id,
+    user_id: userId,
+    scene_id: sceneId,
+    current_step: current?.current_step ?? "listen",
+    selected_block_id: current?.selected_block_id ?? null,
+    full_play_count: current?.full_play_count ?? 0,
+    opened_expression_count: current?.opened_expression_count ?? 0,
+    practiced_sentence_count: current?.practiced_sentence_count ?? 0,
+    scene_practice_completed: current?.scene_practice_completed ?? false,
+    is_done: current?.is_done ?? false,
+    started_at: current?.started_at ?? timestamp,
+    ended_at: current?.ended_at ?? null,
+    last_active_at: current?.last_active_at ?? timestamp,
+    ...patch,
+  };
+
+  const { data, error } = await admin
+    .from("user_scene_sessions")
+    .upsert(next as never, { onConflict: "id" })
+    .select("*")
+    .single<UserSceneSessionRow>();
+
+  if (error || !data) {
+    throwLearningQueryError("upsert user_scene_sessions", {
+      message: error?.message ?? "unknown error",
+      code: error?.code,
+    });
+  }
+  return data as UserSceneSessionRow;
+}
+
+async function ensureActiveSceneSession(userId: string, sceneId: string) {
+  const latestSession = await getLatestSessionByUserAndScene(userId, sceneId);
+  if (latestSession && !latestSession.is_done) {
+    return upsertSession(
+      userId,
+      sceneId,
+      {
+        last_active_at: nowIso(),
+      },
+      latestSession,
+    );
+  }
+  return upsertSession(userId, sceneId, {
+    current_step: "listen",
+    selected_block_id: null,
+    full_play_count: 0,
+    opened_expression_count: 0,
+    practiced_sentence_count: 0,
+    scene_practice_completed: false,
+    is_done: false,
+    started_at: nowIso(),
+    ended_at: null,
+    last_active_at: nowIso(),
+  });
+}
+
+const evaluateSessionDone = (session: Pick<
+  UserSceneSessionRow,
+  "full_play_count" | "opened_expression_count" | "practiced_sentence_count" | "scene_practice_completed"
+>) =>
+  session.full_play_count >= 1 &&
+  session.opened_expression_count >= 1 &&
+  session.practiced_sentence_count >= 1 &&
+  Boolean(session.scene_practice_completed);
+
+function buildTrainingStagePatch(
+  current: UserSceneProgressRow | null,
+  nextStage: SceneMasteryStage,
+) {
+  const stage = chooseHigherMasteryStage(current?.mastery_stage, nextStage);
+  const rawPercent = MASTERY_STAGE_PERCENT[stage];
+  const cappedPercent = stage === "mastered" ? 100 : Math.min(rawPercent, 85);
+  const nextPercent = Math.max(Number(current?.mastery_percent ?? 0), cappedPercent);
+  return {
+    mastery_stage: stage,
+    mastery_percent: nextPercent,
+    progress_percent: nextPercent,
+  };
+}
+
+const parseEstimatedMinutesFromSceneJson = (scene: SceneRow) => {
+  const json = scene.scene_json as { estimatedMinutes?: unknown };
+  return typeof json?.estimatedMinutes === "number" ? json.estimatedMinutes : null;
+};
+
+const toContinueItem = (
+  scene: Pick<SceneRow, "slug" | "title" | "translation" | "scene_json">,
+  progress: UserSceneProgressRow,
+): ContinueLearningItem => ({
+  sceneSlug: scene.slug,
+  title: scene.title,
+  subtitle: scene.translation,
+  progressPercent: Number(progress.progress_percent ?? 0),
+  masteryStage: progress.mastery_stage ?? "listening",
+  masteryPercent: Number(progress.mastery_percent ?? 0),
+  lastViewedAt: progress.last_viewed_at,
+  lastSentenceIndex: progress.last_sentence_index,
+  estimatedMinutes: parseEstimatedMinutesFromSceneJson(scene as SceneRow),
+  savedPhraseCount: progress.saved_phrase_count ?? 0,
+});
 
 export async function startSceneLearning(userId: string, sceneSlug: string) {
   const scene = await resolveVisibleSceneBySlug(userId, sceneSlug);
@@ -207,19 +452,17 @@ export async function startSceneLearning(userId: string, sceneSlug: string) {
   const current = await getProgressByUserAndScene(userId, scene.id);
 
   let nextStatus: LearningStatus = current?.status ?? "in_progress";
-  // Closed-loop MVP rule: re-entering a completed scene keeps it completed
-  // (we only refresh last_viewed_at), avoiding accidental status regression.
   if (!current || current.status === "not_started" || current.status === "paused") {
     nextStatus = "in_progress";
-  } else if (current.status === "completed") {
-    nextStatus = "completed";
   }
 
   const { row, existing } = await upsertProgress(userId, scene.id, {
     status: nextStatus,
     started_at: current?.started_at ?? timestamp,
     last_viewed_at: timestamp,
+    ...buildTrainingStagePatch(current, current?.mastery_stage ?? "listening"),
   });
+  const session = await ensureActiveSceneSession(userId, scene.id);
 
   if (!existing || !existing.started_at) {
     await upsertDailyStats({ userId, scenesStartedDelta: 1 });
@@ -228,6 +471,7 @@ export async function startSceneLearning(userId: string, sceneSlug: string) {
   return {
     scene,
     progress: toProgressView(row),
+    session: toSessionView(session),
   };
 }
 
@@ -244,6 +488,7 @@ export async function updateSceneProgress(
 ) {
   const scene = await resolveVisibleSceneBySlug(userId, sceneSlug);
   const current = await getProgressByUserAndScene(userId, scene.id);
+  const session = await ensureActiveSceneSession(userId, scene.id);
   const timestamp = nowIso();
   const studyDelta = Math.max(0, Math.floor(input.studySecondsDelta ?? 0));
   const phraseDelta = Math.max(0, Math.floor(input.savedPhraseDelta ?? 0));
@@ -254,8 +499,6 @@ export async function updateSceneProgress(
     100,
   );
   const oldProgressPercent = Number(current?.progress_percent ?? 0);
-  // Progress updates should be monotonic in MVP to avoid accidental regressions
-  // from out-of-order UI events or stale local state.
   const monotonicProgressPercent = Math.max(oldProgressPercent, nextProgressPercent);
 
   const nextStatus: LearningStatus =
@@ -263,7 +506,7 @@ export async function updateSceneProgress(
 
   const { row } = await upsertProgress(userId, scene.id, {
     status: nextStatus,
-    progress_percent: nextStatus === "completed" ? 100 : monotonicProgressPercent,
+    progress_percent: nextStatus === "completed" ? Math.max(monotonicProgressPercent, Number(current?.mastery_percent ?? 0)) : monotonicProgressPercent,
     last_sentence_index:
       input.lastSentenceIndex ?? current?.last_sentence_index ?? null,
     last_variant_index:
@@ -283,9 +526,130 @@ export async function updateSceneProgress(
     });
   }
 
+  const nextSession = await upsertSession(
+    userId,
+    scene.id,
+    {
+      last_active_at: timestamp,
+    },
+    session,
+  );
+
   return {
     scene,
     progress: toProgressView(row),
+    session: toSessionView(nextSession),
+  };
+}
+
+export async function recordSceneTrainingEvent(
+  userId: string,
+  sceneSlug: string,
+  input: {
+    event: SceneTrainingEvent;
+    selectedBlockId?: string;
+  },
+) {
+  const scene = await resolveVisibleSceneBySlug(userId, sceneSlug);
+  const currentProgress = await getProgressByUserAndScene(userId, scene.id);
+  const activeSession = await ensureActiveSceneSession(userId, scene.id);
+  const timestamp = nowIso();
+
+  let sessionPatch: Partial<UserSceneSessionRow> = {
+    last_active_at: timestamp,
+  };
+  let progressPatch: Partial<UserSceneProgressRow> = {
+    last_viewed_at: timestamp,
+    last_practiced_at: timestamp,
+  };
+
+  if (input.event === "full_play") {
+    sessionPatch = {
+      ...sessionPatch,
+      full_play_count: (activeSession.full_play_count ?? 0) + 1,
+      current_step: chooseHigherTrainingStep(activeSession.current_step, "listen"),
+    };
+    progressPatch = {
+      ...progressPatch,
+      ...buildTrainingStagePatch(currentProgress, "listening"),
+    };
+  }
+
+  if (input.event === "open_expression") {
+    sessionPatch = {
+      ...sessionPatch,
+      opened_expression_count: (activeSession.opened_expression_count ?? 0) + 1,
+      current_step: chooseHigherTrainingStep(activeSession.current_step, "focus_expression"),
+      selected_block_id: input.selectedBlockId ?? activeSession.selected_block_id ?? null,
+    };
+    progressPatch = {
+      ...progressPatch,
+      focused_expression_count: (currentProgress?.focused_expression_count ?? 0) + 1,
+      ...buildTrainingStagePatch(currentProgress, "focus"),
+    };
+  }
+
+  if (input.event === "practice_sentence") {
+    sessionPatch = {
+      ...sessionPatch,
+      practiced_sentence_count: (activeSession.practiced_sentence_count ?? 0) + 1,
+      current_step: chooseHigherTrainingStep(activeSession.current_step, "practice_sentence"),
+    };
+    progressPatch = {
+      ...progressPatch,
+      practiced_sentence_count: (currentProgress?.practiced_sentence_count ?? 0) + 1,
+      ...buildTrainingStagePatch(currentProgress, "sentence_practice"),
+    };
+  }
+
+  if (input.event === "scene_practice_complete") {
+    sessionPatch = {
+      ...sessionPatch,
+      scene_practice_completed: true,
+      current_step: chooseHigherTrainingStep(activeSession.current_step, "scene_practice"),
+    };
+    progressPatch = {
+      ...progressPatch,
+      scene_practice_count: (currentProgress?.scene_practice_count ?? 0) + 1,
+      ...buildTrainingStagePatch(currentProgress, "scene_practice"),
+    };
+  }
+
+  const nextSessionDraft = {
+    ...activeSession,
+    ...sessionPatch,
+  } as UserSceneSessionRow;
+
+  const sessionDone = evaluateSessionDone(nextSessionDraft);
+  if (sessionDone) {
+    sessionPatch = {
+      ...sessionPatch,
+      is_done: true,
+      current_step: "done",
+      ended_at: timestamp,
+    };
+    progressPatch = {
+      ...progressPatch,
+      status: "completed",
+      completed_at: currentProgress?.completed_at ?? timestamp,
+      variant_unlocked_at: currentProgress?.variant_unlocked_at ?? timestamp,
+      ...buildTrainingStagePatch(currentProgress, "variant_unlocked"),
+    };
+  } else if ((currentProgress?.status ?? "not_started") !== "completed") {
+    progressPatch.status = "in_progress";
+  }
+
+  const nextSession = await upsertSession(userId, scene.id, sessionPatch, activeSession);
+  const { existing, row } = await upsertProgress(userId, scene.id, progressPatch);
+
+  if (sessionDone && existing?.status !== "completed") {
+    await upsertDailyStats({ userId, scenesCompletedDelta: 1 });
+  }
+
+  return {
+    scene,
+    progress: toProgressView(row),
+    session: toSessionView(nextSession),
   };
 }
 
@@ -303,30 +667,30 @@ export async function completeSceneLearning(
   const studyDelta = Math.max(0, Math.floor(input?.studySecondsDelta ?? 0));
   const phraseDelta = Math.max(0, Math.floor(input?.savedPhraseDelta ?? 0));
 
-  const transitionedToCompleted = current?.status !== "completed";
+  const trainingState = await recordSceneTrainingEvent(userId, sceneSlug, {
+    event: "scene_practice_complete",
+  });
 
   const { row } = await upsertProgress(userId, scene.id, {
-    status: "completed",
-    // Completion is authoritative: always force 100 on server side.
-    progress_percent: 100,
-    started_at: current?.started_at ?? timestamp,
-    completed_at: current?.completed_at ?? timestamp,
-    last_viewed_at: timestamp,
     total_study_seconds: (current?.total_study_seconds ?? 0) + studyDelta,
     today_study_seconds: (current?.today_study_seconds ?? 0) + studyDelta,
     saved_phrase_count: (current?.saved_phrase_count ?? 0) + phraseDelta,
+    last_viewed_at: timestamp,
+    last_practiced_at: timestamp,
   });
 
-  await upsertDailyStats({
-    userId,
-    studySecondsDelta: studyDelta,
-    phrasesSavedDelta: phraseDelta,
-    scenesCompletedDelta: transitionedToCompleted ? 1 : 0,
-  });
+  if (studyDelta > 0 || phraseDelta > 0) {
+    await upsertDailyStats({
+      userId,
+      studySecondsDelta: studyDelta,
+      phrasesSavedDelta: phraseDelta,
+    });
+  }
 
   return {
     scene,
     progress: toProgressView(row),
+    session: trainingState.session,
   };
 }
 
@@ -334,39 +698,32 @@ export async function pauseSceneLearning(userId: string, sceneSlug: string) {
   const scene = await resolveVisibleSceneBySlug(userId, sceneSlug);
   const current = await getProgressByUserAndScene(userId, scene.id);
   if (!current) {
-    const { progress } = await startSceneLearning(userId, sceneSlug);
-    return { scene, progress };
+    return startSceneLearning(userId, sceneSlug);
   }
 
+  const session = await getLatestSessionByUserAndScene(userId, scene.id);
   const { row } = await upsertProgress(userId, scene.id, {
     status: current.status === "in_progress" ? "paused" : current.status,
     last_viewed_at: nowIso(),
   });
 
+  const nextSession = session
+    ? await upsertSession(
+        userId,
+        scene.id,
+        {
+          last_active_at: nowIso(),
+        },
+        session,
+      )
+    : null;
+
   return {
     scene,
     progress: toProgressView(row),
+    session: nextSession ? toSessionView(nextSession) : null,
   };
 }
-
-const parseEstimatedMinutesFromSceneJson = (scene: SceneRow) => {
-  const json = scene.scene_json as { estimatedMinutes?: unknown };
-  return typeof json?.estimatedMinutes === "number" ? json.estimatedMinutes : null;
-};
-
-const toContinueItem = (
-  scene: Pick<SceneRow, "slug" | "title" | "translation" | "scene_json">,
-  progress: UserSceneProgressRow,
-): ContinueLearningItem => ({
-  sceneSlug: scene.slug,
-  title: scene.title,
-  subtitle: scene.translation,
-  progressPercent: Number(progress.progress_percent ?? 0),
-  lastViewedAt: progress.last_viewed_at,
-  lastSentenceIndex: progress.last_sentence_index,
-  estimatedMinutes: parseEstimatedMinutesFromSceneJson(scene as SceneRow),
-  savedPhraseCount: progress.saved_phrase_count ?? 0,
-});
 
 export async function getContinueLearningScene(userId: string) {
   const admin = createSupabaseAdminClient();
@@ -374,8 +731,6 @@ export async function getContinueLearningScene(userId: string) {
     .from("user_scene_progress")
     .select("*, scenes!inner(id,slug,title,translation,scene_json)")
     .eq("user_id", userId)
-    // Continue card only accepts active/interrupted learning states.
-    // Completed scenes are intentionally excluded.
     .in("status", ["in_progress", "paused"])
     .order("last_viewed_at", { ascending: false, nullsFirst: false })
     .limit(20);

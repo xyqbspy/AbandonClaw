@@ -50,7 +50,12 @@ import {
   setTtsLooping,
   stopTtsPlayback,
 } from "@/lib/utils/tts-api";
-import { APPLE_BUTTON_BASE, APPLE_BUTTON_TEXT_LG, APPLE_SURFACE } from "@/lib/ui/apple-style";
+import {
+  APPLE_BUTTON_BASE,
+  APPLE_BUTTON_TEXT_LG,
+  APPLE_BUTTON_TEXT_SM,
+  APPLE_SURFACE,
+} from "@/lib/ui/apple-style";
 import {
   LESSON_DIALOGUE_A_BG_CLASS,
   LESSON_DIALOGUE_B_BG_CLASS,
@@ -69,6 +74,7 @@ const speakerLabel = (speaker?: string) => normalizeSpeaker(speaker);
 
 const TOOLBAR_WIDTH = 256;
 const appleButtonLgClassName = `${APPLE_BUTTON_BASE} ${APPLE_BUTTON_TEXT_LG}`;
+const appleButtonSmClassName = `${APPLE_BUTTON_BASE} ${APPLE_BUTTON_TEXT_SM}`;
 const hasSpeakerTag = (speaker?: string) => /^[A-Z]$/.test((speaker ?? "").trim().toUpperCase());
 const getSentenceSpeakText = (sentence: LessonSentence) =>
   (sentence.tts?.trim() || sentence.audioText?.trim() || sentence.text).trim();
@@ -78,15 +84,19 @@ export function LessonReader({
   headerTools,
   topRightTool,
   minimalHeader = false,
+  interactionMode = "default",
   savedPhraseTexts,
   onSavePhrase,
   onReviewPhrase,
+  onSceneLoopPlayback,
   onChunkEncounter,
+  onSentencePracticeComplete,
 }: {
   lesson: Lesson;
   headerTools?: ReactNode;
   topRightTool?: ReactNode;
   minimalHeader?: boolean;
+  interactionMode?: "default" | "training";
   savedPhraseTexts?: string[];
   onSavePhrase?: (payload: {
     text: string;
@@ -106,10 +116,17 @@ export function LessonReader({
     sourceSentenceText?: string;
     sourceChunkText?: string;
   }) => Promise<{ created?: boolean } | void> | { created?: boolean } | void;
+  onSceneLoopPlayback?: (payload: { lesson: Lesson }) => void;
   onChunkEncounter?: (payload: {
     lesson: Lesson;
     sentence: LessonSentence;
     chunkText: string;
+    blockId?: string;
+  }) => void;
+  onSentencePracticeComplete?: (payload: {
+    lesson: Lesson;
+    sentence: LessonSentence;
+    blockId?: string;
   }) => void;
 }) {
   const difficultyLabel =
@@ -143,6 +160,9 @@ export function LessonReader({
   const [mobileActiveGroup, setMobileActiveGroup] =
     useState<MobileSentenceGroup | null>(null);
   const [localSavedPhraseTexts, setLocalSavedPhraseTexts] = useState<Set<string>>(new Set());
+  const [detailVisible, setDetailVisible] = useState(interactionMode !== "training");
+  const [trainingPromptSentenceId, setTrainingPromptSentenceId] = useState<string | null>(null);
+  const [practicedSentenceIds, setPracticedSentenceIds] = useState<Set<string>>(new Set());
   const [activeBlockId, setActiveBlockId] = useState<string | null>(
     isDialogueScene ? firstBlock?.id ?? null : null,
   );
@@ -156,6 +176,7 @@ export function LessonReader({
   const dispatchAction = useCallback((action: InteractionAction) => {
     dispatch(action);
   }, []);
+  const isTrainingMode = interactionMode === "training";
 
   const sentenceCount = useMemo(
     () => getLessonSentences(lesson).length,
@@ -195,6 +216,15 @@ export function LessonReader({
     },
     [activeBlockId, blockOrder, isDialogueScene, state.activeSentenceId],
   );
+  const currentSentenceOwnerBlock = useMemo(
+    () =>
+      state.activeSentenceId
+        ? (blockOrder.find((block) =>
+            block.sentences.some((sentence) => sentence.id === state.activeSentenceId),
+          ) ?? null)
+        : null,
+    [blockOrder, state.activeSentenceId],
+  );
 
   const mobileDisplaySentence = useMemo<LessonSentence | null>(() => {
     if (isDialogueScene) return currentSentence;
@@ -225,6 +255,12 @@ export function LessonReader({
       setActiveBlockId(firstBlock.id);
     }
   }, [activeBlockId, firstBlock?.id, isDialogueScene]);
+
+  useEffect(() => {
+    setDetailVisible(interactionMode !== "training");
+    setTrainingPromptSentenceId(null);
+    setPracticedSentenceIds(new Set());
+  }, [interactionMode, lesson.id]);
 
   const currentSection = useMemo(() => {
     if (!state.activeSentenceId) return lesson.sections[0] ?? null;
@@ -439,7 +475,7 @@ export function LessonReader({
   );
 
   const activateChunk = useCallback(
-    (sentenceId: string, chunkText: string) => {
+    (sentenceId: string, chunkText: string, options?: { openSheet?: boolean }) => {
       const sentence = findSentenceById(sentenceId);
       if (!sentence) return;
       const ownerBlock = blockOrder.find((block) =>
@@ -477,16 +513,31 @@ export function LessonReader({
         lesson,
         sentence,
         chunkText: realChunk,
+        blockId: ownerBlock?.id,
       });
       if (ownerBlock) {
         setActiveBlockId(ownerBlock.id);
       }
-      if (isMobile) setSheetOpen(true);
+      if (isTrainingMode) {
+        setDetailVisible(true);
+      }
+      if (isMobile && options?.openSheet !== false) setSheetOpen(true);
       window.setTimeout(() => {
         suppressSelectionClearRef.current = false;
       }, 80);
     },
-    [blockOrder, dispatchAction, findSentenceById, isMobile, lesson, lesson.slug, onChunkEncounter, sentenceIndexMap, setSheetOpen],
+    [
+      blockOrder,
+      dispatchAction,
+      findSentenceById,
+      isMobile,
+      isTrainingMode,
+      lesson,
+      lesson.slug,
+      onChunkEncounter,
+      sentenceIndexMap,
+      setSheetOpen,
+    ],
   );
 
   const handleSentenceTap = useCallback(
@@ -499,9 +550,14 @@ export function LessonReader({
       if (blockId) {
         setActiveBlockId(blockId);
       }
+      if (isTrainingMode) {
+        setDetailVisible(false);
+        setTrainingPromptSentenceId(null);
+        return;
+      }
       if (isMobile) setSheetOpen(true);
     },
-    [dispatchAction, isMobile, setSheetOpen],
+    [dispatchAction, isMobile, isTrainingMode, setSheetOpen],
   );
 
   const handleBlockTap = useCallback(
@@ -530,9 +586,14 @@ export function LessonReader({
       });
       dispatchAction({ type: "SELECTION_CLEARED" });
       setMobileActiveGroup(group);
+      if (isTrainingMode) {
+        setDetailVisible(false);
+        setTrainingPromptSentenceId(null);
+        return;
+      }
       setSheetOpen(true);
     },
-    [dispatchAction, setSheetOpen],
+    [dispatchAction, isTrainingMode, setSheetOpen],
   );
 
   const extractSelectionInReader = useCallback(() => {
@@ -666,6 +727,7 @@ export function LessonReader({
 
     void (async () => {
       try {
+        onSceneLoopPlayback?.({ lesson });
         await playSceneLoopAudio({
           sceneSlug: lesson.slug,
           sceneType: lesson.sceneType ?? "monologue",
@@ -675,7 +737,7 @@ export function LessonReader({
         toast.error(error instanceof Error ? error.message : "完整场景音频暂不可用");
       }
     })();
-  }, [blockOrder, isSceneLooping, lesson.sceneType, lesson.slug, stopAudio]);
+  }, [blockOrder, isSceneLooping, lesson, lesson.sceneType, lesson.slug, onSceneLoopPlayback, stopAudio]);
 
   useEffect(() => {
     if (!sheetOpen) return;
@@ -800,6 +862,52 @@ export function LessonReader({
       toast.error(error instanceof Error ? error.message : "加入复习失败");
     }
   }, [buildPhrasePayload, onReviewPhrase, onSavePhrase]);
+
+  const openDetailForSentence = useCallback(
+    (sentenceId: string) => {
+      const sentence = findSentenceById(sentenceId);
+      if (!sentence) return;
+
+      dispatchAction({
+        type: "SENTENCE_CONTEXT_SET",
+        payload: { sentenceId: sentence.id },
+      });
+
+      const firstChunk = sentence.chunks[0];
+      if (firstChunk) {
+        activateChunk(sentence.id, firstChunk, { openSheet: true });
+      }
+
+      if (isTrainingMode) {
+        setDetailVisible(true);
+      }
+      if (isMobile) {
+        setSheetOpen(true);
+      }
+    },
+    [activateChunk, dispatchAction, findSentenceById, isMobile, isTrainingMode],
+  );
+
+  const handlePracticeSentence = useCallback(() => {
+    if (!currentSentence) return;
+    handlePronounce(getSentenceSpeakText(currentSentence));
+    setTrainingPromptSentenceId(currentSentence.id);
+  }, [currentSentence, handlePronounce]);
+
+  const handleConfirmSentencePractice = useCallback(() => {
+    if (!currentSentence) return;
+    setPracticedSentenceIds((prev) => {
+      const next = new Set(prev);
+      next.add(currentSentence.id);
+      return next;
+    });
+    setTrainingPromptSentenceId(null);
+    onSentencePracticeComplete?.({
+      lesson,
+      sentence: currentSentence,
+      blockId: currentSentenceOwnerBlock?.id,
+    });
+  }, [currentSentence, currentSentenceOwnerBlock?.id, lesson, onSentencePracticeComplete]);
 
   const resolveSentenceIdForChunk = useCallback(
     (chunk: string) => {
@@ -1001,8 +1109,15 @@ export function LessonReader({
     ],
   );
 
+  const showDesktopDetailPanel = !isMobile && (!isTrainingMode || detailVisible);
+
   return (
-    <div className="relative grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-8">
+    <div
+      className={cn(
+        "relative grid gap-6 lg:gap-8",
+        showDesktopDetailPanel ? "lg:grid-cols-[minmax(0,1fr)_340px]" : "lg:grid-cols-[minmax(0,1fr)]",
+      )}
+    >
       <SelectionToolbar
         visible={Boolean(state.selectionState) && !isMobile}
         top={state.selectionState?.top ?? 0}
@@ -1042,38 +1157,42 @@ export function LessonReader({
             ) : null}
             <div className="flex items-center justify-end gap-2">
               {headerTools}
-              <LoopActionButton
-                active={isSceneLooping}
-                loading={isSceneLoopLoading}
-                variant="ghost"
-                size="sm"
-                className={cn(
-                  appleButtonLgClassName,
-                  "whitespace-nowrap text-foreground/85",
-                  isMobile && "px-2 py-1 text-[15px]",
-                )}
-                iconClassName={cn("size-4", isMobile && "size-3.5")}
-                onClick={toggleSceneLoopPlayback}
-              />
+              {!isTrainingMode ? (
+                <LoopActionButton
+                  active={isSceneLooping}
+                  loading={isSceneLoopLoading}
+                  variant="ghost"
+                  size="sm"
+                  className={cn(
+                    appleButtonLgClassName,
+                    "whitespace-nowrap text-foreground/85",
+                    isMobile && "px-2 py-1 text-[15px]",
+                  )}
+                  iconClassName={cn("size-4", isMobile && "size-3.5")}
+                  onClick={toggleSceneLoopPlayback}
+                />
+              ) : null}
             </div>
           </div>
         ) : isDialogueScene ? (
           <div className={cn("py-1.5", isMobile ? "px-1" : "px-1.5")}>
             <div className="flex items-center justify-end gap-2">
               {headerTools}
-              <LoopActionButton
-                active={isSceneLooping}
-                loading={isSceneLoopLoading}
-                variant="ghost"
-                size="sm"
-                className={cn(
-                  appleButtonLgClassName,
-                  "whitespace-nowrap text-foreground/85",
-                  isMobile && "px-2 py-1 text-[15px]",
-                )}
-                iconClassName={cn("size-4", isMobile && "size-3.5")}
-                onClick={toggleSceneLoopPlayback}
-              />
+              {!isTrainingMode ? (
+                <LoopActionButton
+                  active={isSceneLooping}
+                  loading={isSceneLoopLoading}
+                  variant="ghost"
+                  size="sm"
+                  className={cn(
+                    appleButtonLgClassName,
+                    "whitespace-nowrap text-foreground/85",
+                    isMobile && "px-2 py-1 text-[15px]",
+                  )}
+                  iconClassName={cn("size-4", isMobile && "size-3.5")}
+                  onClick={toggleSceneLoopPlayback}
+                />
+              ) : null}
             </div>
           </div>
         ) : (
@@ -1369,54 +1488,123 @@ export function LessonReader({
         )}
       </div>
 
-      <div
-        className={cn(
-          "transition-all duration-200",
-          currentSentence || chunkDetail
-            ? "opacity-100 translate-x-0"
-            : "opacity-95 translate-x-0.5",
-        )}
-      >
-        <SelectionDetailPanel
-          currentBlock={isDialogueScene ? currentBlock : null}
-          currentSentence={mobileDisplaySentence}
-          chunkDetail={chunkDetail}
-          relatedChunks={relatedChunks}
-          showSpeaker={isDialogueScene}
-          sentenceSectionLabel={sentenceSectionLabel}
-          loading={false}
-          speakingText={effectiveSpeakingText}
-          loadingText={effectiveLoadingText}
-          onSave={handleSave}
-          onReview={handleAddReview}
-          saved={chunkSaved}
-          onPronounce={handlePronounce}
-          onPronounceBlock={() => {
-            if (currentBlock) {
-              void playBlockTts(currentBlock);
-              return;
+      {isTrainingMode && currentSentence ? (
+        <div className="sticky bottom-4 z-20 lg:col-span-1">
+          <div className="rounded-2xl border border-black/8 bg-white/95 px-4 py-3 shadow-[0_10px_30px_rgba(0,0,0,0.08)] backdrop-blur">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div className="min-w-0 space-y-1">
+                <p className="text-xs tracking-[0.08em] text-muted-foreground">当前训练句</p>
+                <p className="line-clamp-2 text-sm font-medium leading-6 text-foreground">
+                  {currentSentence.text}
+                </p>
+                {practicedSentenceIds.has(currentSentence.id) ? (
+                  <p className="text-xs text-[rgb(21,128,61)]">这句已经练过了</p>
+                ) : null}
+                {trainingPromptSentenceId === currentSentence.id ? (
+                  <p className="text-xs text-muted-foreground">先跟读或复述一遍，再点“我练过了”。</p>
+                ) : practicedSentenceIds.has(currentSentence.id) ? (
+                  <p className="text-xs text-muted-foreground">如果想再巩固一次，可以直接再练一遍。</p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">先听一句，再自己跟读或复述一遍。</p>
+                )}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <TtsActionButton
+                  active={isSentencePlaying(currentSentence.id, "normal")}
+                  loading={isSentenceLoading(currentSentence.id, "normal")}
+                  variant="ghost"
+                  size="sm"
+                  className={appleButtonSmClassName}
+                  iconClassName="size-4"
+                  onClick={() => handlePronounce(getSentenceSpeakText(currentSentence))}
+                />
+                <LoopActionButton
+                  active={isSceneLooping}
+                  loading={isSceneLoopLoading}
+                  variant="ghost"
+                  size="sm"
+                  className={appleButtonSmClassName}
+                  iconClassName="size-4"
+                  onClick={toggleSceneLoopPlayback}
+                />
+                <button
+                  type="button"
+                  className={`${appleButtonSmClassName} px-3 py-1.5`}
+                  onClick={() => openDetailForSentence(currentSentence.id)}
+                >
+                  看解释
+                </button>
+                <button
+                  type="button"
+                  className={`${appleButtonSmClassName} px-3 py-1.5`}
+                  onClick={
+                    trainingPromptSentenceId === currentSentence.id
+                      ? handleConfirmSentencePractice
+                      : handlePracticeSentence
+                  }
+                >
+                  {trainingPromptSentenceId === currentSentence.id
+                    ? "我练过了"
+                    : practicedSentenceIds.has(currentSentence.id)
+                      ? "再练一次"
+                      : "练这句"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {showDesktopDetailPanel ? (
+        <div
+          className={cn(
+            "transition-all duration-200",
+            currentSentence || chunkDetail
+              ? "opacity-100 translate-x-0"
+              : "opacity-95 translate-x-0.5",
+          )}
+        >
+          <SelectionDetailPanel
+            currentBlock={isDialogueScene ? currentBlock : null}
+            currentSentence={mobileDisplaySentence}
+            chunkDetail={chunkDetail}
+            relatedChunks={relatedChunks}
+            showSpeaker={isDialogueScene}
+            sentenceSectionLabel={sentenceSectionLabel}
+            loading={false}
+            speakingText={effectiveSpeakingText}
+            loadingText={effectiveLoadingText}
+            onSave={handleSave}
+            onReview={handleAddReview}
+            saved={chunkSaved}
+            onPronounce={handlePronounce}
+            onPronounceBlock={() => {
+              if (currentBlock) {
+                void playBlockTts(currentBlock);
+                return;
+              }
+              if (mobileDisplaySentence) {
+                handlePronounce(
+                  mobileDisplaySentence.tts?.trim() ||
+                    mobileDisplaySentence.audioText?.trim() ||
+                    mobileDisplaySentence.text,
+                );
+              }
+            }}
+            onSelectRelated={(chunk) => {
+              const targetSentenceId = resolveSentenceIdForChunk(chunk);
+              if (!targetSentenceId) return;
+              activateChunk(targetSentenceId, chunk);
+            }}
+            hoveredChunkKey={state.hoveredChunkKey}
+            onHoverChunk={(chunkKey) =>
+              dispatchAction({ type: "CHUNK_HOVERED", payload: { chunkKey } })
             }
-            if (mobileDisplaySentence) {
-              handlePronounce(
-                mobileDisplaySentence.tts?.trim() ||
-                  mobileDisplaySentence.audioText?.trim() ||
-                  mobileDisplaySentence.text,
-              );
-            }
-          }}
-          onSelectRelated={(chunk) => {
-            const targetSentenceId = resolveSentenceIdForChunk(chunk);
-            if (!targetSentenceId) return;
-            activateChunk(targetSentenceId, chunk);
-          }}
-          hoveredChunkKey={state.hoveredChunkKey}
-          onHoverChunk={(chunkKey) =>
-            dispatchAction({ type: "CHUNK_HOVERED", payload: { chunkKey } })
-          }
-          playingChunkKey={playbackState.kind === "chunk" ? (playbackState.text ?? null) : null}
-          loadingChunkKey={loadingChunkKey}
-        />
-      </div>
+            playingChunkKey={playbackState.kind === "chunk" ? (playbackState.text ?? null) : null}
+            loadingChunkKey={loadingChunkKey}
+          />
+        </div>
+      ) : null}
 
       <SelectionDetailSheet
         currentBlock={isDialogueScene ? currentBlock : null}
@@ -1429,7 +1617,12 @@ export function LessonReader({
         loading={false}
         speakingText={effectiveSpeakingText}
         loadingText={effectiveLoadingText}
-        onOpenChange={setSheetOpen}
+        onOpenChange={(open) => {
+          setSheetOpen(open);
+          if (!open && isTrainingMode) {
+            setDetailVisible(false);
+          }
+        }}
         onSave={handleSave}
         onReview={handleAddReview}
         saved={chunkSaved}

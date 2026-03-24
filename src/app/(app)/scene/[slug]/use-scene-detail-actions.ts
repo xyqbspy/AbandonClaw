@@ -33,6 +33,7 @@ type UseSceneDetailActionsArgs = {
   setActiveVariantId: (variantId: string | null) => void;
   setViewModeWithRoute: (viewMode: "scene" | "practice" | "variants" | "expression-map" | "variant-study", variantId?: string | null) => void;
   refreshGeneratedState: (sceneKey: string) => void;
+  onLearningStateChange?: (state: Awaited<ReturnType<typeof completeSceneLearningFromApi>>) => void;
 };
 
 export function useSceneDetailActions({
@@ -43,6 +44,7 @@ export function useSceneDetailActions({
   setActiveVariantId,
   setViewModeWithRoute,
   refreshGeneratedState,
+  onLearningStateChange,
 }: UseSceneDetailActionsArgs) {
   const [practiceLoading, setPracticeLoading] = useState(false);
   const [variantsLoading, setVariantsLoading] = useState(false);
@@ -133,6 +135,9 @@ export function useSceneDetailActions({
     refreshGeneratedState(baseLesson.id);
     setSceneCompleting(true);
     void completeSceneLearningFromApi(baseLesson.slug)
+      .then((result) => {
+        onLearningStateChange?.(result);
+      })
       .catch(() => {
         // Non-blocking.
       })
@@ -147,6 +152,9 @@ export function useSceneDetailActions({
     refreshGeneratedState(baseLesson.id);
     setSceneCompleting(true);
     void completeSceneLearningFromApi(baseLesson.slug)
+      .then((result) => {
+        onLearningStateChange?.(result);
+      })
       .catch(() => {
         // Non-blocking.
       })
@@ -159,13 +167,16 @@ export function useSceneDetailActions({
     if (!baseLesson || sceneCompleting) return;
     setSceneCompleting(true);
     void completeSceneLearningFromApi(baseLesson.slug)
+      .then((result) => {
+        onLearningStateChange?.(result);
+      })
       .catch(() => {
         // Non-blocking.
       })
       .finally(() => {
         setSceneCompleting(false);
       });
-  }, [baseLesson, sceneCompleting]);
+  }, [baseLesson, onLearningStateChange, sceneCompleting]);
 
   const handleOpenVariant = useCallback(
     (variantId: string) => {

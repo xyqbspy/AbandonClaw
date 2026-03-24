@@ -22,17 +22,51 @@ export interface SceneLearningProgressResponse {
     sceneId: string;
     status: "not_started" | "in_progress" | "completed" | "paused";
     progressPercent: number;
+    masteryStage:
+      | "listening"
+      | "focus"
+      | "sentence_practice"
+      | "scene_practice"
+      | "variant_unlocked"
+      | "mastered";
+    masteryPercent: number;
+    focusedExpressionCount: number;
+    practicedSentenceCount: number;
+    scenePracticeCount: number;
+    variantUnlockedAt: string | null;
     lastSentenceIndex: number | null;
     lastVariantIndex: number | null;
     startedAt: string | null;
     lastViewedAt: string | null;
     completedAt: string | null;
+    lastPracticedAt: string | null;
     totalStudySeconds: number;
     todayStudySeconds: number;
     savedPhraseCount: number;
     createdAt: string;
     updatedAt: string;
   };
+  session: {
+    id: string;
+    sceneId: string;
+    currentStep:
+      | "listen"
+      | "focus_expression"
+      | "practice_sentence"
+      | "scene_practice"
+      | "done";
+    selectedBlockId: string | null;
+    fullPlayCount: number;
+    openedExpressionCount: number;
+    practicedSentenceCount: number;
+    scenePracticeCompleted: boolean;
+    isDone: boolean;
+    startedAt: string;
+    endedAt: string | null;
+    lastActiveAt: string;
+    createdAt: string;
+    updatedAt: string;
+  } | null;
 }
 
 export interface UpdateSceneLearningProgressPayload {
@@ -116,6 +150,32 @@ export async function completeSceneLearningFromApi(
   });
 }
 
+export async function recordSceneTrainingEventFromApi(
+  sceneSlug: string,
+  payload: {
+    event:
+      | "full_play"
+      | "open_expression"
+      | "practice_sentence"
+      | "scene_practice_complete";
+    selectedBlockId?: string;
+  },
+) {
+  return withDashboardCacheInvalidation(async () => {
+    const response = await fetch(`/api/learning/scenes/${encodeURIComponent(sceneSlug)}/training`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      throw await toApiError(response, "记录场景训练步骤失败。");
+    }
+    return (await response.json()) as SceneLearningProgressResponse;
+  });
+}
+
 export interface LearningDashboardOverviewResponse {
   streakDays: number;
   completedScenesCount: number;
@@ -130,6 +190,14 @@ export interface LearningDashboardContinueResponse {
   title: string;
   subtitle: string | null;
   progressPercent: number;
+  masteryStage:
+    | "listening"
+    | "focus"
+    | "sentence_practice"
+    | "scene_practice"
+    | "variant_unlocked"
+    | "mastered";
+  masteryPercent: number;
   lastViewedAt: string | null;
   lastSentenceIndex: number | null;
   estimatedMinutes: number | null;

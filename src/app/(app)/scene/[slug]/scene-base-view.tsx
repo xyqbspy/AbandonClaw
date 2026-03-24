@@ -17,24 +17,37 @@ export function SceneBaseView({
   lesson,
   practiceError,
   variantsError,
+  trainingPanel,
   headerTools,
+  interactionMode = "default",
   savedPhraseTexts,
   onSavePhrase,
   onReviewPhrase,
+  onSceneLoopPlayback,
   onChunkEncounter,
+  onSentencePracticeComplete,
   chunkDetailSheet,
 }: {
   lesson: Lesson;
   practiceError: string | null;
   variantsError: string | null;
+  trainingPanel?: ReactNode;
   headerTools: ReactNode;
+  interactionMode?: "default" | "training";
   savedPhraseTexts: string[];
   onSavePhrase: (payload: SavePhrasePayload) => Promise<{ created: boolean }>;
   onReviewPhrase: (payload: SavePhrasePayload) => Promise<{ created: boolean }>;
+  onSceneLoopPlayback?: (payload: { lesson: Lesson }) => void;
   onChunkEncounter?: (payload: {
     lesson: Lesson;
     sentence: import("@/lib/types").LessonSentence;
     chunkText: string;
+    blockId?: string;
+  }) => void;
+  onSentencePracticeComplete?: (payload: {
+    lesson: Lesson;
+    sentence: import("@/lib/types").LessonSentence;
+    blockId?: string;
   }) => void;
   chunkDetailSheet: ReactNode;
 }) {
@@ -43,14 +56,20 @@ export function SceneBaseView({
       {practiceError ? <p className="text-sm text-destructive">{practiceError}</p> : null}
       {variantsError ? <p className="text-sm text-destructive">{variantsError}</p> : null}
 
-      <LessonReader
-        lesson={lesson}
-        headerTools={headerTools}
-        savedPhraseTexts={savedPhraseTexts}
-        onSavePhrase={onSavePhrase}
-        onReviewPhrase={onReviewPhrase}
-        onChunkEncounter={onChunkEncounter}
-      />
+      {trainingPanel}
+      <div className="relative">
+        <LessonReader
+          lesson={lesson}
+          headerTools={headerTools}
+          interactionMode={interactionMode}
+          savedPhraseTexts={savedPhraseTexts}
+          onSavePhrase={onSavePhrase}
+          onReviewPhrase={onReviewPhrase}
+          onSceneLoopPlayback={onSceneLoopPlayback}
+          onChunkEncounter={onChunkEncounter}
+          onSentencePracticeComplete={onSentencePracticeComplete}
+        />
+      </div>
       {chunkDetailSheet}
     </div>
   );

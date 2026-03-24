@@ -15,6 +15,8 @@ export const resolveContinueLearning = (
         title: sceneList[0].title,
         subtitle: sceneList[0].subtitle,
         progressPercent: sceneList[0].progressPercent,
+        masteryStage: "listening",
+        masteryPercent: Math.min(sceneList[0].progressPercent, 20),
         lastViewedAt: sceneList[0].lastViewedAt,
         lastSentenceIndex: null,
         estimatedMinutes: sceneList[0].estimatedMinutes,
@@ -50,7 +52,9 @@ export const buildTodayTasks = ({
     done: sceneDone,
     actionHref: continueLearning ? `/scene/${continueLearning.sceneSlug}` : "/scenes",
     status: sceneDone ? "done" : "up_next",
-    actionLabel: sceneDone ? "已完成" : `开始（${continueLearning?.estimatedMinutes ?? 12} 分钟）`,
+    actionLabel: sceneDone
+      ? "已完成"
+      : `开始（${continueLearning?.estimatedMinutes ?? 12} 分钟）`,
   };
 
   const outputTask: DailyTask = {
@@ -63,31 +67,22 @@ export const buildTodayTasks = ({
     done: outputDone,
     actionHref: "/chunks",
     status: outputDone ? "done" : sceneDone ? "up_next" : "locked",
-    actionLabel: outputDone
-      ? "已完成"
-      : sceneDone
-        ? "去沉淀"
-        : "先完成场景",
+    actionLabel: outputDone ? "已完成" : sceneDone ? "去沉淀" : "先完成场景",
   };
 
   const reviewTask: DailyTask = {
     id: "task-review",
     title: labels.taskReviewTitle,
-    description:
-      sceneDone
-        ? dashboard.todayTasks.reviewTask.dueReviewCount > 0
-          ? `当前待复习 ${dashboard.todayTasks.reviewTask.dueReviewCount} 条，今天已完成 ${dashboard.todayTasks.reviewTask.reviewItemsCompleted} 条。`
-          : `今天已完成 ${dashboard.todayTasks.reviewTask.reviewItemsCompleted} 条复习。`
-        : "先完成今天的场景输入，再进入复习会更顺。",
+    description: sceneDone
+      ? dashboard.todayTasks.reviewTask.dueReviewCount > 0
+        ? `当前待复习 ${dashboard.todayTasks.reviewTask.dueReviewCount} 条，今天已完成 ${dashboard.todayTasks.reviewTask.reviewItemsCompleted} 条。`
+        : `今天已完成 ${dashboard.todayTasks.reviewTask.reviewItemsCompleted} 条复习。`
+      : "先完成今天的场景输入，再进入复习会更顺。",
     durationMinutes: 8,
     done: reviewDone,
     actionHref: "/review",
     status: reviewDone ? "done" : sceneDone ? (outputDone ? "up_next" : "available") : "locked",
-    actionLabel: reviewDone
-      ? "已完成"
-      : sceneDone
-        ? "去复习"
-        : "先完成场景",
+    actionLabel: reviewDone ? "已完成" : sceneDone ? "去复习" : "先完成场景",
   };
 
   return [sceneTask, outputTask, reviewTask];

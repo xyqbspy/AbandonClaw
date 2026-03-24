@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef } from "react";
 import { Lesson } from "@/lib/types";
 import {
   pauseSceneLearningFromApi,
+  SceneLearningProgressResponse,
   startSceneLearningFromApi,
   updateSceneLearningProgressFromApi,
 } from "@/lib/utils/learning-api";
@@ -46,11 +47,13 @@ export const useSceneLearningSync = ({
   baseLesson,
   viewMode,
   activeVariantId,
+  onLearningStateChange,
   deps = defaultDeps,
 }: {
   baseLesson: Lesson | null;
   viewMode: SceneViewMode;
   activeVariantId?: string | null;
+  onLearningStateChange?: (state: SceneLearningProgressResponse) => void;
   deps?: UseSceneLearningSyncDeps;
 }) => {
   const learningStartedRef = useRef(false);
@@ -94,9 +97,17 @@ export const useSceneLearningSync = ({
           lastVariantIndex: payload.lastVariantIndex,
           studySecondsDelta,
         })
-        .then(() => {
+        .then((result) => {
+          if (result && onLearningStateChange) {
+            onLearningStateChange(result);
+          }
           if (payload.withPause) {
-            return deps.pauseSceneLearningFromApi(baseLesson.slug);
+            return deps.pauseSceneLearningFromApi(baseLesson.slug).then((pauseResult) => {
+              if (pauseResult && onLearningStateChange) {
+                onLearningStateChange(pauseResult);
+              }
+              return pauseResult;
+            });
           }
           return undefined;
         })
@@ -104,17 +115,23 @@ export const useSceneLearningSync = ({
           // Non-blocking.
         });
     },
-    [baseLesson, computeElapsedSecondsSinceLastSync, deps],
+    [baseLesson, computeElapsedSecondsSinceLastSync, deps, onLearningStateChange],
   );
 
   useEffect(() => {
     if (!baseLesson || learningStartedRef.current) return;
     learningStartedRef.current = true;
     lastProgressSyncMsRef.current = deps.now();
-    void deps.startSceneLearningFromApi(baseLesson.slug).catch(() => {
-      // Non-blocking: scene reading should still work if progress API fails temporarily.
-    });
-  }, [baseLesson, deps]);
+    void deps.startSceneLearningFromApi(baseLesson.slug)
+      .then((result) => {
+        if (result && onLearningStateChange) {
+          onLearningStateChange(result);
+        }
+      })
+      .catch(() => {
+        // Non-blocking: scene reading should still work if progress API fails temporarily.
+      });
+  }, [baseLesson, deps, onLearningStateChange]);
 
   useEffect(() => {
     currentViewModeRef.current = viewMode;

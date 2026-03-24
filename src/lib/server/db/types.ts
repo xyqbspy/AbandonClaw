@@ -57,6 +57,19 @@ export interface AiCacheRow {
 }
 
 export type LearningStatus = "not_started" | "in_progress" | "completed" | "paused";
+export type SceneMasteryStage =
+  | "listening"
+  | "focus"
+  | "sentence_practice"
+  | "scene_practice"
+  | "variant_unlocked"
+  | "mastered";
+export type SceneTrainingStep =
+  | "listen"
+  | "focus_expression"
+  | "practice_sentence"
+  | "scene_practice"
+  | "done";
 
 export interface UserSceneProgressRow {
   id: string;
@@ -64,14 +77,39 @@ export interface UserSceneProgressRow {
   scene_id: string;
   status: LearningStatus;
   progress_percent: number;
+  mastery_stage: SceneMasteryStage;
+  mastery_percent: number;
   last_sentence_index: number | null;
   last_variant_index: number | null;
   started_at: string | null;
   last_viewed_at: string | null;
   completed_at: string | null;
+  variant_unlocked_at: string | null;
+  last_practiced_at: string | null;
   total_study_seconds: number;
   today_study_seconds: number;
   saved_phrase_count: number;
+  focused_expression_count: number;
+  practiced_sentence_count: number;
+  scene_practice_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UserSceneSessionRow {
+  id: string;
+  user_id: string;
+  scene_id: string;
+  current_step: SceneTrainingStep;
+  selected_block_id: string | null;
+  full_play_count: number;
+  opened_expression_count: number;
+  practiced_sentence_count: number;
+  scene_practice_completed: boolean;
+  is_done: boolean;
+  started_at: string;
+  ended_at: string | null;
+  last_active_at: string;
   created_at: string;
   updated_at: string;
 }
