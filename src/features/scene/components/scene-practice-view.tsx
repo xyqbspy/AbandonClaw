@@ -15,6 +15,7 @@ import {
   hasPracticeAssessmentImproved,
   isPracticeAssessmentComplete,
 } from "@/lib/shared/scene-practice-assessment";
+import { getPracticeModeLabel } from "@/lib/shared/scene-training-copy";
 import {
   getPracticeAssessmentMessage,
   getPracticeCompletionHint,
@@ -193,6 +194,28 @@ export function ScenePracticeView({
   const incorrectExercisesAcrossModules = allTypingExercises.filter(
     (exercise) => (incorrectCountMap[exercise.id] ?? 0) > 0,
   );
+  const getLocalizedModeDescription = (mode: PracticeMode) => {
+    if (mode === "cloze") return "首发题型先从填空开始，帮助你抓住场景里的关键表达。";
+    if (mode === "guided_recall") return "先看到前半句，再把后半句主动提取出来，训练句子骨架和表达衔接。";
+    if (mode === "sentence_recall") return "只给你中文提示，整句完整复现，训练句子从理解到主动输出的闭环。";
+    return "最后一层直接默写整段，把场景从局部提取推进到连续复现。";
+  };
+  const getLocalizedCompletionRequirement = (mode: PracticeMode) => {
+    if (mode === "cloze") return "先完成本轮全部填空题，才能进入下一步的半句复现。";
+    if (mode === "guided_recall") return "先完成填空，再完成本轮半句复现。";
+    if (mode === "sentence_recall") return "先完成半句复现，再完成本轮整句复现。";
+    return "完成整句复现后，再完成本轮全文默写。";
+  };
+  const getLocalizedExercisePrompt = (
+    exercise: (typeof exercises)[number] | null | undefined,
+  ) => {
+    const practiceMode = exercise?.metadata?.practiceMode;
+    if (practiceMode === "guided_recall") return "看到前半句，补出后半句";
+    if (practiceMode === "sentence_recall") return "看中文提示，完整复现这句";
+    if (practiceMode === "full_dictation") return "根据整段中文提示，默写全文";
+    if (exercise?.type === "translation_prompt") return "看中文提示，完整复现这句";
+    return exercise?.prompt ?? labels.clozePrompt;
+  };
   const practiceEntryTitle = activeModule?.title?.trim() || practiceSet?.title?.trim() || labels.practiceEntryTitle;
   const practiceModeLabel =
     activeModule?.modeLabel?.trim() || practiceSet?.modeLabel?.trim() || "填空练习";
@@ -201,6 +224,17 @@ export function ScenePracticeView({
     activeModule?.completionRequirement?.trim() ||
     practiceSet?.completionRequirement?.trim() ||
     "完成首发练习模块：答对当前题组后，再点击“完成本轮练习”。";
+  const localizedPracticeModeLabel = getPracticeModeLabel(activeModule?.mode ?? practiceSet?.mode ?? "cloze");
+  const localizedPracticeDescription = activeModule
+    ? getLocalizedModeDescription(activeModule.mode)
+    : practiceSet?.mode
+      ? getLocalizedModeDescription(practiceSet.mode)
+      : labels.practiceHint;
+  const localizedCompletionRequirement = activeModule
+    ? getLocalizedCompletionRequirement(activeModule.mode)
+    : practiceSet?.mode
+      ? getLocalizedCompletionRequirement(practiceSet.mode)
+      : "完成首发练习模块后，再点击“完成本轮练习”。";
   const completedModuleCount = modules.filter((module) => moduleCompletionMap[module.mode]).length;
   const allModulesCompleted = modules.length === 0 || completedModuleCount === modules.length;
   const isCompletedPractice = practiceSet?.status === "completed";
@@ -222,7 +256,7 @@ export function ScenePracticeView({
     allModulesCompleted: summaryAllModulesCompleted,
     allTypingCompleted,
     hasNextModule,
-    nextModuleLabel: nextModule?.modeLabel,
+    nextModuleLabel: nextModule ? getPracticeModeLabel(nextModule.mode) : null,
     labels,
   });
 
@@ -275,7 +309,7 @@ export function ScenePracticeView({
       const modeKey = `${practiceSet.id}:${module.mode}`;
       if (reportedModeCompletionRef.current.has(modeKey)) return;
       reportedModeCompletionRef.current.add(modeKey);
-      setLatestMilestone(notifyPracticeModuleCompleted(labels, module.modeLabel));
+      setLatestMilestone(notifyPracticeModuleCompleted(labels, getPracticeModeLabel(module.mode)));
       onPracticeModeComplete({
         practiceSetId: practiceSet.id,
         mode: module.mode,
@@ -290,7 +324,7 @@ export function ScenePracticeView({
       if (reportedUnlockedModesRef.current.has(module.mode)) return;
       reportedUnlockedModesRef.current.add(module.mode);
       if (modules[0]?.mode === module.mode) return;
-      setLatestMilestone(notifyPracticeModuleUnlocked(labels, module.modeLabel));
+      setLatestMilestone(notifyPracticeModuleUnlocked(labels, getPracticeModeLabel(module.mode)));
     });
   }, [labels.moduleUnlockedPrefix, modules, unlockedModes]);
 
@@ -323,7 +357,7 @@ export function ScenePracticeView({
           <p className="text-base font-semibold text-foreground">{practiceEntryTitle}</p>
           <p className="text-sm text-muted-foreground">
             {labels.practiceModePrefix}
-            {practiceModeLabel}
+            {localizedPracticeModeLabel}
           </p>
         </div>
 
@@ -350,7 +384,7 @@ export function ScenePracticeView({
                     setActiveExerciseIndex(0);
                   }}
                 >
-                  {module.modeLabel}
+                  {getPracticeModeLabel(module.mode)}
                   {done ? " · 已完成" : !unlocked ? " · 未解锁" : ""}
                 </button>
               );
@@ -396,8 +430,8 @@ export function ScenePracticeView({
               {sourceText}
             </p>
           )}
-          <p className="mt-1">{practiceDescription}</p>
-          <p className="mt-1">{completionRequirement}</p>
+          <p className="mt-1">{localizedPracticeDescription}</p>
+          <p className="mt-1">{localizedCompletionRequirement}</p>
           {practiceSet ? (
             <>
               <p className="mt-1">模块进度：{correctCount}/{typingCount}</p>
@@ -497,7 +531,7 @@ export function ScenePracticeView({
                   {incorrectExercisesAcrossModules.map((exercise) => (
                     <li key={exercise.id}>
                       {exercise.chunkId ?? exercise.id}
-                      {exercise.prompt ? ` - ${exercise.prompt}` : ""}
+                      {getLocalizedExercisePrompt(exercise) ? ` - ${getLocalizedExercisePrompt(exercise)}` : ""}
                     </li>
                   ))}
                 </ul>
@@ -597,7 +631,7 @@ export function ScenePracticeView({
                 className="rounded-md bg-[rgb(240,240,240)] p-3 text-sm"
               >
                 <p className="text-xs text-muted-foreground">{activeExercise.type}</p>
-                <p className="mt-1">{activeExercise.prompt ?? labels.clozePrompt}</p>
+                <p className="mt-1">{getLocalizedExercisePrompt(activeExercise)}</p>
                 {activeExercise.cloze?.displayText ? (
                   <div className="mt-2 rounded-md bg-white px-3 py-2 text-[15px] leading-6">
                     {activeExercise.cloze.displayText}

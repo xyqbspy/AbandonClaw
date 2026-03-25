@@ -263,6 +263,55 @@ test("ScenePracticeView 支持填空题输入并判断正确", async () => {
   });
 });
 
+test("ScenePracticeView 会把英文题型提示统一显示为中文", () => {
+  render(
+    <ScenePracticeView
+      practiceSet={{
+        ...practiceSet,
+        mode: "guided_recall",
+        modeLabel: "guided recall",
+        description: "continue with guided recall",
+        completionRequirement: "finish guided recall",
+        modules: [
+          {
+            ...practiceSet.modules![0]!,
+            mode: "guided_recall",
+            modeLabel: "guided recall",
+            description: "continue with guided recall",
+            completionRequirement: "finish guided recall",
+            exercises: [
+              {
+                ...practiceSet.modules![1]!.exercises[0]!,
+                metadata: {
+                  practiceMode: "guided_recall",
+                },
+                prompt: "Complete the second half.",
+              },
+            ],
+          },
+        ],
+      }}
+      showAnswerMap={{}}
+      appleButtonSmClassName="btn"
+      appleDangerButtonSmClassName="danger"
+      labels={sceneViewLabels.practice}
+      onBack={() => undefined}
+      onDelete={() => undefined}
+      onComplete={() => undefined}
+      onReviewScene={() => undefined}
+      onOpenVariants={() => undefined}
+      onToggleAnswer={() => undefined}
+    />,
+  );
+
+  assert.ok(screen.getByText(hasTextContent("当前题型：半句复现")));
+  assert.ok(screen.getByText("先看到前半句，再把后半句主动提取出来，训练句子骨架和表达衔接。"));
+  assert.ok(screen.getByText("先完成填空，再完成本轮半句复现。"));
+  assert.ok(screen.getByText("看到前半句，补出后半句"));
+  assert.equal(screen.queryByText(/guided recall/i), null);
+  assert.equal(screen.queryByText(/complete the second half/i), null);
+});
+
 test("ScenePracticeView 在来源为 variant 时会展示变体与原场景说明", () => {
   render(
     <ScenePracticeView
