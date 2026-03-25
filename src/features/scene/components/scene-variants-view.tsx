@@ -15,6 +15,7 @@ type SceneVariantsViewProps = {
   labels: SceneVariantsViewLabels;
   onBack: () => void;
   onComplete: () => void;
+  onRepeatVariants?: () => void;
   onDeleteSet: () => void;
   onOpenExpressionMap: () => void;
   onOpenChunk: (chunk: string) => void;
@@ -34,6 +35,7 @@ export function SceneVariantsView({
   labels,
   onBack,
   onComplete,
+  onRepeatVariants,
   onDeleteSet,
   onOpenExpressionMap,
   onOpenChunk,
@@ -54,14 +56,24 @@ export function SceneVariantsView({
           >
             {labels.back}
           </button>
-          <button
-            type="button"
-            className={`h-8 whitespace-nowrap ${appleButtonSmClassName} disabled:opacity-60`}
-            onClick={onComplete}
-            disabled={!variantSet || variantSet.status === "completed"}
-          >
-            {labels.complete}
-          </button>
+          {variantSet?.status === "completed" && onRepeatVariants ? (
+            <button
+              type="button"
+              className={`h-8 whitespace-nowrap ${appleButtonSmClassName}`}
+              onClick={onRepeatVariants}
+            >
+              再练一遍
+            </button>
+          ) : (
+            <button
+              type="button"
+              className={`h-8 whitespace-nowrap ${appleButtonSmClassName} disabled:opacity-60`}
+              onClick={onComplete}
+              disabled={!variantSet || variantSet.status === "completed"}
+            >
+              {labels.complete}
+            </button>
+          )}
           <button
             type="button"
             className={`h-8 whitespace-nowrap px-3 ${appleDangerButtonSmClassName} disabled:opacity-60`}

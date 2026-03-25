@@ -9,10 +9,10 @@ import { normalizePhraseText } from "@/lib/shared/phrases";
 import { buildChunkAudioKey } from "@/lib/shared/tts";
 import {
   playChunkAudio,
-  prefetchChunkAudio,
   regenerateChunkAudioBatch,
   stopTtsPlayback,
 } from "@/lib/utils/tts-api";
+import { scheduleChunkAudioWarmup } from "@/lib/utils/resource-actions";
 import { generateExpressionMapFromApi } from "@/lib/utils/expression-map-api";
 import { ExpressionCluster, ExpressionMapResponse } from "@/lib/types/expression-map";
 import {
@@ -1185,22 +1185,10 @@ export default function ChunksPage() {
     const timer = window.setTimeout(() => {
       const warmupItems = phrases.slice(0, 6);
       for (const item of warmupItems) {
-        const text = item.text.trim();
-        if (text) {
-          void prefetchChunkAudio({
-            chunkText: text,
-            chunkKey: buildChunkAudioKey(text),
-          });
-        }
-
-        const exampleText =
-          item.exampleSentences[0]?.en?.trim() || item.sourceSentenceText?.trim() || "";
-        if (exampleText) {
-          void prefetchChunkAudio({
-            chunkText: exampleText,
-            chunkKey: buildChunkAudioKey(exampleText),
-          });
-        }
+        scheduleChunkAudioWarmup([
+          item.text.trim(),
+          item.exampleSentences[0]?.en?.trim() || item.sourceSentenceText?.trim() || "",
+        ]);
       }
     }, 120);
 
@@ -1284,12 +1272,7 @@ export default function ChunksPage() {
       ];
 
       for (const text of candidateTexts) {
-        const clean = (text ?? "").trim();
-        if (!clean) continue;
-        void prefetchChunkAudio({
-          chunkText: clean,
-          chunkKey: buildChunkAudioKey(clean),
-        });
+        scheduleChunkAudioWarmup([(text ?? "").trim()], { limit: 1 });
       }
     }, 80);
 

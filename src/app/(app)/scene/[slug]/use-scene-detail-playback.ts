@@ -7,14 +7,14 @@ import { getLessonSentences } from "@/lib/shared/lesson-content";
 import { Lesson, LessonSentence, SelectionChunkLayer } from "@/lib/types";
 import { VariantSet } from "@/lib/types/learning-flow";
 import { trackChunksFromApi } from "@/lib/utils/chunks-api";
+import { getSentenceSpeakText } from "@/lib/utils/audio-warmup";
 import {
   playChunkAudio,
   playSentenceAudio,
-  prefetchChunkAudio,
-  prefetchSentenceAudio,
   setTtsLooping,
   stopTtsPlayback,
 } from "@/lib/utils/tts-api";
+import { scheduleChunkAudioWarmup, scheduleLessonAudioWarmup } from "@/lib/utils/resource-actions";
 
 import { findChunkContext } from "./scene-detail-logic";
 
@@ -61,28 +61,11 @@ export function useSceneDetailPlayback({
     if (!warmupLesson) return;
 
     const timer = window.setTimeout(() => {
-      const sentences = getLessonSentences(warmupLesson).slice(0, 2);
-      for (const sentence of sentences) {
-        const text = (sentence.tts?.trim() || sentence.audioText?.trim() || sentence.text).trim();
-        if (!text) continue;
-        void prefetchSentenceAudio({
-          sceneSlug: warmupLesson.slug,
-          sentenceId: sentence.id,
-          text,
-          speaker: sentence.speaker,
-          mode: "normal",
-        });
-      }
-
-      const firstSentence = sentences[0];
-      for (const chunkText of firstSentence?.chunks.slice(0, 2) ?? []) {
-        const clean = chunkText.trim();
-        if (!clean) continue;
-        void prefetchChunkAudio({
-          chunkText: clean,
-          chunkKey: buildChunkAudioKey(clean),
-        });
-      }
+      scheduleLessonAudioWarmup(warmupLesson, {
+        sentenceLimit: 2,
+        chunkLimit: 2,
+        key: `scene-playback:${warmupLesson.id}:${viewMode}`,
+      });
     }, 120);
 
     return () => {
@@ -94,25 +77,42 @@ export function useSceneDetailPlayback({
     if (!variantChunkModalOpen || !variantChunkSentence) return;
 
     const sentenceText =
-      (variantChunkSentence.tts?.trim() ||
-        variantChunkSentence.audioText?.trim() ||
-        variantChunkSentence.text).trim();
+      getSentenceSpeakText(variantChunkSentence);
     if (sentenceText) {
-      void prefetchSentenceAudio({
-        sceneSlug: (baseLesson?.slug ?? sceneSlug).trim() || "scene",
-        sentenceId: variantChunkSentence.id,
-        text: sentenceText,
-        speaker: variantChunkSentence.speaker,
-        mode: "normal",
-      });
+      scheduleLessonAudioWarmup(
+        {
+          id: `warmup-${variantChunkSentence.id}`,
+          slug: (baseLesson?.slug ?? sceneSlug).trim() || "scene",
+          title: "warmup",
+          difficulty: "Beginner",
+          estimatedMinutes: 1,
+          completionRate: 0,
+          tags: [],
+          sections: [
+            {
+              id: "warmup-section",
+              blocks: [
+                {
+                  id: "warmup-block",
+                  speaker: variantChunkSentence.speaker,
+                  sentences: [variantChunkSentence],
+                },
+              ],
+            },
+          ],
+          explanations: [],
+        },
+        {
+          sentenceLimit: 1,
+          chunkLimit: 0,
+          key: `scene-variant-sentence:${variantChunkSentence.id}`,
+        },
+      );
     }
 
     const chunkText = variantChunkDetail?.text?.trim();
     if (!chunkText) return;
-    void prefetchChunkAudio({
-      chunkText,
-      chunkKey: buildChunkAudioKey(chunkText),
-    });
+    scheduleChunkAudioWarmup([chunkText], { limit: 1 });
   }, [baseLesson, sceneSlug, variantChunkDetail, variantChunkModalOpen, variantChunkSentence]);
 
   const handlePronounce = useCallback(

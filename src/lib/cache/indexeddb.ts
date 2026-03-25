@@ -113,6 +113,19 @@ export async function idbDeleteSceneRecord(key: string): Promise<boolean> {
   return Boolean(result);
 }
 
+export async function idbGetAllSceneRecordKeys(): Promise<string[]> {
+  const result = await withStore(STORE_SCENE_RECORDS, "readonly", async (store) => {
+    if (typeof store.getAllKeys === "function") {
+      const req = store.getAllKeys();
+      return requestToPromise(req);
+    }
+    return [] as IDBValidKey[];
+  });
+  return Array.isArray(result)
+    ? result.filter((key): key is string => typeof key === "string")
+    : [];
+}
+
 export async function idbGetMeta<T>(key: string): Promise<T | null> {
   const result = await withStore(STORE_META, "readonly", async (store) => {
     const req = store.get(key);

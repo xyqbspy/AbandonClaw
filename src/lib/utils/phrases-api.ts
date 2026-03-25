@@ -1,5 +1,5 @@
-import { clearLearningDashboardCache } from "@/lib/cache/learning-dashboard-cache";
 import { normalizePhraseText } from "@/lib/shared/phrases";
+import { invalidateAfterPhraseMutation } from "@/lib/utils/cache-actions";
 
 interface ApiErrorBody {
   error?: string;
@@ -102,9 +102,7 @@ export async function savePhraseFromApi(payload: {
     userPhrase: { id: string };
     expressionClusterId: string | null;
   };
-  void clearLearningDashboardCache().catch(() => {
-    // Non-blocking.
-  });
+  invalidateAfterPhraseMutation();
   return data;
 }
 
@@ -144,9 +142,7 @@ export async function savePhrasesBatchFromApi(payload: {
       expressionClusterId: string | null;
     }>;
   };
-  void clearLearningDashboardCache().catch(() => {
-    // Non-blocking.
-  });
+  invalidateAfterPhraseMutation();
   return data;
 }
 

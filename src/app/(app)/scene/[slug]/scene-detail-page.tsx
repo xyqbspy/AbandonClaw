@@ -11,15 +11,18 @@ import { sceneViewLabels } from "@/features/scene/components/scene-view-labels";
 import { normalizePhraseText } from "@/lib/shared/phrases";
 import { Lesson } from "@/lib/types";
 import { savePhraseFromApi } from "@/lib/utils/phrases-api";
+import { hydrateVariantSetFromRun } from "@/lib/utils/scene-learning-flow-storage";
 import {
   completeScenePracticeRunFromApi,
   getScenePracticeSnapshotFromApi,
+  getSceneVariantRunSnapshotFromApi,
   markScenePracticeModeCompleteFromApi,
   recordSceneTrainingEventFromApi,
   recordScenePracticeAttemptFromApi,
   ScenePracticeSnapshotResponse,
   SceneLearningProgressResponse,
   startScenePracticeRunFromApi,
+  startSceneVariantRunFromApi,
 } from "@/lib/utils/learning-api";
 import {
   APPLE_BUTTON_BASE,
@@ -27,6 +30,7 @@ import {
   APPLE_BUTTON_TEXT_LG,
   APPLE_BUTTON_TEXT_SM,
 } from "@/lib/ui/apple-style";
+import { scheduleIdleAction } from "@/lib/utils/resource-actions";
 
 import { useSceneDetailActions } from "./use-scene-detail-actions";
 import { SceneBaseView } from "./scene-base-view";
@@ -84,6 +88,9 @@ function SceneTrainingCoachFloatingEntry({
   practiceModeLabel,
   practiceSnapshot,
   practiceModuleCount,
+  currentStepActionLabel,
+  onCurrentStepAction,
+  currentStepActionDisabled,
 }: {
   sceneId: string;
   trainingState: SceneLearningProgressResponse | null;
@@ -92,6 +99,9 @@ function SceneTrainingCoachFloatingEntry({
   practiceModeLabel?: string | null;
   practiceSnapshot: ScenePracticeSnapshotResponse | null;
   practiceModuleCount: number;
+  currentStepActionLabel: string | null;
+  onCurrentStepAction?: (() => void) | null;
+  currentStepActionDisabled?: boolean;
 }) {
   const [panelOpen, setPanelOpen] = useState(false);
   const [position, setPosition] = useState({ x: 0, y: 0 });
@@ -125,13 +135,14 @@ function SceneTrainingCoachFloatingEntry({
 
   const session = trainingState?.session;
   const progress = trainingState?.progress;
-  const positionStorageKey = `scene-training-fab-position:${sceneId}`;
-  const iconSize = 44;
-  const viewportGap = 12;
-  const topGap = 88;
   const viewportWidth = viewportSize.width || (typeof window === "undefined" ? 390 : window.innerWidth);
   const viewportHeight =
     viewportSize.height || (typeof window === "undefined" ? 844 : window.innerHeight);
+  const positionStorageKey = `scene-training-fab-position:${sceneId}`;
+  const viewportGap = 12;
+  const topGap = 88;
+  const fabWidth = viewportWidth < 640 ? 152 : 168;
+  const fabHeight = 44;
   const panelWidth = Math.min(viewportWidth - viewportGap * 2, viewportWidth < 640 ? 288 : 332);
   const panelMaxHeight = Math.max(260, viewportHeight - topGap - viewportGap * 2);
 
@@ -162,6 +173,7 @@ function SceneTrainingCoachFloatingEntry({
         : rawCompletedMap.done
           ? "本轮训练已完成"
           : "继续当前步骤";
+  const collapsedStepLabel = getSceneTrainingStepTitle(normalizedTrainingState.currentStep);
 
   const statsSummary = useMemo(
     () =>
@@ -194,15 +206,15 @@ function SceneTrainingCoachFloatingEntry({
       return {
         x: Math.min(
           Math.max(viewportGap, nextPosition.x),
-          Math.max(viewportGap, viewportWidth - iconSize - viewportGap),
+          Math.max(viewportGap, viewportWidth - fabWidth - viewportGap),
         ),
         y: Math.min(
           Math.max(topGap, nextPosition.y),
-          Math.max(topGap, viewportHeight - iconSize - viewportGap),
+          Math.max(topGap, viewportHeight - fabHeight - viewportGap),
         ),
       };
     },
-    [viewportHeight, viewportWidth],
+    [fabHeight, fabWidth, viewportHeight, viewportWidth],
   );
 
   const clearDragTimer = useCallback(() => {
@@ -225,7 +237,7 @@ function SceneTrainingCoachFloatingEntry({
     if (typeof window === "undefined") return;
     const savedPosition = window.localStorage.getItem(positionStorageKey);
     const fallbackPosition = {
-      x: Math.max(viewportGap, window.innerWidth - iconSize - viewportGap),
+      x: Math.max(viewportGap, window.innerWidth - fabWidth - viewportGap),
       y: 124,
     };
     if (savedPosition) {
@@ -243,7 +255,7 @@ function SceneTrainingCoachFloatingEntry({
       }
     }
     setPosition(clampPosition(fallbackPosition));
-  }, [clampPosition, positionStorageKey]);
+  }, [clampPosition, fabWidth, positionStorageKey]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -266,8 +278,8 @@ function SceneTrainingCoachFloatingEntry({
   useEffect(() => () => clearDragTimer(), [clearDragTimer]);
 
   const showPanelOnLeft =
-    position.x + iconSize + 8 + panelWidth > viewportWidth - viewportGap;
-  const rawPanelLeft = showPanelOnLeft ? -(panelWidth + 8) : iconSize + 8;
+    position.x + fabWidth + 8 + panelWidth > viewportWidth - viewportGap;
+  const rawPanelLeft = showPanelOnLeft ? -(panelWidth + 8) : fabWidth + 8;
   const minPanelLeft = viewportGap - position.x;
   const maxPanelLeft = viewportWidth - viewportGap - panelWidth - position.x;
   const panelLeft = Math.min(Math.max(rawPanelLeft, minPanelLeft), Math.max(minPanelLeft, maxPanelLeft));
@@ -351,9 +363,9 @@ function SceneTrainingCoachFloatingEntry({
       if (activated && moved) {
         setPosition((currentPosition) => {
           const snappedX =
-            currentPosition.x + iconSize / 2 < viewportWidth / 2
+            currentPosition.x + fabWidth / 2 < viewportWidth / 2
               ? viewportGap
-              : Math.max(viewportGap, viewportWidth - iconSize - viewportGap);
+              : Math.max(viewportGap, viewportWidth - fabWidth - viewportGap);
           return clampPosition({
             x: snappedX,
             y: currentPosition.y,
@@ -370,6 +382,7 @@ function SceneTrainingCoachFloatingEntry({
       clampPosition,
       clearDragTimer,
       resetDragState,
+      fabWidth,
       viewportWidth,
     ],
   );
@@ -404,8 +417,10 @@ function SceneTrainingCoachFloatingEntry({
           type="button"
           aria-label="训练进度入口"
           data-testid="scene-training-fab"
-          className="inline-flex size-11 items-center justify-center rounded-full border border-black/10 bg-white/94 shadow-[0_8px_20px_rgba(0,0,0,0.08)] backdrop-blur transition-transform duration-150"
+          className="inline-flex min-h-11 items-center gap-2 rounded-full border border-black/10 bg-white/94 px-3 py-2 text-left shadow-[0_8px_20px_rgba(0,0,0,0.08)] backdrop-blur transition-transform duration-150"
           style={{
+            width: `${fabWidth}px`,
+            minHeight: `${fabHeight}px`,
             touchAction: "none",
             transform: dragActive ? "scale(1.08)" : "scale(1)",
           }}
@@ -414,6 +429,13 @@ function SceneTrainingCoachFloatingEntry({
           onPointerUp={handleIconPointerUp}
           onPointerCancel={handleIconPointerCancel}
         >
+          <span className="size-2.5 rounded-full bg-[rgb(37,99,235)]" aria-hidden="true" />
+          <span className="flex flex-col leading-none">
+            <span className="text-[11px] text-muted-foreground">当前</span>
+            <span className="mt-1 text-[13px] font-medium text-foreground">
+              {collapsedStepLabel}
+            </span>
+          </span>
           <ChevronDown className="size-4 text-muted-foreground" />
         </button>
 
@@ -520,6 +542,18 @@ function SceneTrainingCoachFloatingEntry({
                 <span>作答 {statsSummary.practiceAttemptCount}</span>
                 <span>{sceneDetailMessages.panelProgressLabel} {statsSummary.progressPercent}%</span>
               </div>
+              {currentStepActionLabel && onCurrentStepAction ? (
+                <button
+                  type="button"
+                  className="mt-3 inline-flex min-h-10 w-full items-center justify-center rounded-2xl bg-[rgb(32,44,60)] px-3 py-2 text-sm font-medium text-white transition hover:bg-[rgb(25,36,50)] disabled:cursor-not-allowed disabled:bg-black/10 disabled:text-muted-foreground"
+                  disabled={currentStepActionDisabled}
+                  onClick={() => {
+                    onCurrentStepAction();
+                  }}
+                >
+                  {currentStepActionLabel}
+                </button>
+              ) : null}
             </div>
           </div>
         ) : null}
@@ -607,7 +641,11 @@ export default function SceneDetailClientPage({
     handleDeleteVariantSet,
     handleDeleteVariantItem,
     handlePracticeToolClick,
+    handleRepeatPractice,
+    handleRepeatVariants,
     handleVariantToolClick,
+    prewarmPractice,
+    prewarmVariants,
     handleOpenExpressionMap,
     setShowAnswerMap,
     resetRouteScopedState,
@@ -836,6 +874,166 @@ export default function SceneDetailClientPage({
     notifySceneSessionCompleted();
   }, [handleVariantToolClick, variantUnlocked]);
 
+  const currentStepAction = useMemo(() => {
+    const currentStep = trainingState?.session?.currentStep ?? null;
+    if (currentStep === "listen") {
+      return {
+        label: "开始听整段",
+        onClick: handleTrainingListenStep,
+        disabled: false,
+      };
+    }
+    if (currentStep === "focus_expression") {
+      return {
+        label: "去看重点表达",
+        onClick: handleTrainingFocusExpressionStep,
+        disabled: false,
+      };
+    }
+    if (currentStep === "practice_sentence") {
+      return {
+        label: "去练核心句",
+        onClick: handleTrainingPracticeSentenceStep,
+        disabled: false,
+      };
+    }
+    if (currentStep === "scene_practice") {
+      return {
+        label:
+          generatedState.practiceStatus === "completed"
+            ? "再练场景练习"
+            : generatedState.practiceStatus === "generated"
+              ? "开始场景练习"
+            : practiceLoading
+              ? "练习准备中..."
+              : "生成并开始练习",
+        onClick: handlePracticeToolClick,
+        disabled: practiceLoading,
+      };
+    }
+    if (currentStep === "done" || variantUnlocked) {
+      return {
+        label:
+          generatedState.variantStatus === "completed"
+            ? "再练变体训练"
+            : generatedState.variantStatus === "generated"
+              ? "查看变体"
+            : variantsLoading
+              ? "变体准备中..."
+              : "打开变体训练",
+        onClick: handleTrainingDoneStep,
+        disabled: variantsLoading,
+      };
+    }
+    return {
+      label: null,
+      onClick: null,
+      disabled: false,
+    };
+  }, [
+    generatedState.practiceStatus,
+    generatedState.variantStatus,
+    handlePracticeToolClick,
+    handleTrainingDoneStep,
+    handleTrainingFocusExpressionStep,
+    handleTrainingListenStep,
+    handleTrainingPracticeSentenceStep,
+    practiceLoading,
+    trainingState?.session?.currentStep,
+    variantUnlocked,
+    variantsLoading,
+  ]);
+
+  useEffect(() => {
+    const currentStep = trainingState?.session?.currentStep;
+    if (
+      !baseLesson ||
+      (currentStep !== "practice_sentence" && currentStep !== "scene_practice") ||
+      generatedState.practiceStatus !== "idle" ||
+      practiceLoading
+    ) {
+      return;
+    }
+    scheduleIdleAction(`scene-practice-prewarm:${baseLesson.id}:${currentStep}`, () => {
+      void prewarmPractice(baseLesson);
+    });
+  }, [
+    baseLesson,
+    generatedState.practiceStatus,
+    practiceLoading,
+    prewarmPractice,
+    trainingState?.session?.currentStep,
+  ]);
+
+  useEffect(() => {
+    const currentStep = trainingState?.session?.currentStep;
+    if (
+      !baseLesson ||
+      (currentStep !== "scene_practice" && currentStep !== "done") ||
+      generatedState.variantStatus !== "idle" ||
+      variantsLoading
+    ) {
+      return;
+    }
+    scheduleIdleAction(`scene-variant-prewarm:${baseLesson.id}:${currentStep}`, () => {
+      void prewarmVariants();
+    });
+  }, [
+    baseLesson,
+    generatedState.variantStatus,
+    prewarmVariants,
+    trainingState?.session?.currentStep,
+    variantsLoading,
+  ]);
+
+  useEffect(() => {
+    if (!baseLesson || !latestVariantSet) return;
+    let cancelled = false;
+
+    void getSceneVariantRunSnapshotFromApi(baseLesson.slug, {
+      variantSetId: latestVariantSet.id,
+    })
+      .then((result) => {
+        if (cancelled || !result.run) return;
+        hydrateVariantSetFromRun(baseLesson.id, latestVariantSet.id, result.run);
+        refreshGeneratedState(baseLesson.id);
+        if (!activeVariantId && !searchParams.get("variant") && result.run.activeVariantId) {
+          setActiveVariantId(result.run.activeVariantId);
+        }
+      })
+      .catch(() => {
+        // Non-blocking.
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    activeVariantId,
+    baseLesson,
+    latestVariantSet?.id,
+    refreshGeneratedState,
+    searchParams,
+    setActiveVariantId,
+  ]);
+
+  useEffect(() => {
+    if (
+      !baseLesson ||
+      viewMode !== "variants" ||
+      !latestVariantSet ||
+      latestVariantSet.status !== "generated"
+    ) {
+      return;
+    }
+
+    void startSceneVariantRunFromApi(baseLesson.slug, {
+      variantSetId: latestVariantSet.id,
+    }).catch(() => {
+      // Non-blocking.
+    });
+  }, [baseLesson, latestVariantSet?.id, latestVariantSet?.status, viewMode]);
+
   if (sceneLoading) {
     return <div className="p-4 text-sm text-muted-foreground">{sceneDetailMessages.loading}</div>;
   }
@@ -853,6 +1051,9 @@ export default function SceneDetailClientPage({
       practiceModeLabel={latestPracticeSet?.modeLabel ?? null}
       practiceSnapshot={practiceSnapshot}
       practiceModuleCount={latestPracticeSet?.modules?.length ?? 0}
+      currentStepActionLabel={currentStepAction.label}
+      onCurrentStepAction={currentStepAction.onClick}
+      currentStepActionDisabled={currentStepAction.disabled}
     />
   );
 
@@ -981,6 +1182,9 @@ export default function SceneDetailClientPage({
               });
           }}
           onReviewScene={() => setViewModeWithRoute("scene")}
+          onRepeatPractice={() => {
+            handleRepeatPractice();
+          }}
           onOpenVariants={() => setViewModeWithRoute("variants")}
           onToggleAnswer={(exerciseId) =>
             setShowAnswerMap((prev) => ({
@@ -1003,6 +1207,7 @@ export default function SceneDetailClientPage({
           labels={sceneViewLabels.variants}
           onBack={() => setViewModeWithRoute("scene")}
           onComplete={handleMarkVariantSetComplete}
+          onRepeatVariants={handleRepeatVariants}
           onDeleteSet={handleDeleteVariantSet}
           onOpenExpressionMap={() => void handleOpenExpressionMap()}
           onOpenChunk={handleOpenVariantChunk}

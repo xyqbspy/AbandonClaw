@@ -1,0 +1,28 @@
+import { NextResponse } from "next/server";
+import { requireCurrentProfile } from "@/lib/server/auth";
+import { toApiErrorResponse } from "@/lib/server/api-error";
+import { parseJsonBody, parseRequiredTrimmedString } from "@/lib/server/validation";
+import { recordSceneVariantView } from "@/lib/server/learning/variant-service";
+
+interface RecordSceneVariantViewPayload extends Record<string, unknown> {
+  variantSetId?: unknown;
+  variantId?: unknown;
+}
+
+export async function POST(
+  request: Request,
+  context: { params: Promise<{ slug: string }> },
+) {
+  try {
+    const { user } = await requireCurrentProfile();
+    const { slug } = await context.params;
+    const payload = await parseJsonBody<RecordSceneVariantViewPayload>(request);
+    const result = await recordSceneVariantView(user.id, slug, {
+      variantSetId: parseRequiredTrimmedString(payload.variantSetId, "variantSetId", 120),
+      variantId: parseRequiredTrimmedString(payload.variantId, "variantId", 120),
+    });
+    return NextResponse.json(result, { status: 200 });
+  } catch (error) {
+    return toApiErrorResponse(error, "Failed to record scene variant view.");
+  }
+}

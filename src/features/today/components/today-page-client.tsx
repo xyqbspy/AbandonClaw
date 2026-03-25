@@ -9,6 +9,8 @@ import { TodayTaskList } from "@/features/today/components/today-task-list";
 import { todayPageLabels as zh } from "@/features/today/components/today-page-labels";
 import {
   buildTodayTasks,
+  getContinueLearningHelperText,
+  getContinueLearningStepLabel,
   getRecommendedScenes,
   resolveContinueLearning,
 } from "@/features/today/components/today-page-selectors";
@@ -22,6 +24,7 @@ import {
   LearningDashboardResponse,
   getLearningDashboardFromApi,
 } from "@/lib/utils/learning-api";
+import { warmupContinueLearningScene } from "@/lib/utils/scene-resource-actions";
 import { getScenesFromApi, SceneListItemResponse } from "@/lib/utils/scenes-api";
 import { startReviewSession } from "@/lib/utils/review-session";
 import { PageHeader } from "@/components/shared/page-header";
@@ -39,7 +42,13 @@ const EMPTY_DASHBOARD: LearningDashboardResponse = {
   },
   continueLearning: null,
   todayTasks: {
-    sceneTask: { done: false, continueSceneSlug: null },
+    sceneTask: {
+      done: false,
+      continueSceneSlug: null,
+      currentStep: null,
+      masteryStage: null,
+      progressPercent: 0,
+    },
     reviewTask: { done: false, reviewItemsCompleted: 0, dueReviewCount: 0 },
     outputTask: { done: false, phrasesSavedToday: 0 },
   },
@@ -168,6 +177,22 @@ export function TodayPageClient({ displayName }: { displayName: string }) {
   );
   const recommendedScenes = useMemo(() => getRecommendedScenes(sceneList), [sceneList]);
   const finalDisplayName = displayName || zh.userFallback;
+  const continueStepLabel = useMemo(
+    () => getContinueLearningStepLabel(continueLearning, dashboard.todayTasks.sceneTask),
+    [continueLearning, dashboard.todayTasks.sceneTask],
+  );
+  const continueHelperText = useMemo(
+    () => getContinueLearningHelperText(continueLearning, dashboard.todayTasks.sceneTask),
+    [continueLearning, dashboard.todayTasks.sceneTask],
+  );
+
+  useEffect(() => {
+    if (!continueLearning) return;
+    warmupContinueLearningScene({
+      sceneSlug: continueLearning.sceneSlug,
+      currentStep: dashboard.todayTasks.sceneTask.currentStep ?? continueLearning.currentStep,
+    });
+  }, [continueLearning, dashboard.todayTasks.sceneTask.currentStep]);
 
   return (
     <div className="space-y-6">
@@ -222,9 +247,17 @@ export function TodayPageClient({ displayName }: { displayName: string }) {
               {continueLearning?.subtitle ?? zh.continueEmptyDesc}
             </p>
             {continueLearning ? (
-              <p className="text-xs text-muted-foreground">
-                {zh.currentProgress}：{Math.round(continueLearning.progressPercent)}%
-              </p>
+              <div className="space-y-1 rounded-lg bg-muted/40 p-3">
+                <p className="text-xs font-medium text-foreground/80">
+                  {zh.continueCurrentPrefix}：{continueStepLabel}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {zh.currentProgress}：{Math.round(continueLearning.progressPercent)}%
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {zh.continueHintTitle}：{continueHelperText}
+                </p>
+              </div>
             ) : null}
             <Link
               href={continueLearning ? `/scene/${continueLearning.sceneSlug}` : "/scenes"}

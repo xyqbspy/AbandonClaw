@@ -6,10 +6,16 @@ import {
   markPracticeSetCompleted,
   markVariantItemStatus,
   markVariantSetCompleted,
+  restartPracticeSet,
+  restartVariantSet,
   savePracticeSet,
   saveVariantSet,
 } from "@/lib/utils/scene-learning-flow-storage";
 import { completeSceneLearningFromApi } from "@/lib/utils/learning-api";
+import {
+  completeSceneVariantRunFromApi,
+  recordSceneVariantViewFromApi,
+} from "@/lib/utils/learning-api";
 import { Lesson } from "@/lib/types";
 import { ExpressionMapResponse } from "@/lib/types/expression-map";
 import { PracticeSet, VariantSet } from "@/lib/types/learning-flow";
@@ -24,6 +30,10 @@ import {
   generateScenePracticeSet,
   generateSceneVariantSet,
 } from "./scene-detail-generation-logic";
+import {
+  warmupRepeatPracticeResources,
+  warmupRepeatVariantResources,
+} from "@/lib/utils/scene-resource-actions";
 
 type UseSceneDetailActionsArgs = {
   baseLesson: Lesson | null;
@@ -89,16 +99,66 @@ export function useSceneDetailActions({
         refreshGeneratedState(baseLesson.id);
         setShowAnswerMap({});
         setViewModeWithRoute("practice");
+        return practiceSet;
       } catch (error) {
         setPracticeError(
           error instanceof Error ? error.message : "Failed to generate practice.",
         );
+        return null;
       } finally {
         setPracticeLoading(false);
       }
     },
     [baseLesson, canGeneratePractice, refreshGeneratedState, setViewModeWithRoute],
   );
+
+  const ensurePracticeSetReady = useCallback(async ({
+    sourceLesson,
+    openOnReady,
+  }: {
+    sourceLesson: Lesson;
+    openOnReady: boolean;
+  }) => {
+    if (!baseLesson) return null;
+    if (latestPracticeSet) {
+      if (openOnReady) {
+        setShowAnswerMap({});
+        setViewModeWithRoute("practice");
+      }
+      return latestPracticeSet;
+    }
+    if (!canGeneratePractice) return null;
+
+    setPracticeLoading(true);
+    setPracticeError(null);
+    try {
+      const practiceSet = await generateScenePracticeSet({
+        baseLesson,
+        sourceLesson,
+      });
+
+      savePracticeSet(practiceSet);
+      refreshGeneratedState(baseLesson.id);
+      setShowAnswerMap({});
+      if (openOnReady) {
+        setViewModeWithRoute("practice");
+      }
+      return practiceSet;
+    } catch (error) {
+      setPracticeError(
+        error instanceof Error ? error.message : "Failed to generate practice.",
+      );
+      return null;
+    } finally {
+      setPracticeLoading(false);
+    }
+  }, [
+    baseLesson,
+    canGeneratePractice,
+    latestPracticeSet,
+    refreshGeneratedState,
+    setViewModeWithRoute,
+  ]);
 
   const handleGenerateVariants = useCallback(async () => {
     if (!baseLesson || !canGenerateVariants) return;
@@ -114,16 +174,113 @@ export function useSceneDetailActions({
       refreshGeneratedState(baseLesson.id);
       setActiveVariantId(null);
       setViewModeWithRoute("variants");
+      return variantSet;
     } catch (error) {
       setVariantsError(
         error instanceof Error ? error.message : "Failed to generate variants.",
       );
+      return null;
     } finally {
       setVariantsLoading(false);
     }
   }, [
     baseLesson,
     canGenerateVariants,
+    refreshGeneratedState,
+    setActiveVariantId,
+    setViewModeWithRoute,
+  ]);
+
+  const ensureVariantSetReady = useCallback(async ({
+    openOnReady,
+  }: {
+    openOnReady: boolean;
+  }) => {
+    if (!baseLesson) return null;
+    if (latestVariantSet) {
+      if (openOnReady) {
+        setViewModeWithRoute("variants");
+      }
+      return latestVariantSet;
+    }
+    if (!canGenerateVariants) return null;
+
+    setVariantsLoading(true);
+    setVariantsError(null);
+    try {
+      const variantSet = await generateSceneVariantSet({
+        baseLesson,
+      });
+
+      saveVariantSet(variantSet);
+      refreshGeneratedState(baseLesson.id);
+      setActiveVariantId(null);
+      if (openOnReady) {
+        setViewModeWithRoute("variants");
+      }
+      return variantSet;
+    } catch (error) {
+      setVariantsError(
+        error instanceof Error ? error.message : "Failed to generate variants.",
+      );
+      return null;
+    } finally {
+      setVariantsLoading(false);
+    }
+  }, [
+    baseLesson,
+    canGenerateVariants,
+    refreshGeneratedState,
+    setActiveVariantId,
+    setViewModeWithRoute,
+  ]);
+
+  const prewarmVariants = useCallback(async () => {
+    await ensureVariantSetReady({ openOnReady: false });
+  }, [ensureVariantSetReady]);
+
+  const prewarmPractice = useCallback(async (sourceLesson?: Lesson | null) => {
+    if (!sourceLesson) return;
+    await ensurePracticeSetReady({
+      sourceLesson,
+      openOnReady: false,
+    });
+  }, [ensurePracticeSetReady]);
+
+  const handleRepeatPractice = useCallback(() => {
+    if (!baseLesson || !latestPracticeSet) return null;
+    const repeatedPracticeSet = restartPracticeSet(latestPracticeSet);
+    refreshGeneratedState(baseLesson.id);
+    warmupRepeatPracticeResources({
+      baseLesson,
+      latestVariantSet,
+      practiceSet: repeatedPracticeSet,
+    });
+    setShowAnswerMap({});
+    setViewModeWithRoute("practice");
+    return repeatedPracticeSet;
+  }, [
+    baseLesson,
+    latestPracticeSet,
+    latestVariantSet,
+    refreshGeneratedState,
+    setViewModeWithRoute,
+  ]);
+
+  const handleRepeatVariants = useCallback(() => {
+    if (!baseLesson || !latestVariantSet) return null;
+    const repeatedVariantSet = restartVariantSet(latestVariantSet);
+    refreshGeneratedState(baseLesson.id);
+    warmupRepeatVariantResources({
+      baseLesson,
+      variantSet: repeatedVariantSet,
+    });
+    setActiveVariantId(null);
+    setViewModeWithRoute("variants");
+    return repeatedVariantSet;
+  }, [
+    baseLesson,
+    latestVariantSet,
     refreshGeneratedState,
     setActiveVariantId,
     setViewModeWithRoute,
@@ -151,6 +308,11 @@ export function useSceneDetailActions({
     markVariantSetCompleted(baseLesson.id, latestVariantSet.id);
     refreshGeneratedState(baseLesson.id);
     setSceneCompleting(true);
+    void completeSceneVariantRunFromApi(baseLesson.slug, {
+      variantSetId: latestVariantSet.id,
+    }).catch(() => {
+      // Non-blocking.
+    });
     void completeSceneLearningFromApi(baseLesson.slug)
       .then((result) => {
         onLearningStateChange?.(result);
@@ -183,6 +345,12 @@ export function useSceneDetailActions({
       if (!baseLesson || !latestVariantSet) return;
       markVariantItemStatus(baseLesson.id, latestVariantSet.id, variantId, "viewed");
       refreshGeneratedState(baseLesson.id);
+      void recordSceneVariantViewFromApi(baseLesson.slug, {
+        variantSetId: latestVariantSet.id,
+        variantId,
+      }).catch(() => {
+        // Non-blocking.
+      });
       setActiveVariantId(variantId);
       setViewModeWithRoute("variant-study", variantId);
     },
@@ -242,6 +410,10 @@ export function useSceneDetailActions({
   );
 
   const handlePracticeToolClick = useCallback(() => {
+    if (latestPracticeSet?.status === "completed") {
+      handleRepeatPractice();
+      return;
+    }
     const intent = resolveSceneToolIntent({
       hasBaseLesson: Boolean(baseLesson),
       loading: practiceLoading,
@@ -249,13 +421,27 @@ export function useSceneDetailActions({
     });
     if (intent === "ignore" || !baseLesson) return;
     if (intent === "generate") {
-      void handleGeneratePractice(baseLesson);
+      void ensurePracticeSetReady({
+        sourceLesson: baseLesson,
+        openOnReady: true,
+      });
       return;
     }
     setViewModeWithRoute("practice");
-  }, [baseLesson, handleGeneratePractice, latestPracticeSet, practiceLoading, setViewModeWithRoute]);
+  }, [
+    baseLesson,
+    handleRepeatPractice,
+    ensurePracticeSetReady,
+    latestPracticeSet,
+    practiceLoading,
+    setViewModeWithRoute,
+  ]);
 
   const handleVariantToolClick = useCallback(() => {
+    if (latestVariantSet?.status === "completed") {
+      handleRepeatVariants();
+      return;
+    }
     const intent = resolveSceneToolIntent({
       hasBaseLesson: Boolean(baseLesson),
       loading: variantsLoading,
@@ -263,11 +449,23 @@ export function useSceneDetailActions({
     });
     if (intent === "ignore" || !baseLesson) return;
     if (intent === "generate") {
-      void handleGenerateVariants();
+      void ensureVariantSetReady({ openOnReady: true });
+      return;
+    }
+    if (activeVariantId && latestVariantSet?.variants.some((variant) => variant.id === activeVariantId)) {
+      setViewModeWithRoute("variant-study", activeVariantId);
       return;
     }
     setViewModeWithRoute("variants");
-  }, [baseLesson, handleGenerateVariants, latestVariantSet, setViewModeWithRoute, variantsLoading]);
+  }, [
+    activeVariantId,
+    baseLesson,
+    ensureVariantSetReady,
+    handleRepeatVariants,
+    latestVariantSet,
+    setViewModeWithRoute,
+    variantsLoading,
+  ]);
 
   const ensureExpressionMap = useCallback(async () => {
     if (!baseLesson || !latestVariantSet) return null;
@@ -336,6 +534,10 @@ export function useSceneDetailActions({
     resetRouteScopedState,
     handleGeneratePractice,
     handleGenerateVariants,
+    handleRepeatPractice,
+    handleRepeatVariants,
+    prewarmPractice,
+    prewarmVariants,
     handleCompleteBaseScene,
     handleMarkPracticeComplete,
     handleMarkVariantSetComplete,

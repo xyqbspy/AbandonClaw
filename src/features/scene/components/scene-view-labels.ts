@@ -58,6 +58,7 @@ export type ScenePracticeViewLabels = {
   summaryNoMistakes: string;
   summaryReviewHint: string;
   summaryVariantHint: string;
+  summaryRepeatAction: string;
   summaryReviewAction: string;
   summaryVariantAction: string;
   prevQuestion: string;
@@ -147,6 +148,7 @@ export const sceneViewLabels: SceneViewLabels = {
     summaryNoMistakes: "本轮没有错题，做得很好。",
     summaryReviewHint: "建议先回看这些表达对应的场景句子，再做一轮练习。",
     summaryVariantHint: "这一轮已经比较稳了，可以继续去做变体训练。",
+    summaryRepeatAction: "再练一遍",
     summaryReviewAction: "回到场景复习",
     summaryVariantAction: "进入变体训练",
     prevQuestion: "上一题",

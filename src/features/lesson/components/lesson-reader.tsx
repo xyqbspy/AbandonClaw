@@ -35,6 +35,8 @@ import { SelectionToolbar } from "@/features/lesson/components/selection-toolbar
 import { normalizePhraseText } from "@/lib/shared/phrases";
 import { buildChunkAudioKey } from "@/lib/shared/tts";
 import { trackChunksFromApi } from "@/lib/utils/chunks-api";
+import { getSentenceSpeakText } from "@/lib/utils/audio-warmup";
+import { scheduleLessonAudioWarmup } from "@/lib/utils/resource-actions";
 import {
   getLessonBlocks,
   getLessonSentences,
@@ -43,8 +45,6 @@ import {
 } from "@/lib/shared/lesson-content";
 import {
   playChunkAudio,
-  prefetchChunkAudio,
-  prefetchSentenceAudio,
   playSceneLoopAudio,
   playSentenceAudio,
   setTtsLooping,
@@ -76,8 +76,6 @@ const TOOLBAR_WIDTH = 256;
 const appleButtonLgClassName = `${APPLE_BUTTON_BASE} ${APPLE_BUTTON_TEXT_LG}`;
 const appleButtonSmClassName = `${APPLE_BUTTON_BASE} ${APPLE_BUTTON_TEXT_SM}`;
 const hasSpeakerTag = (speaker?: string) => /^[A-Z]$/.test((speaker ?? "").trim().toUpperCase());
-const getSentenceSpeakText = (sentence: LessonSentence) =>
-  (sentence.tts?.trim() || sentence.audioText?.trim() || sentence.text).trim();
 
 export function LessonReader({
   lesson,
@@ -441,26 +439,30 @@ export function LessonReader({
     ].filter((item): item is LessonSentence => Boolean(item));
 
     const timer = window.setTimeout(() => {
-      for (const sentence of candidateSentences) {
-        const text = getSentenceSpeakText(sentence);
-        if (!text) continue;
-        void prefetchSentenceAudio({
-          sceneSlug: lesson.slug,
-          sentenceId: sentence.id,
-          text,
-          speaker: sentence.speaker,
-          mode: "normal",
-        });
-      }
-
-      for (const chunkText of anchorSentence.chunks.slice(0, 2)) {
-        const clean = chunkText.trim();
-        if (!clean) continue;
-        void prefetchChunkAudio({
-          chunkText: clean,
-          chunkKey: buildChunkAudioKey(clean),
-        });
-      }
+      scheduleLessonAudioWarmup(
+        {
+          ...lesson,
+          sections: [
+            {
+              id: "warmup-section",
+              title: "warmup",
+              summary: "",
+              blocks: [
+                {
+                  id: "warmup-block",
+                  speaker: anchorSentence.speaker,
+                  sentences: candidateSentences,
+                },
+              ],
+            },
+          ],
+        },
+        {
+          sentenceLimit: candidateSentences.length,
+          chunkLimit: 2,
+          key: `lesson-reader:${lesson.id}:${anchorSentence.id}`,
+        },
+      );
     }, 80);
 
     return () => {

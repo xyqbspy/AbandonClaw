@@ -74,6 +74,14 @@ export interface ScenePracticeSnapshotResponse {
   };
 }
 
+export interface RepeatPracticeContinueView {
+  sceneId: string;
+  practiceSetId: string;
+  sourceType: "original" | "variant";
+  sourceVariantId: string | null;
+  lastActiveAt: string;
+}
+
 const toRunView = (row: UserScenePracticeRunRow): ScenePracticeRunView => ({
   id: row.id,
   sceneId: row.scene_id,
@@ -157,6 +165,33 @@ async function getLatestRunBySet(userId: string, sceneId: string, practiceSetId?
     throwPracticeQueryError("read latest user_scene_practice_runs", error);
   }
   return data ?? null;
+}
+
+export async function getLatestRepeatPracticeRun(
+  userId: string,
+): Promise<RepeatPracticeContinueView | null> {
+  const admin = createSupabaseAdminClient();
+  const { data, error } = await admin
+    .from("user_scene_practice_runs")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("status", "in_progress")
+    .order("last_active_at", { ascending: false, nullsFirst: false })
+    .limit(1)
+    .maybeSingle<UserScenePracticeRunRow>();
+
+  if (error) {
+    throwPracticeQueryError("read repeat practice continue run", error);
+  }
+  if (!data) return null;
+
+  return {
+    sceneId: data.scene_id,
+    practiceSetId: data.practice_set_id,
+    sourceType: data.source_type,
+    sourceVariantId: data.source_variant_id,
+    lastActiveAt: data.last_active_at,
+  };
 }
 
 async function upsertPracticeRun(

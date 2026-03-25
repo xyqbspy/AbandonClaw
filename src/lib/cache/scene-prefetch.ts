@@ -1,4 +1,5 @@
 import { getSceneCache, normalizeSceneSlug, setSceneCache } from "@/lib/cache/scene-cache";
+import { scheduleLessonAudioWarmup } from "@/lib/utils/resource-actions";
 import { getSceneDetailBySlugFromApi } from "@/lib/utils/scenes-api";
 
 const SCENE_PREFETCH_MAX = 2;
@@ -153,6 +154,11 @@ export async function prefetchSceneDetail(slug: string, options?: PrefetchOption
   try {
     const scene = await getSceneDetailBySlugFromApi(normalized);
     await setSceneCache(normalized, scene);
+    scheduleLessonAudioWarmup(scene, {
+      sentenceLimit: 1,
+      chunkLimit: 2,
+      key: `scene-prefetch-audio:${normalized}`,
+    });
     recentPrefetchedAt.set(normalized, Date.now());
     debugLog("prefetched", normalized);
     return true;

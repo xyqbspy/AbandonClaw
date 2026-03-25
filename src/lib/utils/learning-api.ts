@@ -1,4 +1,7 @@
-import { clearLearningDashboardCache } from "@/lib/cache/learning-dashboard-cache";
+import {
+  invalidateAfterSceneLearningMutation,
+  invalidateAfterScenePracticeMutation,
+} from "@/lib/utils/cache-actions";
 
 interface ApiErrorBody {
   error?: string;
@@ -126,16 +129,37 @@ export interface ScenePracticeSnapshotResponse {
   };
 }
 
-const withDashboardCacheInvalidation = async <T>(task: () => Promise<T>) => {
+export interface SceneVariantRunResponse {
+  run: {
+    id: string;
+    sceneId: string;
+    sessionId: string | null;
+    variantSetId: string;
+    activeVariantId: string | null;
+    viewedVariantIds: string[];
+    status: "in_progress" | "completed" | "abandoned";
+    startedAt: string;
+    completedAt: string | null;
+    lastActiveAt: string;
+    createdAt: string;
+    updatedAt: string;
+  } | null;
+}
+
+const withSceneLearningCacheInvalidation = async <T>(task: () => Promise<T>) => {
   const result = await task();
-  void clearLearningDashboardCache().catch(() => {
-    // Non-blocking.
-  });
+  invalidateAfterSceneLearningMutation();
+  return result;
+};
+
+const withScenePracticeCacheInvalidation = async <T>(task: () => Promise<T>) => {
+  const result = await task();
+  invalidateAfterScenePracticeMutation();
   return result;
 };
 
 export async function startSceneLearningFromApi(sceneSlug: string) {
-  return withDashboardCacheInvalidation(async () => {
+  return withSceneLearningCacheInvalidation(async () => {
     const response = await fetch(`/api/learning/scenes/${encodeURIComponent(sceneSlug)}/start`, {
       method: "POST",
     });
@@ -150,7 +174,7 @@ export async function updateSceneLearningProgressFromApi(
   sceneSlug: string,
   payload: UpdateSceneLearningProgressPayload,
 ) {
-  return withDashboardCacheInvalidation(async () => {
+  return withSceneLearningCacheInvalidation(async () => {
     const response = await fetch(`/api/learning/scenes/${encodeURIComponent(sceneSlug)}/progress`, {
       method: "POST",
       headers: {
@@ -166,7 +190,7 @@ export async function updateSceneLearningProgressFromApi(
 }
 
 export async function pauseSceneLearningFromApi(sceneSlug: string) {
-  return withDashboardCacheInvalidation(async () => {
+  return withSceneLearningCacheInvalidation(async () => {
     const response = await fetch(`/api/learning/scenes/${encodeURIComponent(sceneSlug)}/pause`, {
       method: "POST",
     });
@@ -184,7 +208,7 @@ export async function completeSceneLearningFromApi(
     savedPhraseDelta?: number;
   },
 ) {
-  return withDashboardCacheInvalidation(async () => {
+  return withSceneLearningCacheInvalidation(async () => {
     const response = await fetch(`/api/learning/scenes/${encodeURIComponent(sceneSlug)}/complete`, {
       method: "POST",
       headers: {
@@ -210,7 +234,7 @@ export async function recordSceneTrainingEventFromApi(
     selectedBlockId?: string;
   },
 ) {
-  return withDashboardCacheInvalidation(async () => {
+  return withSceneLearningCacheInvalidation(async () => {
     const response = await fetch(`/api/learning/scenes/${encodeURIComponent(sceneSlug)}/training`, {
       method: "POST",
       headers: {
@@ -234,7 +258,7 @@ export async function startScenePracticeRunFromApi(
     sourceVariantId?: string | null;
   },
 ) {
-  return withDashboardCacheInvalidation(async () => {
+  return withScenePracticeCacheInvalidation(async () => {
     const response = await fetch(`/api/learning/scenes/${encodeURIComponent(sceneSlug)}/practice/run`, {
       method: "POST",
       headers: {
@@ -283,7 +307,7 @@ export async function recordScenePracticeAttemptFromApi(
     metadata?: Record<string, unknown>;
   },
 ) {
-  return withDashboardCacheInvalidation(async () => {
+  return withScenePracticeCacheInvalidation(async () => {
     const response = await fetch(
       `/api/learning/scenes/${encodeURIComponent(sceneSlug)}/practice/attempt`,
       {
@@ -309,7 +333,7 @@ export async function markScenePracticeModeCompleteFromApi(
     nextMode?: "cloze" | "guided_recall" | "sentence_recall" | "full_dictation";
   },
 ) {
-  return withDashboardCacheInvalidation(async () => {
+  return withScenePracticeCacheInvalidation(async () => {
     const response = await fetch(
       `/api/learning/scenes/${encodeURIComponent(sceneSlug)}/practice/mode-complete`,
       {
@@ -333,7 +357,7 @@ export async function completeScenePracticeRunFromApi(
     practiceSetId: string;
   },
 ) {
-  return withDashboardCacheInvalidation(async () => {
+  return withScenePracticeCacheInvalidation(async () => {
     const response = await fetch(
       `/api/learning/scenes/${encodeURIComponent(sceneSlug)}/practice/complete`,
       {
@@ -348,6 +372,90 @@ export async function completeScenePracticeRunFromApi(
       throw await toApiError(response, "完成练习 run 失败。");
     }
     return (await response.json()) as ScenePracticeRunResponse;
+  });
+}
+
+export async function startSceneVariantRunFromApi(
+  sceneSlug: string,
+  payload: {
+    variantSetId: string;
+    activeVariantId?: string | null;
+  },
+) {
+  return withSceneLearningCacheInvalidation(async () => {
+    const response = await fetch(`/api/learning/scenes/${encodeURIComponent(sceneSlug)}/variants/run`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      throw await toApiError(response, "启动场景变体训练失败。");
+    }
+    return (await response.json()) as SceneVariantRunResponse;
+  });
+}
+
+export async function getSceneVariantRunSnapshotFromApi(
+  sceneSlug: string,
+  params?: {
+    variantSetId?: string;
+  },
+) {
+  const search = new URLSearchParams();
+  if (params?.variantSetId) search.set("variantSetId", params.variantSetId);
+  const query = search.toString();
+  const response = await fetch(
+    `/api/learning/scenes/${encodeURIComponent(sceneSlug)}/variants/run${query ? `?${query}` : ""}`,
+    { method: "GET" },
+  );
+  if (!response.ok) {
+    throw await toApiError(response, "读取场景变体训练进度失败。");
+  }
+  return (await response.json()) as SceneVariantRunResponse;
+}
+
+export async function recordSceneVariantViewFromApi(
+  sceneSlug: string,
+  payload: {
+    variantSetId: string;
+    variantId: string;
+  },
+) {
+  return withSceneLearningCacheInvalidation(async () => {
+    const response = await fetch(`/api/learning/scenes/${encodeURIComponent(sceneSlug)}/variants/view`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      throw await toApiError(response, "记录变体查看状态失败。");
+    }
+    return (await response.json()) as SceneVariantRunResponse;
+  });
+}
+
+export async function completeSceneVariantRunFromApi(
+  sceneSlug: string,
+  payload: {
+    variantSetId: string;
+  },
+) {
+  return withSceneLearningCacheInvalidation(async () => {
+    const response = await fetch(`/api/learning/scenes/${encodeURIComponent(sceneSlug)}/variants/complete`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      throw await toApiError(response, "完成场景变体训练失败。");
+    }
+    return (await response.json()) as SceneVariantRunResponse;
   });
 }
 
@@ -373,16 +481,41 @@ export interface LearningDashboardContinueResponse {
     | "variant_unlocked"
     | "mastered";
   masteryPercent: number;
+  currentStep:
+    | "listen"
+    | "focus_expression"
+    | "practice_sentence"
+    | "scene_practice"
+    | "done"
+    | null;
   lastViewedAt: string | null;
   lastSentenceIndex: number | null;
   estimatedMinutes: number | null;
   savedPhraseCount: number;
+  repeatMode?: "practice" | "variants" | null;
+  isRepeat?: boolean;
 }
 
 export interface LearningDashboardTasksResponse {
   sceneTask: {
     done: boolean;
     continueSceneSlug: string | null;
+    currentStep:
+      | "listen"
+      | "focus_expression"
+      | "practice_sentence"
+      | "scene_practice"
+      | "done"
+      | null;
+    masteryStage:
+      | "listening"
+      | "focus"
+      | "sentence_practice"
+      | "scene_practice"
+      | "variant_unlocked"
+      | "mastered"
+      | null;
+    progressPercent: number;
   };
   reviewTask: {
     done: boolean;

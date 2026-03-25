@@ -66,6 +66,15 @@ const viewModeCalls: Array<{ viewMode: string; variantId?: string | null }> = []
 const activeVariantCalls: Array<string | null> = [];
 const generatedPracticeCalls: Array<{ baseLesson: Lesson; sourceLesson: Lesson }> = [];
 const generatedVariantCalls: Array<{ baseLesson: Lesson }> = [];
+const repeatPracticeWarmupCalls: Array<{
+  baseLesson: Lesson;
+  latestVariantSet: VariantSet | null;
+  practiceSet: PracticeSet;
+}> = [];
+const repeatVariantWarmupCalls: Array<{
+  baseLesson: Lesson;
+  variantSet: VariantSet;
+}> = [];
 const expressionMapCalls: Array<{
   baseLesson: Lesson | null;
   latestVariantSet: VariantSet | null;
@@ -89,6 +98,31 @@ const mockedModules = {
     markPracticeSetCompleted: () => undefined,
     markVariantItemStatus: () => undefined,
     markVariantSetCompleted: () => undefined,
+    restartPracticeSet: (practiceSet: PracticeSet) => {
+      const next = {
+        ...practiceSet,
+        id: `${practiceSet.id}-repeat`,
+        status: "generated" as const,
+        completedAt: undefined,
+        sessionState: undefined,
+      };
+      savedPracticeSets.push(next);
+      return next;
+    },
+    restartVariantSet: (variantSet: VariantSet) => {
+      const next = {
+        ...variantSet,
+        id: `${variantSet.id}-repeat`,
+        status: "generated" as const,
+        completedAt: undefined,
+        variants: variantSet.variants.map((variant) => ({
+          ...variant,
+          status: "unviewed" as const,
+        })),
+      };
+      savedVariantSets.push(next);
+      return next;
+    },
     savePracticeSet: (next: PracticeSet) => {
       savedPracticeSets.push(next);
     },
@@ -99,6 +133,23 @@ const mockedModules = {
   "@/lib/utils/learning-api": {
     completeSceneLearningFromApi: async (slug: string) => {
       completeCalls.push(slug);
+    },
+    completeSceneVariantRunFromApi: async () => ({ run: null }),
+    recordSceneVariantViewFromApi: async () => ({ run: null }),
+  },
+  "@/lib/utils/scene-resource-actions": {
+    warmupRepeatPracticeResources: (payload: {
+      baseLesson: Lesson;
+      latestVariantSet: VariantSet | null;
+      practiceSet: PracticeSet;
+    }) => {
+      repeatPracticeWarmupCalls.push(payload);
+    },
+    warmupRepeatVariantResources: (payload: {
+      baseLesson: Lesson;
+      variantSet: VariantSet;
+    }) => {
+      repeatVariantWarmupCalls.push(payload);
     },
   },
   "./scene-detail-generation-logic": {
@@ -163,6 +214,8 @@ afterEach(() => {
   activeVariantCalls.length = 0;
   generatedPracticeCalls.length = 0;
   generatedVariantCalls.length = 0;
+  repeatPracticeWarmupCalls.length = 0;
+  repeatVariantWarmupCalls.length = 0;
   expressionMapCalls.length = 0;
   currentExpressionMapResponse = null;
   currentConfirmResult = true;
@@ -292,5 +345,146 @@ test("useSceneDetailActions 会生成表达地图并切到 expression-map 视图
   await waitFor(() => {
     assert.equal(result.current.expressionMap, null);
     assert.deepEqual(result.current.showAnswerMap, {});
+  });
+});
+
+test("useSceneDetailActions 会静默预热 variants，且不切换当前视图", async () => {
+  const useSceneDetailActions = getUseSceneDetailActions();
+
+  const { result } = renderHook(() =>
+    useSceneDetailActions({
+      baseLesson: lesson,
+      latestPracticeSet: null,
+      latestVariantSet: null,
+      activeVariantId: null,
+      setActiveVariantId: (variantId) => activeVariantCalls.push(variantId),
+      setViewModeWithRoute: (viewMode, variantId) => viewModeCalls.push({ viewMode, variantId }),
+      refreshGeneratedState: (sceneKey) => refreshCalls.push(sceneKey),
+    }),
+  );
+
+  await act(async () => {
+    await result.current.prewarmVariants();
+  });
+
+  assert.equal(generatedVariantCalls.length, 1);
+  assert.equal(savedVariantSets[0]?.id, "variant-set-1");
+  assert.deepEqual(refreshCalls, ["scene-1"]);
+  assert.deepEqual(viewModeCalls, []);
+});
+
+test("useSceneDetailActions 会静默预热 practice，且不切换当前视图", async () => {
+  const useSceneDetailActions = getUseSceneDetailActions();
+
+  const { result } = renderHook(() =>
+    useSceneDetailActions({
+      baseLesson: lesson,
+      latestPracticeSet: null,
+      latestVariantSet: null,
+      activeVariantId: null,
+      setActiveVariantId: (variantId) => activeVariantCalls.push(variantId),
+      setViewModeWithRoute: (viewMode, variantId) => viewModeCalls.push({ viewMode, variantId }),
+      refreshGeneratedState: (sceneKey) => refreshCalls.push(sceneKey),
+    }),
+  );
+
+  await act(async () => {
+    await result.current.prewarmPractice(lesson);
+  });
+
+  assert.equal(generatedPracticeCalls.length, 1);
+  assert.equal(savedPracticeSets[0]?.id, "practice-1");
+  assert.deepEqual(refreshCalls, ["scene-1"]);
+  assert.deepEqual(viewModeCalls, []);
+});
+
+test("useSceneDetailActions 会从已完成练习开启新一轮", () => {
+  const useSceneDetailActions = getUseSceneDetailActions();
+
+  const { result } = renderHook(() =>
+    useSceneDetailActions({
+      baseLesson: lesson,
+      latestPracticeSet: {
+        ...practiceSet,
+        status: "completed",
+        completedAt: "2026-03-22T00:00:00.000Z",
+      },
+      latestVariantSet: null,
+      activeVariantId: null,
+      setActiveVariantId: (variantId) => activeVariantCalls.push(variantId),
+      setViewModeWithRoute: (viewMode, variantId) => viewModeCalls.push({ viewMode, variantId }),
+      refreshGeneratedState: (sceneKey) => refreshCalls.push(sceneKey),
+    }),
+  );
+
+  act(() => {
+    result.current.handlePracticeToolClick();
+  });
+
+  assert.equal(savedPracticeSets[0]?.id, "practice-1-repeat");
+  assert.equal(repeatPracticeWarmupCalls[0]?.practiceSet.id, "practice-1-repeat");
+  assert.deepEqual(refreshCalls, ["scene-1"]);
+  assert.deepEqual(viewModeCalls.at(-1), { viewMode: "practice", variantId: undefined });
+});
+
+test("useSceneDetailActions 会从已完成变体开启新一轮", () => {
+  const useSceneDetailActions = getUseSceneDetailActions();
+
+  const { result } = renderHook(() =>
+    useSceneDetailActions({
+      baseLesson: lesson,
+      latestPracticeSet: null,
+      latestVariantSet: {
+        ...variantSet,
+        status: "completed",
+        completedAt: "2026-03-22T00:00:00.000Z",
+        variants: [
+          {
+            ...variantSet.variants[0],
+            status: "completed",
+          },
+        ],
+      },
+      activeVariantId: "variant-1",
+      setActiveVariantId: (variantId) => activeVariantCalls.push(variantId),
+      setViewModeWithRoute: (viewMode, variantId) => viewModeCalls.push({ viewMode, variantId }),
+      refreshGeneratedState: (sceneKey) => refreshCalls.push(sceneKey),
+    }),
+  );
+
+  act(() => {
+    result.current.handleVariantToolClick();
+  });
+
+  assert.equal(savedVariantSets[0]?.id, "variant-set-1-repeat");
+  assert.equal(savedVariantSets[0]?.variants[0]?.status, "unviewed");
+  assert.equal(repeatVariantWarmupCalls[0]?.variantSet.id, "variant-set-1-repeat");
+  assert.deepEqual(activeVariantCalls, [null]);
+  assert.deepEqual(refreshCalls, ["scene-1"]);
+  assert.deepEqual(viewModeCalls.at(-1), { viewMode: "variants", variantId: undefined });
+});
+
+test("useSceneDetailActions 会在已有活跃变体时直接续上该变体", () => {
+  const useSceneDetailActions = getUseSceneDetailActions();
+
+  const { result } = renderHook(() =>
+    useSceneDetailActions({
+      baseLesson: lesson,
+      latestPracticeSet: null,
+      latestVariantSet: variantSet,
+      activeVariantId: "variant-1",
+      setActiveVariantId: (variantId) => activeVariantCalls.push(variantId),
+      setViewModeWithRoute: (viewMode, variantId) => viewModeCalls.push({ viewMode, variantId }),
+      refreshGeneratedState: (sceneKey) => refreshCalls.push(sceneKey),
+    }),
+  );
+
+  act(() => {
+    result.current.handleVariantToolClick();
+  });
+
+  assert.deepEqual(viewModeCalls.at(-1), {
+    viewMode: "variant-study",
+    variantId: "variant-1",
   });
 });

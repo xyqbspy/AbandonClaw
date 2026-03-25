@@ -1,5 +1,6 @@
 import {
   idbDeleteSceneRecord,
+  idbGetAllSceneRecordKeys,
   idbGetSceneRecord,
   idbSetSceneRecord,
 } from "@/lib/cache/indexeddb";
@@ -23,6 +24,7 @@ export type ReviewPageCacheRecord = {
 const CACHE_SCHEMA_VERSION: ReviewPageCacheRecord["schemaVersion"] = "review-page-cache-v1";
 const REVIEW_PAGE_TTL_MS = 3 * 60 * 1000;
 const nowMs = () => Date.now();
+const CACHE_KEY_PREFIX = "review-page:v1:";
 
 const memoryRecords = new Map<string, ReviewPageCacheRecord>();
 
@@ -133,4 +135,14 @@ export async function clearReviewPageCache(limit = 20): Promise<void> {
   const key = cacheKey(normalizedLimit);
   memoryRecords.delete(key);
   await idbDeleteSceneRecord(key);
+}
+
+export async function clearAllReviewPageCache(): Promise<void> {
+  const keys = [
+    ...memoryRecords.keys(),
+    ...(await idbGetAllSceneRecordKeys()).filter((key) => key.startsWith(CACHE_KEY_PREFIX)),
+  ];
+  const uniqueKeys = Array.from(new Set(keys));
+  memoryRecords.clear();
+  await Promise.all(uniqueKeys.map((key) => idbDeleteSceneRecord(key)));
 }

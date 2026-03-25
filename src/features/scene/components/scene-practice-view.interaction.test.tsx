@@ -570,6 +570,7 @@ test("ScenePracticeView 无错题完成时会显示无错题总结", async () =>
 test("ScenePracticeView 总结区动作按钮会触发对应回调", async () => {
   let reviewCount = 0;
   let variantsCount = 0;
+  let repeatCount = 0;
 
   render(
     <ScenePracticeView
@@ -583,6 +584,9 @@ test("ScenePracticeView 总结区动作按钮会触发对应回调", async () =>
       onComplete={() => undefined}
       onReviewScene={() => {
         reviewCount += 1;
+      }}
+      onRepeatPractice={() => {
+        repeatCount += 1;
       }}
       onOpenVariants={() => {
         variantsCount += 1;
@@ -619,6 +623,9 @@ test("ScenePracticeView 总结区动作按钮会触发对应回调", async () =>
       onReviewScene={() => {
         reviewCount += 1;
       }}
+      onRepeatPractice={() => {
+        repeatCount += 1;
+      }}
       onOpenVariants={() => {
         variantsCount += 1;
       }}
@@ -634,4 +641,36 @@ test("ScenePracticeView 总结区动作按钮会触发对应回调", async () =>
 
   fireEvent.click(screen.getByRole("button", { name: "进入变体训练" }));
   assert.equal(variantsCount, 1);
+
+  cleanup();
+
+  render(
+    <ScenePracticeView
+      practiceSet={{ ...practiceSet, status: "completed" }}
+      showAnswerMap={{}}
+      appleButtonSmClassName="btn"
+      appleDangerButtonSmClassName="danger"
+      labels={sceneViewLabels.practice}
+      onBack={() => undefined}
+      onDelete={() => undefined}
+      onComplete={() => undefined}
+      onReviewScene={() => {
+        reviewCount += 1;
+      }}
+      onRepeatPractice={() => {
+        repeatCount += 1;
+      }}
+      onOpenVariants={() => {
+        variantsCount += 1;
+      }}
+      onToggleAnswer={() => undefined}
+    />,
+  );
+
+  await waitFor(() => {
+    assert.ok(screen.getByRole("button", { name: "再练一遍" }));
+  });
+
+  fireEvent.click(screen.getByRole("button", { name: "再练一遍" }));
+  assert.equal(repeatCount, 1);
 });

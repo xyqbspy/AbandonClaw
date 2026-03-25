@@ -123,6 +123,61 @@ export const saveVariantSet = (variantSet: VariantSet) => {
   });
 };
 
+const getVariantStatusPriority = (status: VariantItemStatus) => {
+  if (status === "completed") return 2;
+  if (status === "viewed") return 1;
+  return 0;
+};
+
+export const hydrateVariantSetFromRun = (
+  sceneId: string,
+  variantSetId: string,
+  run: {
+    activeVariantId: string | null;
+    viewedVariantIds: string[];
+    status: "in_progress" | "completed" | "abandoned";
+  },
+) => {
+  const store = getStore();
+  const items = store.variantByScene[sceneId] ?? [];
+  const viewedIds = new Set(run.viewedVariantIds);
+  if (run.activeVariantId) {
+    viewedIds.add(run.activeVariantId);
+  }
+
+  const nextItems = items.map((variantSet) => {
+    if (variantSet.id !== variantSetId) return variantSet;
+    return {
+      ...variantSet,
+      status:
+        run.status === "completed" && variantSet.status !== "completed"
+          ? ("completed" as const)
+          : variantSet.status,
+      completedAt:
+        run.status === "completed" && !variantSet.completedAt
+          ? new Date().toISOString()
+          : variantSet.completedAt,
+      variants: variantSet.variants.map((variant) => {
+        const nextStatus: VariantItemStatus = viewedIds.has(variant.id) ? "viewed" : "unviewed";
+        return getVariantStatusPriority(nextStatus) > getVariantStatusPriority(variant.status)
+          ? {
+              ...variant,
+              status: nextStatus,
+            }
+          : variant;
+      }),
+    };
+  });
+
+  setStore({
+    ...store,
+    variantByScene: {
+      ...store.variantByScene,
+      [sceneId]: nextItems,
+    },
+  });
+};
+
 export const markPracticeSetCompleted = (sceneId: string, practiceSetId: string) => {
   const store = getStore();
   const items = store.practiceByScene[sceneId] ?? [];
@@ -144,6 +199,19 @@ export const markPracticeSetCompleted = (sceneId: string, practiceSetId: string)
       [sceneId]: nextItems,
     },
   });
+};
+
+export const restartPracticeSet = (practiceSet: PracticeSet) => {
+  const nextPracticeSet: PracticeSet = {
+    ...practiceSet,
+    id: `${practiceSet.id}-repeat-${Date.now().toString(36)}`,
+    status: "generated",
+    createdAt: new Date().toISOString(),
+    completedAt: undefined,
+    sessionState: undefined,
+  };
+  savePracticeSet(nextPracticeSet);
+  return nextPracticeSet;
 };
 
 export const deletePracticeSet = (sceneId: string, practiceSetId: string) => {
@@ -179,6 +247,22 @@ export const markVariantSetCompleted = (sceneId: string, variantSetId: string) =
       [sceneId]: nextItems,
     },
   });
+};
+
+export const restartVariantSet = (variantSet: VariantSet) => {
+  const nextVariantSet: VariantSet = {
+    ...variantSet,
+    id: `${variantSet.id}-repeat-${Date.now().toString(36)}`,
+    status: "generated",
+    createdAt: new Date().toISOString(),
+    completedAt: undefined,
+    variants: variantSet.variants.map((variant) => ({
+      ...variant,
+      status: "unviewed",
+    })),
+  };
+  saveVariantSet(nextVariantSet);
+  return nextVariantSet;
 };
 
 export const deleteVariantSet = (sceneId: string, variantSetId: string) => {

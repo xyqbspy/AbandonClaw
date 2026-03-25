@@ -168,3 +168,42 @@ test("SceneVariantsView 在变体集已完成时会禁用完成按钮", () => {
 
   assert.equal(screen.getByRole("button", { name: labels.complete }).hasAttribute("disabled"), true);
 });
+
+test("SceneVariantsView 在变体集已完成时会显示再练入口", () => {
+  const events: string[] = [];
+
+  render(
+    <SceneVariantsView
+      baseLesson={baseLesson}
+      variantSet={{
+        ...variantSet,
+        status: "completed",
+        variants: [
+          {
+            ...variantSet.variants[0],
+            status: "completed",
+          },
+        ],
+      }}
+      expressionMapLoading={false}
+      appleButtonSmClassName="btn"
+      appleDangerButtonSmClassName="danger"
+      labels={labels}
+      onBack={() => undefined}
+      onComplete={() => events.push("complete")}
+      onRepeatVariants={() => events.push("repeat")}
+      onDeleteSet={() => undefined}
+      onOpenExpressionMap={() => undefined}
+      onOpenChunk={() => undefined}
+      onOpenVariant={() => undefined}
+      onDeleteVariant={() => undefined}
+      toVariantTitle={(title) => title}
+      toVariantStatusLabel={(status) => status}
+    />,
+  );
+
+  fireEvent.click(screen.getByRole("button", { name: "再练一遍" }));
+
+  assert.deepEqual(events, ["repeat"]);
+  assert.equal(screen.queryByRole("button", { name: labels.complete }), null);
+});

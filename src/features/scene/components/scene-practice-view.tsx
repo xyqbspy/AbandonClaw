@@ -74,6 +74,7 @@ type ScenePracticeViewProps = {
     nextMode?: PracticeMode;
   }) => void;
   onReviewScene: () => void;
+  onRepeatPractice?: () => void;
   onOpenVariants: () => void;
   onToggleAnswer: (exerciseId: string) => void;
 };
@@ -93,6 +94,7 @@ export function ScenePracticeView({
   onPracticeAttempt,
   onPracticeModeComplete,
   onReviewScene,
+  onRepeatPractice,
   onOpenVariants,
   onToggleAnswer,
 }: ScenePracticeViewProps) {
@@ -201,6 +203,9 @@ export function ScenePracticeView({
     "完成首发练习模块：答对当前题组后，再点击“完成本轮练习”。";
   const completedModuleCount = modules.filter((module) => moduleCompletionMap[module.mode]).length;
   const allModulesCompleted = modules.length === 0 || completedModuleCount === modules.length;
+  const isCompletedPractice = practiceSet?.status === "completed";
+  const summaryCompletedModuleCount = isCompletedPractice ? modules.length : completedModuleCount;
+  const summaryAllModulesCompleted = allModulesCompleted || isCompletedPractice;
   const hasNextModule = Boolean(
     activeModule && modules.findIndex((module) => module.mode === activeModule.mode) < modules.length - 1,
   );
@@ -214,7 +219,7 @@ export function ScenePracticeView({
     labels,
   });
   const completionHint = getPracticeCompletionHint({
-    allModulesCompleted,
+    allModulesCompleted: summaryAllModulesCompleted,
     allTypingCompleted,
     hasNextModule,
     nextModuleLabel: nextModule?.modeLabel,
@@ -447,7 +452,7 @@ export function ScenePracticeView({
         </section>
       ) : null}
 
-      {practiceSet && allModulesCompleted ? (
+      {practiceSet && summaryAllModulesCompleted ? (
         <section className={`space-y-3 rounded-lg p-4 ${APPLE_SURFACE}`}>
           <div className="space-y-1">
             <p className="text-sm font-medium">{labels.summaryTitle}</p>
@@ -467,13 +472,24 @@ export function ScenePracticeView({
               <>
                 <p>{labels.summaryNoMistakes}</p>
                 <p>{labels.summaryVariantHint}</p>
-                <button
-                  type="button"
-                  className={`${appleButtonSmClassName} mt-2 px-3 py-1.5 text-sm`}
-                  onClick={onOpenVariants}
-                >
-                  {labels.summaryVariantAction}
-                </button>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {isCompletedPractice ? (
+                    <button
+                      type="button"
+                      className={`${appleButtonSmClassName} px-3 py-1.5 text-sm`}
+                      onClick={() => onRepeatPractice?.()}
+                    >
+                      {labels.summaryRepeatAction}
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    className={`${appleButtonSmClassName} px-3 py-1.5 text-sm`}
+                    onClick={onOpenVariants}
+                  >
+                    {labels.summaryVariantAction}
+                  </button>
+                </div>
               </>
             ) : (
               <>
@@ -486,13 +502,24 @@ export function ScenePracticeView({
                   ))}
                 </ul>
                 <p>{labels.summaryReviewHint}</p>
-                <button
-                  type="button"
-                  className={`${appleButtonSmClassName} mt-2 px-3 py-1.5 text-sm`}
-                  onClick={onReviewScene}
-                >
-                  {labels.summaryReviewAction}
-                </button>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {isCompletedPractice ? (
+                    <button
+                      type="button"
+                      className={`${appleButtonSmClassName} px-3 py-1.5 text-sm`}
+                      onClick={() => onRepeatPractice?.()}
+                    >
+                      {labels.summaryRepeatAction}
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    className={`${appleButtonSmClassName} px-3 py-1.5 text-sm`}
+                    onClick={onReviewScene}
+                  >
+                    {labels.summaryReviewAction}
+                  </button>
+                </div>
               </>
             )}
           </div>

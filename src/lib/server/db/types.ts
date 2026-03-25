@@ -76,6 +76,7 @@ export type ScenePracticeMode =
   | "sentence_recall"
   | "full_dictation";
 export type ScenePracticeRunStatus = "in_progress" | "completed" | "abandoned";
+export type SceneVariantRunStatus = "in_progress" | "completed" | "abandoned";
 export type ScenePracticeAssessmentLevel =
   | "incorrect"
   | "keyword"
@@ -159,6 +160,22 @@ export interface UserScenePracticeAttemptRow {
   attempt_index: number;
   metadata_json: unknown;
   created_at: string;
+}
+
+export interface UserSceneVariantRunRow {
+  id: string;
+  user_id: string;
+  scene_id: string;
+  session_id: string | null;
+  variant_set_id: string;
+  active_variant_id: string | null;
+  viewed_variant_ids: string[];
+  status: SceneVariantRunStatus;
+  started_at: string;
+  completed_at: string | null;
+  last_active_at: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface UserDailyLearningStatsRow {

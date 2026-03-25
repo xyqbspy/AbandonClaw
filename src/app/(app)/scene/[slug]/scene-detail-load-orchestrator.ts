@@ -1,5 +1,7 @@
 ﻿import { Lesson } from "@/lib/types";
 
+import { scheduleLessonAudioWarmup } from "@/lib/utils/resource-actions";
+
 import {
   buildScenePrefetchPlan,
   resolveSceneCachePresentation,
@@ -86,6 +88,11 @@ export const loadSceneDetail = async ({
 
     callbacks.onHydrateLesson(lesson, "network");
     callbacks.onStopLoading();
+    scheduleLessonAudioWarmup(lesson, {
+      sentenceLimit: 2,
+      chunkLimit: 2,
+      key: `scene-detail-audio:${requestSlug}`,
+    });
 
     void deps.setSceneCache(requestSlug, lesson).catch(() => {
       // Non-blocking cache write.

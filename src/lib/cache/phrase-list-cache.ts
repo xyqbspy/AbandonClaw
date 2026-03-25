@@ -1,5 +1,6 @@
 import {
   idbDeleteSceneRecord,
+  idbGetAllSceneRecordKeys,
   idbGetSceneRecord,
   idbSetSceneRecord,
 } from "@/lib/cache/indexeddb";
@@ -46,6 +47,8 @@ const cacheKey = (params: {
   limit: number;
 }) =>
   `phrase-list:v6:${params.status}:r=${params.reviewStatus}:t=${params.learningItemType}:c=${encodeURIComponent(params.expressionClusterId)}:q=${encodeURIComponent(normalizeQuery(params.query))}:p=${params.page}:l=${params.limit}`;
+
+const CACHE_KEY_PREFIX = "phrase-list:v6:";
 
 const isPhraseListItemValid = (item: UserPhraseItemResponse) =>
   typeof item?.userPhraseId === "string" &&
@@ -180,4 +183,14 @@ export async function setPhraseListCache(
   void idbSetSceneRecord(next).catch(() => {
     debugLog("set persist failed", key);
   });
+}
+
+export async function clearAllPhraseListCache(): Promise<void> {
+  const keys = [
+    ...memoryPhraseListRecords.keys(),
+    ...(await idbGetAllSceneRecordKeys()).filter((key) => key.startsWith(CACHE_KEY_PREFIX)),
+  ];
+  const uniqueKeys = Array.from(new Set(keys));
+  memoryPhraseListRecords.clear();
+  await Promise.all(uniqueKeys.map((key) => idbDeleteSceneRecord(key)));
 }

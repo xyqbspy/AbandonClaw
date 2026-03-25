@@ -1,3 +1,5 @@
+import { invalidateAfterReviewMutation } from "@/lib/utils/cache-actions";
+
 export type ReviewResult = "again" | "hard" | "good";
 
 export interface DueReviewItemResponse {
@@ -76,10 +78,12 @@ export async function submitPhraseReviewFromApi(payload: {
   if (!response.ok) {
     throw await toApiError(response, "提交复习结果失败。");
   }
-  return (await response.json()) as {
+  const data = (await response.json()) as {
     item: DueReviewItemResponse;
     summary: ReviewSummaryResponse;
   };
+  invalidateAfterReviewMutation();
+  return data;
 }
 
 export async function getReviewSummaryFromApi() {

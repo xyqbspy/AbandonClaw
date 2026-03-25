@@ -116,16 +116,22 @@ export interface ContinueLearningItem {
   progressPercent: number;
   masteryStage: SceneMasteryStage;
   masteryPercent: number;
+  currentStep: SceneTrainingStep | null;
   lastViewedAt: string | null;
   lastSentenceIndex: number | null;
   estimatedMinutes: number | null;
   savedPhraseCount: number;
+  repeatMode?: "practice" | "variants" | null;
+  isRepeat?: boolean;
 }
 
 export interface TodayLearningTasks {
   sceneTask: {
     done: boolean;
     continueSceneSlug: string | null;
+    currentStep: SceneTrainingStep | null;
+    masteryStage: SceneMasteryStage | null;
+    progressPercent: number;
   };
   reviewTask: {
     done: boolean;
@@ -433,6 +439,7 @@ const parseEstimatedMinutesFromSceneJson = (scene: SceneRow) => {
 const toContinueItem = (
   scene: Pick<SceneRow, "slug" | "title" | "translation" | "scene_json">,
   progress: UserSceneProgressRow,
+  session: UserSceneSessionRow | null,
 ): ContinueLearningItem => ({
   sceneSlug: scene.slug,
   title: scene.title,
@@ -440,11 +447,128 @@ const toContinueItem = (
   progressPercent: Number(progress.progress_percent ?? 0),
   masteryStage: progress.mastery_stage ?? "listening",
   masteryPercent: Number(progress.mastery_percent ?? 0),
+  currentStep: session?.current_step ?? null,
   lastViewedAt: progress.last_viewed_at,
   lastSentenceIndex: progress.last_sentence_index,
   estimatedMinutes: parseEstimatedMinutesFromSceneJson(scene as SceneRow),
   savedPhraseCount: progress.saved_phrase_count ?? 0,
+  repeatMode: null,
+  isRepeat: false,
 });
+
+async function getLatestRepeatPracticeRun(userId: string) {
+  const admin = createSupabaseAdminClient();
+  const { data, error } = await admin
+    .from("user_scene_practice_runs")
+    .select("scene_id,practice_set_id,source_type,source_variant_id,last_active_at")
+    .eq("user_id", userId)
+    .eq("status", "in_progress")
+    .order("last_active_at", { ascending: false, nullsFirst: false })
+    .limit(1)
+    .maybeSingle<{
+      scene_id: string;
+      practice_set_id: string;
+      source_type: "original" | "variant";
+      source_variant_id: string | null;
+      last_active_at: string;
+    }>();
+
+  if (error) {
+    throwLearningQueryError("read repeat practice continue run", error);
+  }
+  if (!data) return null;
+
+  return {
+    sceneId: data.scene_id,
+    practiceSetId: data.practice_set_id,
+    sourceType: data.source_type,
+    sourceVariantId: data.source_variant_id,
+    lastActiveAt: data.last_active_at,
+  };
+}
+
+async function getLatestRepeatVariantRun(userId: string) {
+  const admin = createSupabaseAdminClient();
+  const { data, error } = await admin
+    .from("user_scene_variant_runs")
+    .select("scene_id,variant_set_id,active_variant_id,last_active_at")
+    .eq("user_id", userId)
+    .eq("status", "in_progress")
+    .order("last_active_at", { ascending: false, nullsFirst: false })
+    .limit(1)
+    .maybeSingle<{
+      scene_id: string;
+      variant_set_id: string;
+      active_variant_id: string | null;
+      last_active_at: string;
+    }>();
+
+  if (error) {
+    throwLearningQueryError("read repeat variant continue run", error);
+  }
+  if (!data) return null;
+
+  return {
+    sceneId: data.scene_id,
+    variantSetId: data.variant_set_id,
+    activeVariantId: data.active_variant_id,
+    lastActiveAt: data.last_active_at,
+  };
+}
+
+const toRepeatPracticeContinueItem = (params: {
+  scene: Pick<SceneRow, "slug" | "title" | "translation" | "scene_json">;
+  progress: UserSceneProgressRow | null;
+  run: {
+    lastActiveAt: string;
+  };
+}): ContinueLearningItem => ({
+  sceneSlug: params.scene.slug,
+  title: params.scene.title,
+  subtitle: params.scene.translation,
+  progressPercent: 100,
+  masteryStage: "mastered",
+  masteryPercent: 100,
+  currentStep: "scene_practice",
+  lastViewedAt: params.run.lastActiveAt,
+  lastSentenceIndex: params.progress?.last_sentence_index ?? null,
+  estimatedMinutes: parseEstimatedMinutesFromSceneJson(params.scene as SceneRow),
+  savedPhraseCount: params.progress?.saved_phrase_count ?? 0,
+  repeatMode: "practice",
+  isRepeat: true,
+});
+
+const toRepeatVariantContinueItem = (params: {
+  scene: Pick<SceneRow, "slug" | "title" | "translation" | "scene_json">;
+  progress: UserSceneProgressRow | null;
+  run: {
+    lastActiveAt: string;
+  };
+}): ContinueLearningItem => ({
+  sceneSlug: params.scene.slug,
+  title: params.scene.title,
+  subtitle: params.scene.translation,
+  progressPercent: 100,
+  masteryStage: "mastered",
+  masteryPercent: 100,
+  currentStep: "done",
+  lastViewedAt: params.run.lastActiveAt,
+  lastSentenceIndex: params.progress?.last_sentence_index ?? null,
+  estimatedMinutes: parseEstimatedMinutesFromSceneJson(params.scene as SceneRow),
+  savedPhraseCount: params.progress?.saved_phrase_count ?? 0,
+  repeatMode: "variants",
+  isRepeat: true,
+});
+
+const pickMostRecentContinueScene = (
+  items: Array<ContinueLearningItem | null>,
+) =>
+  items
+    .filter((item): item is ContinueLearningItem => item !== null)
+    .sort(
+      (left, right) =>
+        new Date(right.lastViewedAt ?? 0).getTime() - new Date(left.lastViewedAt ?? 0).getTime(),
+    )[0] ?? null;
 
 export async function startSceneLearning(userId: string, sceneSlug: string) {
   const scene = await resolveVisibleSceneBySlug(userId, sceneSlug);
@@ -745,15 +869,96 @@ export async function getContinueLearningScene(userId: string) {
     }
   >;
   if (rows.length === 0) return null;
-  const inProgress = rows.find((row) => row.status === "in_progress") ?? null;
-  if (inProgress) return toContinueItem(inProgress.scenes, inProgress);
-  const paused = rows.find((row) => row.status === "paused") ?? null;
-  return paused ? toContinueItem(paused.scenes, paused) : null;
+  const targetRow =
+    rows.find((row) => row.status === "in_progress") ??
+    rows.find((row) => row.status === "paused") ??
+    null;
+  if (!targetRow) return null;
+
+  const latestSession = await getLatestSessionByUserAndScene(userId, targetRow.scene_id);
+  return toContinueItem(targetRow.scenes, targetRow, latestSession);
+}
+
+async function getRepeatPracticeContinueScene(userId: string) {
+  const repeatRun = await getLatestRepeatPracticeRun(userId);
+  if (!repeatRun) return null;
+
+  const admin = createSupabaseAdminClient();
+  const [sceneRes, progressRes] = await Promise.all([
+    admin
+      .from("scenes")
+      .select("id,slug,title,translation,scene_json")
+      .eq("id", repeatRun.sceneId)
+      .maybeSingle<Pick<SceneRow, "id" | "slug" | "title" | "translation" | "scene_json">>(),
+    admin
+      .from("user_scene_progress")
+      .select("*")
+      .eq("user_id", userId)
+      .eq("scene_id", repeatRun.sceneId)
+      .maybeSingle<UserSceneProgressRow>(),
+  ]);
+
+  if (sceneRes.error) {
+    throwLearningQueryError("read repeat practice scene", sceneRes.error);
+  }
+  if (progressRes.error) {
+    throwLearningQueryError("read repeat practice progress", progressRes.error);
+  }
+  if (!sceneRes.data) return null;
+
+  return toRepeatPracticeContinueItem({
+    scene: sceneRes.data,
+    progress: progressRes.data ?? null,
+    run: repeatRun,
+  });
+}
+
+async function getRepeatVariantContinueScene(userId: string) {
+  const repeatRun = await getLatestRepeatVariantRun(userId);
+  if (!repeatRun) return null;
+
+  const admin = createSupabaseAdminClient();
+  const [sceneRes, progressRes] = await Promise.all([
+    admin
+      .from("scenes")
+      .select("id,slug,title,translation,scene_json")
+      .eq("id", repeatRun.sceneId)
+      .maybeSingle<Pick<SceneRow, "id" | "slug" | "title" | "translation" | "scene_json">>(),
+    admin
+      .from("user_scene_progress")
+      .select("*")
+      .eq("user_id", userId)
+      .eq("scene_id", repeatRun.sceneId)
+      .maybeSingle<UserSceneProgressRow>(),
+  ]);
+
+  if (sceneRes.error) {
+    throwLearningQueryError("read repeat variant scene", sceneRes.error);
+  }
+  if (progressRes.error) {
+    throwLearningQueryError("read repeat variant progress", progressRes.error);
+  }
+  if (!sceneRes.data) return null;
+
+  return toRepeatVariantContinueItem({
+    scene: sceneRes.data,
+    progress: progressRes.data ?? null,
+    run: repeatRun,
+  });
 }
 
 export async function getTodayLearningTasks(userId: string): Promise<TodayLearningTasks> {
   const admin = createSupabaseAdminClient();
-  const continueScene = await getContinueLearningScene(userId);
+  const [directContinueScene, repeatPracticeContinue, repeatVariantContinue] = await Promise.all([
+    getContinueLearningScene(userId),
+    getRepeatPracticeContinueScene(userId),
+    getRepeatVariantContinueScene(userId),
+  ]);
+  const continueScene = pickMostRecentContinueScene([
+    directContinueScene,
+    repeatVariantContinue,
+    repeatPracticeContinue,
+  ]);
   const [reviewSummary, statsQuery] = await Promise.all([
     getReviewSummary(userId),
     admin
@@ -775,8 +980,11 @@ export async function getTodayLearningTasks(userId: string): Promise<TodayLearni
 
   return {
     sceneTask: {
-      done: scenesCompleted > 0,
+      done: continueScene?.isRepeat ? false : scenesCompleted > 0,
       continueSceneSlug: continueScene?.sceneSlug ?? null,
+      currentStep: continueScene?.currentStep ?? null,
+      masteryStage: continueScene?.masteryStage ?? null,
+      progressPercent: continueScene?.progressPercent ?? 0,
     },
     reviewTask: {
       done: reviewSummary.dueReviewCount === 0 || reviewItemsCompleted > 0,
@@ -870,15 +1078,22 @@ export async function getLearningOverview(userId: string): Promise<LearningOverv
 }
 
 export async function getLearningDashboard(userId: string) {
-  const [overview, continueLearning, todayTasks] = await Promise.all([
+  const [overview, continueLearning, repeatPracticeContinue, repeatVariantContinue, todayTasks] =
+    await Promise.all([
     getLearningOverview(userId),
     getContinueLearningScene(userId),
+    getRepeatPracticeContinueScene(userId),
+    getRepeatVariantContinueScene(userId),
     getTodayLearningTasks(userId),
-  ]);
+    ]);
 
   return {
     overview,
-    continueLearning,
+    continueLearning: pickMostRecentContinueScene([
+      continueLearning,
+      repeatVariantContinue,
+      repeatPracticeContinue,
+    ]),
     todayTasks,
   };
 }
