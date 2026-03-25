@@ -31,6 +31,7 @@ import {
   APPLE_BUTTON_TEXT_SM,
 } from "@/lib/ui/apple-style";
 import { scheduleIdleAction } from "@/lib/utils/resource-actions";
+import { getPracticeModeLabel } from "@/lib/shared/scene-training-copy";
 
 import { useSceneDetailActions } from "./use-scene-detail-actions";
 import { SceneBaseView } from "./scene-base-view";
@@ -85,23 +86,29 @@ function SceneTrainingCoachFloatingEntry({
   trainingState,
   variantUnlocked,
   practiceSetStatus,
-  practiceModeLabel,
+  practiceModeKey,
   practiceSnapshot,
   practiceModuleCount,
   currentStepActionLabel,
   onCurrentStepAction,
   currentStepActionDisabled,
+  practiceStepAction,
 }: {
   sceneId: string;
   trainingState: SceneLearningProgressResponse | null;
   variantUnlocked: boolean;
   practiceSetStatus: "idle" | "generated" | "completed";
-  practiceModeLabel?: string | null;
+  practiceModeKey?: "cloze" | "guided_recall" | "sentence_recall" | "full_dictation" | null;
   practiceSnapshot: ScenePracticeSnapshotResponse | null;
   practiceModuleCount: number;
   currentStepActionLabel: string | null;
   onCurrentStepAction?: (() => void) | null;
   currentStepActionDisabled?: boolean;
+  practiceStepAction?: {
+    label: string;
+    onClick: () => void;
+    disabled?: boolean;
+  } | null;
 }) {
   const [panelOpen, setPanelOpen] = useState(false);
   const [position, setPosition] = useState({ x: 0, y: 0 });
@@ -110,6 +117,7 @@ function SceneTrainingCoachFloatingEntry({
     width: typeof window === "undefined" ? 0 : window.innerWidth,
     height: typeof window === "undefined" ? 0 : window.innerHeight,
   }));
+  const [fabSize, setFabSize] = useState({ width: 152, height: 44 });
   const iconButtonRef = useRef<HTMLButtonElement | null>(null);
   const dragStateRef = useRef<{
     pointerId: number | null;
@@ -141,8 +149,8 @@ function SceneTrainingCoachFloatingEntry({
   const positionStorageKey = `scene-training-fab-position:${sceneId}`;
   const viewportGap = 12;
   const topGap = 88;
-  const fabWidth = viewportWidth < 640 ? 152 : 168;
-  const fabHeight = 44;
+  const fabWidth = fabSize.width;
+  const fabHeight = fabSize.height;
   const panelWidth = Math.min(viewportWidth - viewportGap * 2, viewportWidth < 640 ? 288 : 332);
   const panelMaxHeight = Math.max(260, viewportHeight - topGap - viewportGap * 2);
 
@@ -188,15 +196,16 @@ function SceneTrainingCoachFloatingEntry({
   );
 
   const currentStepSupportText = useMemo(() => {
+    const normalizedPracticeModeKey = practiceSnapshot?.run?.currentMode ?? practiceModeKey ?? null;
     return getSceneTrainingCurrentStepSupportText({
       currentStep: normalizedTrainingState.currentStep,
-      practiceModeLabel,
-      practiceModeKey: practiceSnapshot?.run?.currentMode ?? null,
+      practiceModeLabel: getPracticeModeLabel(normalizedPracticeModeKey),
+      practiceModeKey: normalizedPracticeModeKey,
       practiceAttemptCount: practiceSnapshot?.summary.totalAttemptCount ?? 0,
     });
   }, [
     normalizedTrainingState.currentStep,
-    practiceModeLabel,
+    practiceModeKey,
     practiceSnapshot?.run?.currentMode,
     practiceSnapshot?.summary.totalAttemptCount,
   ]);
@@ -264,7 +273,18 @@ function SceneTrainingCoachFloatingEntry({
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+    const updateFabSize = () => {
+      const nextWidth = iconButtonRef.current?.offsetWidth ?? 152;
+      const nextHeight = iconButtonRef.current?.offsetHeight ?? 44;
+      setFabSize((currentSize) =>
+        currentSize.width === nextWidth && currentSize.height === nextHeight
+          ? currentSize
+          : { width: nextWidth, height: nextHeight },
+      );
+    };
+    updateFabSize();
     const handleResize = () => {
+      updateFabSize();
       setViewportSize({ width: window.innerWidth, height: window.innerHeight });
       setPosition((currentPosition) => clampPosition(currentPosition));
     };
@@ -274,6 +294,17 @@ function SceneTrainingCoachFloatingEntry({
       window.removeEventListener("resize", handleResize);
     };
   }, [clampPosition]);
+
+  useEffect(() => {
+    const nextWidth = iconButtonRef.current?.offsetWidth;
+    const nextHeight = iconButtonRef.current?.offsetHeight;
+    if (!nextWidth || !nextHeight) return;
+    setFabSize((currentSize) =>
+      currentSize.width === nextWidth && currentSize.height === nextHeight
+        ? currentSize
+        : { width: nextWidth, height: nextHeight },
+    );
+  }, [collapsedStepLabel]);
 
   useEffect(() => () => clearDragTimer(), [clearDragTimer]);
 
@@ -419,7 +450,6 @@ function SceneTrainingCoachFloatingEntry({
           data-testid="scene-training-fab"
           className="inline-flex min-h-11 items-center gap-2 rounded-full border border-black/10 bg-white/94 px-3 py-2 text-left shadow-[0_8px_20px_rgba(0,0,0,0.08)] backdrop-blur transition-transform duration-150"
           style={{
-            width: `${fabWidth}px`,
             minHeight: `${fabHeight}px`,
             touchAction: "none",
             transform: dragActive ? "scale(1.08)" : "scale(1)",
@@ -441,7 +471,7 @@ function SceneTrainingCoachFloatingEntry({
 
         {panelOpen ? (
           <div
-            className="absolute overflow-y-auto rounded-[24px] border border-black/8 bg-white/96 p-3 shadow-[0_16px_40px_rgba(0,0,0,0.12)] backdrop-blur sm:rounded-3xl sm:p-4"
+            className="absolute flex flex-col overflow-hidden rounded-[24px] border border-black/8 bg-white/96 shadow-[0_16px_40px_rgba(0,0,0,0.12)] backdrop-blur sm:rounded-3xl"
             style={{
               left: `${panelLeft}px`,
               top: `${panelTop}px`,
@@ -449,7 +479,7 @@ function SceneTrainingCoachFloatingEntry({
               maxHeight: `${panelMaxHeight}px`,
             }}
           >
-            <div className="flex items-start justify-between gap-3">
+            <div className="flex shrink-0 items-start justify-between gap-3 px-3 pt-3 sm:px-4 sm:pt-4">
               <div className="space-y-1">
                 <p className="text-[15px] font-semibold text-foreground sm:text-base">
                   {sceneDetailMessages.trainingPanelTitle}
@@ -465,74 +495,91 @@ function SceneTrainingCoachFloatingEntry({
               </button>
             </div>
 
-            <div className="mt-3 rounded-[22px] bg-black/[0.03] px-3 py-3.5 sm:mt-4">
-              <p className="text-[13px] text-muted-foreground sm:text-sm">
-                {sceneDetailMessages.currentStepLabel}
-              </p>
-              <p className="mt-1 text-[18px] font-semibold text-foreground sm:text-[20px]">
-                {getSceneTrainingStepTitle(normalizedTrainingState.currentStep)}
-              </p>
-              <p className="mt-2 text-[13px] text-muted-foreground sm:text-sm">
-                {sceneDetailMessages.nextStepPrefix}
-                {nextStepLabel}
-              </p>
-              <p className="mt-2 text-[12px] leading-5 text-muted-foreground/90 sm:text-[13px]">
-                {currentStepSupportText}
-              </p>
-            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3 pt-3 sm:px-4 sm:pb-4 sm:pt-4">
+              <div className="rounded-[22px] bg-black/[0.03] px-3 py-3.5">
+                <p className="text-[13px] text-muted-foreground sm:text-sm">
+                  {sceneDetailMessages.currentStepLabel}
+                </p>
+                <p className="mt-1 text-[18px] font-semibold text-foreground sm:text-[20px]">
+                  {getSceneTrainingStepTitle(normalizedTrainingState.currentStep)}
+                </p>
+                <p className="mt-2 text-[13px] text-muted-foreground sm:text-sm">
+                  {sceneDetailMessages.nextStepPrefix}
+                  {nextStepLabel}
+                </p>
+                <p className="mt-2 text-[12px] leading-5 text-muted-foreground/90 sm:text-[13px]">
+                  {currentStepSupportText}
+                </p>
+              </div>
 
-            <div className="mt-3 rounded-[22px] bg-black/[0.03] px-3 py-3 sm:mt-4">
-              <p className="text-xs text-muted-foreground">{sceneDetailMessages.trainingStepsLabel}</p>
-              <div className="mt-2 space-y-1.5">
-                {normalizedTrainingState.stepStates.map((step, index) => {
-                  const done = step.status === "done";
-                  const active = step.status === "current";
-                  return (
-                    <div
-                      key={step.key}
-                      className="flex items-center justify-between gap-2 rounded-2xl bg-black/[0.03] px-2.5 py-2"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="text-[13px] text-muted-foreground sm:text-sm">
-                          {index + 1}.
-                        </span>
-                        <span
-                          className={
-                            active
-                              ? "text-[13px] font-medium text-foreground sm:text-sm"
-                              : "text-[13px] text-foreground sm:text-sm"
-                          }
-                        >
-                          {step.title}
-                        </span>
-                      </div>
-                      <span
-                        className={
-                          done
-                            ? "inline-flex items-center gap-1 rounded-full bg-[rgb(22,163,74)]/10 px-2 py-1 text-xs text-[rgb(21,128,61)]"
-                            : active
-                              ? "rounded-full bg-black/6 px-2 py-1 text-xs text-foreground"
-                              : "rounded-full bg-transparent px-2 py-1 text-xs text-muted-foreground"
-                        }
+              <div className="mt-3 rounded-[22px] bg-black/[0.03] px-3 py-3 sm:mt-4">
+                <p className="text-xs text-muted-foreground">{sceneDetailMessages.trainingStepsLabel}</p>
+                <div className="mt-2 space-y-1.5">
+                  {normalizedTrainingState.stepStates.map((step, index) => {
+                    const done = step.status === "done";
+                    const active = step.status === "current";
+                    const showPracticeStepAction = done && step.key === "scene_practice" && practiceStepAction;
+                    return (
+                      <div
+                        key={step.key}
+                        className="flex items-center justify-between gap-2 rounded-2xl bg-black/[0.03] px-2.5 py-2"
                       >
-                        {done ? (
-                          <>
-                            <Check className="size-3" />
-                            {sceneDetailMessages.stepDone}
-                          </>
-                        ) : active ? (
-                          sceneDetailMessages.stepCurrent
-                        ) : (
-                          sceneDetailMessages.stepPending
-                        )}
-                      </span>
-                    </div>
-                  );
-                })}
+                        <div className="flex items-center gap-2">
+                          <span className="text-[13px] text-muted-foreground sm:text-sm">
+                            {index + 1}.
+                          </span>
+                          <span
+                            className={
+                              active
+                                ? "text-[13px] font-medium text-foreground sm:text-sm"
+                                : "text-[13px] text-foreground sm:text-sm"
+                            }
+                          >
+                            {step.title}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {showPracticeStepAction ? (
+                            <button
+                              type="button"
+                              className="inline-flex min-h-8 items-center rounded-full border border-black/8 bg-white/80 px-2.5 py-1 text-xs text-foreground transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
+                              disabled={practiceStepAction.disabled}
+                              onClick={() => {
+                                practiceStepAction.onClick();
+                              }}
+                            >
+                              {practiceStepAction.label}
+                            </button>
+                          ) : null}
+                          <span
+                            className={
+                              done
+                                ? "inline-flex items-center gap-1 rounded-full bg-[rgb(22,163,74)]/10 px-2 py-1 text-xs text-[rgb(21,128,61)]"
+                                : active
+                                  ? "rounded-full bg-black/6 px-2 py-1 text-xs text-foreground"
+                                  : "rounded-full bg-transparent px-2 py-1 text-xs text-muted-foreground"
+                            }
+                          >
+                            {done ? (
+                              <>
+                                <Check className="size-3" />
+                                {sceneDetailMessages.stepDone}
+                              </>
+                            ) : active ? (
+                              sceneDetailMessages.stepCurrent
+                            ) : (
+                              sceneDetailMessages.stepPending
+                            )}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </div>
 
-            <div className="mt-3 border-t border-black/6 pt-3 text-[13px] text-muted-foreground sm:mt-4 sm:text-sm">
+            <div className="shrink-0 border-t border-black/6 px-3 pb-3 pt-3 text-[13px] text-muted-foreground sm:px-4 sm:pb-4 sm:text-sm">
               <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground/85">
                 <span>整段播放 {statsSummary.fullPlayCount}</span>
                 <span>重点表达 {statsSummary.openedExpressionCount}</span>
@@ -728,6 +775,10 @@ export default function SceneDetailClientPage({
       }),
     [generatedState.practiceStatus, practiceSnapshot, trainingState?.session, variantUnlocked],
   );
+  const sceneTrainingState = useMemo(
+    () => deriveSceneTrainingState(sceneRawCompletedMap),
+    [sceneRawCompletedMap],
+  );
 
   useEffect(() => {
     if (!baseLesson) return;
@@ -866,16 +917,8 @@ export default function SceneDetailClientPage({
     notifySceneSentenceStepHint();
   }, []);
 
-  const handleTrainingDoneStep = useCallback(() => {
-    if (variantUnlocked) {
-      handleVariantToolClick();
-      return;
-    }
-    notifySceneSessionCompleted();
-  }, [handleVariantToolClick, variantUnlocked]);
-
   const currentStepAction = useMemo(() => {
-    const currentStep = trainingState?.session?.currentStep ?? null;
+    const currentStep = sceneTrainingState.currentStep;
     if (currentStep === "listen") {
       return {
         label: "开始听整段",
@@ -898,6 +941,8 @@ export default function SceneDetailClientPage({
       };
     }
     if (currentStep === "scene_practice") {
+      const practiceAction =
+        generatedState.practiceStatus === "completed" ? handleRepeatPractice : handlePracticeToolClick;
       return {
         label:
           generatedState.practiceStatus === "completed"
@@ -907,11 +952,13 @@ export default function SceneDetailClientPage({
             : practiceLoading
               ? "练习准备中..."
               : "生成并开始练习",
-        onClick: handlePracticeToolClick,
+        onClick: practiceAction,
         disabled: practiceLoading,
       };
     }
     if (currentStep === "done" || variantUnlocked) {
+      const variantAction =
+        generatedState.variantStatus === "completed" ? handleRepeatVariants : handleVariantToolClick;
       return {
         label:
           generatedState.variantStatus === "completed"
@@ -921,7 +968,7 @@ export default function SceneDetailClientPage({
             : variantsLoading
               ? "变体准备中..."
               : "打开变体训练",
-        onClick: handleTrainingDoneStep,
+        onClick: variantAction,
         disabled: variantsLoading,
       };
     }
@@ -934,14 +981,29 @@ export default function SceneDetailClientPage({
     generatedState.practiceStatus,
     generatedState.variantStatus,
     handlePracticeToolClick,
-    handleTrainingDoneStep,
+    handleRepeatPractice,
+    handleRepeatVariants,
     handleTrainingFocusExpressionStep,
     handleTrainingListenStep,
     handleTrainingPracticeSentenceStep,
+    handleVariantToolClick,
     practiceLoading,
-    trainingState?.session?.currentStep,
+    sceneTrainingState.currentStep,
     variantUnlocked,
     variantsLoading,
+  ]);
+
+  const practiceStepAction = useMemo(() => {
+    if (generatedState.practiceStatus !== "completed") return null;
+    return {
+      label: "复习",
+      onClick: handleRepeatPractice,
+      disabled: practiceLoading,
+    };
+  }, [
+    generatedState.practiceStatus,
+    handleRepeatPractice,
+    practiceLoading,
   ]);
 
   useEffect(() => {
@@ -1048,12 +1110,13 @@ export default function SceneDetailClientPage({
       trainingState={trainingState}
       variantUnlocked={variantUnlocked}
       practiceSetStatus={generatedState.practiceStatus}
-      practiceModeLabel={latestPracticeSet?.modeLabel ?? null}
+      practiceModeKey={latestPracticeSet?.mode ?? null}
       practiceSnapshot={practiceSnapshot}
       practiceModuleCount={latestPracticeSet?.modules?.length ?? 0}
       currentStepActionLabel={currentStepAction.label}
       onCurrentStepAction={currentStepAction.onClick}
       currentStepActionDisabled={currentStepAction.disabled}
+      practiceStepAction={practiceStepAction}
     />
   );
 
