@@ -92,11 +92,16 @@ export function PullToRefresh({ children }: { children: ReactNode }) {
       : "下拉刷新";
 
   return (
-    <div onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}>
+    <div
+      className="relative"
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
+    >
       {enabled ? (
         <div
           className={cn(
-            "sticky top-14 z-20 -mb-1 flex h-6 items-center justify-center text-[11px] text-muted-foreground transition-opacity duration-150",
+            "pointer-events-none absolute inset-x-0 top-14 z-20 flex h-6 items-center justify-center text-[11px] text-muted-foreground transition-opacity duration-150",
             pullDistance > 2 || refreshing ? "opacity-100" : "opacity-0",
           )}
         >

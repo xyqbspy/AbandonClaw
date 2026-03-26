@@ -2,27 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { LoadingButton } from "@/components/shared/action-loading";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  APPLE_BANNER_DANGER,
-  APPLE_BUTTON_BASE,
-  APPLE_BUTTON_STRONG,
-  APPLE_BUTTON_TEXT_MD,
-  APPLE_META_TEXT,
-  APPLE_PANEL,
-  APPLE_PANEL_RAISED,
-  APPLE_TITLE_SM,
-} from "@/lib/ui/apple-style";
 import { cn } from "@/lib/utils";
 import { generatePersonalizedSceneFromApi } from "@/lib/utils/scenes-api";
 
@@ -60,14 +41,15 @@ const toneOptions: Array<{ value: Tone; label: string }> = [
 ];
 
 const difficultyOptions: Array<{ value: Difficulty; label: string }> = [
-  { value: "easy", label: "简单" },
-  { value: "medium", label: "中等" },
+  { value: "easy", label: "初级" },
+  { value: "medium", label: "进阶" },
 ];
 
-const sentenceCountOptions: SentenceCount[] = [6, 10, 14];
-const appleButtonClassName = `${APPLE_BUTTON_BASE} ${APPLE_BUTTON_TEXT_MD}`;
-const appleSegmentBaseClassName = `${APPLE_BUTTON_BASE} h-9 px-3 text-sm font-medium`;
-const appleSegmentActiveClassName = `${APPLE_BUTTON_STRONG} h-9 px-3 text-sm font-medium`;
+const sentenceCountOptions: Array<{ value: SentenceCount; label: string }> = [
+  { value: 6, label: "6句" },
+  { value: 10, label: "10句" },
+  { value: 14, label: "14句" },
+];
 
 const defaultForm = {
   promptText: "",
@@ -76,6 +58,13 @@ const defaultForm = {
   sentenceCount: 10 as SentenceCount,
   reuseKnownChunks: true,
 };
+
+const panelClassName = "rounded-[14px] bg-white p-4 shadow-[0_1px_3px_rgba(0,0,0,0.02)]";
+const labelClassName = "mb-3 block pl-0.5 text-[13px] font-semibold text-[#1d1d1f]";
+const segmentBaseClassName =
+  "rounded-[8px] border-none bg-transparent px-3 py-2 text-[13px] font-medium text-[#1d1d1f] transition-all duration-200";
+const segmentActiveClassName =
+  "bg-white shadow-[0_2px_4px_rgba(0,0,0,0.1)]";
 
 export function GenerateSceneSheet({
   open,
@@ -86,9 +75,7 @@ export function GenerateSceneSheet({
   const [promptText, setPromptText] = useState(defaultForm.promptText);
   const [tone, setTone] = useState<Tone>(defaultForm.tone);
   const [difficulty, setDifficulty] = useState<Difficulty>(defaultForm.difficulty);
-  const [sentenceCount, setSentenceCount] = useState<SentenceCount>(
-    defaultForm.sentenceCount,
-  );
+  const [sentenceCount, setSentenceCount] = useState<SentenceCount>(defaultForm.sentenceCount);
   const [reuseKnownChunks, setReuseKnownChunks] = useState(defaultForm.reuseKnownChunks);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -138,8 +125,7 @@ export function GenerateSceneSheet({
         title: result.scene.title,
         migrationInsight: {
           relatedChunkVariantsUsed: result.personalization?.relatedChunkVariantsUsed ?? [],
-          relatedChunkVariantsMatched:
-            result.personalization?.relatedChunkVariantsMatched ?? [],
+          relatedChunkVariantsMatched: result.personalization?.relatedChunkVariantsMatched ?? [],
         },
       });
     } catch (submitError) {
@@ -158,20 +144,22 @@ export function GenerateSceneSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="bottom"
-        className="max-h-[92vh] border-0 bg-transparent p-0 shadow-none sm:mx-auto sm:max-w-2xl"
-        showCloseButton
+        className="max-h-[92vh] border-0 bg-[#F2F2F7] p-0 shadow-none sm:mx-auto sm:max-w-2xl"
+        showCloseButton={false}
       >
-        <div className={`mx-auto flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-[var(--app-radius-card)] sm:rounded-[var(--app-radius-card)] ${APPLE_PANEL_RAISED}`}>
-          <SheetHeader className="space-y-1 px-4 pb-3 pt-4">
-            <SheetTitle>生成我的场景</SheetTitle>
-            <SheetDescription>
-              可以用中文或英文描述你最近想练的情境。
-            </SheetDescription>
-          </SheetHeader>
+        <div className="flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-[24px] bg-[#F2F2F7] sm:rounded-[24px]">
+          <div className="mx-auto my-[10px] h-[5px] w-9 rounded-[3px] bg-[#C7C7CC]" />
 
-          <div className="space-y-4 overflow-y-auto px-4 py-4">
-            <div className={`space-y-2 p-3 ${APPLE_PANEL}`}>
-              <Label htmlFor="scene-generate-prompt">场景方向</Label>
+          <div className="px-5 pb-4">
+            <h2 className="mb-1 text-[20px] font-bold text-[#1d1d1f]">生成我的场景</h2>
+            <p className="text-[14px] text-[#86868B]">可以用中文或英文描述你最近想练的情境。</p>
+          </div>
+
+          <div className="flex-1 space-y-5 overflow-y-auto px-4 pb-5">
+            <div className={panelClassName}>
+              <label htmlFor="scene-generate-prompt" className={labelClassName}>
+                场景方向
+              </label>
               <Textarea
                 id="scene-generate-prompt"
                 ref={textareaRef}
@@ -180,135 +168,128 @@ export function GenerateSceneSheet({
                   setPromptText(event.target.value);
                   if (error) setError(null);
                 }}
-                placeholder={`明天要和同事开会，但我还没准备好
+                placeholder={`明天要和同事开会，但我还没准备好...
 I want a short scene about canceling plans politely
 我想练下班后很累但还得继续工作的表达`}
-                className="min-h-32 text-sm leading-6"
+                className="min-h-32 border-0 bg-transparent px-0 py-0 text-[15px] leading-[1.5] text-[#1d1d1f] shadow-none focus-visible:ring-0"
                 disabled={submitting}
               />
-              <p className={APPLE_META_TEXT}>
+              <p className="mt-2.5 text-[12px] leading-[1.4] text-[#86868B]">
                 示例：我想练礼貌拒绝加班 / I want to practice ordering coffee simply.
               </p>
             </div>
 
-            <div className={`space-y-2 p-3 ${APPLE_PANEL}`}>
-              <Label>语气风格</Label>
-              <div className="grid grid-cols-4 gap-2">
+            <div className={panelClassName}>
+              <p className={labelClassName}>语气风格</p>
+              <div className="grid grid-cols-4 gap-0.5 rounded-[10px] bg-[#E3E3E8] p-0.5">
                 {toneOptions.map((option) => (
-                  <Button
+                  <button
                     key={option.value}
                     type="button"
-                    size="sm"
-                    variant="ghost"
                     className={cn(
-                      tone === option.value
-                        ? appleSegmentActiveClassName
-                        : appleSegmentBaseClassName,
+                      segmentBaseClassName,
+                      tone === option.value && segmentActiveClassName,
                     )}
                     onClick={() => setTone(option.value)}
                     disabled={submitting}
                   >
                     {option.label}
-                  </Button>
+                  </button>
                 ))}
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-              <div className={`space-y-2 p-3 ${APPLE_PANEL}`}>
-                <Label>难度</Label>
-                <div className="flex gap-2">
+              <div className={panelClassName}>
+                <p className={labelClassName}>难度</p>
+                <div className="grid grid-cols-2 gap-0.5 rounded-[10px] bg-[#E3E3E8] p-0.5">
                   {difficultyOptions.map((option) => (
-                    <Button
+                    <button
                       key={option.value}
                       type="button"
-                      size="sm"
-                      variant="ghost"
                       className={cn(
-                        "flex-1",
-                        difficulty === option.value
-                          ? appleSegmentActiveClassName
-                          : appleSegmentBaseClassName,
+                        segmentBaseClassName,
+                        difficulty === option.value && segmentActiveClassName,
                       )}
                       onClick={() => setDifficulty(option.value)}
                       disabled={submitting}
                     >
                       {option.label}
-                    </Button>
+                    </button>
                   ))}
                 </div>
               </div>
 
-              <div className={`space-y-2 p-3 ${APPLE_PANEL}`}>
-                <Label>句数</Label>
-                <div className="flex gap-2">
-                  {sentenceCountOptions.map((value) => (
-                    <Button
-                      key={value}
+              <div className={panelClassName}>
+                <p className={labelClassName}>句数</p>
+                <div className="grid grid-cols-3 gap-0.5 rounded-[10px] bg-[#E3E3E8] p-0.5">
+                  {sentenceCountOptions.map((option) => (
+                    <button
+                      key={option.value}
                       type="button"
-                      size="sm"
-                      variant="ghost"
                       className={cn(
-                        "flex-1",
-                        sentenceCount === value
-                          ? appleSegmentActiveClassName
-                          : appleSegmentBaseClassName,
+                        segmentBaseClassName,
+                        sentenceCount === option.value && segmentActiveClassName,
                       )}
-                      onClick={() => setSentenceCount(value)}
+                      onClick={() => setSentenceCount(option.value)}
                       disabled={submitting}
                     >
-                      {value}
-                    </Button>
+                      {option.label}
+                    </button>
                   ))}
                 </div>
               </div>
             </div>
 
-            <div className={`p-3 ${APPLE_PANEL}`}>
+            <div className={panelClassName}>
               <button
                 type="button"
                 role="switch"
                 aria-checked={reuseKnownChunks}
-                className="flex w-full items-center justify-between gap-3 text-left"
+                className="flex w-full items-center justify-between gap-4 text-left"
                 onClick={() => setReuseKnownChunks((value) => !value)}
                 disabled={submitting}
               >
-                <div className="space-y-1">
-                  <p className={APPLE_TITLE_SM}>尽量复用我练过的表达</p>
-                  <p className={APPLE_META_TEXT}>
-                    这样会更有熟悉感，也更适合做表达迁移练习。
+                <div className="flex-1">
+                  <p className="mb-0.5 text-[15px] font-semibold text-[#1d1d1f]">尽量复用我练过的表达</p>
+                  <p className="text-[12px] leading-[1.4] text-[#86868B]">
+                    更有熟悉感，适合做表达迁移练习。
                   </p>
                 </div>
                 <span
                   className={cn(
-                    "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
-                    reuseKnownChunks ? "bg-[var(--app-surface-strong)]" : "bg-[var(--app-surface-hover)]",
+                    "relative inline-flex h-[31px] w-[51px] shrink-0 rounded-[16px] transition-colors duration-300",
+                    reuseKnownChunks ? "bg-[#34C759]" : "bg-[#E9E9EA]",
                   )}
                 >
                   <span
                     className={cn(
-                      "inline-block h-5 w-5 transform rounded-full bg-white transition-transform",
-                      reuseKnownChunks ? "translate-x-5" : "translate-x-1",
+                      "absolute left-[2px] top-[2px] h-[27px] w-[27px] rounded-full bg-white shadow-[0_3px_8px_rgba(0,0,0,0.15)] transition-transform duration-300",
+                      reuseKnownChunks && "translate-x-5",
                     )}
                   />
                 </span>
               </button>
             </div>
 
-            {error ? <p className={`text-sm ${APPLE_BANNER_DANGER}`}>{error}</p> : null}
+            {error ? (
+              <div className="rounded-[14px] bg-[#fff1f0] px-4 py-3 text-sm text-[#d93025]">
+                {error}
+              </div>
+            ) : null}
           </div>
 
-          <SheetFooter className="px-4 pb-[calc(env(safe-area-inset-bottom)+12px)] pt-3">
+          <div className="bg-[#F2F2F7] px-4 pb-[calc(env(safe-area-inset-bottom)+20px)] pt-3">
             <LoadingButton
               type="button"
-              className={cn("h-10 w-full", appleButtonClassName)}
+              className="h-[50px] w-full rounded-[14px] border-0 bg-[#007AFF] text-[16px] font-semibold text-white shadow-none transition-opacity duration-200 active:scale-[0.98] active:opacity-80"
               onClick={handleSubmit}
               loading={submitting}
               loadingText="生成中..."
             >
               生成场景
             </LoadingButton>
-          </SheetFooter>
+          </div>
         </div>
       </SheetContent>
     </Sheet>

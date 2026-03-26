@@ -10,7 +10,12 @@ import {
   useState,
 } from "react";
 import {
+  ArrowLeft,
+  Info,
   Languages,
+  Pause,
+  Play,
+  Volume2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { appCopy } from "@/lib/constants/copy";
@@ -25,7 +30,6 @@ import {
 import { useMobile } from "@/hooks/use-mobile";
 import { useTtsPlaybackState } from "@/hooks/use-tts-playback-state";
 import { Lesson, LessonBlock, LessonSentence, SelectionChunkLayer } from "@/lib/types";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { LessonProgress } from "@/features/lesson/components/lesson-progress";
@@ -51,10 +55,8 @@ import {
   stopTtsPlayback,
 } from "@/lib/utils/tts-api";
 import {
-  APPLE_BODY_TEXT,
   APPLE_BUTTON_BASE,
   APPLE_BUTTON_TEXT_LG,
-  APPLE_BUTTON_TEXT_SM,
   APPLE_META_TEXT,
   APPLE_PANEL,
   APPLE_PANEL_RAISED,
@@ -78,12 +80,17 @@ const speakerLabel = (speaker?: string) => normalizeSpeaker(speaker);
 
 const TOOLBAR_WIDTH = 256;
 const appleButtonLgClassName = `${APPLE_BUTTON_BASE} ${APPLE_BUTTON_TEXT_LG}`;
-const appleButtonSmClassName = `${APPLE_BUTTON_BASE} ${APPLE_BUTTON_TEXT_SM}`;
 const hasSpeakerTag = (speaker?: string) => /^[A-Z]$/.test((speaker ?? "").trim().toUpperCase());
+const dialogueFooterButtonClassName =
+  "inline-flex items-center justify-center border-none bg-transparent text-[#666]";
+const dialogueTextButtonClassName =
+  "inline-flex cursor-pointer items-center gap-1 text-[12px] leading-none text-[#8e9aaf] transition-colors hover:text-[#2c3e50] active:opacity-70";
 
 export function LessonReader({
   lesson,
   headerTools,
+  headerTitle,
+  onBackToList,
   topRightTool,
   minimalHeader = false,
   interactionMode = "default",
@@ -96,6 +103,8 @@ export function LessonReader({
 }: {
   lesson: Lesson;
   headerTools?: ReactNode;
+  headerTitle?: string;
+  onBackToList?: () => void;
   topRightTool?: ReactNode;
   minimalHeader?: boolean;
   interactionMode?: "default" | "training";
@@ -190,6 +199,7 @@ export function LessonReader({
     ? `双人对话 · ${sentenceCount}轮`
     : `自述练习 · ${sentenceCount}句`;
   const sceneMetaLabel = `${difficultyLabel} · ${lesson.estimatedMinutes}分钟 · ${sceneTypeMetaLabel}`;
+  const resolvedHeaderTitle = headerTitle?.trim() || lesson.subtitle?.trim() || lesson.title;
   const sentenceSectionLabel = isDialogueScene ? "当前对话块" : "当前表达块";
   const sentenceOrder = useMemo(
     () => getLessonSentences(lesson),
@@ -245,6 +255,7 @@ export function LessonReader({
         : null,
     [blockOrder, trainingSentenceId],
   );
+  const activeTrainingSentence = currentTrainingSentence ?? currentSentence ?? firstSentence;
 
   const mobileDisplaySentence = useMemo<LessonSentence | null>(() => {
     if (isDialogueScene) return currentSentence;
@@ -1039,116 +1050,111 @@ export function LessonReader({
         (playbackState.kind === "sentence" &&
           playbackState.sentenceId === blockPlaybackId) ||
         block.sentences.some((sentence) => isSentencePlaying(sentence.id));
-      const isBlockActive = activeBlockId === block.id;
+      const isBlockLoading =
+        playbackState.kind === "sentence" &&
+        playbackState.status === "loading" &&
+        playbackState.sentenceId === blockPlaybackId;
+      const speakerText = speakerLabel(speaker) || "A";
 
       return (
         <div
           key={block.id}
           className={cn(
-            "flex w-full",
-            primarySpeaker ? "justify-start" : "justify-end",
+            "flex w-full flex-col",
+            primarySpeaker ? "items-start" : "items-end",
           )}
         >
           <div
             className={cn(
-              "w-full max-w-[90%] sm:max-w-[78%]",
+              "flex max-w-[85%] flex-col gap-2",
               primarySpeaker ? "items-start" : "items-end",
             )}
           >
             <article
               className={cn(
-                "rounded-[var(--app-radius-card)] px-3 py-2.5 transition-colors",
-                "hover:bg-[var(--app-surface-hover)]",
-                isBlockActive && "ring-1 ring-primary/35",
-                primarySpeaker ? LESSON_DIALOGUE_A_BG_CLASS : LESSON_DIALOGUE_B_BG_CLASS,
+                "w-full px-[18px] py-[14px] text-[16px] leading-[1.4] shadow-[0_4px_15px_rgba(0,0,0,0.03)]",
+                primarySpeaker
+                  ? "rounded-[18px_18px_18px_4px] bg-white text-[#333]"
+                  : "rounded-[18px_18px_4px_18px] bg-[#b5d1ff] text-[#1a2a40]",
               )}
             >
-              <div className="mb-1">
-                <Badge
-                  variant="outline"
-                  className={cn(
-                    "h-5 min-w-5 justify-center rounded-full px-1.5 text-[10px]",
-                    primarySpeaker
-                      ? "border-sky-200/80 bg-sky-50/40 text-sky-700"
-                      : "border-emerald-200/80 bg-emerald-50/40 text-emerald-700",
-                  )}
-                >
-                  {speakerLabel(speaker) || "A"}
-                </Badge>
+              <div className="flex items-start gap-1.5">
+                <span className="shrink-0 font-semibold">{speakerText}:</span>
+                <div className="min-w-0 flex-1 space-y-2">
+                  {block.sentences.map((sentence) => {
+                    return (
+                      <div key={sentence.id} className="space-y-1">
+                        <p
+                          data-sentence-id={sentence.id}
+                          data-sentence-text={sentence.text}
+                          data-sentence-translation={sentence.translation}
+                          className={cn(
+                            "cursor-pointer text-[16px] leading-[1.4]",
+                            isSentencePlaying(sentence.id) && "opacity-80",
+                          )}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            handleSentenceTap(sentence.id, block.id);
+                          }}
+                        >
+                          {sentence.text}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-
-              <div className="space-y-2">
-                {block.sentences.map((sentence) => {
-                  return (
-                    <div key={sentence.id} className="space-y-1">
-                      <p
-                        data-sentence-id={sentence.id}
-                        data-sentence-text={sentence.text}
-                        data-sentence-translation={sentence.translation}
-                        className={cn(
-                          "cursor-pointer text-[1.03rem] leading-relaxed text-foreground/95",
-                          isSentencePlaying(sentence.id) && "text-primary",
-                          sentence.id === state.activeSentenceId && "text-primary",
-                        )}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          handleSentenceTap(sentence.id, block.id);
-                        }}
-                      >
-                        {sentence.text}
-                      </p>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div className={`mt-1 flex items-center gap-2 text-[11px] ${APPLE_META_TEXT}`}>
-                <button
-                  type="button"
-                  className={cn(
-                    "inline-flex cursor-pointer items-center gap-1 transition-colors hover:text-foreground",
-                    isBlockSpeaking && "text-primary",
-                  )}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    toggleDialogueBlockTranslation(block.id);
-                  }}
-                >
-                  <Languages className="size-3.5" />
-                  翻译
-                </button>
-                <span className="opacity-40">·</span>
-                <TtsActionButton
-                  active={isBlockSpeaking}
-                  loading={isSentenceLoading(blockPlaybackId, "normal")}
-                  variant="ghost"
-                  size="sm"
-                  className="h-auto px-0 text-inherit hover:text-foreground"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    void playBlockTts(block);
-                  }}
-                />
-                {/* TODO(audio): 暂时屏蔽慢速朗读按钮，批量生成慢速音频后再恢复。 */}
-              </div>
-
-              {translationOpen ? (
-                <p className={`mt-2 leading-6 ${APPLE_META_TEXT}`}>
-                  {blockTranslation || "该段翻译暂未提供。"}
-                </p>
-              ) : null}
             </article>
+
+            <div className="flex items-center gap-3 px-[5px]">
+              <button
+                type="button"
+                aria-label="翻译"
+                className={cn(dialogueTextButtonClassName, translationOpen && "text-[#4a90e2]")}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  toggleDialogueBlockTranslation(block.id);
+                }}
+              >
+                <Languages className="size-3.5" />
+                {translationOpen ? "收起" : "翻译"}
+              </button>
+              <TtsActionButton
+                active={isBlockSpeaking}
+                loading={isBlockLoading}
+                label="朗读"
+                activeLabel="停止"
+                loadingLabel="加载中..."
+                ariaLabel="朗读"
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  "h-auto px-0 text-[12px] leading-none text-[#8e9aaf] hover:text-[#2c3e50]",
+                  isBlockSpeaking && "text-[#4a90e2] hover:text-[#4a90e2]",
+                )}
+                iconClassName="size-3.5"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  void playBlockTts(block);
+                }}
+              />
+            </div>
+
+            {translationOpen ? (
+              <p className="px-[5px] text-[14px] leading-6 text-[#8e9aaf]">
+                {blockTranslation || "该段翻译暂未提供。"}
+              </p>
+            ) : null}
           </div>
         </div>
       );
     },
     [
-      activeBlockId,
       handleSentenceTap,
       playBlockTts,
       isSentencePlaying,
-      isSentenceLoading,
       playbackState.kind,
+      playbackState.status,
       playbackState.sentenceId,
       toggleDialogueBlockTranslation,
       dialogueBlockTranslationOpenMap,
@@ -1220,7 +1226,7 @@ export function LessonReader({
               ) : null}
             </div>
           </div>
-        ) : isDialogueScene ? (
+        ) : isDialogueScene && isTrainingMode ? null : isDialogueScene ? (
           <div className={cn("py-1.5", isMobile ? "px-1" : "px-1.5")}>
             <div className="flex items-center justify-end gap-2">
               {headerTools}
@@ -1331,8 +1337,46 @@ export function LessonReader({
         )}
 
         {isDialogueScene ? (
-          <div className={cn("space-y-2", isMobile && "space-y-1.5")}>
-            {blockOrder.map((block) => renderDialogueBlock(block))}
+          <div
+            className={cn(
+              isTrainingMode
+                ? "min-h-[calc(100vh-180px)] bg-[#f4f7f9] pb-28 pt-3"
+                : "space-y-[30px]",
+              isMobile && !isTrainingMode && "space-y-1.5",
+            )}
+          >
+            {isTrainingMode ? (
+              <div className="px-5 pb-5">
+                <div className="relative flex min-h-10 items-start justify-center">
+                  {onBackToList ? (
+                    <button
+                      type="button"
+                      aria-label="返回场景列表"
+                      className="absolute left-0 top-0 inline-flex size-10 items-start justify-start pt-0.5 text-[#2c3e50] transition"
+                      onClick={onBackToList}
+                    >
+                      <ArrowLeft className="size-5" />
+                    </button>
+                  ) : null}
+                  <div className="px-12 pt-0.5 text-center">
+                    <h1 className="text-[18px] font-semibold text-[#333]">{resolvedHeaderTitle}</h1>
+                  </div>
+                  {topRightTool ? (
+                    <div className="absolute right-0 top-0 flex items-center gap-2">{topRightTool}</div>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
+
+            <div
+              className={cn(
+                "space-y-[30px]",
+                isTrainingMode && "px-5",
+                isMobile && !isTrainingMode && "space-y-1.5",
+              )}
+            >
+              {blockOrder.map((block) => renderDialogueBlock(block))}
+            </div>
           </div>
         ) : isMobile ? (
           <div className="overflow-hidden bg-transparent">
@@ -1543,68 +1587,87 @@ export function LessonReader({
         )}
       </div>
 
-      {isTrainingMode && currentTrainingSentence ? (
-        <div className="sticky bottom-4 z-20 lg:col-span-1">
-          <div className={`px-4 py-3 backdrop-blur ${APPLE_PANEL_RAISED}`}>
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-              <div className="min-w-0 space-y-1">
-                <p className={`text-xs tracking-[0.08em] ${APPLE_META_TEXT}`}>当前训练句</p>
-                <p className={`line-clamp-2 font-medium leading-6 ${APPLE_BODY_TEXT}`}>
-                  {currentTrainingSentence.text}
-                </p>
-                {practicedSentenceIds.has(currentTrainingSentence.id) ? (
-                  <p className="text-xs text-[rgb(21,128,61)]">这句已经练过了</p>
-                ) : null}
-                {trainingPromptSentenceId === currentTrainingSentence.id ? (
-                  <p className={`text-xs ${APPLE_META_TEXT}`}>先跟读或复述一遍，再点“我练过了”。</p>
-                ) : practicedSentenceIds.has(currentTrainingSentence.id) ? (
-                  <p className={`text-xs ${APPLE_META_TEXT}`}>如果想再巩固一次，可以直接再练一遍。</p>
-                ) : (
-                  <p className={`text-xs ${APPLE_META_TEXT}`}>先听一句，再自己跟读或复述一遍。</p>
+      {isTrainingMode && activeTrainingSentence ? (
+        <div className="sticky bottom-0 z-20 lg:col-span-1">
+          <div
+            className="rounded-t-[30px] bg-white px-[25px] pb-5 pt-5 shadow-[0_-10px_30px_rgba(0,0,0,0.03)]"
+            data-current-training-sentence={activeTrainingSentence.text}
+          >
+            <span className="sr-only">当前训练句</span>
+            <div className="flex flex-wrap items-center gap-5">
+              <button
+                type="button"
+                aria-label={isSceneLooping ? "停止循环播放" : "循环播放场景"}
+                className={cn(
+                  dialogueFooterButtonClassName,
+                  "shrink-0 text-[20px]",
+                  isSceneLooping && "text-[#4a90e2]",
                 )}
-              </div>
-              <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center">
-                <TtsActionButton
-                  active={isSentencePlaying(currentTrainingSentence.id, "normal")}
-                  loading={isSentenceLoading(currentTrainingSentence.id, "normal")}
-                  variant="ghost"
-                  size="sm"
-                  className={`${appleButtonSmClassName} w-full justify-center whitespace-nowrap sm:w-auto`}
-                  iconClassName="size-4"
-                  onClick={() => handlePronounce(getSentenceSpeakText(currentTrainingSentence))}
-                />
-                <LoopActionButton
-                  active={isSceneLooping}
-                  loading={isSceneLoopLoading}
-                  variant="ghost"
-                  size="sm"
-                  className={`${appleButtonSmClassName} w-full justify-center whitespace-nowrap sm:w-auto`}
-                  iconClassName="size-4"
-                  onClick={toggleSceneLoopPlayback}
-                />
-                <button
-                  type="button"
-                  className={`${appleButtonSmClassName} w-full justify-center whitespace-nowrap px-3 py-1.5 sm:w-auto`}
-                  onClick={() => openDetailForSentence(currentTrainingSentence.id)}
-                >
-                  看解释
-                </button>
-                <button
-                  type="button"
-                  className={`${appleButtonSmClassName} w-full justify-center whitespace-nowrap px-3 py-1.5 sm:w-auto`}
-                  onClick={
-                    trainingPromptSentenceId === currentTrainingSentence.id
-                      ? handleConfirmSentencePractice
-                      : handlePracticeSentence
-                  }
-                >
-                  {trainingPromptSentenceId === currentTrainingSentence.id
+                onClick={toggleSceneLoopPlayback}
+              >
+                ↺
+              </button>
+              <button
+                type="button"
+                aria-label={isSentencePlaying(activeTrainingSentence.id, "normal") ? "暂停朗读" : "朗读当前句子"}
+                className={cn(
+                  "inline-flex size-[55px] shrink-0 items-center justify-center rounded-full border-none bg-[#edf2f7] text-[#2d3436] shadow-[0_4px_10px_rgba(0,0,0,0.05)]",
+                  isSentencePlaying(activeTrainingSentence.id, "normal") && "bg-[#dfe9f3]",
+                )}
+                onClick={() => handlePronounce(getSentenceSpeakText(activeTrainingSentence))}
+              >
+                {isSentenceLoading(activeTrainingSentence.id, "normal") ? (
+                  <span className="size-5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                ) : isSentencePlaying(activeTrainingSentence.id, "normal") ? (
+                  <Pause className="size-5" />
+                ) : (
+                  <Play className="ml-1 size-5 fill-current" />
+                )}
+              </button>
+              <button
+                type="button"
+                aria-label="看解释"
+                className={cn(dialogueFooterButtonClassName, "gap-2")}
+                onClick={() => openDetailForSentence(activeTrainingSentence.id)}
+              >
+                <Info className="size-4" />
+                看解释
+              </button>
+              <button
+                type="button"
+                aria-label={
+                  trainingPromptSentenceId === activeTrainingSentence.id
                     ? "我练过了"
-                    : practicedSentenceIds.has(currentTrainingSentence.id)
+                    : practicedSentenceIds.has(activeTrainingSentence.id)
                       ? "再练一次"
-                      : "练这句"}
-                </button>
-              </div>
+                      : "练这句"
+                }
+                className={cn(dialogueFooterButtonClassName, "gap-2")}
+                onClick={
+                  trainingPromptSentenceId === activeTrainingSentence.id
+                    ? handleConfirmSentencePractice
+                    : handlePracticeSentence
+                }
+              >
+                <Volume2 className="size-4" />
+                {trainingPromptSentenceId === activeTrainingSentence.id
+                  ? "我练过了"
+                  : practicedSentenceIds.has(activeTrainingSentence.id)
+                    ? "再练一次"
+                    : "练这句"}
+              </button>
+            </div>
+            <div className="pt-3 text-[13px] leading-6 text-[#8e9aaf]">
+              {trainingPromptSentenceId === activeTrainingSentence.id ? (
+                <p>先跟读或复述一遍，再点“我练过了”。</p>
+              ) : practicedSentenceIds.has(activeTrainingSentence.id) ? (
+                <>
+                  <p>这句已经练过了</p>
+                  <p>如果想再巩固一次，可以直接再练一遍。</p>
+                </>
+              ) : (
+                <p>先听一句，再自己跟读或复述一遍。</p>
+              )}
             </div>
           </div>
         </div>

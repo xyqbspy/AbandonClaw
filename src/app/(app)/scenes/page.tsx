@@ -1,18 +1,15 @@
 ﻿"use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Trash2, X } from "lucide-react";
+import { Clock3, MessageSquareText, Plus, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { GenerateSceneSheet } from "@/components/scenes/generate-scene-sheet";
 import {
   LoadingButton,
-  LoadingContent,
   LoadingOverlay,
   LoadingState,
 } from "@/components/shared/action-loading";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import {
   deleteSceneBySlugFromApi,
@@ -29,13 +26,6 @@ import {
   APPLE_BANNER_DANGER,
   APPLE_BANNER_INFO,
   APPLE_BANNER_SUCCESS,
-  APPLE_BUTTON_BASE,
-  APPLE_BUTTON_DANGER,
-  APPLE_BUTTON_TEXT_SM,
-  APPLE_CARD_INTERACTIVE,
-  APPLE_META_TEXT,
-  APPLE_PANEL,
-  APPLE_TITLE_MD,
 } from "@/lib/ui/apple-style";
 
 const difficultyLabel: Record<string, string> = {
@@ -50,20 +40,36 @@ const learningStatusLabel: Record<SceneListItemResponse["learningStatus"], strin
   completed: "已完成",
   paused: "已暂停",
 };
-const sceneTypeSummary = (scene: SceneListItemResponse) =>
-  scene.sceneType === "dialogue"
-    ? `双人对话 · ${scene.sentenceCount}轮`
-    : `自述练习 · ${scene.sentenceCount}句`;
+const statusClassName: Record<SceneListItemResponse["learningStatus"], string> = {
+  not_started: "text-[#86868B]",
+  in_progress: "text-[#FF9500]",
+  completed: "text-[#34C759]",
+  paused: "text-[#FF9500]",
+};
 
 const placeholderExample = `A: Are we still on for dinner?
 B: I was just about to text you. Something came up at work.
 A: Again?
 B: Yeah, I'm stuck at the office.`;
-const appleButtonClassName = `${APPLE_BUTTON_BASE} ${APPLE_BUTTON_TEXT_SM}`;
+const ACTION_WIDTH = 96;
+const OPEN_THRESHOLD = 48;
+const QUICK_OPEN_THRESHOLD = 24;
+const MAX_OVERSHOOT = 18;
+const sheetPanelClassName = "rounded-[14px] bg-white p-4 shadow-[0_1px_3px_rgba(0,0,0,0.02)]";
+const sheetLabelClassName = "mb-3 block pl-0.5 text-[13px] font-semibold text-[#1d1d1f]";
 type TopTaskStatus = "running" | "done" | "failed";
 type TopTask = {
   status: TopTaskStatus;
   message: string;
+};
+
+type GestureState = {
+  sceneId: string;
+  startX: number;
+  startY: number;
+  startOffset: number;
+  horizontalLocked: boolean;
+  verticalCancelled: boolean;
 };
 
 export default function ScenesPage() {
@@ -76,17 +82,58 @@ export default function ScenesPage() {
   const [loading, setLoading] = useState(true);
   const [allScenes, setAllScenes] = useState<SceneListItemResponse[]>([]);
   const [listDataSource, setListDataSource] = useState<"none" | "cache" | "network">("none");
-  const [confirmDeleteSceneId, setConfirmDeleteSceneId] = useState<string | null>(null);
+  const [pendingDeleteSceneId, setPendingDeleteSceneId] = useState<string | null>(null);
   const [deletingSceneId, setDeletingSceneId] = useState<string | null>(null);
+  const [removingSceneId, setRemovingSceneId] = useState<string | null>(null);
+  const [openSwipeSceneId, setOpenSwipeSceneId] = useState<string | null>(null);
+  const [swipeOffsetMap, setSwipeOffsetMap] = useState<Record<string, number>>({});
   const [topTask, setTopTask] = useState<TopTask | null>(null);
   const [openingSceneTarget, setOpeningSceneTarget] = useState<string | null>(null);
   const activeLoadTokenRef = useRef(0);
+  const gestureRef = useRef<GestureState | null>(null);
+  const removingTimerRef = useRef<number | null>(null);
 
   const openSceneRoute = (href: string) => {
     if (openingSceneTarget === href) return;
     setOpeningSceneTarget(href);
     router.push(href);
   };
+
+  const setCardOffset = useCallback((sceneId: string, offset: number) => {
+    setSwipeOffsetMap((prev) => {
+      const next = { ...prev };
+      if (offset === 0) {
+        delete next[sceneId];
+      } else {
+        next[sceneId] = offset;
+      }
+      return next;
+    });
+  }, []);
+
+  const closeOpenedSwipe = useCallback((exceptSceneId?: string | null) => {
+    setOpenSwipeSceneId((prev) => {
+      if (!prev || prev === exceptSceneId) return prev ?? null;
+      setCardOffset(prev, 0);
+      return null;
+    });
+  }, [setCardOffset]);
+
+  const openSwipe = useCallback((sceneId: string) => {
+    closeOpenedSwipe(sceneId);
+    setCardOffset(sceneId, -ACTION_WIDTH);
+    setOpenSwipeSceneId(sceneId);
+  }, [closeOpenedSwipe, setCardOffset]);
+
+  const closeSwipe = useCallback((sceneId: string) => {
+    setCardOffset(sceneId, 0);
+    setOpenSwipeSceneId((prev) => (prev === sceneId ? null : prev));
+  }, [setCardOffset]);
+
+  const pendingDeleteScene =
+    pendingDeleteSceneId
+      ? allScenes.find((scene) => scene.id === pendingDeleteSceneId) ?? null
+      : null;
 
   const refreshScenes = async (options?: { preferCache?: boolean; forceNetwork?: boolean }) => {
     const token = activeLoadTokenRef.current + 1;
@@ -140,7 +187,7 @@ export default function ScenesPage() {
 
   useEffect(() => {
     void refreshScenes({ preferCache: true });
-  }, []);
+  }, [closeOpenedSwipe]);
 
   useEffect(() => {
     const handlePullRefresh = async (event: Event) => {
@@ -164,7 +211,7 @@ export default function ScenesPage() {
     return () => {
       window.removeEventListener("app:pull-refresh", handlePullRefresh as EventListener);
     };
-  }, []);
+  }, [closeOpenedSwipe]);
 
   useEffect(() => {
     if (!dialogOpen) return;
@@ -182,6 +229,33 @@ export default function ScenesPage() {
     }, 4500);
     return () => window.clearTimeout(timer);
   }, [topTask]);
+
+  useEffect(() => {
+    return () => {
+      if (removingTimerRef.current) {
+        window.clearTimeout(removingTimerRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (
+        target?.closest("[data-swipe-row]") ||
+        target?.closest("[data-delete-modal]") ||
+        target?.closest("[data-import-dialog]")
+      ) {
+        return;
+      }
+      closeOpenedSwipe();
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+    };
+  }, [closeOpenedSwipe]);
 
   const closeDialog = () => {
     setDialogOpen(false);
@@ -257,10 +331,20 @@ export default function ScenesPage() {
     setDeletingSceneId(scene.id);
     try {
       await deleteSceneBySlugFromApi(scene.slug);
+      setRemovingSceneId(scene.id);
+      closeSwipe(scene.id);
+      setPendingDeleteSceneId(null);
       await clearSceneListCache();
-      await refreshScenes({ preferCache: false, forceNetwork: true });
+      await new Promise<void>((resolve) => {
+        removingTimerRef.current = window.setTimeout(() => {
+          setAllScenes((prev) => prev.filter((item) => item.id !== scene.id));
+          setRemovingSceneId(null);
+          removingTimerRef.current = null;
+          resolve();
+        }, 240);
+      });
+      void refreshScenes({ preferCache: false, forceNetwork: true });
       toast.success("自定义场景已删除。");
-      setConfirmDeleteSceneId(null);
     } catch (deleteError) {
       toast.error(deleteError instanceof Error ? deleteError.message : "删除失败。");
     } finally {
@@ -270,120 +354,190 @@ export default function ScenesPage() {
 
   const renderSceneCards = () => {
     if (loading) {
-      return <LoadingState text="场景加载中..." className="py-2" />;
+      return <LoadingState text="场景加载中..." className="py-10" />;
     }
-    if (allScenes.length === 0) return <p className={APPLE_META_TEXT}>暂无场景。</p>;
+    if (allScenes.length === 0) {
+      return (
+        <div className="rounded-[20px] bg-white px-5 py-10 text-center text-[13px] text-[#86868B] shadow-[0_8px_24px_rgba(149,157,165,0.08)]">
+          暂无场景。
+        </div>
+      );
+    }
 
     return (
-      <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="space-y-4">
         {allScenes.map((scene) => {
           const isImported = scene.sourceType === "imported";
           const isOpeningScene = openingSceneTarget?.startsWith(`/scene/${scene.slug}`) ?? false;
+          const swipeOffset = swipeOffsetMap[scene.id] ?? 0;
+          const swipeOpen = openSwipeSceneId === scene.id;
+          const swipeEnabled = isImported && !openingSceneTarget && !deletingSceneId;
           return (
-            <Card
+            <div
               key={scene.id}
-              className={`scene-card-motion relative h-full cursor-pointer ${APPLE_CARD_INTERACTIVE} ${
-                openingSceneTarget ? "pointer-events-none" : ""
+              data-swipe-row="true"
+              className={`relative mb-4 overflow-hidden rounded-[24px] transition-[max-height,margin,opacity] duration-250 ease-out ${
+                removingSceneId === scene.id ? "max-h-0 opacity-0 mb-0" : "max-h-[180px]"
               }`}
-              onClick={() => openSceneRoute(`/scene/${scene.slug}`)}
             >
-              <LoadingOverlay
-                loading={isOpeningScene}
-                loadingText="进入场景中..."
-              />
-              <CardHeader className="space-y-0.5 p-2.5 pb-1.5 sm:p-3 sm:pb-2">
-                <div className="flex items-start gap-2">
-                  <CardTitle className={`min-w-0 flex-1 line-clamp-1 leading-5 ${APPLE_TITLE_MD}`}>
+              {isImported ? (
+                <div className="absolute inset-y-0 right-0 z-0 flex w-24 items-stretch justify-stretch">
+                  <button
+                    type="button"
+                    data-scene-delete="true"
+                    aria-label="删除"
+                    className="flex h-full w-full items-center justify-center bg-linear-to-b from-[#ff5d55] to-[#FF3B30] text-[15px] font-bold tracking-[-0.01em] text-white"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      setPendingDeleteSceneId(scene.id);
+                    }}
+                  >
+                    删除
+                  </button>
+                </div>
+              ) : null}
+
+              <article
+                className={`relative z-10 flex cursor-pointer justify-between gap-[14px] rounded-[24px] bg-[rgba(255,255,255,0.96)] p-5 shadow-[0_10px_28px_rgba(15,23,42,0.08)] will-change-transform transition-[transform,box-shadow,opacity] duration-[280ms] ${
+                  swipeOpen ? "shadow-[0_14px_34px_rgba(15,23,42,0.12)]" : ""
+                } ${
+                  removingSceneId === scene.id ? "scale-[0.96] opacity-0" : ""
+                } ${
+                  openingSceneTarget ? "pointer-events-none" : ""
+                }`}
+                style={{
+                  transform: `translate3d(${swipeOffset}px,0,0)`,
+                  transitionTimingFunction: "cubic-bezier(0.2, 0.8, 0.2, 1)",
+                  touchAction: "pan-y",
+                }}
+                onPointerDown={(event) => {
+                  if (!swipeEnabled) return;
+                  if (event.pointerType === "mouse" && event.button !== 0) return;
+                  gestureRef.current = {
+                    sceneId: scene.id,
+                    startX: event.clientX,
+                    startY: event.clientY,
+                    startOffset: swipeOffset,
+                    horizontalLocked: false,
+                    verticalCancelled: false,
+                  };
+                  (event.currentTarget as HTMLElement).setPointerCapture?.(event.pointerId);
+                }}
+                onPointerMove={(event) => {
+                  const gesture = gestureRef.current;
+                  if (!gesture || gesture.sceneId !== scene.id || !swipeEnabled) return;
+
+                  const dx = event.clientX - gesture.startX;
+                  const dy = event.clientY - gesture.startY;
+
+                  if (!gesture.horizontalLocked && !gesture.verticalCancelled) {
+                    if (Math.abs(dx) > 6 && Math.abs(dx) > Math.abs(dy)) {
+                      gesture.horizontalLocked = true;
+                    } else if (Math.abs(dy) > 6 && Math.abs(dy) > Math.abs(dx)) {
+                      gesture.verticalCancelled = true;
+                    }
+                  }
+
+                  if (gesture.verticalCancelled || !gesture.horizontalLocked) return;
+
+                  let nextX = gesture.startOffset + dx;
+
+                  if (nextX > 0) {
+                    nextX = Math.min(nextX * 0.28, MAX_OVERSHOOT);
+                  }
+                  if (nextX < -ACTION_WIDTH) {
+                    const extra = nextX + ACTION_WIDTH;
+                    nextX = -ACTION_WIDTH + extra * 0.28;
+                    nextX = Math.max(nextX, -ACTION_WIDTH - MAX_OVERSHOOT);
+                  }
+
+                  closeOpenedSwipe(scene.id);
+                  setCardOffset(scene.id, nextX);
+                }}
+                onPointerUp={() => {
+                  const gesture = gestureRef.current;
+                  if (!gesture || gesture.sceneId !== scene.id || !swipeEnabled) return;
+                  gestureRef.current = null;
+                  if (gesture.verticalCancelled) return;
+                  const currentX = swipeOffsetMap[scene.id] ?? swipeOffset;
+                  const absX = Math.abs(currentX);
+                  if (
+                    currentX <= -OPEN_THRESHOLD ||
+                    (gesture.startOffset === -ACTION_WIDTH && absX > QUICK_OPEN_THRESHOLD)
+                  ) {
+                    openSwipe(scene.id);
+                  } else {
+                    closeSwipe(scene.id);
+                  }
+                }}
+                onPointerCancel={() => {
+                  const gesture = gestureRef.current;
+                  if (!gesture || gesture.sceneId !== scene.id || !swipeEnabled) return;
+                  gestureRef.current = null;
+                  closeSwipe(scene.id);
+                }}
+                onClick={(event) => {
+                  if (swipeOpen) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    closeSwipe(scene.id);
+                    return;
+                  }
+                  openSceneRoute(`/scene/${scene.slug}`);
+                }}
+              >
+                <LoadingOverlay
+                  loading={isOpeningScene}
+                  loadingText="进入场景中..."
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="scene-title mb-[6px] text-[16px] leading-[1.35] font-extrabold tracking-[-0.025em] text-[#1D1D1F]">
                     {scene.title}
-                  </CardTitle>
-                  {isImported ? (
-                    <div className="relative shrink-0">
+                  </div>
+                  <div className="mb-4 text-[13px] leading-[1.4] text-[#86868B]">
+                    {scene.subtitle}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-x-[10px] gap-y-2">
+                    <span className="inline-flex h-6 items-center rounded-full bg-[#F2F2F7] px-[10px] text-[11px] font-bold whitespace-nowrap text-[#636366]">
+                      {difficultyLabel[scene.difficulty] ?? "Intermediate"}
+                    </span>
+                    <span className="inline-flex items-center gap-1 text-[11px] font-bold whitespace-nowrap text-[#6E6E73]">
+                      <Clock3 className="size-[13px]" />
+                      {scene.estimatedMinutes} 分钟
+                    </span>
+                    <span className="inline-flex items-center gap-1 text-[11px] font-bold whitespace-nowrap text-[#6E6E73]">
+                      <MessageSquareText className="size-[13px]" />
+                      {scene.sentenceCount} {scene.sentenceCount === 1 ? "句" : "句"}
+                    </span>
+                    {scene.variantLinks.length > 0 ? (
                       <button
                         type="button"
-                        data-scene-delete="true"
-                        aria-label="删除场景"
-                        className={`inline-flex h-7 w-7 cursor-pointer items-center justify-center ${APPLE_META_TEXT} transition-colors hover:text-foreground ${APPLE_BUTTON_BASE}`}
+                        data-scene-variant-view="true"
+                        className="inline-flex h-6 items-center rounded-full bg-[#F2F2F7] px-[10px] text-[11px] font-bold whitespace-nowrap text-[#636366] transition-colors hover:bg-[#EAEAF0] hover:text-[#1D1D1F]"
                         onPointerDown={(event) => event.stopPropagation()}
                         onClick={(event) => {
                           event.preventDefault();
                           event.stopPropagation();
-                          setConfirmDeleteSceneId((prev) => (prev === scene.id ? null : scene.id));
+                          openSceneRoute(`/scene/${scene.slug}?view=variants`);
                         }}
                       >
-                        <Trash2 className="size-3.5" />
+                        查看变体
                       </button>
-                      {confirmDeleteSceneId === scene.id ? (
-                        <div
-                          className="absolute right-0 top-8 z-20 w-44 rounded-[var(--app-radius-panel)] border border-[var(--app-border-soft)] bg-[var(--app-surface)] p-2 shadow-[var(--app-shadow-raised)]"
-                          onPointerDown={(event) => event.stopPropagation()}
-                          onClick={(event) => event.stopPropagation()}
-                        >
-                          <p className={`text-xs ${APPLE_META_TEXT}`}>删除这个场景？</p>
-                          <div className="mt-1.5 flex justify-end gap-1.5">
-                            <button
-                              type="button"
-                              className={`${APPLE_BUTTON_BASE} px-2.5 py-1 text-[11px] font-medium ${APPLE_META_TEXT}`}
-                              onClick={(event) => {
-                                event.preventDefault();
-                                event.stopPropagation();
-                                setConfirmDeleteSceneId(null);
-                              }}
-                            >
-                              取消
-                            </button>
-                            <button
-                              type="button"
-                              className={`${APPLE_BUTTON_DANGER} px-2.5 py-1 text-[11px] font-medium disabled:opacity-60`}
-                              disabled={deletingSceneId === scene.id}
-                              onClick={(event) => {
-                                event.preventDefault();
-                                event.stopPropagation();
-                                void handleDeleteCustomScene(scene);
-                              }}
-                            >
-                              <LoadingContent
-                                loading={deletingSceneId === scene.id}
-                                loadingText="删除中..."
-                              >
-                                删除
-                              </LoadingContent>
-                            </button>
-                          </div>
-                        </div>
-                      ) : null}
-                    </div>
-                  ) : null}
+                    ) : null}
+                  </div>
                 </div>
-                <p className={`line-clamp-1 ${APPLE_META_TEXT}`}>{scene.subtitle}</p>
-              </CardHeader>
 
-              <CardContent className="p-2.5 pt-0 sm:p-3 sm:pt-0">
-                <div className="flex items-center justify-between gap-2">
-                  <p className={APPLE_META_TEXT}>
-                    {difficultyLabel[scene.difficulty] ?? "中级"} · {scene.estimatedMinutes}分钟 ·{" "}
-                    {sceneTypeSummary(scene)}
-                  </p>
-                  <p className={APPLE_META_TEXT}>
-                    {learningStatusLabel[scene.learningStatus]} · {Math.round(scene.progressPercent)}%
-                  </p>
-                  {scene.variantLinks.length > 0 ? (
-                    <button
-                      type="button"
-                      data-scene-variant-view="true"
-                      className={`${APPLE_BUTTON_BASE} px-2.5 py-1 text-[11px] font-medium ${APPLE_META_TEXT} hover:text-foreground`}
-                      onPointerDown={(event) => event.stopPropagation()}
-                      onClick={(event) => {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        openSceneRoute(`/scene/${scene.slug}?view=variants`);
-                      }}
-                    >
-                      查看变体
-                    </button>
-                  ) : null}
+                <div className="min-w-[72px] shrink-0 pt-0.5 text-right">
+                  <div className={`mb-2 text-[12px] font-extrabold tracking-[-0.01em] ${statusClassName[scene.learningStatus]}`}>
+                    {learningStatusLabel[scene.learningStatus]}
+                  </div>
+                  <div className="text-[28px] leading-none font-extrabold tracking-[-0.04em] text-[#1D1D1F]">
+                    {Math.round(scene.progressPercent)}%
+                  </div>
                 </div>
-              </CardContent>
-            </Card>
+              </article>
+            </div>
           );
         })}
       </div>
@@ -400,26 +554,23 @@ export default function ScenesPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-end gap-2">
-        <Button
+      <div className="grid grid-cols-2 gap-3 pb-4">
+        <button
           type="button"
-          size="sm"
-          className={`h-8 cursor-pointer px-3 text-xs ${appleButtonClassName}`}
-          variant="ghost"
+          className="flex h-11 cursor-pointer items-center justify-center gap-1.5 rounded-[12px] border-0 bg-[#007AFF] text-[14px] font-semibold text-white shadow-[0_4px_12px_rgba(0,122,255,0.3)] transition-all duration-200 ease-[cubic-bezier(0.4,0,0.2,1)] active:scale-[0.96] active:opacity-80"
           onClick={() => setGenerateSheetOpen(true)}
         >
-          生成我的场景
-        </Button>
-        <Button
+          <Sparkles className="size-4" />
+          生成场景
+        </button>
+        <button
           type="button"
-          size="sm"
-          className={`h-8 cursor-pointer px-3 text-xs ${appleButtonClassName}`}
-          variant="ghost"
+          className="flex h-11 cursor-pointer items-center justify-center gap-1.5 rounded-[12px] border border-black/5 bg-white text-[14px] font-semibold text-[#1d1d1f] transition-all duration-200 ease-[cubic-bezier(0.4,0,0.2,1)] active:scale-[0.96] active:opacity-80"
           onClick={() => setDialogOpen(true)}
         >
-          <Plus className="size-3" />
-          导入
-        </Button>
+          <Plus className="size-4" />
+          导入自定义
+        </button>
       </div>
 
       {topTask ? (
@@ -436,7 +587,7 @@ export default function ScenesPage() {
         </div>
       ) : null}
 
-      {renderSceneCards()}
+      <div onScroll={() => closeOpenedSwipe()}>{renderSceneCards()}</div>
 
       <GenerateSceneSheet
         open={generateSheetOpen}
@@ -452,73 +603,125 @@ export default function ScenesPage() {
       />
 
       {dialogOpen ? (
-        <div className="fixed inset-0 z-50 flex items-end bg-black/25 p-3 animate-in fade-in-0 duration-200 sm:items-center sm:justify-center sm:p-6">
+        <div className="fixed inset-0 z-50 bg-black/20 backdrop-blur-[10px] animate-in fade-in-0 duration-200">
           <button
             type="button"
             aria-label="关闭导入弹窗"
             className="absolute inset-0"
             onClick={closeDialog}
           />
-          <Card className="relative z-10 w-full max-w-2xl border border-[var(--app-border-soft)] bg-background shadow-[var(--app-shadow-raised)] animate-in slide-in-from-bottom-6 fade-in-0 duration-200 sm:slide-in-from-bottom-0 sm:zoom-in-95">
-            <CardHeader className="space-y-2">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <CardTitle className="text-lg font-semibold text-foreground">导入自定义英文场景</CardTitle>
-                  <p className={`mt-1 ${APPLE_META_TEXT}`}>
-                    系统会将文本解析为当前场景数据结构。
+          <div className="absolute inset-x-0 bottom-0 z-10 animate-in slide-in-from-bottom-6 fade-in-0 duration-300 sm:inset-auto sm:bottom-6 sm:left-1/2 sm:w-full sm:max-w-2xl sm:-translate-x-1/2 sm:zoom-in-95 sm:rounded-[24px]">
+            <div
+              data-import-dialog="true"
+              className="flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-[24px] bg-[#F2F2F7] sm:rounded-[24px]"
+            >
+              <div className="mx-auto my-[10px] h-[5px] w-9 rounded-[3px] bg-[#C7C7CC]" />
+
+              <div className="px-5 pb-4">
+                <h2 className="mb-1 text-[20px] font-bold text-[#1d1d1f]">导入自定义场景</h2>
+                <p className="text-[14px] text-[#86868B]">
+                  粘贴英文对话内容，系统会自动解析成当前场景结构。
+                </p>
+              </div>
+
+              <div className="flex-1 space-y-5 overflow-y-auto px-4 pb-5">
+                <div className={sheetPanelClassName}>
+                  <label htmlFor="scene-import-input" className={sheetLabelClassName}>
+                    场景文本
+                  </label>
+                  <Textarea
+                    id="scene-import-input"
+                    value={input}
+                    onChange={(event) => {
+                      setInput(event.target.value);
+                      if (error) setError("");
+                    }}
+                    placeholder={placeholderExample}
+                    className="min-h-44 border-0 bg-transparent px-0 py-0 text-[15px] leading-[1.5] text-[#1d1d1f] shadow-none focus-visible:ring-0"
+                    disabled={importing}
+                  />
+                  <p className="mt-2.5 text-[12px] leading-[1.4] text-[#86868B]">
+                    建议按对话格式粘贴，例如每行一条，包含说话人和内容。
                   </p>
                 </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  className={`cursor-pointer rounded-full ${APPLE_BUTTON_BASE}`}
-                  aria-label="关闭"
-                  onClick={closeDialog}
-                >
-                  <X className="size-4" />
-                </Button>
+
+                {error ? (
+                  <div className="rounded-[14px] bg-[#fff1f0] px-4 py-3 text-sm text-[#d93025]">
+                    {error}
+                  </div>
+                ) : null}
               </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className={`p-3 ${APPLE_PANEL}`}>
-                <Textarea
-                  value={input}
-                  onChange={(event) => {
-                    setInput(event.target.value);
-                    if (error) setError("");
-                  }}
-                  placeholder={placeholderExample}
-                  className="min-h-44 border-0 bg-transparent text-sm leading-6 shadow-none focus-visible:ring-0"
-                />
+
+              <div className="bg-[#F2F2F7] px-4 pb-[calc(env(safe-area-inset-bottom)+20px)] pt-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    className="h-[50px] cursor-pointer rounded-[14px] border border-black/5 bg-white text-[16px] font-semibold text-[#1d1d1f] transition-all duration-200 ease-[cubic-bezier(0.4,0,0.2,1)] active:scale-[0.98] active:opacity-80"
+                    onClick={closeDialog}
+                    disabled={importing}
+                  >
+                    取消
+                  </button>
+                  <LoadingButton
+                    type="button"
+                    className="h-[50px] w-full rounded-[14px] border-0 bg-[#007AFF] text-[16px] font-semibold text-white shadow-none transition-opacity duration-200 active:scale-[0.98] active:opacity-80"
+                    onClick={handleImport}
+                    loading={importing}
+                    loadingText="导入中..."
+                  >
+                    导入场景
+                  </LoadingButton>
+                </div>
               </div>
-              {error ? <p className="text-sm text-destructive">{error}</p> : null}
-              <div className="flex justify-end gap-2">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={closeDialog}
-                  className={`cursor-pointer ${appleButtonClassName}`}
-                >
-                  取消
-                </Button>
-                <LoadingButton
-                  type="button"
-                  variant="ghost"
-                  onClick={handleImport}
-                  className={`cursor-pointer ${appleButtonClassName}`}
-                  loading={importing}
-                  loadingText="导入中..."
-                >
-                  导入
-                </LoadingButton>
-              </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </div>
       ) : null}
+
+      <div
+        data-delete-modal="true"
+        className={`fixed inset-0 z-30 flex items-center justify-center bg-black/20 px-6 backdrop-blur-[10px] transition-opacity duration-200 ${
+          pendingDeleteScene ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
+        }`}
+        onClick={(event) => {
+          if (event.target === event.currentTarget) {
+            setPendingDeleteSceneId(null);
+          }
+        }}
+      >
+        <div className={`w-full max-w-[300px] overflow-hidden rounded-[22px] bg-[rgba(255,255,255,0.88)] shadow-[0_24px_60px_rgba(0,0,0,0.16)] backdrop-blur-[24px] transition-transform duration-200 ${
+          pendingDeleteScene ? "translate-y-0 scale-100" : "translate-y-[10px] scale-[0.96]"
+        }`}>
+          <div className="px-5 pb-[18px] pt-[22px] text-center">
+            <div className="mb-2 text-[18px] font-extrabold tracking-[-0.02em] text-[#1D1D1F]">
+              删除场景？
+            </div>
+            <div className="text-[13px] leading-[1.45] text-[#86868B]">
+              这个场景会从列表中移除，删除后无法恢复。
+            </div>
+          </div>
+          <div className="grid grid-cols-2 border-t border-[rgba(60,60,67,0.12)] bg-[rgba(255,255,255,0.6)]">
+            <button
+              type="button"
+              className="h-[50px] cursor-pointer bg-transparent text-[16px] font-bold text-[#007AFF]"
+              onClick={() => setPendingDeleteSceneId(null)}
+            >
+              取消
+            </button>
+            <button
+              type="button"
+              className="h-[50px] cursor-pointer border-l border-[rgba(60,60,67,0.12)] bg-transparent text-[16px] font-bold text-[#FF3B30] disabled:opacity-60"
+              disabled={!pendingDeleteScene || deletingSceneId === pendingDeleteScene.id}
+              onClick={() => {
+                if (!pendingDeleteScene) return;
+                void handleDeleteCustomScene(pendingDeleteScene);
+              }}
+            >
+              {deletingSceneId === pendingDeleteScene?.id ? "删除中..." : "删除"}
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
-
-

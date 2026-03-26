@@ -19,6 +19,8 @@ export function SceneBaseView({
   variantsError,
   trainingPanel,
   headerTools,
+  headerTitle,
+  onBackToList,
   interactionMode = "default",
   savedPhraseTexts,
   onSavePhrase,
@@ -33,6 +35,8 @@ export function SceneBaseView({
   variantsError: string | null;
   trainingPanel?: ReactNode;
   headerTools: ReactNode;
+  headerTitle?: string;
+  onBackToList?: () => void;
   interactionMode?: "default" | "training";
   savedPhraseTexts: string[];
   onSavePhrase: (payload: SavePhrasePayload) => Promise<{ created: boolean }>;
@@ -62,6 +66,8 @@ export function SceneBaseView({
         <LessonReader
           lesson={lesson}
           headerTools={headerTools}
+          headerTitle={headerTitle}
+          onBackToList={onBackToList}
           interactionMode={interactionMode}
           savedPhraseTexts={savedPhraseTexts}
           onSavePhrase={onSavePhrase}

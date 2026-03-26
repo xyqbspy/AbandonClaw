@@ -58,7 +58,7 @@ export function DetailSheetShell({
       <button
         type="button"
         aria-label={closeLabel}
-        className="absolute inset-0 bg-black/20 backdrop-blur-[1px] animate-in fade-in-0 duration-200"
+        className="absolute inset-0 bg-black/20 backdrop-blur-[10px] animate-in fade-in-0 duration-200"
         onClick={() => onOpenChange(false)}
       />
       <section
@@ -67,7 +67,7 @@ export function DetailSheetShell({
         aria-modal="true"
         aria-label={ariaLabel}
         className={cn(
-          "absolute inset-x-0 bottom-0 z-[71] flex flex-col overflow-hidden rounded-t-2xl bg-white shadow-xl animate-in slide-in-from-bottom-6 fade-in-0 duration-200",
+          "absolute inset-x-0 bottom-0 z-[71] flex flex-col overflow-hidden rounded-t-[22px] bg-[rgba(255,255,255,0.88)] shadow-[0_24px_60px_rgba(0,0,0,0.18)] backdrop-blur-[24px] animate-in slide-in-from-bottom-6 fade-in-0 duration-200 ease-[cubic-bezier(0.2,0.8,0.2,1)]",
           panelClassName,
         )}
       >
@@ -78,7 +78,7 @@ export function DetailSheetShell({
               <Button
                 size="icon-sm"
                 variant="ghost"
-                className={cn("cursor-pointer shrink-0", appleButtonClassName)}
+                className={cn("cursor-pointer shrink-0 rounded-full bg-transparent hover:bg-white/55", appleButtonClassName)}
                 aria-label={closeLabel}
                 onClick={() => onOpenChange(false)}
               >
@@ -90,7 +90,7 @@ export function DetailSheetShell({
 
         <div className={cn("min-h-0 flex-1 overflow-y-auto px-4 py-4", bodyClassName)}>{children}</div>
 
-        {footer ? <footer className={cn("shrink-0 bg-background/95 p-3", footerClassName)}>{footer}</footer> : null}
+        {footer ? <footer className={cn("shrink-0 bg-white/60 p-3", footerClassName)}>{footer}</footer> : null}
       </section>
     </div>,
     document.body,

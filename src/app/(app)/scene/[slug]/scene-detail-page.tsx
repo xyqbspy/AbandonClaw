@@ -1482,12 +1482,14 @@ export default function SceneDetailClientPage({
   }
 
   return (
-    <SceneBaseView
+      <SceneBaseView
         lesson={baseLesson}
         practiceError={practiceError}
         variantsError={variantsError}
         trainingPanel={trainingPanel}
         headerTools={null}
+        headerTitle={baseLesson.subtitle?.trim() || baseLesson.sections[0]?.summary?.trim() || baseLesson.title}
+        onBackToList={() => router.push("/scenes")}
         interactionMode="training"
         savedPhraseTexts={Array.from(savedPhraseTextSet)}
         onSavePhrase={savePhraseForScene}

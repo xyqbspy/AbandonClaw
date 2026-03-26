@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import test, { afterEach } from "node:test";
 import React from "react";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 
 const localRequire = createRequire(import.meta.url);
 const nodeModule = localRequire("node:module") as typeof import("node:module");
@@ -24,6 +24,20 @@ const sceneList = [
     sourceType: "builtin" as const,
     variantLinks: [],
   },
+  {
+    id: "scene-2",
+    slug: "imported-scene",
+    title: "Imported Scene",
+    subtitle: "imported subtitle",
+    difficulty: "Intermediate" as const,
+    estimatedMinutes: 7,
+    sentenceCount: 5,
+    sceneType: "monologue" as const,
+    learningStatus: "paused" as const,
+    progressPercent: 40,
+    sourceType: "imported" as const,
+    variantLinks: [],
+  },
 ];
 
 const mockedModules = {
@@ -34,7 +48,7 @@ const mockedModules = {
       },
     }),
   },
-  "sonner": {
+  sonner: {
     toast: {
       error: () => undefined,
       success: () => undefined,
@@ -97,5 +111,42 @@ test("ScenesPage 点击场景卡片时会显示进入中的覆盖态", async () 
   assert.equal(routerPushCalls.at(-1), "/scene/coffee-chat");
   await waitFor(() => {
     screen.getByText("进入场景中...");
+  });
+});
+
+test("ScenesPage 侧滑后点击删除会弹出二次确认弹框", async () => {
+  const ScenesPage = getScenesPage();
+  render(<ScenesPage />);
+
+  const importedCard = (await screen.findByText("Imported Scene")).closest("article");
+  assert.ok(importedCard instanceof HTMLElement);
+
+  fireEvent.pointerDown(importedCard, {
+    button: 0,
+    clientX: 220,
+    clientY: 40,
+    pointerId: 1,
+    pointerType: "touch",
+  });
+  fireEvent.pointerMove(importedCard, {
+    clientX: 120,
+    clientY: 42,
+    pointerId: 1,
+    pointerType: "touch",
+  });
+  fireEvent.pointerUp(importedCard, {
+    clientX: 120,
+    clientY: 42,
+    pointerId: 1,
+    pointerType: "touch",
+  });
+
+  const swipeRow = importedCard.closest("[data-swipe-row]");
+  assert.ok(swipeRow instanceof HTMLElement);
+  fireEvent.click(within(swipeRow).getByRole("button", { name: "删除" }));
+
+  await waitFor(() => {
+    screen.getByText("删除场景？");
+    screen.getByRole("button", { name: "取消" });
   });
 });
