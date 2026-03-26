@@ -1,8 +1,10 @@
 "use client";
 
 import { ChevronDown } from "lucide-react";
+import { LoadingState } from "@/components/shared/action-loading";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { normalizePhraseText } from "@/lib/shared/phrases";
+import { APPLE_BODY_TEXT, APPLE_META_TEXT, APPLE_TITLE_SM } from "@/lib/ui/apple-style";
 import { UserPhraseItemResponse } from "@/lib/utils/phrases-api";
 import { FocusPreviewItem, SavedRelationRowsBySourceId } from "./types";
 
@@ -50,7 +52,7 @@ export function ClusterFocusList({
   onOpenPreviewItem,
 }: ClusterFocusListProps) {
   if (!ready) {
-    return <p className="text-sm text-muted-foreground">{labels.loading}</p>;
+    return <LoadingState text={labels.loading} className="py-1" />;
   }
 
   return (
@@ -102,9 +104,9 @@ export function ClusterFocusList({
                 aria-expanded={isExpanded}
                 aria-label={isExpanded ? labels.collapse : labels.expand}
               >
-                <p className="text-[11px] text-muted-foreground">{labels.title}</p>
+                <p className={APPLE_META_TEXT}>{labels.title}</p>
                 <ChevronDown
-                  className={`size-4 shrink-0 text-muted-foreground transition-transform duration-200 ${
+                  className={`size-4 shrink-0 ${APPLE_META_TEXT} transition-transform duration-200 ${
                     isExpanded ? "rotate-180" : "rotate-0"
                   }`}
                 />
@@ -114,8 +116,8 @@ export function ClusterFocusList({
                 className="mt-0.5 min-w-0 text-left"
                 onClick={() => onOpenMainDetail(row)}
               >
-                <p className="text-[15px] font-semibold leading-snug">{row.text}</p>
-                <p className="mt-0.5 line-clamp-1 text-xs leading-5 text-muted-foreground">
+                <p className={`leading-snug ${APPLE_TITLE_SM}`}>{row.text}</p>
+                <p className={`mt-0.5 line-clamp-1 leading-5 ${APPLE_META_TEXT}`}>
                   {row.translation ?? labels.noTranslation}
                 </p>
               </button>
@@ -129,10 +131,10 @@ export function ClusterFocusList({
                 {previewSimilarItems.length > 0 ? (
                   <div className="space-y-3">
                     <div className="flex items-center justify-between gap-3">
-                      <p className="text-sm font-medium text-foreground/85">{labels.similarTab}</p>
+                      <p className={`font-medium ${APPLE_BODY_TEXT}`}>{labels.similarTab}</p>
                       <button
                         type="button"
-                        className="text-xs font-medium text-muted-foreground transition hover:text-foreground"
+                        className={`font-medium ${APPLE_META_TEXT} transition hover:text-foreground`}
                         onClick={() => onOpenMainSimilarTab(row)}
                       >
                         {labels.openCurrentDetail}
@@ -145,12 +147,12 @@ export function ClusterFocusList({
                           <button
                             key={item.key}
                             type="button"
-                            className={`block w-full text-left ${isLast ? "" : "border-b border-[rgb(236,238,240)] pb-2"}`}
+                            className={`block w-full text-left ${isLast ? "" : "border-b border-[var(--app-border-soft)] pb-2"}`}
                             onClick={() => onOpenPreviewItem(row, item)}
                           >
-                            <p className="text-sm font-medium text-foreground">{item.text}</p>
+                            <p className={`font-medium ${APPLE_BODY_TEXT}`}>{item.text}</p>
                             {item.savedItem?.translation ? (
-                              <p className="mt-0.5 text-xs text-muted-foreground">
+                              <p className={`mt-0.5 ${APPLE_META_TEXT}`}>
                                 {item.savedItem.translation}
                               </p>
                             ) : null}

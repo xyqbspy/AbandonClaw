@@ -10,8 +10,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { DetailSheetShell } from "@/components/shared/detail-sheet-shell";
 import {
+  APPLE_BODY_TEXT,
   APPLE_BUTTON_BASE,
   APPLE_BUTTON_TEXT_SM,
+  APPLE_META_TEXT,
 } from "@/lib/ui/apple-style";
 import {
   LESSON_CHIP_ACTIVE_CLASS,
@@ -136,7 +138,7 @@ export function SelectionDetailSheet({
               {showSentenceSection ? (
                 <section
                   className={cn(
-                    "rounded-xl p-3",
+                    "rounded-[var(--app-radius-card)] p-3",
                     LESSON_DETAIL_BLOCK_BG_CLASS,
                   )}
                 >
@@ -146,7 +148,7 @@ export function SelectionDetailSheet({
                     <div className="flex items-center gap-3">
                       <button
                         type="button"
-                        className="inline-flex cursor-pointer items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground active:opacity-70"
+                        className={`inline-flex cursor-pointer items-center gap-1 text-xs ${APPLE_META_TEXT} transition-colors hover:text-foreground active:opacity-70`}
                         onClick={() => setShowSentenceTranslation((prev) => !prev)}
                       >
                         <Languages className="size-3.5" />
@@ -157,7 +159,7 @@ export function SelectionDetailSheet({
                         loading={loadingText === blockSpeakText}
                         variant="ghost"
                         size="sm"
-                        className="h-auto px-0 text-xs text-muted-foreground hover:text-foreground"
+                        className={`h-auto px-0 text-xs ${APPLE_META_TEXT} hover:text-foreground`}
                         onClick={onPronounceBlock}
                       />
                     </div>
@@ -165,8 +167,8 @@ export function SelectionDetailSheet({
                 </div>
                 {currentSentence ? (
                   <>
-                    <div className={cn("mt-1 rounded-lg px-0 py-2", LESSON_DETAIL_BLOCK_BG_CLASS)}>
-                      <p className="text-sm leading-7 break-words">
+                    <div className={cn("mt-1 rounded-[var(--app-radius-panel)] px-0 py-2", LESSON_DETAIL_BLOCK_BG_CLASS)}>
+                      <p className={`${APPLE_BODY_TEXT} leading-7 break-words`}>
                         {currentBlock && currentBlock.sentences.length > 1 ? blockText : currentSentence.text}
                       </p>
                     </div>
@@ -178,13 +180,13 @@ export function SelectionDetailSheet({
                           : "mt-0.5 grid-rows-[0fr] opacity-0",
                       )}
                     >
-                      <p className={cn("min-h-0 rounded-lg px-0 py-2 text-sm leading-6", LESSON_DETAIL_BLOCK_BG_CLASS)}>
+                      <p className={cn(`min-h-0 rounded-[var(--app-radius-panel)] px-0 py-2 leading-6 ${APPLE_META_TEXT}`, LESSON_DETAIL_BLOCK_BG_CLASS)}>
                         {blockTranslation || currentSentence.translation}
                       </p>
                     </div>
 
                     <div className="mt-3 space-y-2">
-                      <p className="text-xs tracking-[0.08em] text-muted-foreground">
+                      <p className={`text-xs tracking-[0.08em] ${APPLE_META_TEXT}`}>
                         {showSpeaker ? "本轮相关短语" : "本句相关短语"}
                       </p>
                       <div className="flex flex-wrap gap-2">
@@ -222,12 +224,12 @@ export function SelectionDetailSheet({
                     </div>
                   </>
                 ) : (
-                  <p className="text-sm text-muted-foreground">点击左侧句子开始学习。</p>
+                  <p className={APPLE_META_TEXT}>点击左侧句子开始学习。</p>
                 )}
                 </section>
               ) : null}
 
-              <section className={cn("space-y-3 rounded-xl p-3", LESSON_DETAIL_BLOCK_BG_CLASS)}>
+              <section className={cn("space-y-3 rounded-[var(--app-radius-card)] p-3", LESSON_DETAIL_BLOCK_BG_CLASS)}>
                 <div className="flex items-center justify-between gap-3">
                   <h3 className="text-sm font-medium">{topHint}</h3>
                   {chunkDetail ? (
@@ -236,7 +238,7 @@ export function SelectionDetailSheet({
                       loading={loadingText === chunkDetail.text}
                       variant="ghost"
                       size="sm"
-                      className="h-auto px-0 text-xs text-muted-foreground hover:text-foreground"
+                      className={`h-auto px-0 text-xs ${APPLE_META_TEXT} hover:text-foreground`}
                       onClick={() => onPronounce(chunkDetail.text)}
                     />
                   ) : null}
@@ -244,12 +246,12 @@ export function SelectionDetailSheet({
                 {chunkDetail ? (
                   <div key={`mobile-chunk-${chunkDetail.text}`} className="space-y-3 animate-in fade-in-0 slide-in-from-bottom-1 duration-200">
                     {isLongChunk(chunkDetail.text) ? (
-                      <p
-                        className={cn(
-                          "inline-flex max-w-full rounded-2xl px-3 py-2 text-sm leading-6 break-words",
-                          LESSON_CHIP_BASE_CLASS,
-                          LESSON_CHIP_ACTIVE_CLASS,
-                        )}
+                        <p
+                          className={cn(
+                            "inline-flex max-w-full rounded-[var(--app-radius-pill)] px-3 py-2 text-sm leading-6 break-words",
+                            LESSON_CHIP_BASE_CLASS,
+                            LESSON_CHIP_ACTIVE_CLASS,
+                          )}
                       >
                         {chunkDetail.text}
                       </p>
@@ -265,12 +267,12 @@ export function SelectionDetailSheet({
                       </span>
                     )}
                     <div>
-                      <p className="text-xs tracking-[0.08em] text-muted-foreground">中文释义</p>
-                      <p className="mt-1 text-sm">{chunkDetail.translation}</p>
+                      <p className={`text-xs tracking-[0.08em] ${APPLE_META_TEXT}`}>中文释义</p>
+                      <p className={`mt-1 ${APPLE_BODY_TEXT}`}>{chunkDetail.translation}</p>
                     </div>
                     <div>
-                      <p className="text-xs tracking-[0.08em] text-muted-foreground">当前句中含义</p>
-                      <p className="mt-1 text-sm text-muted-foreground">
+                      <p className={`text-xs tracking-[0.08em] ${APPLE_META_TEXT}`}>当前句中含义</p>
+                      <p className={`mt-1 ${APPLE_META_TEXT}`}>
                         {hasChinese(chunkDetail.meaningInSentence)
                           ? chunkDetail.meaningInSentence
                           : `这里表示：${chunkDetail.translation || "该表达在本句中的含义。"}`
@@ -278,8 +280,8 @@ export function SelectionDetailSheet({
                       </p>
                     </div>
                     <div>
-                      <p className="text-xs tracking-[0.08em] text-muted-foreground">常见用法</p>
-                      <p className="mt-1 text-sm leading-7">
+                      <p className={`text-xs tracking-[0.08em] ${APPLE_META_TEXT}`}>常见用法</p>
+                      <p className={`mt-1 leading-7 ${APPLE_BODY_TEXT}`}>
                         {hasChinese(chunkDetail.grammarLabel) ? `${chunkDetail.grammarLabel} · ` : ""}
                         {hasChinese(chunkDetail.usageNote)
                           ? chunkDetail.usageNote
@@ -291,13 +293,13 @@ export function SelectionDetailSheet({
                         const exampleText = example.en;
                         const translation = example.zh;
                         return (
-                        <div key={`${example.en}-${index}`} className={cn("rounded-lg py-2 text-sm", LESSON_DETAIL_BLOCK_BG_CLASS)}>
+                        <div key={`${example.en}-${index}`} className={cn("rounded-[var(--app-radius-panel)] py-2 text-sm", LESSON_DETAIL_BLOCK_BG_CLASS)}>
                           <div className="flex items-center justify-between gap-2">
-                            <p className="text-xs tracking-[0.08em] text-muted-foreground">例句</p>
+                            <p className={`text-xs tracking-[0.08em] ${APPLE_META_TEXT}`}>例句</p>
                             <div className="inline-flex items-center gap-2">
                               <button
                                 type="button"
-                                className="inline-flex cursor-pointer items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground active:opacity-70"
+                                className={`inline-flex cursor-pointer items-center gap-1 text-xs ${APPLE_META_TEXT} transition-colors hover:text-foreground active:opacity-70`}
                                 onClick={() => toggleExampleTranslation(exampleText)}
                               >
                                 <Languages className="size-3.5" />
@@ -308,7 +310,7 @@ export function SelectionDetailSheet({
                                 loading={loadingText === exampleText}
                                 variant="ghost"
                                 size="sm"
-                                className="h-auto px-0 text-xs text-muted-foreground hover:text-foreground"
+                                className={`h-auto px-0 text-xs ${APPLE_META_TEXT} hover:text-foreground`}
                                 ariaLabel="朗读例句"
                                 iconClassName="size-4"
                                 onClick={() => onPronounce(exampleText)}
@@ -324,7 +326,7 @@ export function SelectionDetailSheet({
                                 : "mt-0.5 grid-rows-[0fr] opacity-0",
                             )}
                           >
-                            <p className="min-h-0 text-sm leading-6 text-muted-foreground">
+                            <p className={`min-h-0 leading-6 ${APPLE_META_TEXT}`}>
                               {hasChinese(translation) ? translation : "该例句翻译待补充。"}
                             </p>
                           </div>
@@ -333,7 +335,7 @@ export function SelectionDetailSheet({
                     </div>
                   </div>
                 ) : (
-                  <p className="text-sm text-muted-foreground">点击下方短语查看解析与例句。</p>
+                  <p className={APPLE_META_TEXT}>点击下方短语查看解析与例句。</p>
                 )}
               </section>
             </div>

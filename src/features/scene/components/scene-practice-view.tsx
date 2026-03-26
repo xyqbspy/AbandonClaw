@@ -8,7 +8,16 @@ import {
 } from "@/lib/types/learning-flow";
 import { ScenePracticeSnapshotResponse } from "@/lib/utils/learning-api";
 import { updatePracticeSetSession } from "@/lib/utils/scene-learning-flow-storage";
-import { APPLE_SURFACE } from "@/lib/ui/apple-style";
+import {
+  APPLE_BODY_TEXT,
+  APPLE_INPUT_BASE,
+  APPLE_LIST_ITEM,
+  APPLE_META_TEXT,
+  APPLE_PANEL,
+  APPLE_PANEL_RAISED,
+  APPLE_TITLE_MD,
+  APPLE_TITLE_SM,
+} from "@/lib/ui/apple-style";
 import {
   buildAcceptedPracticeAnswers,
   getPracticeAssessment,
@@ -99,6 +108,16 @@ export function ScenePracticeView({
   onOpenVariants,
   onToggleAnswer,
 }: ScenePracticeViewProps) {
+  const moduleChipBaseClassName =
+    "rounded-[var(--app-radius-pill)] border px-3 py-1.5 text-xs font-semibold transition-[background-color,border-color,color] duration-150";
+  const milestoneCardClassName = `${APPLE_PANEL} rounded-[var(--app-radius-card)] px-3 py-3`;
+  const assessmentTextClassName = (assessment: PracticeAssessmentLevel | null | undefined) => {
+    if (assessment === "complete") return "text-emerald-700";
+    if (assessment === "structure") return "text-sky-700";
+    if (assessment === "keyword") return "text-amber-700";
+    return "text-destructive";
+  };
+
   const [answerMap, setAnswerMap] = useState<Record<string, string>>({});
   const [resultMap, setResultMap] = useState<Record<string, "correct" | "incorrect" | null>>({});
   const [assessmentMap, setAssessmentMap] = useState<
@@ -352,10 +371,10 @@ export function ScenePracticeView({
 
   return (
     <div className="space-y-4">
-      <section className={`space-y-3 rounded-lg p-4 ${APPLE_SURFACE}`}>
+      <section className={`space-y-3 rounded-[var(--app-radius-panel)] p-4 ${APPLE_PANEL_RAISED}`}>
         <div className="space-y-1">
-          <p className="text-base font-semibold text-foreground">{practiceEntryTitle}</p>
-          <p className="text-sm text-muted-foreground">
+          <p className={`${APPLE_TITLE_MD}`}>{practiceEntryTitle}</p>
+          <p className={`${APPLE_META_TEXT}`}>
             {labels.practiceModePrefix}
             {localizedPracticeModeLabel}
           </p>
@@ -371,12 +390,12 @@ export function ScenePracticeView({
                 <button
                   key={module.mode}
                   type="button"
-                  className={`rounded-full px-3 py-1.5 text-xs transition ${
+                  className={`${moduleChipBaseClassName} ${
                     active
-                      ? "bg-black text-white"
+                      ? "border-[var(--app-surface-strong)] bg-[var(--app-surface-strong)] text-primary-foreground"
                       : unlocked
-                        ? "bg-black/5 text-foreground"
-                        : "bg-black/5 text-muted-foreground"
+                        ? "border-[var(--app-border-soft)] bg-[var(--app-surface)] text-foreground"
+                        : "border-[var(--app-border-soft)] bg-[var(--app-surface-subtle)] text-muted-foreground"
                   }`}
                   disabled={!unlocked}
                   onClick={() => {
@@ -418,7 +437,7 @@ export function ScenePracticeView({
           </button>
         </div>
 
-        <div className="text-sm text-muted-foreground">
+        <div className={`space-y-1 ${APPLE_META_TEXT}`}>
           {practiceSet?.sourceType === "variant" ? (
             <p>
               {labels.basedOnVariantPrefix}
@@ -446,36 +465,36 @@ export function ScenePracticeView({
       </section>
 
       {practiceSet ? (
-        <section className={`space-y-3 rounded-lg p-4 ${APPLE_SURFACE}`}>
+        <section className={`space-y-3 rounded-[var(--app-radius-panel)] p-4 ${APPLE_PANEL_RAISED}`}>
           <div className="space-y-1">
-            <p className="text-sm font-medium text-foreground">{labels.sentenceMilestoneTitle}</p>
-            <p className="text-sm text-muted-foreground">
+            <p className={APPLE_TITLE_SM}>{labels.sentenceMilestoneTitle}</p>
+            <p className={APPLE_META_TEXT}>
               {sentenceMilestoneSummary.totalTracked > 0
                 ? "系统会按你当前最高提取层级记录每一句的进展。"
                 : labels.noMilestoneYet}
             </p>
           </div>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-            <div className="rounded-2xl bg-[rgb(250,245,220)] px-3 py-3">
-              <p className="text-xs text-[rgb(161,98,7)]">{labels.sentenceMilestoneKeyword}</p>
+            <div className={milestoneCardClassName}>
+              <p className="text-xs font-semibold text-amber-700">{labels.sentenceMilestoneKeyword}</p>
               <p className="mt-1 text-lg font-semibold text-foreground">
                 {sentenceMilestoneSummary.keywordCount}
               </p>
             </div>
-            <div className="rounded-2xl bg-[rgb(232,244,250)] px-3 py-3">
-              <p className="text-xs text-[rgb(14,116,144)]">{labels.sentenceMilestoneStructure}</p>
+            <div className={milestoneCardClassName}>
+              <p className="text-xs font-semibold text-sky-700">{labels.sentenceMilestoneStructure}</p>
               <p className="mt-1 text-lg font-semibold text-foreground">
                 {sentenceMilestoneSummary.structureCount}
               </p>
             </div>
-            <div className="rounded-2xl bg-[rgb(235,248,239)] px-3 py-3">
-              <p className="text-xs text-[rgb(21,128,61)]">{labels.sentenceMilestoneComplete}</p>
+            <div className={milestoneCardClassName}>
+              <p className="text-xs font-semibold text-emerald-700">{labels.sentenceMilestoneComplete}</p>
               <p className="mt-1 text-lg font-semibold text-foreground">
                 {sentenceMilestoneSummary.completeCount}
               </p>
             </div>
           </div>
-          <div className="space-y-1 text-sm text-muted-foreground">
+          <div className={`space-y-1 ${APPLE_META_TEXT}`}>
             <p>
               {labels.moduleMilestoneLabel}：{completedModuleCount}/{modules.length}
             </p>
@@ -487,20 +506,20 @@ export function ScenePracticeView({
       ) : null}
 
       {practiceSet && summaryAllModulesCompleted ? (
-        <section className={`space-y-3 rounded-lg p-4 ${APPLE_SURFACE}`}>
+        <section className={`space-y-3 rounded-[var(--app-radius-panel)] p-4 ${APPLE_PANEL_RAISED}`}>
           <div className="space-y-1">
-            <p className="text-sm font-medium">{labels.summaryTitle}</p>
-            <p className="text-sm text-muted-foreground">
+            <p className={APPLE_TITLE_SM}>{labels.summaryTitle}</p>
+            <p className={APPLE_META_TEXT}>
               {labels.summaryCompleted}: {overallCorrectCount}/{overallTypingCount}
             </p>
-            <p className="text-sm text-muted-foreground">
+            <p className={APPLE_META_TEXT}>
               {labels.summaryAttempts}: {overallAttempts}
             </p>
-            <p className="text-sm text-muted-foreground">
+            <p className={APPLE_META_TEXT}>
               {labels.summaryIncorrect}: {overallIncorrectAttempts}
             </p>
           </div>
-          <div className="space-y-1 text-sm text-muted-foreground">
+          <div className={`space-y-1 ${APPLE_META_TEXT}`}>
             <p>{labels.summaryMistakeChunks}</p>
             {incorrectExercisesAcrossModules.length === 0 ? (
               <>
@@ -561,11 +580,11 @@ export function ScenePracticeView({
       ) : null}
 
       {practiceSet ? (
-        <details className={`rounded-lg p-4 ${APPLE_SURFACE}`}>
-          <summary className="cursor-pointer text-sm font-medium text-foreground">
+        <details className={`rounded-[var(--app-radius-panel)] p-4 ${APPLE_PANEL}`}>
+          <summary className={`cursor-pointer ${APPLE_TITLE_SM}`}>
             练习调试视图
           </summary>
-          <div className="mt-3 space-y-2 text-xs text-muted-foreground">
+          <div className={`mt-3 space-y-2 text-xs ${APPLE_META_TEXT}`}>
             <p>practiceSetId: {practiceSet.id}</p>
             <p>sourceType: {practiceSet.sourceType}</p>
             <p>当前模块: {activeModule?.mode ?? "-"}</p>
@@ -594,10 +613,10 @@ export function ScenePracticeView({
       ) : null}
 
       {!practiceSet ? (
-        <p className="text-sm text-muted-foreground">{labels.empty}</p>
+        <p className={APPLE_META_TEXT}>{labels.empty}</p>
       ) : (
-        <section className={`space-y-3 rounded-lg p-4 ${APPLE_SURFACE}`}>
-          <div className="flex items-center justify-between gap-3 text-sm text-muted-foreground">
+        <section className={`space-y-3 rounded-[var(--app-radius-panel)] p-4 ${APPLE_PANEL_RAISED}`}>
+          <div className={`flex items-center justify-between gap-3 ${APPLE_META_TEXT}`}>
             <p>
               {labels.currentQuestionLabel}：{exercises.length === 0 ? 0 : safeActiveExerciseIndex + 1}/
               {exercises.length}
@@ -628,24 +647,24 @@ export function ScenePracticeView({
             <ul className="space-y-2">
               <li
                 key={`${activeExercise.id}-${safeActiveExerciseIndex}`}
-                className="rounded-md bg-[rgb(240,240,240)] p-3 text-sm"
+                className={`p-3 ${APPLE_LIST_ITEM}`}
               >
-                <p className="text-xs text-muted-foreground">{activeExercise.type}</p>
-                <p className="mt-1">{getLocalizedExercisePrompt(activeExercise)}</p>
+                <p className={`text-xs ${APPLE_META_TEXT}`}>{activeExercise.type}</p>
+                <p className={`mt-1 ${APPLE_BODY_TEXT}`}>{getLocalizedExercisePrompt(activeExercise)}</p>
                 {activeExercise.cloze?.displayText ? (
-                  <div className="mt-2 rounded-md bg-white px-3 py-2 text-[15px] leading-6">
+                  <div className={`mt-2 rounded-[var(--app-radius-card)] px-3 py-2 text-[15px] leading-6 ${APPLE_PANEL}`}>
                     {activeExercise.cloze.displayText}
                   </div>
                 ) : null}
                 {activeExercise.hint ? (
-                  <p className="mt-2 text-xs text-muted-foreground">提示：{activeExercise.hint}</p>
+                  <p className={`mt-2 text-xs ${APPLE_META_TEXT}`}>提示：{activeExercise.hint}</p>
                 ) : null}
                 {activeExercise.chunkId ? (
-                  <p className="mt-1 text-xs text-muted-foreground">
+                  <p className={`mt-1 text-xs ${APPLE_META_TEXT}`}>
                     {labels.chunkPrefix} {activeExercise.chunkId}
                   </p>
                 ) : null}
-                <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+                <div className={`mt-2 space-y-1 text-xs ${APPLE_META_TEXT}`}>
                   <p>{labels.currentAttemptsLabel}：{activeAttemptCount} 次</p>
                   <p>{labels.currentIncorrectLabel}：{activeIncorrectCount} 次</p>
                   {resultMap[activeExercise.id] === "correct" ? <p>{labels.currentCompletedLabel}</p> : null}
@@ -767,7 +786,7 @@ export function ScenePracticeView({
                         }}
                         placeholder={`${labels.inputPlaceholder}，支持分行默写整段`}
                         rows={8}
-                        className="w-full rounded-md border border-black/10 bg-white px-3 py-2 text-sm leading-6 outline-none transition focus:border-black/20"
+                        className={`w-full px-3 py-2 text-sm leading-6 outline-none focus:border-[var(--app-border-strong)] ${APPLE_INPUT_BASE}`}
                       />
                     ) : (
                       <input
@@ -794,7 +813,7 @@ export function ScenePracticeView({
                           }
                         }}
                         placeholder={labels.inputPlaceholder}
-                        className="w-full rounded-md border border-black/10 bg-white px-3 py-2 text-sm outline-none transition focus:border-black/20"
+                        className={`w-full px-3 py-2 text-sm outline-none focus:border-[var(--app-border-strong)] ${APPLE_INPUT_BASE}`}
                       />
                     )}
                     <div className="flex flex-wrap gap-2">
@@ -828,15 +847,9 @@ export function ScenePracticeView({
                     </div>
                     {assessmentMap[activeExercise.id] ? (
                       <p
-                        className={`text-xs ${
-                          assessmentMap[activeExercise.id] === "complete"
-                            ? "text-[rgb(22,101,52)]"
-                            : assessmentMap[activeExercise.id] === "structure"
-                              ? "text-[rgb(21,94,117)]"
-                              : assessmentMap[activeExercise.id] === "keyword"
-                                ? "text-[rgb(161,98,7)]"
-                            : "text-[rgb(185,28,28)]"
-                        }`}
+                        className={`text-xs font-medium ${assessmentTextClassName(
+                          assessmentMap[activeExercise.id],
+                        )}`}
                       >
                         {getPracticeAssessmentMessage(assessmentMap[activeExercise.id], labels)}
                       </p>
@@ -852,15 +865,15 @@ export function ScenePracticeView({
                   {showAnswerMap[activeExercise.id] ? labels.hideAnswer : labels.showAnswer}
                 </button>
                 {showAnswerMap[activeExercise.id] ? (
-                  <div className="mt-2 rounded bg-white p-2 text-sm">
-                    <p className="text-xs text-muted-foreground">{labels.answerLabel}</p>
-                    <p className="mt-1">{activeExercise.answer.text}</p>
+                  <div className={`mt-2 rounded-[var(--app-radius-card)] p-2 text-sm ${APPLE_PANEL}`}>
+                    <p className={`text-xs ${APPLE_META_TEXT}`}>{labels.answerLabel}</p>
+                    <p className={`mt-1 ${APPLE_BODY_TEXT}`}>{activeExercise.answer.text}</p>
                   </div>
                 ) : null}
               </li>
             </ul>
           ) : (
-            <p className="text-sm text-muted-foreground">{labels.finishQuestionSet}</p>
+            <p className={APPLE_META_TEXT}>{labels.finishQuestionSet}</p>
           )}
         </section>
       )}

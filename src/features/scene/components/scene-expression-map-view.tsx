@@ -2,7 +2,13 @@
 
 import { ReactNode } from "react";
 import { ExpressionCluster } from "@/lib/types/expression-map";
-import { APPLE_BUTTON_BASE, APPLE_SURFACE } from "@/lib/ui/apple-style";
+import {
+  APPLE_BUTTON_BASE,
+  APPLE_LIST_ITEM,
+  APPLE_META_TEXT,
+  APPLE_PANEL_RAISED,
+  APPLE_TITLE_SM,
+} from "@/lib/ui/apple-style";
 import { SceneExpressionMapViewLabels } from "./scene-view-labels";
 
 type SceneExpressionMapViewProps = {
@@ -26,7 +32,7 @@ export function SceneExpressionMapView({
 }: SceneExpressionMapViewProps) {
   return (
     <div className="space-y-4">
-      <section className={`space-y-3 rounded-lg p-4 ${APPLE_SURFACE}`}>
+      <section className={`space-y-3 p-4 ${APPLE_PANEL_RAISED}`}>
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -36,20 +42,20 @@ export function SceneExpressionMapView({
             {labels.back}
           </button>
         </div>
-        <p className="text-sm text-muted-foreground">{labels.description}</p>
-        {error ? <p className="text-sm text-destructive">{error}</p> : null}
+        <p className={APPLE_META_TEXT}>{labels.description}</p>
+        {error ? <p className={`font-medium text-destructive ${APPLE_META_TEXT}`}>{error}</p> : null}
       </section>
 
-      <section className={`space-y-2 rounded-lg p-4 ${APPLE_SURFACE}`}>
+      <section className={`space-y-3 p-4 ${APPLE_PANEL_RAISED}`}>
         {clusters.length === 0 ? (
-          <p className="text-sm text-muted-foreground">{labels.empty}</p>
+          <p className={APPLE_META_TEXT}>{labels.empty}</p>
         ) : (
           <ul className="space-y-2">
             {clusters.map((cluster) => (
-              <li key={cluster.id} className="space-y-2 rounded-md bg-[rgb(240,240,240)] p-3 text-sm">
-                <p className="font-medium">{cluster.anchor}</p>
-                <p className="text-xs text-muted-foreground">{cluster.meaning}</p>
-                <p className="text-xs text-muted-foreground">
+              <li key={cluster.id} className={`space-y-2 p-3 ${APPLE_LIST_ITEM}`}>
+                <p className={APPLE_TITLE_SM}>{cluster.anchor}</p>
+                <p className={APPLE_META_TEXT}>{cluster.meaning}</p>
+                <p className={APPLE_META_TEXT}>
                   {labels.sourceSceneCountPrefix}{cluster.sourceSceneIds.length}
                 </p>
                 <div className="flex flex-wrap gap-2">

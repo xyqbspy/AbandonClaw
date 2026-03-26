@@ -5,6 +5,12 @@ import { useRouter } from "next/navigation";
 import { Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { GenerateSceneSheet } from "@/components/scenes/generate-scene-sheet";
+import {
+  LoadingButton,
+  LoadingContent,
+  LoadingOverlay,
+  LoadingState,
+} from "@/components/shared/action-loading";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -20,10 +26,16 @@ import {
   setSceneListCache,
 } from "@/lib/cache/scene-list-cache";
 import {
+  APPLE_BANNER_DANGER,
+  APPLE_BANNER_INFO,
+  APPLE_BANNER_SUCCESS,
   APPLE_BUTTON_BASE,
   APPLE_BUTTON_DANGER,
   APPLE_BUTTON_TEXT_SM,
-  APPLE_SURFACE,
+  APPLE_CARD_INTERACTIVE,
+  APPLE_META_TEXT,
+  APPLE_PANEL,
+  APPLE_TITLE_MD,
 } from "@/lib/ui/apple-style";
 
 const difficultyLabel: Record<string, string> = {
@@ -67,7 +79,14 @@ export default function ScenesPage() {
   const [confirmDeleteSceneId, setConfirmDeleteSceneId] = useState<string | null>(null);
   const [deletingSceneId, setDeletingSceneId] = useState<string | null>(null);
   const [topTask, setTopTask] = useState<TopTask | null>(null);
+  const [openingSceneTarget, setOpeningSceneTarget] = useState<string | null>(null);
   const activeLoadTokenRef = useRef(0);
+
+  const openSceneRoute = (href: string) => {
+    if (openingSceneTarget === href) return;
+    setOpeningSceneTarget(href);
+    router.push(href);
+  };
 
   const refreshScenes = async (options?: { preferCache?: boolean; forceNetwork?: boolean }) => {
     const token = activeLoadTokenRef.current + 1;
@@ -250,22 +269,31 @@ export default function ScenesPage() {
   };
 
   const renderSceneCards = () => {
-    if (loading) return <p className="text-sm text-muted-foreground">场景加载中...</p>;
-    if (allScenes.length === 0) return <p className="text-sm text-muted-foreground">暂无场景。</p>;
+    if (loading) {
+      return <LoadingState text="场景加载中..." className="py-2" />;
+    }
+    if (allScenes.length === 0) return <p className={APPLE_META_TEXT}>暂无场景。</p>;
 
     return (
       <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
         {allScenes.map((scene) => {
           const isImported = scene.sourceType === "imported";
+          const isOpeningScene = openingSceneTarget?.startsWith(`/scene/${scene.slug}`) ?? false;
           return (
             <Card
               key={scene.id}
-              className={`scene-card-motion h-full cursor-pointer ${APPLE_SURFACE} transition-all duration-150 hover:bg-[rgb(242,242,242)]`}
-              onClick={() => router.push(`/scene/${scene.slug}`)}
+              className={`scene-card-motion relative h-full cursor-pointer ${APPLE_CARD_INTERACTIVE} ${
+                openingSceneTarget ? "pointer-events-none" : ""
+              }`}
+              onClick={() => openSceneRoute(`/scene/${scene.slug}`)}
             >
+              <LoadingOverlay
+                loading={isOpeningScene}
+                loadingText="进入场景中..."
+              />
               <CardHeader className="space-y-0.5 p-2.5 pb-1.5 sm:p-3 sm:pb-2">
                 <div className="flex items-start gap-2">
-                  <CardTitle className="min-w-0 flex-1 line-clamp-1 text-[15px] leading-5 sm:text-base">
+                  <CardTitle className={`min-w-0 flex-1 line-clamp-1 leading-5 ${APPLE_TITLE_MD}`}>
                     {scene.title}
                   </CardTitle>
                   {isImported ? (
@@ -274,7 +302,7 @@ export default function ScenesPage() {
                         type="button"
                         data-scene-delete="true"
                         aria-label="删除场景"
-                        className={`inline-flex h-7 w-7 cursor-pointer items-center justify-center text-muted-foreground transition-colors hover:text-foreground ${APPLE_BUTTON_BASE}`}
+                        className={`inline-flex h-7 w-7 cursor-pointer items-center justify-center ${APPLE_META_TEXT} transition-colors hover:text-foreground ${APPLE_BUTTON_BASE}`}
                         onPointerDown={(event) => event.stopPropagation()}
                         onClick={(event) => {
                           event.preventDefault();
@@ -286,15 +314,15 @@ export default function ScenesPage() {
                       </button>
                       {confirmDeleteSceneId === scene.id ? (
                         <div
-                          className="absolute right-0 top-8 z-20 w-44 rounded-2xl border-0 bg-[rgb(246,246,246)] p-2 shadow-[0_8px_24px_rgba(0,0,0,0.08)]"
+                          className="absolute right-0 top-8 z-20 w-44 rounded-[var(--app-radius-panel)] border border-[var(--app-border-soft)] bg-[var(--app-surface)] p-2 shadow-[var(--app-shadow-raised)]"
                           onPointerDown={(event) => event.stopPropagation()}
                           onClick={(event) => event.stopPropagation()}
                         >
-                          <p className="text-xs text-muted-foreground">删除这个场景？</p>
+                          <p className={`text-xs ${APPLE_META_TEXT}`}>删除这个场景？</p>
                           <div className="mt-1.5 flex justify-end gap-1.5">
                             <button
                               type="button"
-                              className={`${APPLE_BUTTON_BASE} px-2.5 py-1 text-[11px] font-medium text-muted-foreground`}
+                              className={`${APPLE_BUTTON_BASE} px-2.5 py-1 text-[11px] font-medium ${APPLE_META_TEXT}`}
                               onClick={(event) => {
                                 event.preventDefault();
                                 event.stopPropagation();
@@ -313,7 +341,12 @@ export default function ScenesPage() {
                                 void handleDeleteCustomScene(scene);
                               }}
                             >
-                              {deletingSceneId === scene.id ? "删除中..." : "删除"}
+                              <LoadingContent
+                                loading={deletingSceneId === scene.id}
+                                loadingText="删除中..."
+                              >
+                                删除
+                              </LoadingContent>
                             </button>
                           </div>
                         </div>
@@ -321,28 +354,28 @@ export default function ScenesPage() {
                     </div>
                   ) : null}
                 </div>
-                <p className="line-clamp-1 text-[11px] text-muted-foreground">{scene.subtitle}</p>
+                <p className={`line-clamp-1 ${APPLE_META_TEXT}`}>{scene.subtitle}</p>
               </CardHeader>
 
               <CardContent className="p-2.5 pt-0 sm:p-3 sm:pt-0">
                 <div className="flex items-center justify-between gap-2">
-                  <p className="text-[11px] text-muted-foreground">
+                  <p className={APPLE_META_TEXT}>
                     {difficultyLabel[scene.difficulty] ?? "中级"} · {scene.estimatedMinutes}分钟 ·{" "}
                     {sceneTypeSummary(scene)}
                   </p>
-                  <p className="text-[11px] text-muted-foreground">
+                  <p className={APPLE_META_TEXT}>
                     {learningStatusLabel[scene.learningStatus]} · {Math.round(scene.progressPercent)}%
                   </p>
                   {scene.variantLinks.length > 0 ? (
                     <button
                       type="button"
                       data-scene-variant-view="true"
-                      className={`${APPLE_BUTTON_BASE} px-2.5 py-1 text-[11px] font-medium text-muted-foreground hover:text-foreground`}
+                      className={`${APPLE_BUTTON_BASE} px-2.5 py-1 text-[11px] font-medium ${APPLE_META_TEXT} hover:text-foreground`}
                       onPointerDown={(event) => event.stopPropagation()}
                       onClick={(event) => {
                         event.preventDefault();
                         event.stopPropagation();
-                        router.push(`/scene/${scene.slug}?view=variants`);
+                        openSceneRoute(`/scene/${scene.slug}?view=variants`);
                       }}
                     >
                       查看变体
@@ -391,12 +424,12 @@ export default function ScenesPage() {
 
       {topTask ? (
         <div
-          className={`rounded-lg px-3 py-2 text-sm ${
+          className={`text-sm ${
             topTask.status === "running"
-              ? "bg-[rgb(246,246,246)] text-foreground"
+              ? APPLE_BANNER_INFO
               : topTask.status === "done"
-                ? "bg-[rgb(232,246,232)] text-foreground"
-                : "bg-[rgb(253,236,236)] text-destructive"
+                ? APPLE_BANNER_SUCCESS
+                : APPLE_BANNER_DANGER
           }`}
         >
           {topTask.message}
@@ -426,12 +459,12 @@ export default function ScenesPage() {
             className="absolute inset-0"
             onClick={closeDialog}
           />
-          <Card className="relative z-10 w-full max-w-2xl border-0 bg-white shadow-[0_16px_40px_rgba(0,0,0,0.12)] animate-in slide-in-from-bottom-6 fade-in-0 duration-200 sm:slide-in-from-bottom-0 sm:zoom-in-95">
+          <Card className="relative z-10 w-full max-w-2xl border border-[var(--app-border-soft)] bg-background shadow-[var(--app-shadow-raised)] animate-in slide-in-from-bottom-6 fade-in-0 duration-200 sm:slide-in-from-bottom-0 sm:zoom-in-95">
             <CardHeader className="space-y-2">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <CardTitle className="text-lg">导入自定义英文场景</CardTitle>
-                  <p className="mt-1 text-sm text-muted-foreground">
+                  <CardTitle className="text-lg font-semibold text-foreground">导入自定义英文场景</CardTitle>
+                  <p className={`mt-1 ${APPLE_META_TEXT}`}>
                     系统会将文本解析为当前场景数据结构。
                   </p>
                 </div>
@@ -439,7 +472,7 @@ export default function ScenesPage() {
                   type="button"
                   variant="ghost"
                   size="icon-sm"
-                  className="cursor-pointer rounded-full border border-black/5 bg-white hover:bg-[rgb(246,246,246)]"
+                  className={`cursor-pointer rounded-full ${APPLE_BUTTON_BASE}`}
                   aria-label="关闭"
                   onClick={closeDialog}
                 >
@@ -448,7 +481,7 @@ export default function ScenesPage() {
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="rounded-xl bg-[rgb(246,246,246)] p-3">
+              <div className={`p-3 ${APPLE_PANEL}`}>
                 <Textarea
                   value={input}
                   onChange={(event) => {
@@ -456,7 +489,7 @@ export default function ScenesPage() {
                     if (error) setError("");
                   }}
                   placeholder={placeholderExample}
-                  className="min-h-44 border-0 bg-[rgb(246,246,246)] text-sm leading-6 shadow-none focus-visible:ring-0"
+                  className="min-h-44 border-0 bg-transparent text-sm leading-6 shadow-none focus-visible:ring-0"
                 />
               </div>
               {error ? <p className="text-sm text-destructive">{error}</p> : null}
@@ -469,15 +502,16 @@ export default function ScenesPage() {
                 >
                   取消
                 </Button>
-                <Button
+                <LoadingButton
                   type="button"
                   variant="ghost"
                   onClick={handleImport}
                   className={`cursor-pointer ${appleButtonClassName}`}
-                  disabled={importing}
+                  loading={importing}
+                  loadingText="导入中..."
                 >
-                  {importing ? "导入中..." : "导入"}
-                </Button>
+                  导入
+                </LoadingButton>
               </div>
             </CardContent>
           </Card>

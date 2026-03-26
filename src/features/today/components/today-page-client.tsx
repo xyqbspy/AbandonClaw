@@ -29,7 +29,17 @@ import { getScenesFromApi, SceneListItemResponse } from "@/lib/utils/scenes-api"
 import { startReviewSession } from "@/lib/utils/review-session";
 import { PageHeader } from "@/components/shared/page-header";
 import { StatCard } from "@/components/shared/stat-card";
+import { LoadingState } from "@/components/shared/action-loading";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  APPLE_BUTTON_STRONG,
+  APPLE_BUTTON_TEXT_MD,
+  APPLE_CARD_INTERACTIVE,
+  APPLE_LIST_ITEM,
+  APPLE_META_TEXT,
+  APPLE_PANEL,
+  APPLE_TITLE_MD,
+} from "@/lib/ui/apple-style";
 
 const EMPTY_DASHBOARD: LearningDashboardResponse = {
   overview: {
@@ -232,36 +242,36 @@ export function TodayPageClient({ displayName }: { displayName: string }) {
       />
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
+        <Card className={APPLE_CARD_INTERACTIVE}>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className={`flex items-center gap-2 ${APPLE_TITLE_MD}`}>
               <BookOpenCheck className="size-5" />
               {zh.continueTitle}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <p className="text-lg font-medium">
+            <p className="text-lg font-semibold text-foreground">
               {continueLearning?.title ?? zh.continueEmptyTitle}
             </p>
-            <p className="text-sm text-muted-foreground">
+            <p className={APPLE_META_TEXT}>
               {continueLearning?.subtitle ?? zh.continueEmptyDesc}
             </p>
             {continueLearning ? (
-              <div className="space-y-1 rounded-lg bg-muted/40 p-3">
+              <div className={`space-y-1 p-3 ${APPLE_PANEL}`}>
                 <p className="text-xs font-medium text-foreground/80">
                   {zh.continueCurrentPrefix}：{continueStepLabel}
                 </p>
-                <p className="text-xs text-muted-foreground">
+                <p className={APPLE_META_TEXT}>
                   {zh.currentProgress}：{Math.round(continueLearning.progressPercent)}%
                 </p>
-                <p className="text-xs text-muted-foreground">
+                <p className={APPLE_META_TEXT}>
                   {zh.continueHintTitle}：{continueHelperText}
                 </p>
               </div>
             ) : null}
             <Link
               href={continueLearning ? `/scene/${continueLearning.sceneSlug}` : "/scenes"}
-              className="inline-flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-primary px-2.5 text-sm font-medium text-primary-foreground transition hover:bg-primary/90 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+              className={`inline-flex h-9 cursor-pointer items-center justify-center gap-1.5 ${APPLE_BUTTON_STRONG} ${APPLE_BUTTON_TEXT_MD} active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50`}
             >
               {zh.continueBtn}
               <ArrowRight className="size-4" />
@@ -269,21 +279,21 @@ export function TodayPageClient({ displayName }: { displayName: string }) {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className={APPLE_CARD_INTERACTIVE}>
           <CardHeader>
-            <CardTitle>{zh.recTitle}</CardTitle>
+            <CardTitle className={APPLE_TITLE_MD}>{zh.recTitle}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
             {loading && recommendedScenes.length === 0 ? (
-              <p className="text-sm text-muted-foreground">{zh.sceneLoading}</p>
+              <LoadingState text={zh.sceneLoading} className="py-1" />
             ) : recommendedScenes.length === 0 ? (
-              <p className="text-sm text-muted-foreground">{zh.recEmpty}</p>
+              <p className={APPLE_META_TEXT}>{zh.recEmpty}</p>
             ) : (
               recommendedScenes.map((scene) => (
                 <Link key={scene.id} href={`/scene/${scene.slug}`} className="block">
-                  <div className="rounded-lg border border-border/70 p-3 text-sm transition-colors hover:bg-muted">
-                    <p className="font-medium">{scene.title}</p>
-                    <p className="text-muted-foreground">
+                  <div className={`p-3 text-sm ${APPLE_LIST_ITEM}`}>
+                    <p className="font-semibold text-foreground">{scene.title}</p>
+                    <p className={APPLE_META_TEXT}>
                       {zh.estimatedMinutes} {scene.estimatedMinutes} {zh.minute}
                     </p>
                   </div>

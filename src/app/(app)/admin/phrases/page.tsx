@@ -19,7 +19,15 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { listAdminPhrases } from "@/lib/server/admin/service";
-import { APPLE_BUTTON_BASE, APPLE_BUTTON_DANGER, APPLE_BUTTON_TEXT_SM, APPLE_INPUT_BASE } from "@/lib/ui/apple-style";
+import {
+  APPLE_BUTTON_BASE,
+  APPLE_BUTTON_DANGER,
+  APPLE_BUTTON_TEXT_SM,
+  APPLE_INPUT_BASE,
+  APPLE_META_TEXT,
+  APPLE_TABLE_HEAD,
+  APPLE_TABLE_ROW,
+} from "@/lib/ui/apple-style";
 
 const LABELS = {
   eyebrow: "\u7ba1\u7406\u540e\u53f0",
@@ -123,7 +131,7 @@ export default async function AdminPhrasesPage({
         </AdminActionBar>
 
         <table className="min-w-full text-sm">
-          <thead className="bg-muted/40 text-left text-xs text-muted-foreground">
+          <thead className={`${APPLE_TABLE_HEAD} text-left text-xs`}>
             <tr>
               <th className="w-12 px-3 py-2">选择</th>
               <th className="px-3 py-2">内容</th>
@@ -138,7 +146,7 @@ export default async function AdminPhrasesPage({
           </thead>
           <tbody>
             {result.rows.map((row) => (
-              <tr key={row.userPhraseId} className="align-top">
+              <tr key={row.userPhraseId} className={`${APPLE_TABLE_ROW} align-top`}>
                 <td className="px-3 py-2">
                   {row.learningItemType === "expression" ? (
                     <input
@@ -153,7 +161,7 @@ export default async function AdminPhrasesPage({
                 <td className="max-w-[360px] px-3 py-2">
                   <p className="line-clamp-2 font-medium">{row.text}</p>
                   {row.sourceSentenceText && row.learningItemType === "expression" ? (
-                    <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
+                    <p className={`mt-0.5 line-clamp-1 ${APPLE_META_TEXT}`}>
                       {LABELS.example}
                       {row.sourceSentenceText}
                     </p>
@@ -179,14 +187,14 @@ export default async function AdminPhrasesPage({
                     {row.enrichmentLabel}
                   </Badge>
                 </td>
-                <td className="max-w-[260px] px-3 py-2 text-muted-foreground">
+                <td className={`max-w-[260px] px-3 py-2 ${APPLE_META_TEXT}`}>
                   <p className="line-clamp-2">{row.translation ?? "-"}</p>
                 </td>
-                <td className="px-3 py-2 text-xs text-muted-foreground">{row.sourceSceneSlug ?? "-"}</td>
-                <td className="px-3 py-2 font-mono text-xs text-muted-foreground">
+                <td className={`px-3 py-2 ${APPLE_META_TEXT}`}>{row.sourceSceneSlug ?? "-"}</td>
+                <td className={`px-3 py-2 font-mono ${APPLE_META_TEXT}`}>
                   {row.userId.slice(0, 8)}...
                 </td>
-                <td className="px-3 py-2 whitespace-nowrap text-xs text-muted-foreground">
+                <td className={`px-3 py-2 whitespace-nowrap ${APPLE_META_TEXT}`}>
                   {row.savedAt}
                 </td>
                 <td className="px-3 py-2">

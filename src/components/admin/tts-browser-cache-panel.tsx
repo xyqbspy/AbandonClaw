@@ -23,7 +23,10 @@ import {
   APPLE_BUTTON_BASE,
   APPLE_BUTTON_TEXT_SM,
   APPLE_INPUT_BASE,
-  APPLE_SURFACE,
+  APPLE_META_TEXT,
+  APPLE_PANEL_RAISED,
+  APPLE_TABLE_HEAD,
+  APPLE_TABLE_ROW,
 } from "@/lib/ui/apple-style";
 
 const formatBytes = (bytes: number) => {
@@ -138,13 +141,17 @@ export function TtsBrowserCachePanel() {
   const handleClearKeys = async (cacheKeys: string[], label: string) => {
     if (cacheKeys.length === 0 || clearing) return;
 
-    const confirmed = await confirmAction(`确认清理${label}吗？这会删除当前浏览器里的 TTS 音频缓存。`);
+    const confirmed = await confirmAction(
+      `确认清理${label}吗？这会删除当前浏览器里的 TTS 音频缓存。`,
+    );
     if (!confirmed) return;
 
     setClearing(true);
     try {
       const result = await clearBrowserTtsCacheEntries(cacheKeys);
-      toast.success(`已清理 ${result.removedCount} 条音频缓存，释放 ${formatBytes(result.removedBytes)}。`);
+      toast.success(
+        `已清理 ${result.removedCount} 条音频缓存，释放 ${formatBytes(result.removedBytes)}。`,
+      );
       await refreshCacheState();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "清理 TTS 本地缓存失败。");
@@ -155,13 +162,17 @@ export function TtsBrowserCachePanel() {
 
   const handleClearAll = async () => {
     if (clearing) return;
-    const confirmed = await confirmAction("确认清空当前浏览器里的全部 TTS 音频缓存吗？");
+    const confirmed = await confirmAction(
+      "确认清空当前浏览器里的全部 TTS 音频缓存吗？",
+    );
     if (!confirmed) return;
 
     setClearing(true);
     try {
       const result = await clearAllBrowserTtsCache();
-      toast.success(`已清空 ${result.removedCount} 条 TTS 缓存，释放 ${formatBytes(result.removedBytes)}。`);
+      toast.success(
+        `已清空 ${result.removedCount} 条 TTS 缓存，释放 ${formatBytes(result.removedBytes)}。`,
+      );
       await refreshCacheState();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "清空 TTS 本地缓存失败。");
@@ -172,17 +183,18 @@ export function TtsBrowserCachePanel() {
 
   return (
     <div className="space-y-4">
-      <Card className={APPLE_SURFACE}>
+      <Card className={APPLE_PANEL_RAISED}>
         <CardHeader className="pb-3">
           <CardTitle className="text-sm">浏览器本地 TTS 缓存</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4 text-sm">
-          <p className="text-muted-foreground">
-            这里显示的是当前设备、当前浏览器下的本地音频缓存。首次在线播放成功后，后续会优先从这里复用。
+          <p className={APPLE_META_TEXT}>
+            这里显示的是当前设备、当前浏览器里的本地音频缓存。首次在线播放成功后，
+            后续会优先从这里复用。
           </p>
 
           {!supported ? (
-            <div className="rounded-lg border border-dashed border-border/70 px-3 py-4 text-sm text-muted-foreground">
+            <div className={`rounded-[var(--app-radius-panel)] border border-dashed border-[var(--app-border-soft)] px-3 py-4 ${APPLE_META_TEXT}`}>
               当前环境不支持浏览器 Cache Storage，无法查看本地 TTS 缓存。
             </div>
           ) : (
@@ -227,7 +239,7 @@ export function TtsBrowserCachePanel() {
                   </select>
                 </div>
 
-                <AdminActionBar className="rounded-lg border border-border/60">
+                <AdminActionBar className="rounded-[var(--app-radius-panel)] border border-[var(--app-border-soft)]">
                   <AdminActionBarHint>已选 {selectedEntryCount} 条，可按类型筛选后定向清理。</AdminActionBarHint>
                   <AdminActionBarActions>
                     <Button
@@ -261,8 +273,8 @@ export function TtsBrowserCachePanel() {
                 </AdminActionBar>
               </div>
 
-              <div className="rounded-lg border border-border/60 bg-background">
-                <div className="flex items-center justify-between border-b border-border/60 px-3 py-2 text-xs text-muted-foreground">
+              <div className={`overflow-hidden rounded-[var(--app-radius-panel)] border border-[var(--app-border-soft)] bg-background`}>
+                <div className={`flex items-center justify-between border-b border-[var(--app-border-soft)] px-3 py-2 text-xs ${APPLE_META_TEXT}`}>
                   <label className="inline-flex items-center gap-2">
                     <input
                       type="checkbox"
@@ -278,13 +290,13 @@ export function TtsBrowserCachePanel() {
                 </div>
 
                 {loading ? (
-                  <div className="px-3 py-8 text-center text-sm text-muted-foreground">正在读取本地缓存...</div>
+                  <div className={`px-3 py-8 text-center ${APPLE_META_TEXT}`}>正在读取本地缓存...</div>
                 ) : filteredEntries.length === 0 ? (
-                  <div className="px-3 py-8 text-center text-sm text-muted-foreground">当前没有匹配的 TTS 缓存。</div>
+                  <div className={`px-3 py-8 text-center ${APPLE_META_TEXT}`}>当前没有匹配的 TTS 缓存。</div>
                 ) : (
                   <div className="max-h-[520px] overflow-auto">
                     <table className="min-w-full text-sm">
-                      <thead className="sticky top-0 bg-background text-left text-xs text-muted-foreground">
+                      <thead className={`sticky top-0 text-left text-xs ${APPLE_TABLE_HEAD}`}>
                         <tr>
                           <th className="px-3 py-2">选择</th>
                           <th className="px-3 py-2">类型</th>
@@ -295,7 +307,7 @@ export function TtsBrowserCachePanel() {
                       </thead>
                       <tbody>
                         {filteredEntries.map((entry) => (
-                          <tr key={entry.cacheKey} className="border-t border-border/50 align-top">
+                          <tr key={entry.cacheKey} className={`${APPLE_TABLE_ROW} align-top`}>
                             <td className="px-3 py-2">
                               <input
                                 type="checkbox"
@@ -305,7 +317,7 @@ export function TtsBrowserCachePanel() {
                             </td>
                             <td className="px-3 py-2">{entry.kind}</td>
                             <td className="px-3 py-2 whitespace-nowrap">{formatBytes(entry.size)}</td>
-                            <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">
+                            <td className={`px-3 py-2 whitespace-nowrap ${APPLE_META_TEXT}`}>
                               {entry.contentType ?? "-"}
                             </td>
                             <td className="px-3 py-2 font-mono text-xs">{entry.cacheKey}</td>

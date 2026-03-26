@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { APPLE_SURFACE } from "@/lib/ui/apple-style";
+import { APPLE_META_TEXT, APPLE_SURFACE, APPLE_TITLE_SM } from "@/lib/ui/apple-style";
 import { cn } from "@/lib/utils";
 
 export function AdminInfoCard({
@@ -17,7 +17,7 @@ export function AdminInfoCard({
   return (
     <Card className={cn(APPLE_SURFACE, className)}>
       <CardHeader>
-        <CardTitle className="text-sm">{title}</CardTitle>
+        <CardTitle className={APPLE_TITLE_SM}>{title}</CardTitle>
       </CardHeader>
       <CardContent className={cn("text-sm", contentClassName)}>{children}</CardContent>
     </Card>
@@ -38,7 +38,7 @@ export function AdminInfoList({
   return (
     <div className={cn("space-y-1.5", className)}>
       {items.map((item, index) => (
-        <p key={index} className={item.muted ? "text-muted-foreground" : undefined}>
+        <p key={index} className={item.muted ? APPLE_META_TEXT : undefined}>
           {item.label}
           {item.value}
         </p>

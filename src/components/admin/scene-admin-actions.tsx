@@ -6,6 +6,7 @@ import {
   regenerateSceneVariantsAction,
   toggleSceneVisibilityAction,
 } from "@/app/(app)/admin/actions";
+import { LoadingContent } from "@/components/shared/action-loading";
 import { ConfirmButton } from "@/components/shared/confirm-action";
 import { Button } from "@/components/ui/button";
 
@@ -23,6 +24,8 @@ export function SceneAdminActions({
   const [loadingGenerate, setLoadingGenerate] = useState(false);
   const [loadingForceGenerate, setLoadingForceGenerate] = useState(false);
 
+  const toggleLabel = isPublic ? "设为私有" : "设为公开";
+
   return (
     <div className="flex flex-wrap items-center gap-2">
       <form action={toggleSceneVisibilityAction} onSubmit={() => setLoadingToggle(true)}>
@@ -30,7 +33,9 @@ export function SceneAdminActions({
         <input type="hidden" name="nextPublic" value={String(!isPublic)} />
         <input type="hidden" name="returnTo" value={returnTo} />
         <Button type="submit" variant="outline" size="sm" disabled={loadingToggle}>
-          {loadingToggle ? "更新中..." : isPublic ? "设为私有" : "设为公开"}
+          <LoadingContent loading={loadingToggle} loadingText="更新中...">
+            {toggleLabel}
+          </LoadingContent>
         </Button>
       </form>
 
@@ -40,7 +45,9 @@ export function SceneAdminActions({
         <input type="hidden" name="retainChunkRatio" value="0.6" />
         <input type="hidden" name="returnTo" value={returnTo} />
         <Button type="submit" variant="secondary" size="sm" disabled={loadingGenerate}>
-          {loadingGenerate ? "生成中..." : "重新生成变体"}
+          <LoadingContent loading={loadingGenerate} loadingText="生成中...">
+            重新生成变体
+          </LoadingContent>
         </Button>
       </form>
 
@@ -59,7 +66,9 @@ export function SceneAdminActions({
           pendingText="强制生成中..."
           onClick={() => setLoadingForceGenerate(true)}
         >
-          {loadingForceGenerate ? "强制生成中..." : "强制重新生成"}
+          <LoadingContent loading={loadingForceGenerate} loadingText="强制生成中...">
+            强制重新生成
+          </LoadingContent>
         </ConfirmButton>
       </form>
 
@@ -76,7 +85,9 @@ export function SceneAdminActions({
           pendingText="删除中..."
           onClick={() => setLoadingDelete(true)}
         >
-          {loadingDelete ? "删除中..." : "删除场景"}
+          <LoadingContent loading={loadingDelete} loadingText="删除中...">
+            删除场景
+          </LoadingContent>
         </ConfirmButton>
       </form>
     </div>

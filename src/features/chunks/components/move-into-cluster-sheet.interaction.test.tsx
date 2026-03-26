@@ -232,3 +232,27 @@ test("MoveIntoClusterSheet 底部关闭和确认移入会触发回调", () => {
   assert.equal(closed, true);
   assert.equal(submitted, true);
 });
+
+test("MoveIntoClusterSheet 提交中时会保持统一 loading 文案", () => {
+  render(
+    <MoveIntoClusterSheet
+      open
+      focusExpression={{ text: "burn yourself out" }}
+      groups={[]}
+      expandedGroups={{}}
+      selectedMap={{}}
+      submitting
+      appleButtonClassName="btn"
+      labels={labels}
+      onOpenChange={() => undefined}
+      onToggleGroupExpand={() => undefined}
+      onToggleGroupSelect={() => undefined}
+      onToggleCandidate={() => undefined}
+      onSubmit={() => undefined}
+    />,
+  );
+
+  const submitButton = screen.getByRole("button", { name: "确认移入..." });
+  assert.equal(submitButton.hasAttribute("disabled"), true);
+  assert.equal(screen.queryByRole("button", { name: "确认移入...." }), null);
+});

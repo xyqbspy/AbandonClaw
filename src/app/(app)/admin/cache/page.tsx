@@ -10,7 +10,14 @@ import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { listAdminAiCache } from "@/lib/server/admin/service";
-import { APPLE_BUTTON_BASE, APPLE_BUTTON_TEXT_SM, APPLE_INPUT_BASE } from "@/lib/ui/apple-style";
+import {
+  APPLE_BUTTON_BASE,
+  APPLE_BUTTON_TEXT_SM,
+  APPLE_INPUT_BASE,
+  APPLE_META_TEXT,
+  APPLE_TABLE_HEAD,
+  APPLE_TABLE_ROW,
+} from "@/lib/ui/apple-style";
 
 const LABELS = {
   eyebrow: "\u7ba1\u7406\u540e\u53f0",
@@ -91,7 +98,7 @@ export default async function AdminCachePage({
 
       <AdminTableShell>
         <table className="min-w-full text-sm">
-          <thead className="bg-muted/40 text-left text-xs text-muted-foreground">
+          <thead className={`${APPLE_TABLE_HEAD} text-left text-xs`}>
             <tr>
               <th className="px-3 py-2">cache_key</th>
               <th className="px-3 py-2">cache_type</th>
@@ -105,15 +112,15 @@ export default async function AdminCachePage({
           </thead>
           <tbody>
             {result.rows.map((row) => (
-              <tr key={row.id} className="align-top">
-                <td className="px-3 py-2 font-mono text-xs">{row.cache_key}</td>
+              <tr key={row.id} className={`${APPLE_TABLE_ROW} align-top`}>
+                <td className={`px-3 py-2 font-mono ${APPLE_META_TEXT}`}>{row.cache_key}</td>
                 <td className="px-3 py-2">{row.cache_type}</td>
                 <td className="px-3 py-2">{row.status}</td>
-                <td className="px-3 py-2 font-mono text-xs">{row.input_hash ?? "-"}</td>
-                <td className="px-3 py-2 font-mono text-xs">{row.source_ref ?? "-"}</td>
+                <td className={`px-3 py-2 font-mono ${APPLE_META_TEXT}`}>{row.input_hash ?? "-"}</td>
+                <td className={`px-3 py-2 font-mono ${APPLE_META_TEXT}`}>{row.source_ref ?? "-"}</td>
                 <td className="px-3 py-2">{row.model ?? "-"}</td>
                 <td className="px-3 py-2">{row.prompt_version ?? "-"}</td>
-                <td className="px-3 py-2 whitespace-nowrap">{row.created_at}</td>
+                <td className={`px-3 py-2 whitespace-nowrap ${APPLE_META_TEXT}`}>{row.created_at}</td>
               </tr>
             ))}
             {result.rows.length === 0 ? (
@@ -143,7 +150,7 @@ export default async function AdminCachePage({
                 </span>
               }
             />
-            <p className="text-muted-foreground">{LABELS.preview}</p>
+            <p className={APPLE_META_TEXT}>{LABELS.preview}</p>
           </div>
           <AdminCodeBlock className="max-h-40">
             {JSON.stringify(

@@ -1,6 +1,7 @@
 "use client";
 
 import { ChevronDown } from "lucide-react";
+import { formatLoadingText, LoadingButton } from "@/components/shared/action-loading";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,6 +13,14 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { UserPhraseItemResponse } from "@/lib/utils/phrases-api";
+import {
+  APPLE_BUTTON_STRONG,
+  APPLE_BODY_TEXT,
+  APPLE_LIST_ITEM,
+  APPLE_META_TEXT,
+  APPLE_PANEL,
+  APPLE_TITLE_MD,
+} from "@/lib/ui/apple-style";
 import { MoveIntoClusterCandidate, MoveIntoClusterGroup } from "./types";
 
 type MoveIntoClusterSheetLabels = {
@@ -66,22 +75,27 @@ export function MoveIntoClusterSheet({
   onToggleCandidate,
   onSubmit,
 }: MoveIntoClusterSheetProps) {
+  const appleOutlineBadgeClassName =
+    "border-[var(--app-border-soft)] bg-[var(--app-surface)] text-[var(--muted-foreground)]";
+  const appleSelectedBadgeClassName =
+    "border-[var(--app-border-soft)] bg-[var(--app-surface-subtle)] text-foreground";
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="bottom"
         overlayClassName="z-[80]"
-        className="z-[81] flex h-[85vh] max-h-[85vh] flex-col rounded-t-2xl border-0 bg-white"
+        className={`z-[81] flex h-[85vh] max-h-[85vh] flex-col rounded-t-2xl border border-[var(--app-border-soft)] bg-background ${APPLE_PANEL}`}
       >
-        <SheetHeader className="shrink-0 border-b border-[rgb(236,238,240)] bg-[rgb(250,250,250)] px-4 pb-4 pt-4">
-          <SheetTitle>{labels.title}</SheetTitle>
+        <SheetHeader className="shrink-0 border-b border-[var(--app-border-soft)] bg-[var(--app-surface)] px-4 pb-4 pt-4">
+          <SheetTitle className={APPLE_TITLE_MD}>{labels.title}</SheetTitle>
           <SheetDescription>{labels.description}</SheetDescription>
         </SheetHeader>
 
-        <div className="shrink-0 border-b border-[rgb(236,238,240)] bg-[rgb(250,250,250)] px-4 py-4">
+        <div className="shrink-0 border-b border-[var(--app-border-soft)] bg-[var(--app-surface)] px-4 py-4">
           {focusExpression ? (
-            <div className="rounded-xl bg-[rgb(246,246,246)] p-4">
-              <p className="text-xl font-semibold tracking-tight">
+            <div className={`p-4 ${APPLE_PANEL}`}>
+              <p className={APPLE_TITLE_MD}>
                 {labels.currentMain}
                 {focusExpression.text}
               </p>
@@ -89,9 +103,9 @@ export function MoveIntoClusterSheet({
           ) : null}
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto bg-white px-4 py-3">
+        <div className="min-h-0 flex-1 overflow-y-auto bg-background px-4 py-3">
           {groups.length === 0 ? (
-            <p className="text-sm text-muted-foreground">{labels.empty}</p>
+            <p className={`text-sm ${APPLE_META_TEXT}`}>{labels.empty}</p>
           ) : (
             <div className="space-y-3">
               {groups.map((group) => {
@@ -107,21 +121,21 @@ export function MoveIntoClusterSheet({
                   });
 
                   return (
-                    <div key={group.key} className="rounded-2xl bg-[rgb(246,246,246)] p-3">
+                    <div key={group.key} className={`p-3 ${APPLE_PANEL}`}>
                       <div className="flex items-start justify-between gap-3 px-3">
                         <button
                           type="button"
                           className="min-w-0 flex-1 text-left"
                           onClick={() => onToggleGroupExpand(group.key)}
                         >
-                          <p className="text-base font-semibold">{group.title}</p>
+                          <p className={APPLE_TITLE_MD}>{group.title}</p>
                           {mainCandidate?.row.translation ? (
-                            <p className="mt-1 text-xs text-muted-foreground">
+                            <p className={`mt-1 ${APPLE_META_TEXT}`}>
                               {mainCandidate.row.translation}
                             </p>
                           ) : null}
                           {groupSelected ? (
-                            <p className="mt-1 text-xs text-muted-foreground">
+                            <p className={`mt-1 ${APPLE_META_TEXT}`}>
                               {labels.coveredByMain}
                             </p>
                           ) : null}
@@ -129,7 +143,7 @@ export function MoveIntoClusterSheet({
                         <div className="flex shrink-0 items-center gap-2">
                           <button
                             type="button"
-                            className="inline-flex items-center rounded-full border border-[rgb(220,224,228)] p-2 text-xs text-muted-foreground transition hover:bg-[rgb(240,240,240)]"
+                            className={`inline-flex items-center rounded-full border border-[var(--app-border-soft)] p-2 ${APPLE_META_TEXT} transition hover:bg-[var(--app-surface-hover)]`}
                             onClick={() => onToggleGroupExpand(group.key)}
                           >
                             <ChevronDown
@@ -143,7 +157,7 @@ export function MoveIntoClusterSheet({
                             variant="ghost"
                             className={`h-auto px-2 py-1 text-xs ${
                               groupSelected
-                                ? "bg-[rgb(32,44,60)] text-white hover:bg-[rgb(25,36,50)]"
+                                ? APPLE_BUTTON_STRONG
                                 : ""
                             }`}
                             onClick={() => onToggleGroupSelect(group, groupSelected)}
@@ -167,30 +181,37 @@ export function MoveIntoClusterSheet({
                               <button
                                 key={candidate.row.userPhraseId}
                                 type="button"
-                                className={`w-full rounded-xl border border-transparent bg-[rgb(246,246,246)] text-left transition ${
+                                className={`w-full text-left transition ${APPLE_LIST_ITEM} ${
                                   isCoveredByMainSelected
-                                    ? "text-muted-foreground"
-                                    : "hover:bg-[rgb(240,240,240)]"
+                                    ? APPLE_META_TEXT
+                                    : "hover:bg-[var(--app-surface-hover)]"
                                 }`}
                                 disabled={isCoveredByMainSelected}
                                 onClick={() => onToggleCandidate(group, candidate, selected)}
                               >
                                 <div className="flex items-start justify-between gap-3 px-3">
                                   <div className="min-w-0 flex-1">
-                                    <p className="text-sm font-medium">{candidate.row.text}</p>
+                                    <p className={`font-medium ${APPLE_BODY_TEXT}`}>{candidate.row.text}</p>
                                     {candidate.row.translation ? (
-                                      <p className="mt-1 text-xs text-muted-foreground">
+                                      <p className={`mt-1 ${APPLE_META_TEXT}`}>
                                         {candidate.row.translation}
                                       </p>
                                     ) : null}
                                   </div>
                                   <div className="flex shrink-0 items-center gap-2">
-                                    <Badge variant="outline">
+                                    <Badge variant="outline" className={appleOutlineBadgeClassName}>
                                       {candidate.isSourceMain ? labels.mainExpression : labels.subExpression}
                                     </Badge>
                                     <Badge
                                       variant={
                                         isCoveredByMainSelected ? "outline" : selected ? "default" : "secondary"
+                                      }
+                                      className={
+                                        isCoveredByMainSelected
+                                          ? appleOutlineBadgeClassName
+                                          : selected
+                                            ? APPLE_BUTTON_STRONG
+                                            : appleSelectedBadgeClassName
                                       }
                                     >
                                       {isCoveredByMainSelected
@@ -215,22 +236,25 @@ export function MoveIntoClusterSheet({
                 if (!candidate) return null;
 
                 return (
-                  <div key={group.key} className="rounded-2xl bg-[rgb(246,246,246)] p-3">
+                  <div key={group.key} className={`p-3 ${APPLE_PANEL}`}>
                     <button
                       type="button"
-                      className="w-full rounded-xl border border-transparent bg-[rgb(246,246,246)] text-left transition hover:bg-[rgb(240,240,240)]"
+                      className={`w-full text-left transition ${APPLE_LIST_ITEM} hover:bg-[var(--app-surface-hover)]`}
                       onClick={() => onToggleCandidate(group, candidate, selected)}
                     >
                       <div className="flex items-start justify-between gap-3 px-3">
                         <div className="min-w-0 flex-1">
-                          <p className="text-base font-semibold">{candidate.row.text}</p>
+                          <p className={APPLE_TITLE_MD}>{candidate.row.text}</p>
                           {candidate.row.translation ? (
-                            <p className="mt-1 text-xs text-muted-foreground">
+                            <p className={`mt-1 ${APPLE_META_TEXT}`}>
                               {candidate.row.translation}
                             </p>
                           ) : null}
                         </div>
-                        <Badge variant={selected ? "default" : "secondary"}>
+                        <Badge
+                          variant={selected ? "default" : "secondary"}
+                          className={selected ? APPLE_BUTTON_STRONG : appleSelectedBadgeClassName}
+                        >
                           {selected ? labels.selected : labels.unselected}
                         </Badge>
                       </div>
@@ -242,20 +266,21 @@ export function MoveIntoClusterSheet({
           )}
         </div>
 
-        <SheetFooter className="shrink-0 border-t border-[rgb(236,238,240)] bg-[rgb(250,250,250)] px-4 pb-safe pt-3">
+        <SheetFooter className="shrink-0 border-t border-[var(--app-border-soft)] bg-[var(--app-surface)] px-4 pb-safe pt-3">
           <div className="grid grid-cols-2 gap-2">
             <Button type="button" variant="ghost" className={appleButtonClassName} onClick={() => onOpenChange(false)}>
               {labels.close}
             </Button>
-            <Button
+            <LoadingButton
               type="button"
               variant="ghost"
-              className={appleButtonClassName}
-              disabled={submitting}
+              className={APPLE_BUTTON_STRONG}
+              loading={submitting}
+              loadingText={formatLoadingText(labels.submit)}
               onClick={onSubmit}
             >
-              {submitting ? `${labels.submit}...` : labels.submit}
-            </Button>
+              {labels.submit}
+            </LoadingButton>
           </div>
         </SheetFooter>
       </SheetContent>

@@ -2,6 +2,7 @@
 
 import { ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { getReviewPageCache, setReviewPageCache } from "@/lib/cache/review-page-cache";
+import { LoadingButton, LoadingState } from "@/components/shared/action-loading";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -53,6 +54,16 @@ import {
   notifyReviewSubmitFailed,
 } from "./review-page-notify";
 import { reviewPageLabels as zh } from "./review-page-labels";
+import {
+  APPLE_BODY_TEXT,
+  APPLE_CARD_INTERACTIVE,
+  APPLE_INPUT_PANEL,
+  APPLE_LIST_ITEM,
+  APPLE_META_TEXT,
+  APPLE_PANEL,
+  APPLE_PANEL_RAISED,
+  APPLE_TITLE_MD,
+} from "@/lib/ui/apple-style";
 
 const REVIEW_LIMIT = 20;
 
@@ -75,6 +86,7 @@ export default function ReviewPage() {
   const [isSessionReview, setIsSessionReview] = useState(false);
   const [sessionSource, setSessionSource] = useState<string | null>(null);
   const [showReference, setShowReference] = useState(false);
+  const [openingSceneHref, setOpeningSceneHref] = useState<string | null>(null);
   const [summary, setSummary] = useState<{
     dueReviewCount: number;
     reviewedTodayCount: number;
@@ -259,6 +271,12 @@ export default function ReviewPage() {
     }
   };
 
+  const openScene = (href: string) => {
+    if (!href || openingSceneHref === href) return;
+    setOpeningSceneHref(href);
+    window.location.assign(href);
+  };
+
   const submitInlineScenePractice = async (item: DueScenePracticeReviewItemResponse) => {
     const itemKey = buildScenePracticeReviewItemKey(item);
     const answer = scenePracticeAnswerMap[itemKey]?.trim() ?? "";
@@ -351,13 +369,13 @@ export default function ReviewPage() {
       <PageHeader eyebrow={zh.eyebrow} title={zh.title} description={zh.desc} />
 
       <div className="space-y-1">
-        <p className="text-sm text-foreground/90">{primaryHint}</p>
+        <p className={APPLE_BODY_TEXT}>{primaryHint}</p>
         {sourceLabel ? (
-          <p className="text-xs text-muted-foreground">
+          <p className={`text-xs ${APPLE_META_TEXT}`}>
             {zh.sourcePrefix}：{sourceLabel}
           </p>
         ) : null}
-        <p className="text-sm text-muted-foreground">
+        <p className={APPLE_META_TEXT}>
           {zh.dueNow} {loading ? "..." : summary?.dueReviewCount ?? 0} {zh.statusJoiner} {zh.doneToday}{" "}
           {loading ? "..." : summary?.reviewedTodayCount ?? 0} {zh.statusJoiner} {zh.accuracy}{" "}
           {loading ? "..." : summary?.reviewAccuracy == null ? zh.dash : `${summary.reviewAccuracy}%`}
@@ -365,10 +383,10 @@ export default function ReviewPage() {
       </div>
 
       {!loading && scenePracticeItems.length > 0 ? (
-        <Card>
+        <Card className={APPLE_PANEL_RAISED}>
           <CardHeader>
             <CardTitle className="text-lg">场景练习待复习</CardTitle>
-            <p className="text-sm text-muted-foreground">
+            <p className={APPLE_META_TEXT}>
               这里会优先展示你最近在场景练习里只做到“关键词”或“骨架”的句子，方便继续按推荐题型回练。
             </p>
           </CardHeader>
@@ -388,11 +406,11 @@ export default function ReviewPage() {
                 return (
                   <div
                     key={`${item.sceneSlug}-${item.sentenceId ?? item.exerciseId}-${item.reviewedAt}`}
-                    className="rounded-lg border border-black/6 bg-muted/40 p-3"
+                    className={`p-3 ${APPLE_LIST_ITEM}`}
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <p className="text-sm font-medium text-foreground">{item.sceneTitle}</p>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-sm font-semibold text-foreground">{item.sceneTitle}</p>
+                      <p className={APPLE_META_TEXT}>
                         当前评估：
                         {assessmentLabelMap[item.assessmentLevel as keyof typeof assessmentLabelMap] ??
                           item.assessmentLevel}{" "}
@@ -403,43 +421,43 @@ export default function ReviewPage() {
                       <p className="mt-2 text-sm text-foreground">{item.displayText}</p>
                     ) : null}
                     {item.promptText ? (
-                      <p className="mt-1 text-xs text-muted-foreground">提示：{item.promptText}</p>
+                      <p className={`mt-1 ${APPLE_META_TEXT}`}>提示：{item.promptText}</p>
                     ) : null}
                     {item.latestAnswer ? (
-                      <p className="mt-1 text-xs text-muted-foreground">
+                      <p className={`mt-1 ${APPLE_META_TEXT}`}>
                         你上次的答案：{item.latestAnswer}
                       </p>
                     ) : null}
                     {item.expectedAnswer ? (
-                      <p className="mt-1 text-xs text-muted-foreground">
+                      <p className={`mt-1 ${APPLE_META_TEXT}`}>
                         参考目标：{item.expectedAnswer}
                       </p>
                     ) : null}
 
-                    <div className="mt-3 rounded-lg bg-background p-3">
+                    <div className={`mt-3 p-3 ${APPLE_PANEL}`}>
                       <div className="space-y-2">
-                        <p className="text-xs text-muted-foreground">{zh.practiceAgain}</p>
+                        <p className={APPLE_META_TEXT}>{zh.practiceAgain}</p>
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-xs text-muted-foreground">{zh.practiceModePrefix}</span>
+                          <span className={APPLE_META_TEXT}>{zh.practiceModePrefix}</span>
                           <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${modeAccentClassName}`}>
                             {reviewModeLabelMap[item.recommendedMode]}
                           </span>
                         </div>
                         {item.promptText ? (
-                          <div className="rounded-md bg-muted/60 p-2">
-                            <p className="text-[11px] text-muted-foreground">{zh.practicePromptPrefix}</p>
+                          <div className="rounded-[var(--app-radius-panel)] bg-background/75 p-2">
+                            <p className={APPLE_META_TEXT}>{zh.practicePromptPrefix}</p>
                             <p className="mt-1 text-sm text-foreground">{item.promptText}</p>
                           </div>
                         ) : null}
                         {item.hint ? (
-                          <p className="text-xs text-muted-foreground">
+                          <p className={APPLE_META_TEXT}>
                             {zh.practiceHintPrefix}：{item.hint}
                           </p>
                         ) : null}
                       </div>
                       {item.recommendedMode === "full_dictation" ? (
                         <textarea
-                          className="mt-2 min-h-28 w-full rounded-md border border-black/10 bg-white px-3 py-2 text-sm outline-none transition focus:border-primary"
+                          className={`mt-2 min-h-28 w-full px-3 py-2 text-sm ${APPLE_INPUT_PANEL}`}
                           placeholder={placeholder}
                           value={inlineAnswer}
                           onChange={(event) => {
@@ -458,7 +476,7 @@ export default function ReviewPage() {
                         />
                       ) : (
                         <input
-                          className="mt-2 h-11 w-full rounded-md border border-black/10 bg-white px-3 text-sm outline-none transition focus:border-primary"
+                          className={`mt-2 h-11 w-full px-3 text-sm ${APPLE_INPUT_PANEL}`}
                           placeholder={placeholder}
                           value={inlineAnswer}
                           onChange={(event) => {
@@ -492,14 +510,15 @@ export default function ReviewPage() {
                         </p>
                       ) : null}
                       <div className="mt-3 flex flex-wrap gap-2">
-                        <Button
+                        <LoadingButton
                           type="button"
                           size="sm"
-                          disabled={isSubmittingInline}
+                          loading={isSubmittingInline}
+                          loadingText={`${zh.practiceCheck}...`}
                           onClick={() => void submitInlineScenePractice(item)}
                         >
                           {zh.practiceCheck}
-                        </Button>
+                        </LoadingButton>
                         <Button
                           type="button"
                           size="sm"
@@ -522,25 +541,29 @@ export default function ReviewPage() {
                     </div>
 
                     <div className="mt-3 flex flex-wrap gap-2">
-                      <Button
+                      <LoadingButton
                         type="button"
                         size="sm"
+                        loading={openingSceneHref === `/scene/${item.sceneSlug}?view=practice`}
+                        loadingText="进入场景中..."
                         onClick={() => {
-                          window.location.assign(`/scene/${item.sceneSlug}?view=practice`);
+                          openScene(`/scene/${item.sceneSlug}?view=practice`);
                         }}
                       >
                         回到场景继续练
-                      </Button>
-                      <Button
+                      </LoadingButton>
+                      <LoadingButton
                         type="button"
                         size="sm"
                         variant="outline"
+                        loading={openingSceneHref === `/scene/${item.sceneSlug}`}
+                        loadingText="进入场景中..."
                         onClick={() => {
-                          window.location.assign(`/scene/${item.sceneSlug}`);
+                          openScene(`/scene/${item.sceneSlug}`);
                         }}
                       >
                         {zh.openSourceScene}
-                      </Button>
+                      </LoadingButton>
                     </div>
                   </div>
                 );
@@ -551,81 +574,90 @@ export default function ReviewPage() {
       ) : null}
 
       {loading ? (
-        <p className="text-sm text-muted-foreground">{zh.queueLoading}</p>
+        <LoadingState text={zh.queueLoading} className="py-1" />
       ) : !current ? (
         <Card>
-          <CardContent className="py-8 text-sm text-muted-foreground">{zh.queueEmpty}</CardContent>
+          <CardContent className={`py-8 ${APPLE_META_TEXT}`}>{zh.queueEmpty}</CardContent>
         </Card>
       ) : (
-        <Card>
+        <Card className={APPLE_CARD_INTERACTIVE}>
           <CardHeader>
-            <p className="text-sm text-muted-foreground">
+            <p className={APPLE_META_TEXT}>
               {zh.trainingGuidePrefix} <ExpressionWordMark>{zh.expressionLabel}</ExpressionWordMark> {zh.trainingGuideSuffix}
             </p>
-            <p className="text-xs text-muted-foreground">{trainingHintSubtle}</p>
-            <CardTitle className="text-xl">
+            <p className={APPLE_META_TEXT}>{trainingHintSubtle}</p>
+            <CardTitle className={`text-xl ${APPLE_TITLE_MD}`}>
               <ExpressionWordMark>{zh.expressionLabel}</ExpressionWordMark>：{current.text}
             </CardTitle>
-            <p className="line-clamp-1 text-sm text-muted-foreground">
+            <p className={`line-clamp-1 ${APPLE_META_TEXT}`}>
               {current.translation ?? zh.noTranslation}
             </p>
           </CardHeader>
           <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">{zh.activeRecallHint}</p>
+            <p className={APPLE_META_TEXT}>{zh.activeRecallHint}</p>
             <Button
               type="button"
               size="sm"
               variant="ghost"
-              className="h-auto justify-start px-0 text-xs text-muted-foreground"
+              className={`h-auto justify-start px-0 text-xs ${APPLE_META_TEXT}`}
               onClick={() => setShowReference((prev) => !prev)}
             >
               {showReference ? zh.hideReference : zh.showReference}
             </Button>
             {showReference ? (
-              <div className="rounded-lg bg-muted p-3">
-                <p className="text-xs text-muted-foreground">{zh.exampleLabel}</p>
-                <p className="mt-1 text-sm">{exampleSentence}</p>
+              <div className={`p-3 ${APPLE_PANEL}`}>
+                <p className={APPLE_META_TEXT}>{zh.exampleLabel}</p>
+                <p className={`mt-1 ${APPLE_BODY_TEXT}`}>{exampleSentence}</p>
                 {current.usageNote ? (
-                  <p className="mt-2 text-xs text-muted-foreground">{current.usageNote}</p>
+                  <p className={`mt-2 ${APPLE_META_TEXT}`}>{current.usageNote}</p>
                 ) : null}
                 {current.sourceSceneSlug ? (
                   <div className="mt-3">
-                    <Button
+                    <LoadingButton
                       type="button"
                       size="sm"
                       variant="outline"
+                      loading={openingSceneHref === `/scene/${current.sourceSceneSlug}`}
+                      loadingText="进入场景中..."
                       onClick={() => {
-                        window.location.assign(`/scene/${current.sourceSceneSlug}`);
+                        openScene(`/scene/${current.sourceSceneSlug}`);
                       }}
                     >
                       {zh.openSourceScene}
-                    </Button>
+                    </LoadingButton>
                   </div>
                 ) : null}
               </div>
             ) : null}
             <div className="grid grid-cols-3 gap-2">
-              <Button
+              <LoadingButton
                 type="button"
                 variant="destructive"
-                disabled={submitting}
+                loading={submitting}
+                loadingText={`${zh.againLabel}...`}
                 onClick={() => void submit("again")}
               >
                 {zh.againLabel}
-              </Button>
-              <Button
+              </LoadingButton>
+              <LoadingButton
                 type="button"
                 variant="secondary"
-                disabled={submitting}
+                loading={submitting}
+                loadingText={`${zh.hardLabel}...`}
                 onClick={() => void submit("hard")}
               >
                 {zh.hardLabel}
-              </Button>
-              <Button type="button" disabled={submitting} onClick={() => void submit("good")}>
+              </LoadingButton>
+              <LoadingButton
+                type="button"
+                loading={submitting}
+                loadingText={`${zh.goodLabel}...`}
+                onClick={() => void submit("good")}
+              >
                 {zh.goodLabel}
-              </Button>
+              </LoadingButton>
             </div>
-            <p className="text-[11px] text-muted-foreground">
+            <p className={APPLE_META_TEXT}>
               {zh.reviewStats} {current.reviewCount}，{zh.correct} {current.correctCount}，{zh.incorrect}{" "}
               {current.incorrectCount}
             </p>

@@ -1,10 +1,19 @@
 import Link from "next/link";
-import { marketingNav } from "@/lib/constants/navigation";
 import { Wordmark } from "@/components/branding/wordmark";
+import { marketingNav } from "@/lib/constants/navigation";
+import {
+  APPLE_BUTTON_BASE,
+  APPLE_BUTTON_STRONG,
+  APPLE_BUTTON_TEXT_MD,
+  APPLE_META_TEXT,
+} from "@/lib/ui/apple-style";
+
+const primaryButtonClassName = `${APPLE_BUTTON_STRONG} ${APPLE_BUTTON_TEXT_MD} inline-flex h-8 items-center justify-center px-4`;
+const secondaryButtonClassName = `${APPLE_BUTTON_BASE} ${APPLE_BUTTON_TEXT_MD} inline-flex h-7 items-center justify-center px-2.5`;
 
 export function SiteHeader() {
   return (
-    <header className="sticky top-0 z-40 border-b border-border/60 bg-background/90 backdrop-blur">
+    <header className="sticky top-0 z-40 border-b border-[var(--app-border-soft)] bg-background/90 backdrop-blur">
       <div className="app-container flex h-16 items-center justify-between gap-4">
         <Wordmark />
         <nav className="hidden items-center gap-5 md:flex">
@@ -12,29 +21,20 @@ export function SiteHeader() {
             <Link
               key={item.href}
               href={item.href}
-              className="cursor-pointer text-sm text-muted-foreground transition hover:text-foreground"
+              className={`cursor-pointer text-sm transition hover:text-foreground ${APPLE_META_TEXT}`}
             >
               {item.title}
             </Link>
           ))}
-          <Link
-            href="/scenes"
-            className="inline-flex h-8 cursor-pointer items-center justify-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:bg-primary/90 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
-          >
+          <Link href="/scenes" className={primaryButtonClassName}>
             开始学习
           </Link>
         </nav>
         <div className="flex items-center gap-2 md:hidden">
-          <Link
-            href="/login"
-            className="inline-flex h-7 cursor-pointer items-center justify-center rounded-lg border border-border bg-background px-2.5 text-[0.8rem] font-medium transition hover:bg-muted active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
-          >
+          <Link href="/login" className={secondaryButtonClassName}>
             登录
           </Link>
-          <Link
-            href="/scenes"
-            className="inline-flex h-7 cursor-pointer items-center justify-center rounded-lg bg-primary px-2.5 text-[0.8rem] font-medium text-primary-foreground transition hover:bg-primary/90 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
-          >
+          <Link href="/scenes" className={`${APPLE_BUTTON_STRONG} ${APPLE_BUTTON_TEXT_MD} inline-flex h-7 items-center justify-center px-2.5`}>
             开始学习
           </Link>
         </div>

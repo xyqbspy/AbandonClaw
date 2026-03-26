@@ -1,16 +1,24 @@
 "use client";
 
 import { ReactNode } from "react";
-import { normalizePhraseText } from "@/lib/shared/phrases";
+import { LoadingState } from "@/components/shared/action-loading";
+import { TtsActionButton } from "@/components/audio/tts-action-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { TtsActionButton } from "@/components/audio/tts-action-button";
-import { FocusDetailRelatedItem } from "./focus-detail-selectors";
+import { normalizePhraseText } from "@/lib/shared/phrases";
+import {
+  APPLE_BODY_TEXT,
+  APPLE_LIST_ITEM,
+  APPLE_META_TEXT,
+  APPLE_PANEL,
+  APPLE_TITLE_MD,
+} from "@/lib/ui/apple-style";
 import {
   ManualExpressionAssistResponse,
   UserPhraseItemResponse,
 } from "@/lib/utils/phrases-api";
+import { FocusDetailRelatedItem } from "./focus-detail-selectors";
 
 type FocusDetailTabValue = "info" | "similar" | "contrast";
 
@@ -76,6 +84,9 @@ type FocusDetailContentProps = {
   onSaveContrastRow?: (row: FocusDetailRelatedItem) => void;
 };
 
+const APPLE_CANDIDATE_BADGE =
+  "border-[var(--app-border-soft)] bg-[var(--app-surface)] text-[var(--muted-foreground)]";
+
 export function FocusDetailContent({
   detail,
   activeAssistItem,
@@ -115,11 +126,11 @@ export function FocusDetailContent({
     const actionLabel = isSaved
       ? labels.addedThisExpression ?? labels.addThisExpression ?? "已加入"
       : isSaving
-        ? labels.addingThisExpression ?? labels.addThisExpression ?? "加入中"
+        ? labels.addingThisExpression ?? labels.addThisExpression ?? "加入中..."
         : labels.addThisExpression ?? "加入表达库";
 
     return (
-      <div key={row.key} className="w-full rounded-xl bg-[rgb(246,246,246)] p-3">
+      <div key={row.key} className={`w-full p-3 ${APPLE_LIST_ITEM}`}>
         <div className="flex items-start justify-between gap-3">
           {canOpenDetail ? (
             <button
@@ -129,11 +140,11 @@ export function FocusDetailContent({
                 kind === "similar" ? onOpenSimilarRow(row) : onOpenContrastRow(row)
               }
             >
-              <p className="text-sm font-medium">{row.text}</p>
+              <p className="text-sm font-medium text-foreground">{row.text}</p>
             </button>
           ) : (
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium">{row.text}</p>
+              <p className="text-sm font-medium text-foreground">{row.text}</p>
             </div>
           )}
 
@@ -154,12 +165,12 @@ export function FocusDetailContent({
         </div>
 
         {row.translation ? (
-          <p className="mt-1 text-xs text-muted-foreground">
+          <p className={`mt-1 ${APPLE_META_TEXT}`}>
             {kind === "similar" ? "（同类）" : "（对照）"}
             {row.translation}
           </p>
         ) : row.differenceLabel ? (
-          <p className="mt-1 text-xs text-muted-foreground">{row.differenceLabel}</p>
+          <p className={`mt-1 ${APPLE_META_TEXT}`}>{row.differenceLabel}</p>
         ) : null}
       </div>
     );
@@ -167,38 +178,42 @@ export function FocusDetailContent({
 
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col space-y-4">
-      <div className="shrink-0 rounded-2xl bg-[linear-gradient(135deg,rgb(245,247,250),rgb(234,239,244))] p-4">
+      <div className={`shrink-0 p-4 ${APPLE_PANEL}`}>
         <div className="space-y-1">
           <div className="flex items-center justify-between gap-3">
-            <p className="min-w-0 text-lg font-semibold">{detail.text}</p>
+            <p className={`min-w-0 text-lg ${APPLE_TITLE_MD}`}>{detail.text}</p>
             <div className="flex shrink-0 items-center gap-2">
               {detail.savedItem || activeAssistItem ? (
                 <TtsActionButton
                   active={isDetailSpeaking}
                   onClick={() => onSpeak(detailSpeakText)}
-                  className="h-auto px-0 text-xs text-muted-foreground hover:text-foreground"
+                  className={`h-auto px-0 ${APPLE_META_TEXT} hover:text-foreground`}
                   iconClassName="size-4"
                   label={labels.speakSentence}
                 />
               ) : null}
-              {!detail.savedItem ? <Badge variant="outline">{labels.candidateBadge}</Badge> : null}
+              {!detail.savedItem ? (
+                <Badge variant="outline" className={APPLE_CANDIDATE_BADGE}>
+                  {labels.candidateBadge}
+                </Badge>
+              ) : null}
             </div>
           </div>
-          <p className="text-sm text-muted-foreground">
+          <p className={`text-sm ${APPLE_META_TEXT}`}>
             {retryingEnrichment
               ? labels.enriching
-              : detail.savedItem?.translation ?? activeAssistItem?.translation ?? labels.noTranslation}
+              : detail.savedItem?.translation ??
+                activeAssistItem?.translation ??
+                labels.noTranslation}
           </p>
         </div>
         {detail.differenceLabel ? (
-          <p className="mt-2 text-xs text-muted-foreground">{detail.differenceLabel}</p>
+          <p className={`mt-2 ${APPLE_META_TEXT}`}>{detail.differenceLabel}</p>
         ) : null}
       </div>
 
-      {focusDetailLoading ? <p className="text-sm text-muted-foreground">{labels.loading}</p> : null}
-      {retryingEnrichment ? (
-        <p className="text-sm text-muted-foreground">{labels.enriching}</p>
-      ) : null}
+      {focusDetailLoading ? <LoadingState text={labels.loading} /> : null}
+      {retryingEnrichment ? <LoadingState text={labels.enriching} /> : null}
 
       <Tabs
         value={focusDetailTab}
@@ -226,51 +241,51 @@ export function FocusDetailContent({
                 ].map((title) => (
                   <div
                     key={title}
-                    className="space-y-2 rounded-xl bg-[rgb(246,246,246)] p-3"
+                    className={`space-y-2 p-3 ${APPLE_LIST_ITEM}`}
                     aria-label={`${title}补全中`}
                   >
-                    <p className="text-xs text-muted-foreground">{title}</p>
+                    <p className={APPLE_META_TEXT}>{title}</p>
                     <div className="space-y-2 animate-pulse">
-                      <div className="h-3 w-5/6 rounded bg-[rgb(225,228,232)]" />
-                      <div className="h-3 w-2/3 rounded bg-[rgb(225,228,232)]" />
+                      <div className="h-3 w-5/6 rounded bg-[var(--app-surface-hover)]" />
+                      <div className="h-3 w-2/3 rounded bg-[var(--app-surface-hover)]" />
                     </div>
                   </div>
                 ))}
               </div>
             ) : (
               <div className="grid gap-3 sm:grid-cols-2">
-                <div className="space-y-1 rounded-xl bg-[rgb(246,246,246)] p-3">
-                  <p className="text-xs text-muted-foreground">{labels.commonUsage}</p>
-                  <p className="text-sm text-foreground/90">{usageHint || labels.usageHintFallback}</p>
+                <div className={`space-y-1 p-3 ${APPLE_LIST_ITEM}`}>
+                  <p className={APPLE_META_TEXT}>{labels.commonUsage}</p>
+                  <p className={APPLE_BODY_TEXT}>{usageHint || labels.usageHintFallback}</p>
                 </div>
-                <div className="space-y-1 rounded-xl bg-[rgb(246,246,246)] p-3">
-                  <p className="text-xs text-muted-foreground">{labels.typicalScenario}</p>
-                  <p className="text-sm text-foreground/90">
+                <div className={`space-y-1 p-3 ${APPLE_LIST_ITEM}`}>
+                  <p className={APPLE_META_TEXT}>{labels.typicalScenario}</p>
+                  <p className={APPLE_BODY_TEXT}>
                     {typicalScenario || labels.typicalScenarioPending}
                   </p>
                 </div>
-                <div className="space-y-1 rounded-xl bg-[rgb(246,246,246)] p-3">
-                  <p className="text-xs text-muted-foreground">{labels.semanticFocus}</p>
-                  <p className="text-sm text-foreground/90">
+                <div className={`space-y-1 p-3 ${APPLE_LIST_ITEM}`}>
+                  <p className={APPLE_META_TEXT}>{labels.semanticFocus}</p>
+                  <p className={APPLE_BODY_TEXT}>
                     {semanticFocus || labels.semanticFocusPending}
                   </p>
                 </div>
-                <div className="space-y-1 rounded-xl bg-[rgb(246,246,246)] p-3">
-                  <p className="text-xs text-muted-foreground">{labels.reviewStage}</p>
-                  <p className="text-sm text-foreground/90">{reviewHint || labels.reviewHintFallback}</p>
+                <div className={`space-y-1 p-3 ${APPLE_LIST_ITEM}`}>
+                  <p className={APPLE_META_TEXT}>{labels.reviewStage}</p>
+                  <p className={APPLE_BODY_TEXT}>{reviewHint || labels.reviewHintFallback}</p>
                 </div>
               </div>
             )}
 
             <div className="space-y-2">
-              <p className="text-xs text-muted-foreground">{labels.sourceSentence}</p>
+              <p className={APPLE_META_TEXT}>{labels.sourceSentence}</p>
               {retryingEnrichment ? (
-                <div className="rounded-xl bg-[rgb(246,246,246)] p-3 animate-pulse" aria-label="例句补全中">
-                  <div className="h-4 w-4/5 rounded bg-[rgb(225,228,232)]" />
-                  <div className="mt-2 h-3 w-2/3 rounded bg-[rgb(225,228,232)]" />
+                <div className={`animate-pulse p-3 ${APPLE_LIST_ITEM}`} aria-label="例句补全中">
+                  <div className="h-4 w-4/5 rounded bg-[var(--app-surface-hover)]" />
+                  <div className="mt-2 h-3 w-2/3 rounded bg-[var(--app-surface-hover)]" />
                 </div>
               ) : (
-                exampleCards ?? <p className="text-sm text-muted-foreground">{labels.noSourceSentence}</p>
+                exampleCards ?? <p className={APPLE_BODY_TEXT}>{labels.noSourceSentence}</p>
               )}
             </div>
           </div>
@@ -281,13 +296,13 @@ export function FocusDetailContent({
           className="mt-0 min-h-0 w-full flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-1"
         >
           <div className="space-y-2 pb-6">
-            <p className="text-xs text-muted-foreground">{labels.similarHint}</p>
+            <p className={APPLE_META_TEXT}>{labels.similarHint}</p>
             {similarRows.length > 0 ? (
               similarRows.slice(0, 12).map((row) => renderRelatedRow(row, "similar"))
             ) : isSavedRelatedLoading ? (
-              <p className="text-sm text-muted-foreground">{labels.loading}</p>
+              <LoadingState text={labels.loading} />
             ) : (
-              <p className="text-sm text-muted-foreground">{labels.emptySimilar}</p>
+              <p className={APPLE_BODY_TEXT}>{labels.emptySimilar}</p>
             )}
           </div>
         </TabsContent>
@@ -297,13 +312,13 @@ export function FocusDetailContent({
           className="mt-0 min-h-0 w-full flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-1"
         >
           <div className="space-y-2 pb-6">
-            <p className="text-xs text-muted-foreground">{labels.contrastHint}</p>
+            <p className={APPLE_META_TEXT}>{labels.contrastHint}</p>
             {contrastRows.length > 0 ? (
               contrastRows.slice(0, 12).map((row) => renderRelatedRow(row, "contrast"))
             ) : isSavedRelatedLoading ? (
-              <p className="text-sm text-muted-foreground">{labels.loading}</p>
+              <LoadingState text={labels.loading} />
             ) : (
-              <p className="text-sm text-muted-foreground">{labels.emptyContrast}</p>
+              <p className={APPLE_BODY_TEXT}>{labels.emptyContrast}</p>
             )}
           </div>
         </TabsContent>

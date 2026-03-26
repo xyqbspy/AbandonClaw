@@ -69,6 +69,7 @@ export type ScenePracticeViewLabels = {
 export type SceneVariantsViewLabels = {
   back: string;
   complete: string;
+  repeat: string;
   deleteSet: string;
   sourceScenePrefix: string;
   variantsHint: string;
@@ -158,6 +159,7 @@ export const sceneViewLabels: SceneViewLabels = {
   variants: {
     back: "返回",
     complete: "完成学习",
+    repeat: "再练变体训练",
     deleteSet: "删除变体",
     sourceScenePrefix: "来源场景：",
     variantsHint: "把这些核心表达迁移到相似语境里继续练习。",

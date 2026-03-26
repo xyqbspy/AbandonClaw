@@ -1,10 +1,15 @@
-export const LESSON_DIALOGUE_A_BG_CLASS = "bg-[rgb(246,246,246)]";
-export const LESSON_DIALOGUE_B_BG_CLASS = "bg-[rgb(210,255,152)]";
+export const LESSON_DIALOGUE_A_BG_CLASS =
+  "border border-[var(--app-border-soft)] bg-[var(--app-surface)]";
+export const LESSON_DIALOGUE_B_BG_CLASS =
+  "border border-emerald-700/12 bg-emerald-50/70";
 
-export const LESSON_DETAIL_BLOCK_BG_CLASS = "bg-[rgb(246,246,246)]";
+export const LESSON_DETAIL_BLOCK_BG_CLASS =
+  "border border-transparent bg-[var(--app-surface-subtle)]";
 
 export const LESSON_CHIP_BASE_CLASS =
-  "cursor-pointer rounded-full bg-[rgb(234,242,250)] px-2.5 py-1 text-xs transition-all duration-150";
-export const LESSON_CHIP_ACTIVE_CLASS = "bg-[rgb(210,229,244)] text-foreground";
-export const LESSON_CHIP_INACTIVE_CLASS = "text-muted-foreground hover:bg-[rgb(224,236,247)]";
-export const LESSON_CHIP_HOVER_CLASS = "bg-[rgb(224,236,247)]";
+  "cursor-pointer rounded-[var(--app-radius-pill)] border border-[var(--app-border-soft)] bg-[var(--app-surface)] px-2.5 py-1 text-xs transition-all duration-150";
+export const LESSON_CHIP_ACTIVE_CLASS =
+  "border-[var(--app-border-strong)] bg-[var(--app-surface-hover)] text-foreground";
+export const LESSON_CHIP_INACTIVE_CLASS =
+  "text-[var(--muted-foreground)] hover:bg-[var(--app-surface-hover)]";
+export const LESSON_CHIP_HOVER_CLASS = "bg-[var(--app-surface-hover)]";

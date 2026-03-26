@@ -13,6 +13,7 @@ afterEach(() => {
 const labels = {
   back: "返回",
   complete: "完成学习",
+  repeat: "再练变体训练",
   deleteSet: "删除变体",
   sourceScenePrefix: "来源场景：",
   variantsHint: "把这些核心表达迁移到相似语境里继续练习。",
@@ -202,7 +203,7 @@ test("SceneVariantsView 在变体集已完成时会显示再练入口", () => {
     />,
   );
 
-  fireEvent.click(screen.getByRole("button", { name: "再练一遍" }));
+  fireEvent.click(screen.getByRole("button", { name: labels.repeat }));
 
   assert.deepEqual(events, ["repeat"]);
   assert.equal(screen.queryByRole("button", { name: labels.complete }), null);

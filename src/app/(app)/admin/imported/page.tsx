@@ -7,7 +7,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { listAdminScenes } from "@/lib/server/admin/service";
-import { APPLE_BUTTON_BASE, APPLE_BUTTON_TEXT_SM } from "@/lib/ui/apple-style";
+import {
+  APPLE_BUTTON_BASE,
+  APPLE_BUTTON_TEXT_SM,
+  APPLE_META_TEXT,
+  APPLE_TABLE_HEAD,
+  APPLE_TABLE_ROW,
+  APPLE_TITLE_SM,
+} from "@/lib/ui/apple-style";
 
 const LABELS = {
   eyebrow: "\u7ba1\u7406\u540e\u53f0",
@@ -58,7 +65,7 @@ export default async function AdminImportedScenesPage({
 
       <AdminTableShell>
         <table className="min-w-full text-sm">
-          <thead className="bg-muted/40 text-left text-xs text-muted-foreground">
+          <thead className={`${APPLE_TABLE_HEAD} text-left text-xs`}>
             <tr>
               <th className="px-3 py-2">title</th>
               <th className="px-3 py-2">slug</th>
@@ -70,22 +77,22 @@ export default async function AdminImportedScenesPage({
           </thead>
           <tbody>
             {result.rows.map((row) => (
-              <tr key={row.id} className="align-top">
+              <tr key={row.id} className={`${APPLE_TABLE_ROW} align-top`}>
                 <td className="px-3 py-2">
                   <Link
                     href={`/admin/scenes/${row.id}`}
-                    className="text-foreground underline-offset-2 hover:underline"
+                    className={`${APPLE_TITLE_SM} underline-offset-2 hover:underline`}
                   >
                     {row.title}
                   </Link>
                 </td>
-                <td className="px-3 py-2 font-mono text-xs">{row.slug}</td>
+                <td className={`px-3 py-2 font-mono ${APPLE_META_TEXT}`}>{row.slug}</td>
                 <td className="px-3 py-2">
                   <Badge variant="outline">{row.origin}</Badge>
                 </td>
                 <td className="px-3 py-2">{row.is_public ? "true" : "false"}</td>
-                <td className="px-3 py-2 font-mono text-xs">{row.created_by ?? "-"}</td>
-                <td className="px-3 py-2 whitespace-nowrap">{row.created_at}</td>
+                <td className={`px-3 py-2 font-mono ${APPLE_META_TEXT}`}>{row.created_by ?? "-"}</td>
+                <td className={`px-3 py-2 whitespace-nowrap ${APPLE_META_TEXT}`}>{row.created_at}</td>
               </tr>
             ))}
             {result.rows.length === 0 ? (

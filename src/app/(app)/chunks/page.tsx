@@ -17,13 +17,9 @@ import { generateExpressionMapFromApi } from "@/lib/utils/expression-map-api";
 import { ExpressionCluster, ExpressionMapResponse } from "@/lib/types/expression-map";
 import {
   enrichSimilarExpressionFromApi,
-  enrichSimilarExpressionsBatchFromApi,
-  generateManualExpressionAssistFromApi,
-  generateSimilarExpressionsFromApi,
   ManualExpressionAssistResponse,
   PhraseReviewStatus,
   savePhrasesBatchFromApi,
-  SimilarExpressionCandidateResponse,
   savePhraseFromApi,
   UserPhraseItemResponse,
 } from "@/lib/utils/phrases-api";
@@ -31,6 +27,7 @@ import { startReviewSession } from "@/lib/utils/review-session";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { EmptyState } from "@/components/shared/empty-state";
+import { formatLoadingText, LoadingButton, LoadingState } from "@/components/shared/action-loading";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -59,7 +56,14 @@ import {
   toggleMoveIntoClusterGroupSelection,
 } from "@/features/chunks/expression-clusters/ui-logic";
 import {
+  APPLE_BANNER_DANGER,
+  APPLE_BANNER_INFO,
   APPLE_BUTTON_BASE,
+  APPLE_BUTTON_STRONG,
+  APPLE_INPUT_PANEL,
+  APPLE_LIST_ITEM,
+  APPLE_META_TEXT,
+  APPLE_PANEL,
   APPLE_BUTTON_TEXT_SM,
   APPLE_SURFACE,
 } from "@/lib/ui/apple-style";
@@ -115,13 +119,6 @@ import {
   notifyChunksLoadFailed,
   notifyChunksMissingExpression,
   notifyChunksMissingSentence,
-  notifyChunksNoSourceSentence,
-  notifyChunksQuickAddCopyFailed,
-  notifyChunksQuickAddCopySuccess,
-  notifyChunksRegenerateAudioFailed,
-  notifyChunksRegenerateAudioSuccess,
-  notifyChunksRetryEnrichmentFailed,
-  notifyChunksRetryEnrichmentSuccess,
   notifyChunksReviewFamilyStarted,
   notifyChunksReviewStarted,
   notifyChunksSelectAtLeastOne,
@@ -187,7 +184,7 @@ const SIMILAR_LABEL_FALLBACK = [
   zh.diffRelated,
 ];
 const appleButtonClassName = `${APPLE_BUTTON_BASE} ${APPLE_BUTTON_TEXT_SM}`;
-
+const appleButtonStrongClassName = `${APPLE_BUTTON_STRONG} ${APPLE_BUTTON_TEXT_SM}`;
 const normalizeSimilarLabel = (label: string | null | undefined) => {
   const trimmed = (label ?? "").trim();
   if (!trimmed) return zh.diffRelated;
@@ -311,7 +308,7 @@ const renderExampleSentenceCards = (
   return (
     <div className="space-y-2">
       {examples.map((example, index) => (
-        <div key={`${example.en}-${index}`} className="rounded-xl bg-[rgb(246,246,246)] p-3">
+        <div key={`${example.en}-${index}`} className={`p-3 ${APPLE_LIST_ITEM}`}>
           <div className="flex items-start justify-between gap-3">
             <p className="min-w-0 flex-1 text-sm text-foreground/90">
               {renderSentenceWithExpressionHighlight(example.en, expression)}
@@ -321,13 +318,13 @@ const renderExampleSentenceCards = (
                 active={options.isSpeakingText?.(example.en) ?? false}
                 loading={options.isLoadingText?.(example.en) ?? false}
                 onClick={() => options.onSpeak?.(example.en)}
-                className="mt-0.5 h-auto shrink-0 px-0 text-xs text-muted-foreground hover:text-foreground"
+                className={`mt-0.5 h-auto shrink-0 px-0 ${APPLE_META_TEXT} hover:text-foreground`}
                 iconClassName="size-4"
                 label={zh.speakSentence}
               />
             ) : null}
           </div>
-          <p className="mt-1 text-xs text-muted-foreground">{example.zh}</p>
+          <p className={`mt-1 ${APPLE_META_TEXT}`}>{example.zh}</p>
         </div>
       ))}
     </div>
@@ -340,16 +337,6 @@ type FocusDetailState = {
   kind: "current" | "library-similar" | "suggested-similar" | "contrast";
   savedItem: UserPhraseItemResponse | null;
   assistItem: ManualExpressionAssistResponse["inputItem"] | null;
-};
-
-type FocusDetailTabValue = "info" | "similar" | "contrast";
-
-type FocusDetailTrailItem = {
-  userPhraseId: string | null;
-  text: string;
-  differenceLabel?: string | null;
-  kind: FocusDetailState["kind"];
-  tab: FocusDetailTabValue;
 };
 
 type FocusDetailConfirmAction = "set-cluster-main" | "set-standalone-main";
@@ -377,7 +364,6 @@ export default function ChunksPage() {
   const [playingText, setPlayingText] = useState<string | null>(null);
   const searchParams = useSearchParams();
   const {
-    routeState,
     query,
     setQuery,
     reviewFilter,
@@ -403,6 +389,7 @@ export default function ChunksPage() {
   const [activeClusterId, setActiveClusterId] = useState<string | null>(null);
   const [addingCluster, setAddingCluster] = useState(false);
   const [mapOpeningForId, setMapOpeningForId] = useState<string | null>(null);
+  const [openingSourceSceneSlug, setOpeningSourceSceneSlug] = useState<string | null>(null);
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
   const [expandedCardIds, setExpandedCardIds] = useState<Record<string, boolean>>({});
   const [expandedSimilarIds, setExpandedSimilarIds] = useState<Record<string, boolean>>({});
@@ -454,7 +441,7 @@ export default function ChunksPage() {
     };
   }, [quickAddRelatedOpen]);
 
-  const { loading, phrases, setPhrases, total, listDataSource, loadPhrases } = useChunksListData({
+  const { loading, phrases, setPhrases, total, loadPhrases } = useChunksListData({
     query,
     reviewFilter,
     contentFilter,
@@ -681,7 +668,7 @@ export default function ChunksPage() {
     onLoadFailed: (message) => {
       notifyChunksLoadFailed(message);
     },
-    onCandidateSaved: async ({ focusItem, candidate, kind }) => {
+    onCandidateSaved: async ({ focusItem }) => {
       await loadPhrases(query, reviewFilter, contentFilter, expressionClusterFilterId, {
         preferCache: false,
       });
@@ -744,7 +731,6 @@ export default function ChunksPage() {
     focusDetailOpen,
     setFocusDetailOpen,
     focusDetailLoading,
-    setFocusDetailLoading,
     focusDetail,
     setFocusDetail,
     focusDetailTab,
@@ -800,7 +786,6 @@ export default function ChunksPage() {
     manualExpressionAssist,
     manualAssistLoading,
     manualSelectedMap,
-    savingManualExpression,
     clearManualExpressionAssist,
     resetManualExpressionComposer,
     toggleManualSelected,
@@ -1307,6 +1292,12 @@ export default function ChunksPage() {
         expressions: asReviewSessionExpressions([mapSourceExpression]),
       });
     }
+  };
+
+  const openSourceScene = (slug: string) => {
+    if (!slug || openingSourceSceneSlug === slug) return;
+    setOpeningSourceSceneSlug(slug);
+    router.push(`/scene/${slug}`);
   };
 
   const handleAddClusterToReview = async () => {
@@ -1818,18 +1809,18 @@ export default function ChunksPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className={`flex flex-wrap items-center justify-between gap-3 p-3 ${APPLE_PANEL}`}>
         <div className="relative w-full max-w-sm">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            className="pl-9"
+            className={`${APPLE_INPUT_PANEL} pl-9`}
             placeholder={zh.searchPlaceholder}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
           />
         </div>
         <div className="flex items-center gap-2">
-          <p className="text-xs text-muted-foreground">{summary}</p>
+          <p className={APPLE_META_TEXT}>{summary}</p>
           <Button
             type="button"
             size="sm"
@@ -1842,14 +1833,14 @@ export default function ChunksPage() {
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-2">
+      <div className={`flex flex-wrap gap-2 p-2 ${APPLE_PANEL}`}>
         <Button
           type="button"
           size="sm"
           variant="ghost"
-          className={`${appleButtonClassName} ${
-            contentFilter === "expression"
-              ? "bg-[rgb(32,44,60)] text-white hover:bg-[rgb(25,36,50)]"
+            className={`${appleButtonClassName} ${
+              contentFilter === "expression"
+              ? appleButtonStrongClassName
               : ""
           }`}
           onClick={() => {
@@ -1863,9 +1854,9 @@ export default function ChunksPage() {
           type="button"
           size="sm"
           variant="ghost"
-          className={`${appleButtonClassName} ${
-            contentFilter === "sentence"
-              ? "bg-[rgb(32,44,60)] text-white hover:bg-[rgb(25,36,50)]"
+            className={`${appleButtonClassName} ${
+              contentFilter === "sentence"
+              ? appleButtonStrongClassName
               : ""
           }`}
           onClick={() => {
@@ -1878,14 +1869,14 @@ export default function ChunksPage() {
       </div>
 
       {contentFilter === "expression" ? (
-        <div className="flex flex-wrap gap-2">
+        <div className={`flex flex-wrap gap-2 p-2 ${APPLE_PANEL}`}>
           <Button
             type="button"
             size="sm"
             variant="ghost"
             className={`${appleButtonClassName} ${
               expressionViewMode === "focus"
-                ? "bg-[rgb(32,44,60)] text-white hover:bg-[rgb(25,36,50)]"
+                ? appleButtonStrongClassName
                 : ""
             }`}
             onClick={() => setExpressionViewMode("focus")}
@@ -1898,7 +1889,7 @@ export default function ChunksPage() {
             variant="ghost"
             className={`${appleButtonClassName} ${
               expressionViewMode === "list"
-                ? "bg-[rgb(32,44,60)] text-white hover:bg-[rgb(25,36,50)]"
+                ? appleButtonStrongClassName
                 : ""
             }`}
             onClick={() => setExpressionViewMode("list")}
@@ -1909,7 +1900,7 @@ export default function ChunksPage() {
       ) : null}
 
       {!(contentFilter === "expression" && expressionViewMode === "focus") ? (
-        <div className="flex flex-wrap gap-2">
+        <div className={`flex flex-wrap gap-2 p-2 ${APPLE_PANEL}`}>
           {[
             { key: "all", label: zh.tabs.all },
             { key: "saved", label: zh.tabs.saved },
@@ -1923,7 +1914,7 @@ export default function ChunksPage() {
               variant="ghost"
               className={`${appleButtonClassName} ${
                 reviewFilter === tab.key
-                  ? "bg-[rgb(32,44,60)] text-white hover:bg-[rgb(25,36,50)]"
+                  ? appleButtonStrongClassName
                   : ""
               }`}
               onClick={() => setReviewFilter(tab.key as PhraseReviewStatus | "all")}
@@ -1935,8 +1926,8 @@ export default function ChunksPage() {
       ) : null}
 
       {expressionClusterFilterId ? (
-        <div className="flex flex-wrap items-center gap-2 rounded-lg bg-[rgb(246,246,246)] px-3 py-2">
-          <p className="text-xs text-muted-foreground">{zh.viewingClusterFilter}</p>
+        <div className={`flex flex-wrap items-center gap-2 px-3 py-2 ${APPLE_PANEL}`}>
+          <p className={APPLE_META_TEXT}>{zh.viewingClusterFilter}</p>
           {clusterFilterExpressionLabel ? (
             <p className="text-xs text-foreground/90">
               {zh.filteredClusterPrefix}
@@ -1950,11 +1941,11 @@ export default function ChunksPage() {
         </div>
       ) : null}
 
-      {loading ? (
-        <p className="text-sm text-muted-foreground">{zh.listLoading}</p>
-      ) : phrases.length === 0 ? (
-        <EmptyState title={zh.emptyTitle} description={zh.emptyDesc} />
-      ) : contentFilter === "expression" && expressionViewMode === "focus" && focusExpression ? (
+        {loading ? (
+          <LoadingState text={zh.listLoading} className="py-2" />
+        ) : phrases.length === 0 ? (
+          <EmptyState title={zh.emptyTitle} description={zh.emptyDesc} />
+        ) : contentFilter === "expression" && expressionViewMode === "focus" && focusExpression ? (
         <div className="space-y-4">
           <ClusterFocusList
             ready={focusRelationsBootstrapDone}
@@ -2010,7 +2001,7 @@ export default function ChunksPage() {
 
         </div>
       ) : (
-        <ChunksListView
+          <ChunksListView
           phrases={phrases}
           clusterMembersByClusterId={clusterMembersByClusterId}
           expandedSimilarIds={expandedSimilarIds}
@@ -2019,10 +2010,11 @@ export default function ChunksPage() {
           savedSentenceExpressionKeys={savedSentenceExpressionKeys}
           retryingEnrichmentIds={retryingEnrichmentIds}
           reviewStatusLabel={reviewStatusLabel}
-          savingSentenceExpressionKey={savingSentenceExpressionKey}
-          generatingSimilarForId={generatingSimilarForId}
-          mapOpeningForId={mapOpeningForId}
-          playingText={playingText}
+            savingSentenceExpressionKey={savingSentenceExpressionKey}
+            generatingSimilarForId={generatingSimilarForId}
+            mapOpeningForId={mapOpeningForId}
+            openingSourceSceneSlug={openingSourceSceneSlug}
+            playingText={playingText}
           ttsPlaybackText={ttsPlaybackState.text}
           ttsLoadingText={ttsPlaybackState.status === "loading" ? ttsPlaybackState.text : null}
           appleButtonClassName={appleButtonClassName}
@@ -2088,7 +2080,7 @@ export default function ChunksPage() {
           openExpressionComposerFromSentence={openExpressionComposerFromSentence}
           startReviewFromCard={startReviewFromCard}
           openExpressionMap={openExpressionMap}
-          openSourceScene={(slug) => router.push(`/scene/${slug}`)}
+            openSourceScene={openSourceScene}
           retryAiEnrichment={retryAiEnrichment}
           applyClusterFilter={applyClusterFilter}
           openGenerateSimilarSheet={openGenerateSimilarSheet}
@@ -2102,14 +2094,17 @@ export default function ChunksPage() {
           if (!open && !savingManual) resetManualForm();
         }}
       >
-        <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto rounded-t-2xl border-0 bg-white">
-          <SheetHeader>
+        <SheetContent
+          side="bottom"
+          className={`max-h-[85vh] overflow-y-auto rounded-t-2xl border border-[var(--app-border-soft)] bg-background ${APPLE_PANEL}`}
+        >
+          <SheetHeader className="space-y-1 px-4 pb-3 pt-4">
             <SheetTitle>{manualSheetState.title}</SheetTitle>
             <SheetDescription>{manualSheetState.description}</SheetDescription>
           </SheetHeader>
-          <div className="space-y-4 px-4 pb-2">
+          <div className="space-y-4 px-4 pb-4">
             <div className="space-y-1">
-              <p className="text-xs text-muted-foreground">{manualSheetState.itemTypeLabel}</p>
+              <p className={APPLE_META_TEXT}>{manualSheetState.itemTypeLabel}</p>
               <Tabs
                 value={manualItemType}
                 onValueChange={(value) =>
@@ -2130,8 +2125,9 @@ export default function ChunksPage() {
             {manualItemType === "expression" ? (
               <div className="space-y-3 pt-1">
                 <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">{zh.expressionTextLabel}</p>
+                  <p className={APPLE_META_TEXT}>{zh.expressionTextLabel}</p>
                   <Input
+                    className={APPLE_INPUT_PANEL}
                     value={manualText}
                     onChange={(event) => {
                       setManualText(event.target.value);
@@ -2140,18 +2136,20 @@ export default function ChunksPage() {
                     placeholder={zh.expressionTextPlaceholder}
                   />
                 </div>
-                <Button
+                <LoadingButton
                   type="button"
                   variant="ghost"
                   className={appleButtonClassName}
-                  disabled={manualAssistLoading || !manualText.trim()}
+                  disabled={!manualText.trim()}
+                  loading={manualAssistLoading}
+                  loadingText={formatLoadingText(zh.generatingSuggestions)}
                   onClick={() => void loadManualExpressionAssist(manualText)}
                 >
-                  {manualAssistLoading ? `${zh.generatingSuggestions}...` : zh.findMoreRelated}
-                </Button>
+                  {zh.findMoreRelated}
+                </LoadingButton>
                 {manualExpressionAssist ? (
-                  <div className="space-y-3 rounded-xl bg-[rgb(246,246,246)] p-3">
-                    <div className="space-y-1 rounded-lg bg-white p-3">
+                  <div className={`space-y-3 p-3 ${APPLE_PANEL}`}>
+                    <div className={`space-y-1 p-3 ${APPLE_LIST_ITEM}`}>
                       <label className="flex cursor-pointer items-start gap-2">
                         <input
                           type="checkbox"
@@ -2160,15 +2158,15 @@ export default function ChunksPage() {
                           onChange={() => toggleManualSelected(manualExpressionAssist.inputItem.text)}
                         />
                         <div className="space-y-1">
-                          <p className="text-xs text-muted-foreground">{zh.currentInputCard}</p>
+                          <p className={APPLE_META_TEXT}>{zh.currentInputCard}</p>
                           <p className="text-sm font-medium">{manualExpressionAssist.inputItem.text}</p>
                           {manualExpressionAssist.inputItem.translation ? (
-                            <p className="text-xs text-muted-foreground">
+                            <p className={APPLE_META_TEXT}>
                               {manualExpressionAssist.inputItem.translation}
                             </p>
                           ) : null}
                           {manualExpressionAssist.inputItem.usageNote ? (
-                            <p className="text-xs text-muted-foreground">
+                            <p className={APPLE_META_TEXT}>
                               {manualExpressionAssist.inputItem.usageNote}
                             </p>
                           ) : null}
@@ -2191,12 +2189,12 @@ export default function ChunksPage() {
                     </div>
 
                     <div className="space-y-2">
-                      <p className="text-xs text-muted-foreground">{zh.similarExpressionsAuto}</p>
+                      <p className={APPLE_META_TEXT}>{zh.similarExpressionsAuto}</p>
                       {manualExpressionAssist.similarExpressions.length > 0 ? (
                         manualExpressionAssist.similarExpressions.map((candidate) => (
                           <label
                             key={`similar-${candidate.text}`}
-                            className="flex cursor-pointer items-start gap-2 rounded-lg bg-white p-3"
+                            className={`flex cursor-pointer items-start gap-2 p-3 ${APPLE_LIST_ITEM}`}
                           >
                             <input
                               type="checkbox"
@@ -2206,24 +2204,24 @@ export default function ChunksPage() {
                             />
                             <div className="space-y-0.5">
                               <p className="text-sm font-medium">{candidate.text}</p>
-                              <p className="text-xs text-muted-foreground">
+                              <p className={APPLE_META_TEXT}>
                                 {normalizeSimilarLabel(candidate.differenceLabel)}
                               </p>
                             </div>
                           </label>
                         ))
                       ) : (
-                        <p className="text-xs text-muted-foreground">{zh.similarEmpty}</p>
+                        <p className={APPLE_META_TEXT}>{zh.similarEmpty}</p>
                       )}
                     </div>
 
                     <div className="space-y-2">
-                      <p className="text-xs text-muted-foreground">{zh.contrastExpressionsAuto}</p>
+                      <p className={APPLE_META_TEXT}>{zh.contrastExpressionsAuto}</p>
                       {manualExpressionAssist.contrastExpressions.length > 0 ? (
                         manualExpressionAssist.contrastExpressions.map((candidate) => (
                           <label
                             key={`contrast-${candidate.text}`}
-                            className="flex cursor-pointer items-start gap-2 rounded-lg bg-white p-3"
+                            className={`flex cursor-pointer items-start gap-2 p-3 ${APPLE_LIST_ITEM}`}
                           >
                             <input
                               type="checkbox"
@@ -2233,12 +2231,12 @@ export default function ChunksPage() {
                             />
                             <div className="space-y-0.5">
                               <p className="text-sm font-medium">{candidate.text}</p>
-                              <p className="text-xs text-muted-foreground">{candidate.differenceLabel}</p>
+                              <p className={APPLE_META_TEXT}>{candidate.differenceLabel}</p>
                             </div>
                           </label>
                         ))
                       ) : (
-                        <p className="text-xs text-muted-foreground">{zh.noContrastExpressions}</p>
+                        <p className={APPLE_META_TEXT}>{zh.noContrastExpressions}</p>
                       )}
                     </div>
                   </div>
@@ -2247,44 +2245,47 @@ export default function ChunksPage() {
             ) : (
               <div className="space-y-3 pt-1">
                 <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">{zh.sentenceMainLabel}</p>
+                  <p className={APPLE_META_TEXT}>{zh.sentenceMainLabel}</p>
                   <Textarea
+                    className={APPLE_INPUT_PANEL}
                     value={manualSentence}
                     onChange={(event) => setManualSentence(event.target.value)}
                     rows={4}
                     placeholder={zh.sentenceMainPlaceholder}
                   />
-                  <p className="text-[11px] text-muted-foreground">{zh.sentenceAutoHint}</p>
+                  <p className={APPLE_META_TEXT}>{zh.sentenceAutoHint}</p>
                 </div>
               </div>
             )}
           </div>
 
-          <SheetFooter>
+          <SheetFooter className="px-4 pt-3 pb-[calc(env(safe-area-inset-bottom)+12px)]">
             <div
               className={`grid gap-2 pb-safe ${
                 manualSheetState.footerGridClassName
               }`}
             >
-              <Button
+              <LoadingButton
                 type="button"
                 variant="ghost"
-                className={appleButtonClassName}
-                disabled={manualSheetState.isSaving}
+                className={appleButtonStrongClassName}
+                loading={manualSheetState.isSaving}
+                loadingText={formatLoadingText(manualSheetState.primaryActionLabel)}
                 onClick={() => void handleSaveManualExpression("save")}
               >
                 {manualSheetState.primaryActionLabel}
-              </Button>
+              </LoadingButton>
               {manualSheetState.showSecondaryAction ? (
-                <Button
+                <LoadingButton
                   type="button"
                   variant="ghost"
                   className={appleButtonClassName}
-                  disabled={manualSheetState.isSaving}
+                  loading={manualSheetState.isSaving}
+                  loadingText={formatLoadingText(manualSheetState.secondaryActionLabel)}
                   onClick={() => void handleSaveManualExpression("save_and_review")}
                 >
                   {manualSheetState.secondaryActionLabel}
-                </Button>
+                </LoadingButton>
               ) : null}
             </div>
           </SheetFooter>
@@ -2303,45 +2304,46 @@ export default function ChunksPage() {
         <SheetContent
           side="bottom"
           overlayClassName="z-[80]"
-          className="z-[81] max-h-[85vh] overflow-y-auto rounded-t-2xl border-0 bg-white"
+          className={`z-[81] max-h-[85vh] overflow-y-auto rounded-t-2xl border border-[var(--app-border-soft)] bg-background ${APPLE_PANEL}`}
         >
-          <SheetHeader>
+          <SheetHeader className="space-y-1 px-4 pb-3 pt-4">
             <SheetTitle>{zh.quickAddRelatedTitle}</SheetTitle>
             <SheetDescription>{zh.quickAddRelatedDesc}</SheetDescription>
           </SheetHeader>
 
-          <div className="space-y-4 px-4 pb-2">
+          <div className="space-y-4 px-4 pb-4">
             <button
               type="button"
-              className="w-full rounded-xl bg-[rgb(246,246,246)] p-3 text-left transition hover:bg-[rgb(238,240,242)]"
+              className={`w-full p-3 text-left transition ${APPLE_LIST_ITEM}`}
               onClick={() => void handleCopyQuickAddTarget()}
             >
               <div className="space-y-1">
                 <div className="flex items-center justify-between gap-3">
-                  <p className="text-xs text-muted-foreground">{zh.quickAddTargetLabel}</p>
-                  <p className="text-xs text-muted-foreground">{zh.quickAddCopyTarget}</p>
+                  <p className={APPLE_META_TEXT}>{zh.quickAddTargetLabel}</p>
+                  <p className={APPLE_META_TEXT}>{zh.quickAddCopyTarget}</p>
                 </div>
                 <p className="text-sm font-medium">{focusExpression?.text ?? ""}</p>
               </div>
             </button>
 
             <div className="space-y-1">
-              <p className="text-xs text-muted-foreground">{zh.quickAddTextLabel}</p>
+              <p className={APPLE_META_TEXT}>{zh.quickAddTextLabel}</p>
               <Input
+                className={APPLE_INPUT_PANEL}
                 ref={quickAddRelatedInputRef}
                 value={quickAddRelatedText}
                 onChange={(event) => setQuickAddRelatedText(event.target.value)}
                 placeholder={zh.quickAddTextPlaceholder}
               />
               {quickAddRelatedValidationMessage ? (
-                <p className="text-xs text-[rgb(185,28,28)]">{quickAddRelatedValidationMessage}</p>
+                <p className={APPLE_BANNER_DANGER}>{quickAddRelatedValidationMessage}</p>
               ) : quickAddRelatedLibraryHint ? (
-                <p className="text-xs text-[rgb(8,99,117)]">{quickAddRelatedLibraryHint}</p>
+                <p className={APPLE_BANNER_INFO}>{quickAddRelatedLibraryHint}</p>
               ) : null}
             </div>
 
             <div className="space-y-1">
-              <p className="text-xs text-muted-foreground">{zh.quickAddRelationTypeLabel}</p>
+              <p className={APPLE_META_TEXT}>{zh.quickAddRelationTypeLabel}</p>
               <Tabs
                 value={quickAddRelatedType}
                 onValueChange={(value) =>
@@ -2360,21 +2362,22 @@ export default function ChunksPage() {
             </div>
           </div>
 
-          <SheetFooter>
+          <SheetFooter className="px-4 pt-3 pb-[calc(env(safe-area-inset-bottom)+12px)]">
             <div className="grid gap-2 pb-safe">
-              <Button
+              <LoadingButton
                 type="button"
                 variant="ghost"
-                className={appleButtonClassName}
+                className={appleButtonStrongClassName}
                 disabled={
-                  savingQuickAddRelated ||
                   !quickAddRelatedText.trim() ||
                   Boolean(quickAddRelatedValidationMessage)
                 }
+                loading={savingQuickAddRelated}
+                loadingText={formatLoadingText(zh.quickAddSubmit)}
                 onClick={() => void handleSaveQuickAddRelated()}
               >
-                {savingQuickAddRelated ? `${zh.quickAddSubmit}...` : zh.quickAddSubmit}
-              </Button>
+                {zh.quickAddSubmit}
+              </LoadingButton>
             </div>
           </SheetFooter>
         </SheetContent>
@@ -2389,24 +2392,27 @@ export default function ChunksPage() {
           }
         }}
       >
-        <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto rounded-t-2xl border-0 bg-white">
-          <SheetHeader>
+        <SheetContent
+          side="bottom"
+          className={`max-h-[85vh] overflow-y-auto rounded-t-2xl border border-[var(--app-border-soft)] bg-background ${APPLE_PANEL}`}
+        >
+          <SheetHeader className="space-y-1 px-4 pb-3 pt-4">
             <SheetTitle>{generatedSimilarSheetState.title}</SheetTitle>
             <SheetDescription>{generatedSimilarSheetState.description}</SheetDescription>
           </SheetHeader>
 
-          <div className="space-y-3 px-4 pb-2">
+          <div className="space-y-3 px-4 pb-4">
             {generatedSimilarSheetState.showSeedExpression ? (
-              <div className="rounded-lg bg-[rgb(246,246,246)] p-2.5">
-                <p className="text-xs text-muted-foreground">{generatedSimilarSheetState.centerExpressionLabel}</p>
+              <div className={`p-2.5 ${APPLE_PANEL}`}>
+                <p className={APPLE_META_TEXT}>{generatedSimilarSheetState.centerExpressionLabel}</p>
                 <p className="text-sm font-medium">{similarSeedExpression?.text ?? ""}</p>
               </div>
             ) : null}
             {generatedSimilarSheetState.showGenerating ? (
-              <p className="text-sm text-muted-foreground">{generatedSimilarSheetState.generatingLabel}</p>
+              <p className={`text-sm ${APPLE_META_TEXT}`}>{generatedSimilarSheetState.generatingLabel}</p>
             ) : null}
             {generatedSimilarSheetState.showEmpty ? (
-              <p className="text-sm text-muted-foreground">{generatedSimilarSheetState.emptyLabel}</p>
+              <p className={`text-sm ${APPLE_META_TEXT}`}>{generatedSimilarSheetState.emptyLabel}</p>
             ) : null}
             {generatedSimilarSheetState.showCandidates ? (
               <div className="space-y-2">
@@ -2414,7 +2420,7 @@ export default function ChunksPage() {
                   const normalized = normalizePhraseText(candidate.text);
                   const checked = Boolean(selectedSimilarMap[normalized]);
                   return (
-                    <label key={normalized} className="flex cursor-pointer items-start gap-2 rounded-lg bg-[rgb(246,246,246)] p-2.5">
+                    <label key={normalized} className={`flex cursor-pointer items-start gap-2 p-2.5 ${APPLE_LIST_ITEM}`}>
                       <input
                         type="checkbox"
                         className="mt-0.5"
@@ -2423,7 +2429,7 @@ export default function ChunksPage() {
                       />
                       <div className="space-y-0.5">
                         <p className="text-sm font-medium">{candidate.text}</p>
-                        <p className="text-xs text-muted-foreground">
+                        <p className={APPLE_META_TEXT}>
                           {normalizeSimilarLabel(candidate.differenceLabel)}
                         </p>
                       </div>
@@ -2434,20 +2440,22 @@ export default function ChunksPage() {
             ) : null}
           </div>
 
-          <SheetFooter>
+          <SheetFooter className="px-4 pt-3 pb-[calc(env(safe-area-inset-bottom)+12px)]">
             <div className="grid grid-cols-2 gap-2 pb-safe">
               <Button type="button" variant="ghost" className={appleButtonClassName} onClick={() => setSimilarSheetOpen(false)}>
                 {generatedSimilarSheetState.closeLabel}
               </Button>
-              <Button
+              <LoadingButton
                 type="button"
                 variant="ghost"
-                className={appleButtonClassName}
-                disabled={generatedSimilarSheetState.submitDisabled}
+                className={appleButtonStrongClassName}
+                disabled={generatingSimilarForId !== null}
+                loading={savingSelectedSimilar}
+                loadingText={formatLoadingText(generatedSimilarSheetState.submitLabel)}
                 onClick={() => void saveSelectedSimilarCandidates()}
               >
                 {generatedSimilarSheetState.submitLabel}
-              </Button>
+              </LoadingButton>
             </div>
           </SheetFooter>
         </SheetContent>

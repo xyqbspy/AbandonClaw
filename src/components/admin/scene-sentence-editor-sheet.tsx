@@ -4,11 +4,27 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { updateSceneSentencesAction } from "@/app/(app)/admin/actions";
+import { LoadingButton } from "@/components/shared/action-loading";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
-import { APPLE_BUTTON_BASE, APPLE_BUTTON_TEXT_SM, APPLE_INPUT_BASE } from "@/lib/ui/apple-style";
+import {
+  APPLE_BUTTON_BASE,
+  APPLE_BUTTON_TEXT_SM,
+  APPLE_INPUT_BASE,
+  APPLE_META_TEXT,
+  APPLE_PANEL,
+  APPLE_SURFACE,
+  APPLE_TITLE_SM,
+} from "@/lib/ui/apple-style";
 
 type EditableSentence = {
   sentenceId: string;
@@ -141,23 +157,21 @@ export function SceneSentenceEditorSheet({
 
           <div className="space-y-5 px-4 py-4">
             {draftSections.map((section, sectionIndex) => (
-              <section key={section.sectionId} className="space-y-3 rounded-2xl border border-border/60 p-4">
+              <section key={section.sectionId} className={`space-y-3 p-4 ${APPLE_SURFACE}`}>
                 <div className="space-y-1">
-                  <p className="text-sm font-medium">
+                  <p className={APPLE_TITLE_SM}>
                     Section {sectionIndex + 1}
                     {section.title ? ` · ${section.title}` : ""}
                   </p>
-                  <p className="text-xs text-muted-foreground">
-                    这里修改的是句子正文、翻译、TTS 文本和 chunks。保存后会清掉该场景的线上音频缓存。
+                  <p className={APPLE_META_TEXT}>
+                    这里修改的是句子正文、翻译、TTS 文本和 chunks。保存后会清理该场景的线上音频缓存。
                   </p>
                 </div>
 
                 {section.blocks.map((block, blockIndex) => (
-                  <div key={block.blockId} className="space-y-3 rounded-xl bg-muted/30 p-3">
-                    <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                      <span>Block {blockIndex + 1}</span>
-                      <span>{block.type}</span>
-                      <span>speaker: {block.speaker ?? "-"}</span>
+                  <div key={block.blockId} className={`space-y-3 p-3 ${APPLE_PANEL} rounded-xl`}>
+                    <div className={APPLE_META_TEXT}>
+                      Block {blockIndex + 1} · {block.type} · speaker: {block.speaker ?? "-"}
                     </div>
 
                     {block.sentences.map((sentence, sentenceIndex) => (
@@ -165,14 +179,13 @@ export function SceneSentenceEditorSheet({
                         key={sentence.sentenceId}
                         className="space-y-2 rounded-xl border border-border/60 bg-background p-3"
                       >
-                        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                          <span>Sentence {sentenceIndex + 1}</span>
-                          <span>ID: {sentence.sentenceId}</span>
-                          <span>speaker: {sentence.speaker ?? block.speaker ?? "-"}</span>
+                        <div className={APPLE_META_TEXT}>
+                          Sentence {sentenceIndex + 1} · ID: {sentence.sentenceId} · speaker:{" "}
+                          {sentence.speaker ?? block.speaker ?? "-"}
                         </div>
 
                         <div className="space-y-1">
-                          <label className="text-xs text-muted-foreground">英文句子</label>
+                          <label className={APPLE_META_TEXT}>英文句子</label>
                           <Textarea
                             value={sentence.text}
                             onChange={(event) =>
@@ -183,7 +196,7 @@ export function SceneSentenceEditorSheet({
                         </div>
 
                         <div className="space-y-1">
-                          <label className="text-xs text-muted-foreground">中文翻译</label>
+                          <label className={APPLE_META_TEXT}>中文翻译</label>
                           <Textarea
                             value={sentence.translation}
                             onChange={(event) =>
@@ -194,7 +207,7 @@ export function SceneSentenceEditorSheet({
                         </div>
 
                         <div className="space-y-1">
-                          <label className="text-xs text-muted-foreground">TTS 文本</label>
+                          <label className={APPLE_META_TEXT}>TTS 文本</label>
                           <Input
                             value={sentence.tts}
                             onChange={(event) =>
@@ -205,7 +218,7 @@ export function SceneSentenceEditorSheet({
                         </div>
 
                         <div className="space-y-1">
-                          <label className="text-xs text-muted-foreground">Chunks（每行一个）</label>
+                          <label className={APPLE_META_TEXT}>Chunks（每行一个）</label>
                           <Textarea
                             value={sentence.chunks.join("\n")}
                             onChange={(event) =>
@@ -235,14 +248,15 @@ export function SceneSentenceEditorSheet({
             >
               取消
             </Button>
-            <Button
+            <LoadingButton
               type="button"
               className={`${APPLE_BUTTON_BASE} ${APPLE_BUTTON_TEXT_SM}`}
               onClick={handleSave}
-              disabled={isPending}
+              loading={isPending}
+              loadingText="保存中..."
             >
-              {isPending ? "保存中..." : "保存并清理音频"}
-            </Button>
+              保存并清理音频
+            </LoadingButton>
           </SheetFooter>
         </SheetContent>
       </Sheet>

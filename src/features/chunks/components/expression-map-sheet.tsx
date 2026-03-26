@@ -1,5 +1,6 @@
 "use client";
 
+import { formatLoadingText, LoadingButton } from "@/components/shared/action-loading";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -10,6 +11,15 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import {
+  APPLE_BANNER_DANGER,
+  APPLE_BUTTON_STRONG,
+  APPLE_BODY_TEXT,
+  APPLE_LIST_ITEM,
+  APPLE_META_TEXT,
+  APPLE_PANEL,
+  APPLE_TITLE_MD,
+} from "@/lib/ui/apple-style";
 import { ExpressionCluster, ExpressionMapResponse } from "@/lib/types/expression-map";
 
 type ExpressionMapSheetLabels = {
@@ -49,6 +59,10 @@ type ExpressionMapSheetProps = {
   onAddCluster: () => void;
 };
 
+const APPLE_STATUS_BADGE =
+  "border-[var(--app-border-soft)] bg-[var(--app-surface-subtle)] text-foreground";
+const APPLE_UNKNOWN_BADGE =
+  "border-[var(--app-border-soft)] bg-[var(--app-surface)] text-[var(--muted-foreground)]";
 export function ExpressionMapSheet({
   open,
   loading,
@@ -70,17 +84,20 @@ export function ExpressionMapSheet({
 }: ExpressionMapSheetProps) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto rounded-t-2xl border-0 bg-white">
-        <SheetHeader>
-          <SheetTitle>{labels.title}</SheetTitle>
+      <SheetContent
+        side="bottom"
+        className={`max-h-[85vh] overflow-y-auto rounded-t-2xl border border-[var(--app-border-soft)] bg-background ${APPLE_PANEL}`}
+      >
+        <SheetHeader className="space-y-1 px-4 pb-3 pt-4">
+          <SheetTitle className={APPLE_TITLE_MD}>{labels.title}</SheetTitle>
           <SheetDescription>{labels.description}</SheetDescription>
         </SheetHeader>
 
-        <div className="space-y-4 px-4 pb-2">
-          {loading ? <p className="text-sm text-muted-foreground">{labels.loading}</p> : null}
-          {!loading && error ? <p className="text-sm text-destructive">{error}</p> : null}
+        <div className="space-y-4 px-4 pb-4">
+          {loading ? <p className={APPLE_BODY_TEXT}>{labels.loading}</p> : null}
+          {!loading && error ? <p className={APPLE_BANNER_DANGER}>{error}</p> : null}
           {!loading && !error && data?.clusters.length === 0 ? (
-            <p className="text-sm text-muted-foreground">{labels.empty}</p>
+            <p className={APPLE_BODY_TEXT}>{labels.empty}</p>
           ) : null}
 
           {!loading && !error && data?.clusters.length ? (
@@ -94,7 +111,7 @@ export function ExpressionMapSheet({
                     variant="ghost"
                     className={`${appleButtonClassName} ${
                       activeClusterId === cluster.id
-                        ? "bg-[rgb(32,44,60)] text-white hover:bg-[rgb(25,36,50)]"
+                        ? APPLE_BUTTON_STRONG
                         : ""
                     }`}
                     onClick={() => onSelectCluster(cluster.id)}
@@ -105,40 +122,51 @@ export function ExpressionMapSheet({
               </div>
 
               {activeCluster ? (
-                <div className="space-y-3 rounded-xl bg-[rgb(246,246,246)] p-3">
+                <div className={`space-y-3 p-3 ${APPLE_PANEL}`}>
                   <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground">{labels.centerExpression}</p>
-                    <p className="text-sm font-medium">{centerExpressionText || activeCluster.anchor}</p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className={APPLE_META_TEXT}>{labels.centerExpression}</p>
+                    <p className="text-sm font-medium text-foreground">
+                      {centerExpressionText || activeCluster.anchor}
+                    </p>
+                    <p className={APPLE_META_TEXT}>
                       {labels.clusterMeaning}：{activeCluster.meaning}
                     </p>
                   </div>
 
-                  <p className="text-xs text-muted-foreground">{labels.relatedExpressions}</p>
+                  <p className={APPLE_META_TEXT}>{labels.relatedExpressions}</p>
                   <div className="space-y-2">
                     {displayedClusterExpressions.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">{labels.clusterEmpty}</p>
+                      <p className={APPLE_BODY_TEXT}>{labels.clusterEmpty}</p>
                     ) : (
                       displayedClusterExpressions.map((text) => {
                         const normalized = text.trim().toLowerCase();
                         const status = expressionStatusByNormalized.get(normalized);
                         const statusText = status ?? labels.statusUnknown;
-                        const note = buildDifferenceNote(centerExpressionText || activeCluster.anchor, text);
+                        const note = buildDifferenceNote(
+                          centerExpressionText || activeCluster.anchor,
+                          text,
+                        );
                         return (
-                          <div key={text} className="rounded-lg bg-[rgb(246,246,246)] p-2.5">
+                          <div key={text} className={`p-2.5 ${APPLE_LIST_ITEM}`}>
                             <div className="flex items-center justify-between gap-2">
-                              <p className="text-sm font-medium">{text}</p>
-                              <Badge variant={status ? "secondary" : "outline"}>{statusText}</Badge>
+                              <p className="text-sm font-medium text-foreground">{text}</p>
+                              <Badge
+                                variant={status ? "secondary" : "outline"}
+                                className={status ? APPLE_STATUS_BADGE : APPLE_UNKNOWN_BADGE}
+                              >
+                                {statusText}
+                              </Badge>
                             </div>
-                            <p className="mt-1 text-xs text-muted-foreground">{note}</p>
+                            <p className={`mt-1 ${APPLE_META_TEXT}`}>{note}</p>
                           </div>
                         );
                       })
                     )}
                   </div>
                   {activeCluster.expressions.length > displayedClusterExpressions.length ? (
-                    <p className="text-xs text-muted-foreground">
-                      {labels.mapLimitedPrefix} {displayedClusterExpressions.length} {labels.mapLimitedSuffix}
+                    <p className={APPLE_META_TEXT}>
+                      {labels.mapLimitedPrefix} {displayedClusterExpressions.length}{" "}
+                      {labels.mapLimitedSuffix}
                     </p>
                   ) : null}
                 </div>
@@ -147,17 +175,35 @@ export function ExpressionMapSheet({
           ) : null}
         </div>
 
-        <SheetFooter>
+        <SheetFooter className="px-4 pt-3 pb-[calc(env(safe-area-inset-bottom)+12px)]">
           <div className="grid grid-cols-3 gap-2 pb-safe">
-            <Button type="button" variant="ghost" className={appleButtonClassName} onClick={() => onOpenChange(false)}>
+            <Button
+              type="button"
+              variant="ghost"
+              className={appleButtonClassName}
+              onClick={() => onOpenChange(false)}
+            >
               {labels.close}
             </Button>
-            <Button type="button" variant="ghost" className={appleButtonClassName} onClick={onPracticeCluster}>
+            <Button
+              type="button"
+              variant="ghost"
+              className={appleButtonClassName}
+              onClick={onPracticeCluster}
+            >
               {labels.practiceCluster}
             </Button>
-            <Button type="button" variant="ghost" className={appleButtonClassName} disabled={addingCluster} onClick={onAddCluster}>
-              {addingCluster ? `${labels.addCluster}...` : labels.addCluster}
-            </Button>
+            <LoadingButton
+              type="button"
+              variant="ghost"
+              className={appleButtonClassName}
+              disabled={addingCluster}
+              loading={addingCluster}
+              loadingText={formatLoadingText(labels.addCluster)}
+              onClick={onAddCluster}
+            >
+              {labels.addCluster}
+            </LoadingButton>
           </div>
         </SheetFooter>
       </SheetContent>

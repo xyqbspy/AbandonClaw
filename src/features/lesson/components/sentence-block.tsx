@@ -6,6 +6,7 @@ import { LessonSentence } from "@/lib/types";
 import { TtsActionButton } from "@/components/audio/tts-action-button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { APPLE_BODY_TEXT, APPLE_META_TEXT, APPLE_PANEL } from "@/lib/ui/apple-style";
 
 const normalizeSpeaker = (speaker?: string) => (speaker ?? "").trim().toUpperCase();
 const isPrimarySpeaker = (speaker?: string) => normalizeSpeaker(speaker) === "A";
@@ -63,8 +64,8 @@ export function SentenceBlock({
       className={cn(
         "transition-colors duration-150",
         showSpeaker
-          ? "rounded-lg px-2 py-2.5 hover:bg-muted/35"
-          : "space-y-3 border border-border/70 p-4 hover:border-primary/30 sm:p-5",
+          ? `rounded-[var(--app-radius-panel)] px-2 py-2.5 hover:bg-[var(--app-surface-hover)]`
+          : `space-y-3 rounded-[var(--app-radius-card)] border border-[var(--app-border-soft)] p-4 hover:border-[var(--app-border-strong)] sm:p-5`,
         mobileTapEnabled &&
           "cursor-pointer active:scale-[0.998] active:border-primary/40",
         showSpeaker && isPrimarySpeaker(sentence.speaker) && "sm:mr-14",
@@ -74,8 +75,8 @@ export function SentenceBlock({
         if (mobileTapEnabled) onSentenceTap?.(sentence.id);
       }}
     >
-      <div className="mb-1 flex items-center justify-end gap-3 text-xs text-muted-foreground">
-        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+      <div className={`mb-1 flex items-center justify-end gap-3 text-xs ${APPLE_META_TEXT}`}>
+        <div className={`flex items-center gap-3 text-xs ${APPLE_META_TEXT}`}>
           <button
             type="button"
             className="inline-flex cursor-pointer items-center gap-1 transition-colors hover:text-foreground"
@@ -92,7 +93,7 @@ export function SentenceBlock({
             loading={loading}
             variant="ghost"
             size="sm"
-            className="h-auto px-0 text-muted-foreground hover:text-foreground"
+            className={`h-auto px-0 ${APPLE_META_TEXT} hover:text-foreground`}
             onClick={(event) => {
               event.stopPropagation();
               onPronounce?.(getSentenceSpeakText(sentence));
@@ -117,7 +118,7 @@ export function SentenceBlock({
             data-sentence-text={sentence.text}
             data-sentence-translation={sentence.translation}
             className={cn(
-              "cursor-text text-[1.04rem] leading-relaxed sm:text-lg",
+              `cursor-text text-[1.04rem] leading-relaxed ${APPLE_BODY_TEXT} sm:text-lg`,
               mobileTapEnabled && "selection:bg-primary/20",
             )}
           >
@@ -130,7 +131,7 @@ export function SentenceBlock({
           data-sentence-text={sentence.text}
           data-sentence-translation={sentence.translation}
           className={cn(
-            "cursor-text text-[1.04rem] leading-relaxed sm:text-lg",
+            `cursor-text text-[1.04rem] leading-relaxed ${APPLE_BODY_TEXT} sm:text-lg`,
             mobileTapEnabled && "selection:bg-primary/20",
           )}
         >
@@ -144,7 +145,7 @@ export function SentenceBlock({
           translationOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
         )}
       >
-        <p className="min-h-0 rounded-md bg-muted/35 px-3 py-2 text-sm text-muted-foreground">
+        <p className={`min-h-0 rounded-[var(--app-radius-panel)] px-3 py-2 ${APPLE_META_TEXT} ${APPLE_PANEL}`}>
           {translationText}
         </p>
       </div>

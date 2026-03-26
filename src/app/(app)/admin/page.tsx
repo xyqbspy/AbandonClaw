@@ -8,7 +8,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireAdmin } from "@/lib/server/auth";
 import { getAdminOverviewStats } from "@/lib/server/admin/service";
-import { APPLE_BUTTON_BASE, APPLE_BUTTON_TEXT_SM, APPLE_SURFACE } from "@/lib/ui/apple-style";
+import {
+  APPLE_BUTTON_BASE,
+  APPLE_BUTTON_TEXT_SM,
+  APPLE_CARD_INTERACTIVE,
+  APPLE_META_TEXT,
+  APPLE_TITLE_MD,
+} from "@/lib/ui/apple-style";
 
 const LABELS = {
   eyebrow: "\u5185\u90e8\u5de5\u5177",
@@ -124,11 +130,11 @@ export default async function AdminHomePage({
       <div className="grid gap-3 sm:grid-cols-2">
         {entries.map((entry) => (
           <Link key={entry.href} href={entry.href} className="block">
-            <Card className={`${APPLE_SURFACE} transition-colors hover:bg-[rgb(242,242,242)]`}>
+            <Card className={APPLE_CARD_INTERACTIVE}>
               <CardHeader>
-                <CardTitle>{entry.title}</CardTitle>
+                <CardTitle className={APPLE_TITLE_MD}>{entry.title}</CardTitle>
               </CardHeader>
-              <CardContent className="text-sm text-muted-foreground">{entry.description}</CardContent>
+              <CardContent className={APPLE_META_TEXT}>{entry.description}</CardContent>
             </Card>
           </Link>
         ))}

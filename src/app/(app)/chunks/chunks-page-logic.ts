@@ -481,8 +481,8 @@ export const buildManualSheetState = ({
     itemTypeLabel: labels.itemTypeLabel,
     isSaving,
     footerGridClassName: manualItemType === "sentence" ? "grid-cols-1" : "grid-cols-2",
-    primaryActionLabel: isSaving ? `${primaryIdleLabel}...` : primaryIdleLabel,
-    secondaryActionLabel: isSaving ? `${labels.saveAndReview}...` : labels.saveAndReview,
+    primaryActionLabel: primaryIdleLabel,
+    secondaryActionLabel: labels.saveAndReview,
     showSecondaryAction: manualItemType === "expression",
   };
 };
@@ -514,7 +514,7 @@ export const buildGeneratedSimilarSheetState = ({
   generatingLabel: `${labels.generating}...`,
   emptyLabel: labels.empty,
   closeLabel: labels.close,
-  submitLabel: savingSelectedSimilar ? `${labels.submit}...` : labels.submit,
+  submitLabel: labels.submit,
   showSeedExpression: Boolean(similarSeedExpression),
   showGenerating: Boolean(generatingSimilarForId),
   showEmpty: !generatingSimilarForId && generatedSimilarCandidates.length === 0,

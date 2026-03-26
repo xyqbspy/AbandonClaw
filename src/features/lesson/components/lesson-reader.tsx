@@ -51,9 +51,13 @@ import {
   stopTtsPlayback,
 } from "@/lib/utils/tts-api";
 import {
+  APPLE_BODY_TEXT,
   APPLE_BUTTON_BASE,
   APPLE_BUTTON_TEXT_LG,
   APPLE_BUTTON_TEXT_SM,
+  APPLE_META_TEXT,
+  APPLE_PANEL,
+  APPLE_PANEL_RAISED,
   APPLE_SURFACE,
 } from "@/lib/ui/apple-style";
 import {
@@ -120,6 +124,7 @@ export function LessonReader({
     sentence: LessonSentence;
     chunkText: string;
     blockId?: string;
+    source?: "direct" | "related";
   }) => void;
   onSentencePracticeComplete?: (payload: {
     lesson: Lesson;
@@ -495,7 +500,11 @@ export function LessonReader({
   );
 
   const activateChunk = useCallback(
-    (sentenceId: string, chunkText: string, options?: { openSheet?: boolean }) => {
+    (
+      sentenceId: string,
+      chunkText: string,
+      options?: { openSheet?: boolean; source?: "direct" | "related" },
+    ) => {
       const sentence = findSentenceById(sentenceId);
       if (!sentence) return;
       const ownerBlock = blockOrder.find((block) =>
@@ -534,6 +543,7 @@ export function LessonReader({
         sentence,
         chunkText: realChunk,
         blockId: ownerBlock?.id,
+        source: options?.source ?? "direct",
       });
       if (ownerBlock) {
         setActiveBlockId(ownerBlock.id);
@@ -1047,8 +1057,8 @@ export function LessonReader({
           >
             <article
               className={cn(
-                "rounded-lg px-3 py-2.5 transition-colors",
-                "hover:bg-muted/20",
+                "rounded-[var(--app-radius-card)] px-3 py-2.5 transition-colors",
+                "hover:bg-[var(--app-surface-hover)]",
                 isBlockActive && "ring-1 ring-primary/35",
                 primarySpeaker ? LESSON_DIALOGUE_A_BG_CLASS : LESSON_DIALOGUE_B_BG_CLASS,
               )}
@@ -1092,7 +1102,7 @@ export function LessonReader({
                 })}
               </div>
 
-              <div className="mt-1 flex items-center gap-2 text-[11px] text-muted-foreground/60">
+              <div className={`mt-1 flex items-center gap-2 text-[11px] ${APPLE_META_TEXT}`}>
                 <button
                   type="button"
                   className={cn(
@@ -1123,7 +1133,7 @@ export function LessonReader({
               </div>
 
               {translationOpen ? (
-                <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                <p className={`mt-2 leading-6 ${APPLE_META_TEXT}`}>
                   {blockTranslation || "该段翻译暂未提供。"}
                 </p>
               ) : null}
@@ -1255,12 +1265,12 @@ export function LessonReader({
                       loading={isSceneLoopLoading}
                       variant="ghost"
                       size="sm"
-                      className="h-6 px-1.5 text-[10px] text-muted-foreground/80"
+                      className={`h-6 px-1.5 text-[10px] ${APPLE_META_TEXT}`}
                       iconClassName="size-3"
                       onClick={toggleSceneLoopPlayback}
                     />
                   </div>
-                  <p className="text-[10px] leading-4 whitespace-nowrap text-muted-foreground/80">
+                  <p className={`text-[10px] leading-4 whitespace-nowrap ${APPLE_META_TEXT}`}>
                     {sceneMetaLabel}
                   </p>
                   {headerTools ? (
@@ -1279,7 +1289,7 @@ export function LessonReader({
                 {lesson.title}
               </h1>
               {isMobile ? null : (
-                <p className="max-w-2xl text-sm text-muted-foreground sm:text-base">
+                <p className={`max-w-2xl ${APPLE_META_TEXT} sm:text-base`}>
                   {lesson.subtitle}
                 </p>
               )}
@@ -1288,7 +1298,7 @@ export function LessonReader({
               ) : null}
               {!isMobile ? (
                 <>
-                  <p className="text-sm text-muted-foreground">{sceneMetaLabel}</p>
+                  <p className={APPLE_META_TEXT}>{sceneMetaLabel}</p>
                   <div className="flex flex-wrap gap-2">
                     <LoopActionButton
                       active={isSceneLooping}
@@ -1311,7 +1321,7 @@ export function LessonReader({
                     />
                     {headerTools}
                   </div>
-                  <p className="text-xs text-muted-foreground">
+                  <p className={`text-xs ${APPLE_META_TEXT}`}>
                     {appCopy.lesson.prompt}
                   </p>
                 </>
@@ -1355,12 +1365,12 @@ export function LessonReader({
                       <div
                         key={groupKey}
                         className={cn(
-                          "rounded-lg px-2 py-1 transition-colors duration-150",
+                          "rounded-[var(--app-radius-panel)] px-2 py-1 transition-colors duration-150",
                           groupSelected
                             ? "bg-accent/12"
                             : active
-                              ? "bg-muted/8"
-                              : "hover:bg-muted/20",
+                              ? "bg-[var(--app-surface-subtle)]"
+                              : "hover:bg-[var(--app-surface-hover)]",
                         )}
                       >
                         <div className="px-1.5 py-0.5">
@@ -1378,7 +1388,7 @@ export function LessonReader({
                                   "inline-flex cursor-pointer items-center gap-1 text-[11px] leading-none transition-colors active:opacity-70",
                                   groupSelected
                                     ? "text-primary/80 hover:text-primary/95"
-                                    : "text-muted-foreground/70 hover:text-muted-foreground",
+                                    : `${APPLE_META_TEXT} hover:text-foreground`,
                                 )}
                                 onClick={(event) => {
                                   event.stopPropagation();
@@ -1400,7 +1410,7 @@ export function LessonReader({
                                   "h-auto px-0 text-[11px] leading-none",
                                   groupSelected
                                     ? "text-primary/80 hover:text-primary/95"
-                                    : "text-muted-foreground/70 hover:text-muted-foreground",
+                                    : `${APPLE_META_TEXT} hover:text-foreground`,
                                 )}
                                 iconClassName="size-3"
                                 onClick={(event) => {
@@ -1416,7 +1426,7 @@ export function LessonReader({
                                 translationOpen ? "mb-2 grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
                               )}
                             >
-                              <p className="min-h-0 rounded-sm bg-muted/35 px-2.5 py-1.5 text-[13px] leading-6 text-muted-foreground">
+                              <p className={`min-h-0 rounded-[var(--app-radius-panel)] px-2.5 py-1.5 text-[13px] leading-6 ${APPLE_META_TEXT} ${APPLE_PANEL}`}>
                                 {groupTranslation}
                               </p>
                             </div>
@@ -1462,12 +1472,12 @@ export function LessonReader({
             <section key={section.id} className="space-y-3">
               <div className="space-y-1 px-1">
                 <h2 className="text-xl font-semibold">{section.title}</h2>
-                <p className="text-sm text-muted-foreground">{section.summary}</p>
+                <p className={APPLE_META_TEXT}>{section.summary}</p>
               </div>
               <div className="space-y-3">
                 {getSectionBlocks(section, lesson.sceneType ?? "monologue").map((block) => (
                   <div key={block.id} className="space-y-2">
-                    <article className={cn("rounded-lg px-3 py-2.5 transition-colors hover:bg-muted/20", LESSON_DIALOGUE_A_BG_CLASS)}>
+                    <article className={cn("rounded-[var(--app-radius-card)] px-3 py-2.5 transition-colors hover:bg-[var(--app-surface-hover)]", LESSON_DIALOGUE_A_BG_CLASS)}>
                       <div className="space-y-2">
                         {block.sentences.map((sentence) => (
                           <p
@@ -1483,7 +1493,7 @@ export function LessonReader({
                         ))}
                       </div>
 
-                      <div className="mt-1 flex items-center gap-2 text-[11px] text-muted-foreground/60">
+                      <div className={`mt-1 flex items-center gap-2 text-[11px] ${APPLE_META_TEXT}`}>
                         <button
                           type="button"
                           className="inline-flex cursor-pointer items-center gap-1 transition-colors hover:text-foreground"
@@ -1515,7 +1525,7 @@ export function LessonReader({
                       </div>
 
                       {dialogueBlockTranslationOpenMap[block.id] ? (
-                        <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                        <p className={`mt-2 leading-6 ${APPLE_META_TEXT}`}>
                           {block.translation?.trim() ||
                             block.sentences
                               .map((sentence) => sentence.translation?.trim())
@@ -1535,22 +1545,22 @@ export function LessonReader({
 
       {isTrainingMode && currentTrainingSentence ? (
         <div className="sticky bottom-4 z-20 lg:col-span-1">
-          <div className="rounded-2xl border border-black/8 bg-white/95 px-4 py-3 shadow-[0_10px_30px_rgba(0,0,0,0.08)] backdrop-blur">
+          <div className={`px-4 py-3 backdrop-blur ${APPLE_PANEL_RAISED}`}>
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <div className="min-w-0 space-y-1">
-                <p className="text-xs tracking-[0.08em] text-muted-foreground">当前训练句</p>
-                <p className="line-clamp-2 text-sm font-medium leading-6 text-foreground">
+                <p className={`text-xs tracking-[0.08em] ${APPLE_META_TEXT}`}>当前训练句</p>
+                <p className={`line-clamp-2 font-medium leading-6 ${APPLE_BODY_TEXT}`}>
                   {currentTrainingSentence.text}
                 </p>
                 {practicedSentenceIds.has(currentTrainingSentence.id) ? (
                   <p className="text-xs text-[rgb(21,128,61)]">这句已经练过了</p>
                 ) : null}
                 {trainingPromptSentenceId === currentTrainingSentence.id ? (
-                  <p className="text-xs text-muted-foreground">先跟读或复述一遍，再点“我练过了”。</p>
+                  <p className={`text-xs ${APPLE_META_TEXT}`}>先跟读或复述一遍，再点“我练过了”。</p>
                 ) : practicedSentenceIds.has(currentTrainingSentence.id) ? (
-                  <p className="text-xs text-muted-foreground">如果想再巩固一次，可以直接再练一遍。</p>
+                  <p className={`text-xs ${APPLE_META_TEXT}`}>如果想再巩固一次，可以直接再练一遍。</p>
                 ) : (
-                  <p className="text-xs text-muted-foreground">先听一句，再自己跟读或复述一遍。</p>
+                  <p className={`text-xs ${APPLE_META_TEXT}`}>先听一句，再自己跟读或复述一遍。</p>
                 )}
               </div>
               <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center">
@@ -1639,7 +1649,7 @@ export function LessonReader({
             onSelectRelated={(chunk) => {
               const targetSentenceId = resolveSentenceIdForChunk(chunk);
               if (!targetSentenceId) return;
-              activateChunk(targetSentenceId, chunk);
+            activateChunk(targetSentenceId, chunk, { source: "related" });
             }}
             hoveredChunkKey={state.hoveredChunkKey}
             onHoverChunk={(chunkKey) =>
@@ -1688,7 +1698,7 @@ export function LessonReader({
         onSelectRelated={(chunk) => {
           const targetSentenceId = resolveSentenceIdForChunk(chunk);
           if (!targetSentenceId) return;
-          activateChunk(targetSentenceId, chunk);
+          activateChunk(targetSentenceId, chunk, { source: "related" });
         }}
         hoveredChunkKey={state.hoveredChunkKey}
         onHoverChunk={(chunkKey) =>

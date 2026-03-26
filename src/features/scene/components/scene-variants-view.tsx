@@ -1,9 +1,17 @@
 "use client";
 
 import { ReactNode } from "react";
+import { LoadingContent } from "@/components/shared/action-loading";
 import { Lesson } from "@/lib/types";
 import { VariantSet } from "@/lib/types/learning-flow";
-import { APPLE_BUTTON_BASE, APPLE_SURFACE } from "@/lib/ui/apple-style";
+import {
+  APPLE_BUTTON_BASE,
+  APPLE_LIST_ITEM,
+  APPLE_META_TEXT,
+  APPLE_PANEL_RAISED,
+  APPLE_TITLE_MD,
+  APPLE_TITLE_SM,
+} from "@/lib/ui/apple-style";
 import { SceneVariantsViewLabels } from "./scene-view-labels";
 
 type SceneVariantsViewProps = {
@@ -47,7 +55,7 @@ export function SceneVariantsView({
 }: SceneVariantsViewProps) {
   return (
     <div className="space-y-5">
-      <section className="space-y-4 rounded-xl border-0 bg-[rgb(246,246,246)] p-4 sm:p-5">
+      <section className={`space-y-4 p-4 sm:p-5 ${APPLE_PANEL_RAISED}`}>
         <div className="flex flex-wrap items-center justify-end gap-2">
           <button
             type="button"
@@ -62,7 +70,7 @@ export function SceneVariantsView({
               className={`h-8 whitespace-nowrap ${appleButtonSmClassName}`}
               onClick={onRepeatVariants}
             >
-              再练一遍
+              {labels.repeat}
             </button>
           ) : (
             <button
@@ -84,21 +92,23 @@ export function SceneVariantsView({
           </button>
         </div>
 
-        <div className="space-y-0.5 text-sm text-muted-foreground">
+        <div className={`space-y-0.5 ${APPLE_META_TEXT}`}>
           <p>{labels.sourceScenePrefix}{baseLesson.title}</p>
           <p>{labels.variantsHint}</p>
         </div>
 
         <div className="space-y-2">
           <div className="flex items-center justify-between gap-2">
-            <h3 className="text-sm font-medium">{labels.reusedChunksTitle}</h3>
+            <h3 className={APPLE_TITLE_MD}>{labels.reusedChunksTitle}</h3>
             <button
               type="button"
-              className={`h-8 whitespace-nowrap ${APPLE_BUTTON_BASE} px-3 text-[11px] font-semibold text-muted-foreground disabled:opacity-60`}
+              className={`h-8 whitespace-nowrap ${APPLE_BUTTON_BASE} px-3 text-[11px] font-semibold ${APPLE_META_TEXT} disabled:opacity-60`}
               onClick={onOpenExpressionMap}
               disabled={!variantSet || expressionMapLoading}
             >
-              {expressionMapLoading ? labels.loadingMap : labels.openMap}
+              <LoadingContent loading={expressionMapLoading} loadingText={labels.loadingMap}>
+                {labels.openMap}
+              </LoadingContent>
             </button>
           </div>
           {variantSet?.reusedChunks?.length ? (
@@ -119,21 +129,25 @@ export function SceneVariantsView({
       </section>
 
       {!variantSet ? (
-        <p className="text-sm text-muted-foreground">{labels.empty}</p>
+        <p className={APPLE_META_TEXT}>{labels.empty}</p>
       ) : (
-        <section className={`space-y-2 rounded-xl p-4 sm:p-5 ${APPLE_SURFACE}`}>
+        <section className={`space-y-3 p-4 sm:p-5 ${APPLE_PANEL_RAISED}`}>
+          <div className="space-y-1">
+            <h3 className={APPLE_TITLE_SM}>变体列表</h3>
+            <p className={APPLE_META_TEXT}>按顺序浏览和完成本轮变体，已完成后可重新开启一轮。</p>
+          </div>
           <ul className="space-y-2">
             {variantSet.variants.map((variant) => (
               <li
                 key={variant.id}
-                className="flex items-center justify-between gap-3 rounded-lg bg-[rgb(246,246,246)] p-3 text-sm"
+                className={`flex items-center justify-between gap-3 p-3 ${APPLE_LIST_ITEM}`}
               >
                 <div className="min-w-0 flex-1">
-                  <p className="font-medium">{toVariantTitle(variant.lesson.title)}</p>
-                  <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
+                  <p className={APPLE_TITLE_SM}>{toVariantTitle(variant.lesson.title)}</p>
+                  <p className={`mt-0.5 line-clamp-2 ${APPLE_META_TEXT}`}>
                     {variant.lesson.sections[0]?.summary ?? variant.lesson.subtitle}
                   </p>
-                  <p className="mt-1 text-xs text-muted-foreground">
+                  <p className={`mt-1 ${APPLE_META_TEXT}`}>
                     {labels.statusPrefix}{toVariantStatusLabel(variant.status)}
                   </p>
                 </div>

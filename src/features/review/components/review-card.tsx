@@ -6,23 +6,30 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
+import {
+  APPLE_BODY_TEXT,
+  APPLE_CARD_INTERACTIVE,
+  APPLE_META_TEXT,
+  APPLE_PANEL,
+} from "@/lib/ui/apple-style";
 
 export function ReviewCard({ item }: { item: ReviewItem }) {
-  const dueLabel = item.due === "today" ? "今日待复习" : item.due === "saved" ? "已收藏" : "已掌握";
+  const dueLabel =
+    item.due === "today" ? "今日待复习" : item.due === "saved" ? "已收藏" : "已掌握";
 
   return (
-    <Card className="bg-card/90">
+    <Card className={APPLE_CARD_INTERACTIVE}>
       <CardHeader className="space-y-2">
         <div className="flex items-center justify-between gap-2">
           <CardTitle className="text-lg">{item.chunk}</CardTitle>
           <Badge variant="secondary">{dueLabel}</Badge>
         </div>
-        <p className="text-sm text-muted-foreground">{item.meaning}</p>
+        <p className={APPLE_META_TEXT}>{item.meaning}</p>
       </CardHeader>
       <CardContent className="space-y-3">
-        <p className="rounded-lg bg-muted p-3 text-sm">&quot;{item.contextSentence}&quot;</p>
+        <p className={`p-3 ${APPLE_PANEL} ${APPLE_BODY_TEXT}`}>&quot;{item.contextSentence}&quot;</p>
         <div className="space-y-2">
-          <p className="text-xs tracking-[0.08em] text-muted-foreground">掌握度</p>
+          <p className={APPLE_META_TEXT}>掌握度</p>
           <Progress value={item.mastery} className="h-2" />
         </div>
       </CardContent>

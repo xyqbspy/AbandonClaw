@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { APPLE_SURFACE } from "@/lib/ui/apple-style";
+import { APPLE_META_TEXT, APPLE_SURFACE, APPLE_TITLE_SM } from "@/lib/ui/apple-style";
 import { cn } from "@/lib/utils";
 
 export function StatCard({
@@ -21,12 +21,12 @@ export function StatCard({
   return (
     <Card className={cn(APPLE_SURFACE, className)}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
-        <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
+        <CardTitle className={cn(APPLE_TITLE_SM, "text-muted-foreground")}>{title}</CardTitle>
         {icon}
       </CardHeader>
       <CardContent className="space-y-1">
         <p className={cn("text-2xl font-semibold tracking-tight", valueClassName)}>{value}</p>
-        {hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
+        {hint ? <p className={APPLE_META_TEXT}>{hint}</p> : null}
       </CardContent>
     </Card>
   );

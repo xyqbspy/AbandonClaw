@@ -43,6 +43,7 @@ export function SceneBaseView({
     sentence: import("@/lib/types").LessonSentence;
     chunkText: string;
     blockId?: string;
+    source?: "direct" | "related";
   }) => void;
   onSentencePracticeComplete?: (payload: {
     lesson: Lesson;

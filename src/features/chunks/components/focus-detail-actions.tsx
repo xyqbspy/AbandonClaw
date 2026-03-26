@@ -1,7 +1,9 @@
 "use client";
 
 import { ChevronDown } from "lucide-react";
+import { LoadingContent } from "@/components/shared/action-loading";
 import { Button } from "@/components/ui/button";
+import { APPLE_PANEL_RAISED } from "@/lib/ui/apple-style";
 
 type FocusDetailActionsLabels = {
   moreActions: string;
@@ -74,6 +76,8 @@ export function FocusDetailActions({
   onRequestSetStandaloneMain,
 }: FocusDetailActionsProps) {
   if (!show) return <div />;
+  const menuItemClassName =
+    "flex w-full items-center rounded-[var(--app-radius-panel)] px-3 py-2.5 text-left text-sm text-foreground transition hover:bg-[var(--app-surface-hover)] disabled:text-muted-foreground";
 
   return (
     <div className="relative">
@@ -89,21 +93,26 @@ export function FocusDetailActions({
       </Button>
 
       {open ? (
-        <div className="absolute bottom-full left-0 z-10 mb-2 min-w-[200px] overflow-hidden rounded-2xl border border-[rgb(228,232,236)] bg-white p-1 shadow-lg">
+        <div className={`absolute bottom-full left-0 z-10 mb-2 min-w-[200px] overflow-hidden p-1 ${APPLE_PANEL_RAISED}`}>
           {canShowFindRelations ? (
             <button
               type="button"
-              className="flex w-full items-center rounded-xl px-3 py-2.5 text-left text-sm text-foreground transition hover:bg-[rgb(246,246,246)] disabled:text-muted-foreground"
+              className={menuItemClassName}
               disabled={focusAssistLoading}
               onClick={onRequestFindRelations}
             >
-              {focusAssistLoading ? `${labels.findRelations}...` : labels.findRelations}
+              <LoadingContent
+                loading={focusAssistLoading}
+                loadingText={`${labels.findRelations}...`}
+              >
+                {labels.findRelations}
+              </LoadingContent>
             </button>
           ) : null}
           {canShowManualAddRelated ? (
             <button
               type="button"
-              className="flex w-full items-center rounded-xl px-3 py-2.5 text-left text-sm text-foreground transition hover:bg-[rgb(246,246,246)] disabled:text-muted-foreground"
+              className={menuItemClassName}
               disabled={openingManualAddRelated}
               onClick={onRequestManualAddRelated}
             >
@@ -115,7 +124,7 @@ export function FocusDetailActions({
           {canShowRegenerateAudio ? (
             <button
               type="button"
-              className="flex w-full items-center rounded-xl px-3 py-2.5 text-left text-sm text-foreground transition hover:bg-[rgb(246,246,246)] disabled:text-muted-foreground"
+              className={menuItemClassName}
               disabled={regeneratingAudio}
               onClick={onRequestRegenerateAudio}
             >
@@ -127,7 +136,7 @@ export function FocusDetailActions({
           {canShowRetryEnrichment ? (
             <button
               type="button"
-              className="flex w-full items-center rounded-xl px-3 py-2.5 text-left text-sm text-foreground transition hover:bg-[rgb(246,246,246)] disabled:text-muted-foreground"
+              className={menuItemClassName}
               disabled={retryingEnrichment}
               onClick={onRequestRetryEnrichment}
             >
@@ -139,7 +148,7 @@ export function FocusDetailActions({
           {canSetCurrentClusterMain ? (
             <button
               type="button"
-              className="flex w-full items-center rounded-xl px-3 py-2.5 text-left text-sm text-foreground transition hover:bg-[rgb(246,246,246)]"
+              className="flex w-full items-center rounded-[var(--app-radius-panel)] px-3 py-2.5 text-left text-sm text-foreground transition hover:bg-[var(--app-surface-hover)]"
               disabled={!hasFocusDetailText}
               onClick={onRequestSetCurrentClusterMain}
             >
@@ -149,25 +158,31 @@ export function FocusDetailActions({
           {canMoveIntoCurrentCluster ? (
             <button
               type="button"
-              className="flex w-full items-center rounded-xl px-3 py-2.5 text-left text-sm text-foreground transition hover:bg-[rgb(246,246,246)] disabled:text-muted-foreground"
+              className={menuItemClassName}
               disabled={movingIntoCluster || ensuringMoveTargetCluster}
               onClick={onRequestMoveIntoCluster}
             >
-              {movingIntoCluster || ensuringMoveTargetCluster
-                ? `${labels.moveIntoCluster}...`
-                : labels.moveIntoCluster}
+              <LoadingContent
+                loading={movingIntoCluster || ensuringMoveTargetCluster}
+                loadingText={`${labels.moveIntoCluster}...`}
+              >
+                {labels.moveIntoCluster}
+              </LoadingContent>
             </button>
           ) : null}
           {canSetStandaloneMain ? (
             <button
               type="button"
-              className="flex w-full items-center rounded-xl px-3 py-2.5 text-left text-sm text-foreground transition hover:bg-[rgb(246,246,246)] disabled:text-muted-foreground"
+              className={menuItemClassName}
               disabled={detachingClusterMember}
               onClick={onRequestSetStandaloneMain}
             >
-              {detachingClusterMember
-                ? `${labels.detachClusterMember}...`
-                : labels.detachClusterMember}
+              <LoadingContent
+                loading={detachingClusterMember}
+                loadingText={`${labels.detachClusterMember}...`}
+              >
+                {labels.detachClusterMember}
+              </LoadingContent>
             </button>
           ) : null}
         </div>

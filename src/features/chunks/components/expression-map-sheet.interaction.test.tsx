@@ -184,6 +184,33 @@ test("ExpressionMapSheet 会处理簇切换和底部动作", () => {
   assert.equal(added, true);
 });
 
+test("ExpressionMapSheet 加入表达簇时会保持统一 loading 文案", () => {
+  render(
+    <ExpressionMapSheet
+      open
+      loading={false}
+      error={null}
+      data={data}
+      activeClusterId="cluster-1"
+      activeCluster={data.clusters[0]}
+      centerExpressionText=""
+      displayedClusterExpressions={["wear yourself out"]}
+      expressionStatusByNormalized={new Map()}
+      addingCluster
+      appleButtonClassName="btn"
+      labels={labels}
+      buildDifferenceNote={() => "差异说明"}
+      onOpenChange={() => undefined}
+      onSelectCluster={() => undefined}
+      onPracticeCluster={() => undefined}
+      onAddCluster={() => undefined}
+    />,
+  );
+
+  assert.ok(screen.getByRole("button", { name: "加入表达簇..." }));
+  assert.equal(screen.queryByRole("button", { name: "加入表达簇...." }), null);
+});
+
 test("ExpressionMapSheet 会根据 activeCluster 更新簇内容", () => {
   const { rerender } = render(
     <ExpressionMapSheet

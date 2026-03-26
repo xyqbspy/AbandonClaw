@@ -18,7 +18,16 @@ import { Input } from "@/components/ui/input";
 import { listAdminScenes } from "@/lib/server/admin/service";
 import { normalizeParsedSceneDialogue } from "@/lib/shared/scene-dialogue";
 import { ParsedScene } from "@/lib/types/scene-parser";
-import { APPLE_BUTTON_BASE, APPLE_BUTTON_DANGER, APPLE_BUTTON_TEXT_SM, APPLE_INPUT_BASE } from "@/lib/ui/apple-style";
+import {
+  APPLE_BUTTON_BASE,
+  APPLE_BUTTON_DANGER,
+  APPLE_BUTTON_TEXT_SM,
+  APPLE_INPUT_BASE,
+  APPLE_META_TEXT,
+  APPLE_TABLE_HEAD,
+  APPLE_TABLE_ROW,
+  APPLE_TITLE_SM,
+} from "@/lib/ui/apple-style";
 
 const LABELS = {
   eyebrow: "\u7ba1\u7406\u540e\u53f0",
@@ -166,7 +175,7 @@ export default async function AdminScenesPage({
 
       <AdminTableShell>
         <table className="min-w-full text-sm">
-          <thead className="bg-muted/40 text-left text-xs text-muted-foreground">
+          <thead className={`${APPLE_TABLE_HEAD} text-left text-xs`}>
             <tr>
               <th className="px-3 py-2">场景</th>
               <th className="px-3 py-2">结构</th>
@@ -178,24 +187,24 @@ export default async function AdminScenesPage({
           </thead>
           <tbody>
             {rows.map(({ row, sceneType, sectionCount, sentenceCount, editorSections }) => (
-              <tr key={row.id} className="align-top border-t border-border/40">
+              <tr key={row.id} className={`${APPLE_TABLE_ROW} align-top`}>
                 <td className="px-3 py-3">
                   <div className="space-y-1">
                     <Link
                       href={buildAdminHref(`/admin/scenes/${row.id}`, { returnTo: currentHref })}
-                      className="text-sm font-medium text-foreground underline-offset-2 hover:underline"
+                      className={`${APPLE_TITLE_SM} underline-offset-2 hover:underline`}
                     >
                       {row.title}
                     </Link>
-                    <p className="font-mono text-[11px] text-muted-foreground">{row.slug}</p>
-                    <p className="font-mono text-[11px] text-muted-foreground">owner: {row.created_by ?? "-"}</p>
+                    <p className={`font-mono ${APPLE_META_TEXT}`}>{row.slug}</p>
+                    <p className={`font-mono ${APPLE_META_TEXT}`}>owner: {row.created_by ?? "-"}</p>
                   </div>
                 </td>
                 <td className="px-3 py-3">
                   {editorSections ? (
                     <div className="space-y-1 text-xs">
                       <p>{sceneType}</p>
-                      <p className="text-muted-foreground">
+                      <p className={APPLE_META_TEXT}>
                         {sectionCount} sections / {sentenceCount} sentences
                       </p>
                     </div>
@@ -207,7 +216,7 @@ export default async function AdminScenesPage({
                   <Badge variant="outline">{row.origin}</Badge>
                 </td>
                 <td className="px-3 py-3">{row.is_public ? LABELS.public : LABELS.private}</td>
-                <td className="px-3 py-3 whitespace-nowrap text-xs text-muted-foreground">
+                <td className={`px-3 py-3 whitespace-nowrap ${APPLE_META_TEXT}`}>
                   <div>
                     {LABELS.updated}: {row.updated_at}
                   </div>

@@ -17,6 +17,13 @@ type RequestIdleCallbackFn = (
 type CancelIdleCallbackFn = (handle: number) => void;
 
 const pendingActionKeys = new Set<string>();
+const pendingActionHandles = new Map<
+  string,
+  {
+    handle: number;
+    usesIdleCallback: boolean;
+  }
+>();
 
 const isClient = () => typeof window !== "undefined";
 
@@ -42,6 +49,7 @@ export const scheduleIdleAction = (
 
   const finish = () => {
     pendingActionKeys.delete(key);
+    pendingActionHandles.delete(key);
   };
 
   const run = () => {
@@ -54,13 +62,34 @@ export const scheduleIdleAction = (
 
   const requestIdle = getRequestIdleCallback();
   if (requestIdle) {
-    requestIdle(() => {
+    const handle = requestIdle(() => {
       run();
     }, { timeout: timeoutMs });
+    pendingActionHandles.set(key, { handle, usesIdleCallback: true });
     return true;
   }
 
-  window.setTimeout(run, fallbackDelayMs);
+  const handle = window.setTimeout(run, fallbackDelayMs);
+  pendingActionHandles.set(key, { handle, usesIdleCallback: false });
+  return true;
+};
+
+export const cancelScheduledIdleAction = (key: string) => {
+  if (!isClient()) return false;
+  const pending = pendingActionHandles.get(key);
+  if (!pending) return false;
+
+  if (pending.usesIdleCallback) {
+    const cancelIdle = getCancelIdleCallback();
+    if (cancelIdle) {
+      cancelIdle(pending.handle);
+    }
+  } else {
+    window.clearTimeout(pending.handle);
+  }
+
+  pendingActionHandles.delete(key);
+  pendingActionKeys.delete(key);
   return true;
 };
 
