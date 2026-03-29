@@ -223,6 +223,8 @@ test("useSceneLearningSync 在冷却窗口内重复进入时不会重复 start",
     shouldFlushSceneLearningDelta: () => false,
     buildSceneLearningUpdatePayload: () => ({
       progressPercent: 20,
+      lastVariantIndex: undefined,
+      withPause: false,
     }),
     now: () => now,
     setTimeoutFn: () => 1,
@@ -273,6 +275,8 @@ test("useSceneLearningSync 超过冷却窗口后会重新 start", async () => {
     shouldFlushSceneLearningDelta: () => false,
     buildSceneLearningUpdatePayload: () => ({
       progressPercent: 20,
+      lastVariantIndex: undefined,
+      withPause: false,
     }),
     now: () => now,
     setTimeoutFn: () => 1,
@@ -322,6 +326,8 @@ test("useSceneLearningSync 在有新鲜学习态缓存时不会立刻重复 star
     shouldFlushSceneLearningDelta: () => false,
     buildSceneLearningUpdatePayload: () => ({
       progressPercent: 20,
+      lastVariantIndex: undefined,
+      withPause: false,
     }),
     now: () => 10_000,
     setTimeoutFn: () => 1,

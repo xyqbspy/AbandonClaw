@@ -268,14 +268,18 @@ test("ScenePracticeView 支持填空题输入并判断正确", async () => {
 });
 
 test("ScenePracticeView 会按题面挖空内容接受旧练习集里的局部答案", async () => {
+  const clozeModule = practiceSet.modules?.[0];
+  assert.ok(clozeModule);
+  const firstExercise = clozeModule.exercises[0];
+  assert.ok(firstExercise);
   const legacyPracticeSet: PracticeSet = {
     ...practiceSet,
     modules: [
       {
-        ...practiceSet.modules[0]!,
+        ...clozeModule,
         exercises: [
           {
-            ...practiceSet.modules[0]!.exercises[0]!,
+            ...firstExercise,
             answer: {
               text: "burn yourself out",
               acceptedAnswers: ["burn yourself out"],

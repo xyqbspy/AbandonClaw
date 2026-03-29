@@ -1,6 +1,6 @@
 import { normalizeParsedSceneDialogue } from "@/lib/shared/scene-dialogue";
 import { deriveDisplayedClozeAnswer, normalizePracticeAnswer } from "@/lib/shared/scene-practice-assessment";
-import { ExerciseSpec, ParsedScene } from "@/lib/types/scene-parser";
+import { ClozeSpec, ExerciseSpec, ParsedScene } from "@/lib/types/scene-parser";
 
 const toMetadataRecord = (value: unknown) =>
   value && typeof value === "object" && !Array.isArray(value)
@@ -43,9 +43,11 @@ export const normalizePracticeExercisesForScene = (
     const hasDisplaySpecificAnswer =
       normalizePracticeAnswer(displayAnswer) !== normalizePracticeAnswer(exercise.answer.text);
     const sentence = sentenceMap.get(exercise.sentenceId);
-    const chunk = exercise.chunkId
-      ? sentence?.chunks.find((item) => item.id === exercise.chunkId)
-      : sentence?.chunks[0];
+    const chunk =
+      sentence &&
+      (exercise.chunkId
+        ? sentence.chunks.find((item) => item.id === exercise.chunkId)
+        : sentence.chunks[0]);
 
     const canonicalAnswer = hasDisplaySpecificAnswer
       ? displayAnswer
@@ -61,9 +63,26 @@ export const normalizePracticeExercisesForScene = (
       Boolean(chunk?.text?.trim()) &&
       normalizePracticeAnswer(canonicalAnswer) === normalizePracticeAnswer(chunk?.text ?? "");
     const nextDisplayText =
-      shouldUseSceneChunkText && sentence
+      shouldUseSceneChunkText && sentence && chunk
         ? `${sentence.text.slice(0, chunk.start)}____${sentence.text.slice(chunk.end)}`
         : exercise.cloze?.displayText;
+    const nextCloze: ClozeSpec | undefined = (() => {
+      if (!exercise.cloze && !nextDisplayText) return undefined;
+
+      const baseDisplayText = nextDisplayText ?? exercise.cloze?.displayText;
+      if (!baseDisplayText) return undefined;
+
+      return {
+        ...exercise.cloze,
+        displayText: baseDisplayText,
+        ...(shouldUseSceneChunkText && chunk
+          ? {
+              blankStart: chunk.start,
+              blankEnd: chunk.end,
+            }
+          : {}),
+      };
+    })();
 
     return {
       ...exercise,
@@ -73,19 +92,7 @@ export const normalizePracticeExercisesForScene = (
         text: canonicalAnswer,
         acceptedAnswers,
       },
-      cloze:
-        exercise.cloze || nextDisplayText
-          ? {
-              ...exercise.cloze,
-              ...(nextDisplayText ? { displayText: nextDisplayText } : {}),
-              ...(shouldUseSceneChunkText && chunk
-                ? {
-                    blankStart: chunk.start,
-                    blankEnd: chunk.end,
-                  }
-                : {}),
-            }
-          : undefined,
+      cloze: nextCloze,
       metadata: {
         ...metadata,
         chunkText: canonicalAnswer,

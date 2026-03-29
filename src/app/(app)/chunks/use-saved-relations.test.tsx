@@ -13,6 +13,30 @@ afterEach(() => {
 });
 
 type SavedRelationsDeps = NonNullable<Parameters<typeof useSavedRelations>[0]["deps"]>;
+type PhraseRelationsCacheResult = Awaited<ReturnType<SavedRelationsDeps["getPhraseRelationsCache"]>>;
+
+const buildPhraseRelationsCacheResult = (
+  userPhraseId: string,
+  rows: UserPhraseRelationItemResponse[],
+): PhraseRelationsCacheResult => {
+  const now = Date.now();
+  return {
+    found: true,
+    isExpired: false,
+    record: {
+      schemaVersion: "chunks-relations-cache-v1",
+      key: `phrase-relations:v1:${userPhraseId}`,
+      type: "phrase_relations",
+      data: {
+        userPhraseId,
+        rows,
+      },
+      cachedAt: now,
+      lastAccessedAt: now,
+      expiresAt: now + 60_000,
+    },
+  };
+};
 
 const expressionRows: UserPhraseItemResponse[] = [
   {
@@ -286,25 +310,19 @@ test("useSavedRelations 在 onLoadFailed 回调变化时不会重复批量预热
 test("useSavedRelations 会优先复用缓存关系并跳过批量请求", async () => {
   let batchCalls = 0;
   const deps: SavedRelationsDeps = {
-    getPhraseRelationsCache: async (userPhraseId: string) => ({
-      found: true,
-      isExpired: false,
-      record: {
-        data: {
-          userPhraseId,
-          rows:
-            userPhraseId === "p1"
-              ? [
-                  {
-                    sourceUserPhraseId: userPhraseId,
-                    relationType: "similar",
-                    item: expressionRows[1],
-                  },
-                ]
-              : [],
-        },
-      },
-    }),
+    getPhraseRelationsCache: async (userPhraseId: string) =>
+      buildPhraseRelationsCacheResult(
+        userPhraseId,
+        userPhraseId === "p1"
+          ? [
+              {
+                sourceUserPhraseId: userPhraseId,
+                relationType: "similar",
+                item: expressionRows[1],
+              },
+            ]
+          : [],
+      ),
     setPhraseRelationsCache: async () => undefined,
     getPhraseRelationsBatchFromApi: async () => {
       batchCalls += 1;

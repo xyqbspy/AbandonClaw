@@ -12,6 +12,10 @@ afterEach(() => {
 
 type SceneDetailDataDeps = UseSceneDetailDataDeps;
 type LoadSceneDetailArgs = Parameters<SceneDetailDataDeps["loadSceneDetail"]>[0];
+type SceneSavedPhraseTextsCacheResult = Awaited<
+  ReturnType<SceneDetailDataDeps["getSceneSavedPhraseTextsCache"]>
+>;
+type SceneCacheSnapshotResult = ReturnType<SceneDetailDataDeps["getSceneCacheSnapshotSync"]>;
 
 const createLesson = (id: string, slug = id): Lesson => ({
   id,
@@ -25,6 +29,53 @@ const createLesson = (id: string, slug = id): Lesson => ({
   sections: [],
   explanations: [],
 });
+
+const buildSavedPhraseTextsCacheResult = (
+  sceneId: string,
+  normalizedTexts: string[],
+): SceneSavedPhraseTextsCacheResult => {
+  const now = Date.now();
+  return {
+    found: true,
+    isExpired: false,
+    record: {
+      schemaVersion: "scene-saved-phrase-texts-cache-v1",
+      key: `scene-saved-texts:v1:${sceneId}`,
+      type: "scene_saved_phrase_texts",
+      data: {
+        sceneId,
+        normalizedTexts,
+      },
+      cachedAt: now,
+      lastAccessedAt: now,
+      expiresAt: now + 60_000,
+    },
+  };
+};
+
+const buildSceneCacheSnapshotResult = (
+  slug: string,
+  lesson: Lesson,
+  isExpired = false,
+): SceneCacheSnapshotResult => {
+  const now = Date.now();
+  return {
+    found: true,
+    isExpired,
+    record: {
+      schemaVersion: "scene-cache-v3",
+      key: `scene:${slug}`,
+      type: "scene",
+      slug,
+      data: lesson,
+      version: null,
+      sourceUpdatedAt: null,
+      cachedAt: now,
+      lastAccessedAt: now,
+      expiresAt: now + 60_000,
+    },
+  };
+};
 
 test("useSceneDetailData 会先接收缓存，再被网络结果覆盖", async () => {
   const cacheLesson = createLesson("scene-cache", "scene-a");
@@ -234,16 +285,8 @@ test("useSceneDetailData 会优先回填场景已收藏短语缓存", async () =
       callbacks.onHydrateLesson(lesson, "network");
       callbacks.onStopLoading();
     },
-    getSceneSavedPhraseTextsCache: async () => ({
-      found: true,
-      isExpired: false,
-      record: {
-        data: {
-          sceneId: lesson.id,
-          normalizedTexts: ["call it a day"],
-        },
-      },
-    }),
+    getSceneSavedPhraseTextsCache: async () =>
+      buildSavedPhraseTextsCacheResult(lesson.id, ["call it a day"]),
     setSceneSavedPhraseTextsCache: async () => undefined,
     getSavedNormalizedPhraseTextsFromApi: async () => ["call it a day", "wrap up"],
     collectLessonChunkTexts: () => ["call it a day", "wrap up"],
@@ -289,16 +332,8 @@ test("useSceneDetailData 在已收藏短语缓存未过期时不会继续请求�
       callbacks.onHydrateLesson(lesson, "network");
       callbacks.onStopLoading();
     },
-    getSceneSavedPhraseTextsCache: async () => ({
-      found: true,
-      isExpired: false,
-      record: {
-        data: {
-          sceneId: lesson.id,
-          normalizedTexts: ["call it a day"],
-        },
-      },
-    }),
+    getSceneSavedPhraseTextsCache: async () =>
+      buildSavedPhraseTextsCacheResult(lesson.id, ["call it a day"]),
     setSceneSavedPhraseTextsCache: async () => undefined,
     getSavedNormalizedPhraseTextsFromApi: async () => {
       savedPhraseApiCalled = true;
@@ -332,13 +367,8 @@ test("useSceneDetailData 会同步复用本会话场景缓存做到首帧回填"
   const deps: SceneDetailDataDeps = {
     clearExpiredSceneCaches: async () => undefined,
     getSceneCache: async () => ({ found: false, isExpired: false, record: null }),
-    getSceneCacheSnapshotSync: () => ({
-      found: true,
-      isExpired: false,
-      record: {
-        data: cachedLesson,
-      },
-    }),
+    getSceneCacheSnapshotSync: () =>
+      buildSceneCacheSnapshotResult("scene-sync-cache", cachedLesson),
     getSceneDetailBySlugFromApi: async () => cachedLesson,
     setSceneCache: async () => undefined,
     getScenesFromApi: async () => [],
@@ -384,13 +414,8 @@ test("useSceneDetailData 在同步缓存已过期时也会先展示旧内容，�
   const deps: SceneDetailDataDeps = {
     clearExpiredSceneCaches: async () => undefined,
     getSceneCache: async () => ({ found: false, isExpired: false, record: null }),
-    getSceneCacheSnapshotSync: () => ({
-      found: true,
-      isExpired: true,
-      record: {
-        data: cachedLesson,
-      },
-    }),
+    getSceneCacheSnapshotSync: () =>
+      buildSceneCacheSnapshotResult("scene-stale-cache", cachedLesson, true),
     getSceneDetailBySlugFromApi: async () => networkLesson,
     setSceneCache: async () => undefined,
     getScenesFromApi: async () => [],
@@ -432,7 +457,11 @@ test("useSceneDetailData 在同步缓存已过期时也会先展示旧内容，�
     assert.equal(result.current.sceneLoading, false);
   });
 
-  resolveNetwork?.();
+  if (!resolveNetwork) {
+    throw new Error("resolveNetwork was not initialized");
+  }
+  const runResolve: () => void = resolveNetwork;
+  runResolve();
 
   await waitFor(() => {
     assert.equal(result.current.baseLesson?.id, "scene-stale-network");

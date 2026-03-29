@@ -9,7 +9,7 @@ if (typeof document === "undefined") {
   const dom = new JSDOM("<!doctype html><html><body></body></html>", {
     url: "http://localhost",
   });
-  globalThis.window = dom.window as typeof globalThis & Window;
+  globalThis.window = dom.window as unknown as typeof globalThis & Window;
   globalThis.document = dom.window.document;
   globalThis.HTMLElement = dom.window.HTMLElement;
   globalThis.Node = dom.window.Node;

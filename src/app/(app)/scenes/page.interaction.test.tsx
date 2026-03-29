@@ -159,7 +159,11 @@ test("ScenesPage 点击场景卡片时会给详情预热一个短暂完成窗口
   });
   assert.equal(routerPushCalls.length, 0);
 
-  resolveWarmup?.(true);
+  if (!resolveWarmup) {
+    throw new Error("resolveWarmup was not initialized");
+  }
+  const finishWarmup: (value: boolean) => void = resolveWarmup;
+  finishWarmup(true);
 
   await waitFor(() => {
     assert.equal(routerPushCalls.at(-1), "/scene/coffee-chat");

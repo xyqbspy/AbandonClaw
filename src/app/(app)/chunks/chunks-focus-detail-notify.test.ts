@@ -24,7 +24,7 @@ localRequire.cache[localRequire.resolve("sonner")] = {
       },
     },
   },
-};
+} as unknown as NodeJS.Module;
 
 const notify = localRequire("./chunks-focus-detail-notify.ts") as typeof import("./chunks-focus-detail-notify");
 const { chunksPageMessages: zh } = localRequire("./chunks-page-messages.ts") as typeof import("./chunks-page-messages");

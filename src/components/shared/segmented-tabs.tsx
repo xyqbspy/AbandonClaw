@@ -46,12 +46,14 @@ export function SegmentedTabsList({
   ...props
 }: TabsPrimitive.List.Props) {
   const { value } = useSegmentedTabsContext();
-  const items = React.Children.toArray(children).filter(React.isValidElement);
+  const items = React.Children.toArray(children).filter(
+    (child): child is React.ReactElement<{ value?: string }> => React.isValidElement(child),
+  );
   const itemCount = Math.max(items.length, 1);
   const activeIndex = Math.max(
     0,
     items.findIndex((child) => {
-      const childValue = child.props?.value;
+      const childValue = child.props.value;
       return typeof childValue === "string" && childValue === value;
     }),
   );

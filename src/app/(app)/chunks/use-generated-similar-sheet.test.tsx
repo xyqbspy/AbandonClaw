@@ -9,6 +9,34 @@ afterEach(() => {
   cleanup();
 });
 
+type GeneratedSimilarSheetDeps = NonNullable<Parameters<typeof useGeneratedSimilarSheet>[0]["deps"]>;
+type GeneratedSimilarCacheResult = Awaited<
+  ReturnType<GeneratedSimilarSheetDeps["getGeneratedSimilarCache"]>
+>;
+
+const buildGeneratedSimilarCacheResult = (
+  userPhraseId: string,
+  candidates: Array<{ text: string; differenceLabel: string }>,
+): GeneratedSimilarCacheResult => {
+  const now = Date.now();
+  return {
+    found: true,
+    isExpired: false,
+    record: {
+      schemaVersion: "generated-similar-cache-v1",
+      key: `generated-similar:v1:${userPhraseId}`,
+      type: "generated_similar",
+      data: {
+        userPhraseId,
+        candidates,
+      },
+      cachedAt: now,
+      lastAccessedAt: now,
+      expiresAt: now + 60_000,
+    },
+  };
+};
+
 const expressionRows: UserPhraseItemResponse[] = [
   {
     userPhraseId: "p1",
@@ -196,15 +224,10 @@ test("useGeneratedSimilarSheet 会优先复用缓存候选并跳过接口请求"
       onLoadCluster: async () => undefined,
       onApplyClusterFilter: () => undefined,
       deps: {
-        getGeneratedSimilarCache: async () => ({
-          found: true,
-          isExpired: false,
-          record: {
-            data: {
-              candidates: [{ text: "call it quits", differenceLabel: "更直接" }],
-            },
-          },
-        }),
+        getGeneratedSimilarCache: async () =>
+          buildGeneratedSimilarCacheResult("p1", [
+            { text: "call it quits", differenceLabel: "更直接" },
+          ]),
         setGeneratedSimilarCache: async () => undefined,
         generateSimilarExpressionsFromApi: async () => {
           networkCalls += 1;

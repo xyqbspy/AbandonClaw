@@ -72,7 +72,7 @@ const getScenePrefetchModule = () => {
     delete localRequire.cache[modulePath];
     scenePrefetchModule = localRequire("./scene-prefetch") as typeof scenePrefetchModule;
   }
-  return scenePrefetchModule;
+  return scenePrefetchModule!;
 };
 
 afterEach(() => {
