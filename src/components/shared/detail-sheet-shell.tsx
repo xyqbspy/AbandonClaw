@@ -83,7 +83,7 @@ export function DetailSheetShell({
         {header || showCloseButton ? (
           <header
             className={cn(
-              "shrink-0 flex items-start justify-between gap-3 px-4 pb-3 pt-3",
+              "shrink-0 flex items-start justify-between gap-[var(--mobile-adapt-space-md)] px-[var(--mobile-adapt-space-overlay)] pb-[var(--mobile-adapt-space-md)] pt-[var(--mobile-adapt-space-md)]",
               headerClassName,
             )}
           >
@@ -99,16 +99,16 @@ export function DetailSheetShell({
                 aria-label={closeLabel}
                 onClick={() => onOpenChange(false)}
               >
-                <X className="size-4" />
+                <X className="size-[var(--mobile-adapt-overlay-icon)]" />
               </Button>
             ) : null}
           </header>
         ) : null}
 
-        <div className={cn("min-h-0 flex-1 overflow-y-auto px-4 py-4", bodyClassName)}>{children}</div>
+        <div className={cn("min-h-0 flex-1 overflow-y-auto px-[var(--mobile-adapt-space-overlay)] py-[var(--mobile-adapt-space-overlay)]", bodyClassName)}>{children}</div>
 
         {footer ? (
-          <footer className={cn("shrink-0 bg-white/60 p-3", footerClassName)}>{footer}</footer>
+          <footer className={cn("shrink-0 bg-white/60 p-[var(--mobile-adapt-space-overlay)]", footerClassName)}>{footer}</footer>
         ) : null}
       </section>
     </div>,

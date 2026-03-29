@@ -31,12 +31,12 @@ export function SceneExpressionMapView({
   chunkDetailSheet,
 }: SceneExpressionMapViewProps) {
   return (
-    <div className="space-y-4">
-      <section className={`space-y-3 p-4 ${APPLE_PANEL_RAISED}`}>
-        <div className="flex items-center gap-2">
+    <div className="space-y-[var(--mobile-adapt-space-xl)]">
+      <section className={`space-y-[var(--mobile-adapt-space-md)] p-[var(--mobile-adapt-space-sheet)] ${APPLE_PANEL_RAISED}`}>
+        <div className="flex items-center gap-[var(--mobile-adapt-space-sm)]">
           <button
             type="button"
-            className={`${appleButtonSmClassName} px-3 py-1.5 text-sm`}
+            className={`${appleButtonSmClassName} px-[var(--mobile-adapt-space-md)] py-[var(--mobile-adapt-space-2xs)] text-[length:var(--mobile-adapt-font-body-sm)]`}
             onClick={onBack}
           >
             {labels.back}
@@ -46,24 +46,24 @@ export function SceneExpressionMapView({
         {error ? <p className={`font-medium text-destructive ${APPLE_META_TEXT}`}>{error}</p> : null}
       </section>
 
-      <section className={`space-y-3 p-4 ${APPLE_PANEL_RAISED}`}>
+      <section className={`space-y-[var(--mobile-adapt-space-md)] p-[var(--mobile-adapt-space-sheet)] ${APPLE_PANEL_RAISED}`}>
         {clusters.length === 0 ? (
           <p className={APPLE_META_TEXT}>{labels.empty}</p>
         ) : (
-          <ul className="space-y-2">
+          <ul className="space-y-[var(--mobile-adapt-space-sm)]">
             {clusters.map((cluster) => (
-              <li key={cluster.id} className={`space-y-2 p-3 ${APPLE_LIST_ITEM}`}>
+              <li key={cluster.id} className={`space-y-[var(--mobile-adapt-space-sm)] p-[var(--mobile-adapt-space-md)] ${APPLE_LIST_ITEM}`}>
                 <p className={APPLE_TITLE_SM}>{cluster.anchor}</p>
                 <p className={APPLE_META_TEXT}>{cluster.meaning}</p>
                 <p className={APPLE_META_TEXT}>
                   {labels.sourceSceneCountPrefix}{cluster.sourceSceneIds.length}
                 </p>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-[var(--mobile-adapt-space-sm)]">
                   {cluster.expressions.map((expression) => (
                     <button
                       key={`${cluster.id}-${expression}`}
                       type="button"
-                      className={`${APPLE_BUTTON_BASE} px-2 py-1 text-xs`}
+                      className={`${APPLE_BUTTON_BASE} px-[var(--mobile-adapt-space-sm)] py-[var(--mobile-adapt-space-2xs)] text-[length:var(--mobile-adapt-font-meta)]`}
                       onClick={() => onOpenExpressionDetail(expression, cluster.expressions)}
                     >
                       {expression}

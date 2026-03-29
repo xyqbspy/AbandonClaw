@@ -64,8 +64,8 @@ export function SentenceBlock({
       className={cn(
         "transition-colors duration-150",
         showSpeaker
-          ? `rounded-[var(--app-radius-panel)] px-2 py-2.5 hover:bg-[var(--app-surface-hover)]`
-          : `space-y-3 rounded-[var(--app-radius-card)] border border-[var(--app-border-soft)] p-4 hover:border-[var(--app-border-strong)] sm:p-5`,
+          ? `rounded-[var(--app-radius-panel)] px-[var(--mobile-adapt-space-sm)] py-[var(--mobile-adapt-space-md)] hover:bg-[var(--app-surface-hover)]`
+          : `space-y-[var(--mobile-adapt-space-md)] rounded-[var(--app-radius-card)] border border-[var(--app-border-soft)] p-[var(--mobile-adapt-space-sheet)] hover:border-[var(--app-border-strong)] sm:p-5`,
         mobileTapEnabled &&
           "cursor-pointer active:scale-[0.998] active:border-primary/40",
         showSpeaker && isPrimarySpeaker(sentence.speaker) && "sm:mr-14",
@@ -75,8 +75,8 @@ export function SentenceBlock({
         if (mobileTapEnabled) onSentenceTap?.(sentence.id);
       }}
     >
-      <div className={`mb-1 flex items-center justify-end gap-3 text-xs ${APPLE_META_TEXT}`}>
-        <div className={`flex items-center gap-3 text-xs ${APPLE_META_TEXT}`}>
+      <div className={`mb-[var(--mobile-adapt-space-2xs)] flex items-center justify-end gap-[var(--mobile-adapt-space-md)] text-[length:var(--mobile-adapt-font-meta)] ${APPLE_META_TEXT}`}>
+        <div className={`flex items-center gap-[var(--mobile-adapt-space-md)] text-[length:var(--mobile-adapt-font-meta)] ${APPLE_META_TEXT}`}>
           <button
             type="button"
             className="inline-flex cursor-pointer items-center gap-1 transition-colors hover:text-foreground"
@@ -103,11 +103,11 @@ export function SentenceBlock({
       </div>
 
       {showSpeaker && sentence.speaker ? (
-        <div className="flex items-start gap-2">
+        <div className="flex items-start gap-[var(--mobile-adapt-space-sm)]">
           <Badge
             variant="outline"
             className={cn(
-              "mt-0.5 h-5 min-w-5 justify-center px-1.5 text-[10px] tracking-[0.04em]",
+              "mt-[2px] h-[clamp(18px,4.8vw,20px)] min-w-[clamp(18px,4.8vw,20px)] justify-center px-[var(--mobile-adapt-space-sm)] text-[length:var(--mobile-adapt-font-caption)] tracking-[0.04em]",
               speakerBadgeClassName(sentence.speaker),
             )}
           >
@@ -118,7 +118,7 @@ export function SentenceBlock({
             data-sentence-text={sentence.text}
             data-sentence-translation={sentence.translation}
             className={cn(
-              `cursor-text text-[1.04rem] leading-relaxed ${APPLE_BODY_TEXT} sm:text-lg`,
+              `cursor-text text-[length:var(--mobile-adapt-font-body)] leading-relaxed ${APPLE_BODY_TEXT} sm:text-lg`,
               mobileTapEnabled && "selection:bg-primary/20",
             )}
           >
@@ -131,7 +131,7 @@ export function SentenceBlock({
           data-sentence-text={sentence.text}
           data-sentence-translation={sentence.translation}
           className={cn(
-            `cursor-text text-[1.04rem] leading-relaxed ${APPLE_BODY_TEXT} sm:text-lg`,
+            `cursor-text text-[length:var(--mobile-adapt-font-body)] leading-relaxed ${APPLE_BODY_TEXT} sm:text-lg`,
             mobileTapEnabled && "selection:bg-primary/20",
           )}
         >
@@ -145,13 +145,13 @@ export function SentenceBlock({
           translationOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
         )}
       >
-        <p className={`min-h-0 rounded-[var(--app-radius-panel)] px-3 py-2 ${APPLE_META_TEXT} ${APPLE_PANEL}`}>
+        <p className={`min-h-0 rounded-[var(--app-radius-panel)] px-[var(--mobile-adapt-space-md)] py-[var(--mobile-adapt-space-sm)] text-[length:var(--mobile-adapt-font-body-sm)] ${APPLE_META_TEXT} ${APPLE_PANEL}`}>
           {translationText}
         </p>
       </div>
 
       {sentence.chunks.length > 0 ? (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-[var(--mobile-adapt-space-sm)]">
           {sentence.chunks.map((chunk) => {
             const active = activeChunkKey?.toLowerCase() === chunk.toLowerCase();
             const hovered = hoveredChunkKey?.toLowerCase() === chunk.toLowerCase();
@@ -188,7 +188,7 @@ export function SentenceBlock({
                 <Badge
                   variant={active ? "default" : "outline"}
                   className={cn(
-                    "cursor-pointer border-border/80 px-2.5 py-1 transition-colors",
+                    "cursor-pointer border-border/80 px-[var(--mobile-adapt-space-md)] py-[var(--mobile-adapt-space-2xs)] text-[length:var(--mobile-adapt-font-meta)] transition-colors",
                     !active && "hover:border-primary/40 hover:bg-accent",
                     hovered && !active && "border-primary/40 bg-accent",
                   )}

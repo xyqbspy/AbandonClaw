@@ -165,7 +165,7 @@ export function FocusDetailSheet({
         closeOnBackdropClick={false}
         showCloseButton={false}
         panelClassName="!h-[100dvh] !min-h-[100dvh] !max-h-[100dvh] rounded-none md:!h-[100vh] md:!min-h-[100vh] md:!max-h-[100vh] md:!rounded-t-[28px]"
-        bodyClassName="min-h-0 min-w-0 flex flex-1 flex-col overflow-hidden px-6 pb-4 pt-2 [@media(max-height:760px)]:px-4 [@media(max-height:760px)]:pb-2 [@media(max-height:760px)]:pt-1"
+        bodyClassName="min-h-0 min-w-0 flex flex-1 flex-col overflow-hidden px-[var(--mobile-adapt-space-overlay)] pb-[var(--mobile-adapt-space-overlay-gap)] pt-[var(--mobile-adapt-space-sm)] [@media(max-height:760px)]:px-[var(--mobile-adapt-space-sheet)] [@media(max-height:760px)]:pb-[var(--mobile-adapt-space-sm)] [@media(max-height:760px)]:pt-[var(--mobile-adapt-space-2xs)]"
         header={
           <FocusDetailSheetHeader
             title={labels.title}
@@ -182,7 +182,7 @@ export function FocusDetailSheet({
             onOpenNextSibling={onOpenNextSibling}
           />
         }
-        headerClassName="border-b-0 bg-transparent px-6 pb-2 pt-5 [@media(max-height:760px)]:px-4 [@media(max-height:760px)]:pb-1 [@media(max-height:760px)]:pt-3"
+        headerClassName="border-b-0 bg-transparent px-[var(--mobile-adapt-space-overlay)] pb-[var(--mobile-adapt-space-sm)] pt-[var(--mobile-adapt-space-overlay)] [@media(max-height:760px)]:px-[var(--mobile-adapt-space-sheet)] [@media(max-height:760px)]:pb-[var(--mobile-adapt-space-2xs)] [@media(max-height:760px)]:pt-[var(--mobile-adapt-space-lg)]"
         footer={
           <FocusDetailSheetFooter
             detail={detail}
@@ -226,7 +226,7 @@ export function FocusDetailSheet({
             completeAssistLabel={labels.completeAssist ?? "完成"}
           />
         }
-        footerClassName="!border-t-0 !bg-transparent px-6 pb-6 pt-2 [@media(max-height:760px)]:px-4 [@media(max-height:760px)]:pb-3 [@media(max-height:760px)]:pt-1"
+        footerClassName="!border-t-0 !bg-transparent px-[var(--mobile-adapt-space-overlay)] pb-[calc(env(safe-area-inset-bottom)+var(--mobile-adapt-space-overlay))] pt-[var(--mobile-adapt-space-sm)] [@media(max-height:760px)]:px-[var(--mobile-adapt-space-sheet)] [@media(max-height:760px)]:pb-[calc(env(safe-area-inset-bottom)+var(--mobile-adapt-space-md))] [@media(max-height:760px)]:pt-[var(--mobile-adapt-space-2xs)]"
       >
         {detail ? (
           <FocusDetailContent

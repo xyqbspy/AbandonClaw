@@ -85,16 +85,16 @@ export function MoveIntoClusterSheet({
       <SheetContent
         side="bottom"
         overlayClassName="z-[80]"
-        className={`z-[81] flex h-[85vh] max-h-[85vh] flex-col rounded-t-2xl border border-[var(--app-border-soft)] bg-background ${APPLE_PANEL}`}
+        className={`z-[81] flex h-[var(--mobile-adapt-overlay-sheet-height)] max-h-[var(--mobile-adapt-overlay-sheet-height)] flex-col rounded-t-[var(--mobile-adapt-overlay-radius)] border border-[var(--app-border-soft)] bg-background ${APPLE_PANEL}`}
       >
-        <SheetHeader className="shrink-0 border-b border-[var(--app-border-soft)] bg-[var(--app-surface)] px-4 pb-4 pt-4">
+        <SheetHeader className="shrink-0 border-b border-[var(--app-border-soft)] bg-[var(--app-surface)] px-[var(--mobile-adapt-space-overlay)] pb-[var(--mobile-adapt-space-xl)] pt-[var(--mobile-adapt-space-overlay)]">
           <SheetTitle className={APPLE_TITLE_MD}>{labels.title}</SheetTitle>
           <SheetDescription>{labels.description}</SheetDescription>
         </SheetHeader>
 
-        <div className="shrink-0 border-b border-[var(--app-border-soft)] bg-[var(--app-surface)] px-4 py-4">
+        <div className="shrink-0 border-b border-[var(--app-border-soft)] bg-[var(--app-surface)] px-[var(--mobile-adapt-space-overlay)] py-[var(--mobile-adapt-space-xl)]">
           {focusExpression ? (
-            <div className={`p-4 ${APPLE_PANEL}`}>
+            <div className={`rounded-[var(--mobile-adapt-overlay-card-radius)] p-[var(--mobile-adapt-space-overlay)] ${APPLE_PANEL}`}>
               <p className={APPLE_TITLE_MD}>
                 {labels.currentMain}
                 {focusExpression.text}
@@ -103,11 +103,11 @@ export function MoveIntoClusterSheet({
           ) : null}
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto bg-background px-4 py-3">
+        <div className="min-h-0 flex-1 overflow-y-auto bg-background px-[var(--mobile-adapt-space-overlay)] py-[var(--mobile-adapt-space-md)]">
           {groups.length === 0 ? (
-            <p className={`text-sm ${APPLE_META_TEXT}`}>{labels.empty}</p>
+            <p className={`text-[length:var(--mobile-adapt-overlay-body)] ${APPLE_META_TEXT}`}>{labels.empty}</p>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-[var(--mobile-space-md)]">
               {groups.map((group) => {
                 if (group.isCluster) {
                   const mainCandidate = group.candidates.find((candidate) => candidate.isSourceMain) ?? null;
@@ -121,8 +121,8 @@ export function MoveIntoClusterSheet({
                   });
 
                   return (
-                    <div key={group.key} className={`p-3 ${APPLE_PANEL}`}>
-                      <div className="flex items-start justify-between gap-3 px-3">
+                    <div key={group.key} className={`rounded-[var(--mobile-adapt-overlay-card-radius)] p-[var(--mobile-adapt-space-md)] ${APPLE_PANEL}`}>
+                      <div className="flex items-start justify-between gap-[var(--mobile-adapt-space-md)] px-[var(--mobile-adapt-space-md)]">
                         <button
                           type="button"
                           className="min-w-0 flex-1 text-left"
@@ -140,10 +140,10 @@ export function MoveIntoClusterSheet({
                             </p>
                           ) : null}
                         </button>
-                        <div className="flex shrink-0 items-center gap-2">
+                        <div className="flex shrink-0 items-center gap-[var(--mobile-adapt-space-sm)]">
                           <button
                             type="button"
-                            className={`inline-flex items-center rounded-full border border-[var(--app-border-soft)] p-2 ${APPLE_META_TEXT} transition hover:bg-[var(--app-surface-hover)]`}
+                            className={`inline-flex items-center rounded-full border border-[var(--app-border-soft)] p-[var(--mobile-adapt-space-sm)] ${APPLE_META_TEXT} transition hover:bg-[var(--app-surface-hover)]`}
                             onClick={() => onToggleGroupExpand(group.key)}
                           >
                             <ChevronDown
@@ -155,7 +155,7 @@ export function MoveIntoClusterSheet({
                           <Button
                             type="button"
                             variant="ghost"
-                            className={`h-auto px-2 py-1 text-xs ${
+                            className={`h-auto px-[var(--mobile-adapt-space-sm)] py-[var(--mobile-adapt-space-2xs)] text-[length:var(--mobile-adapt-overlay-meta)] ${
                               groupSelected
                                 ? APPLE_BUTTON_STRONG
                                 : ""
@@ -168,7 +168,7 @@ export function MoveIntoClusterSheet({
                       </div>
 
                       {expandedGroups[group.key] ? (
-                        <div className="mt-3 space-y-2">
+                        <div className="mt-[var(--mobile-adapt-space-md)] space-y-[var(--mobile-adapt-space-sm)]">
                           {group.candidates.map((candidate) => {
                             const selected = Boolean(selectedMap[candidate.row.userPhraseId]);
                             const isCoveredByMainSelected = Boolean(
@@ -189,7 +189,7 @@ export function MoveIntoClusterSheet({
                                 disabled={isCoveredByMainSelected}
                                 onClick={() => onToggleCandidate(group, candidate, selected)}
                               >
-                                <div className="flex items-start justify-between gap-3 px-3">
+                                <div className="flex items-start justify-between gap-[var(--mobile-adapt-space-md)] px-[var(--mobile-adapt-space-md)]">
                                   <div className="min-w-0 flex-1">
                                     <p className={`font-medium ${APPLE_BODY_TEXT}`}>{candidate.row.text}</p>
                                     {candidate.row.translation ? (
@@ -198,7 +198,7 @@ export function MoveIntoClusterSheet({
                                       </p>
                                     ) : null}
                                   </div>
-                                  <div className="flex shrink-0 items-center gap-2">
+                                  <div className="flex shrink-0 items-center gap-[var(--mobile-adapt-space-sm)]">
                                     <Badge variant="outline" className={appleOutlineBadgeClassName}>
                                       {candidate.isSourceMain ? labels.mainExpression : labels.subExpression}
                                     </Badge>
@@ -236,13 +236,13 @@ export function MoveIntoClusterSheet({
                 if (!candidate) return null;
 
                 return (
-                  <div key={group.key} className={`p-3 ${APPLE_PANEL}`}>
+                  <div key={group.key} className={`rounded-[var(--mobile-adapt-overlay-card-radius)] p-[var(--mobile-adapt-space-md)] ${APPLE_PANEL}`}>
                     <button
                       type="button"
                       className={`w-full text-left transition ${APPLE_LIST_ITEM} hover:bg-[var(--app-surface-hover)]`}
                       onClick={() => onToggleCandidate(group, candidate, selected)}
                     >
-                      <div className="flex items-start justify-between gap-3 px-3">
+                      <div className="flex items-start justify-between gap-[var(--mobile-adapt-space-md)] px-[var(--mobile-adapt-space-md)]">
                         <div className="min-w-0 flex-1">
                           <p className={APPLE_TITLE_MD}>{candidate.row.text}</p>
                           {candidate.row.translation ? (
@@ -266,8 +266,8 @@ export function MoveIntoClusterSheet({
           )}
         </div>
 
-        <SheetFooter className="shrink-0 border-t border-[var(--app-border-soft)] bg-[var(--app-surface)] px-4 pb-safe pt-3">
-          <div className="grid grid-cols-2 gap-2">
+        <SheetFooter className="shrink-0 border-t border-[var(--app-border-soft)] bg-[var(--app-surface)] px-[var(--mobile-adapt-space-overlay)] pb-[calc(env(safe-area-inset-bottom)+var(--mobile-adapt-space-md))] pt-[var(--mobile-adapt-space-md)]">
+          <div className="grid grid-cols-2 gap-[var(--mobile-adapt-space-sm)]">
             <Button type="button" variant="ghost" className={appleButtonClassName} onClick={() => onOpenChange(false)}>
               {labels.close}
             </Button>

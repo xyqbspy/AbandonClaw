@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { ChevronDown } from "lucide-react";
 import { LoadingState } from "@/components/shared/action-loading";
@@ -150,7 +150,7 @@ export function ClusterFocusList({
                     ))}
                   </div>
                 ) : isExpanded ? (
-                  <p className="px-1 py-2 text-[13px] text-[#718096]">{labels.noTranslation}</p>
+                  <p className="px-1 py-[var(--mobile-space-sm)] text-[length:var(--mobile-font-body-sm)] text-[#718096]">{labels.noTranslation}</p>
                 ) : null}
               </div>
             </ExpressionSummaryGroup>
@@ -160,3 +160,5 @@ export function ClusterFocusList({
     </div>
   );
 }
+
+

@@ -29,7 +29,7 @@ export function SceneVariantStudyView({
   onReviewPhrase: (payload: SavePhrasePayload) => Promise<{ created: boolean }>;
 }) {
   return (
-    <div className="space-y-4">
+    <div className="space-y-[var(--mobile-adapt-space-xl)]">
       <LessonReader
         lesson={lesson}
         minimalHeader

@@ -78,7 +78,7 @@ const TOOLBAR_WIDTH = 256;
 const appleButtonLgClassName = `${APPLE_BUTTON_BASE} ${APPLE_BUTTON_TEXT_LG}`;
 const hasSpeakerTag = (speaker?: string) => /^[A-Z]$/.test((speaker ?? "").trim().toUpperCase());
 const dialogueTextButtonClassName =
-  "inline-flex cursor-pointer items-center gap-1 text-[12px] leading-none text-[#8e9aaf] transition-colors hover:text-[#2c3e50] active:opacity-70";
+  "inline-flex cursor-pointer items-center gap-1 text-[length:var(--mobile-font-meta)] leading-none text-[#8e9aaf] transition-colors hover:text-[#2c3e50] active:opacity-70";
 
 export function LessonReader({
   lesson,
@@ -1022,30 +1022,30 @@ export function LessonReader({
         >
           <div
             className={cn(
-              "flex max-w-[85%] flex-col gap-2",
+              "flex max-w-[var(--mobile-dialogue-width)] flex-col gap-[var(--mobile-space-md)] sm:max-w-[85%]",
               primarySpeaker ? "items-start" : "items-end",
             )}
           >
             <article
               className={cn(
-                "w-full px-[18px] py-[14px] text-[16px] leading-[1.4] shadow-[0_4px_15px_rgba(0,0,0,0.03)]",
+                "w-full break-words px-[var(--mobile-bubble-px)] py-[var(--mobile-bubble-py)] text-[length:var(--mobile-font-body)] leading-[1.42] shadow-[0_4px_15px_rgba(0,0,0,0.03)]",
                 primarySpeaker
                   ? "rounded-[18px_18px_18px_4px] bg-white text-[#333]"
                   : "rounded-[18px_18px_4px_18px] bg-[#b5d1ff] text-[#1a2a40]",
               )}
             >
               <div className="flex items-start gap-1.5">
-                <span className="shrink-0 font-semibold">{speakerText}:</span>
-                <div className="min-w-0 flex-1 space-y-2">
+                <span className="shrink-0 text-[clamp(13px,3.4vw,14px)] font-semibold">{speakerText}:</span>
+                <div className="min-w-0 flex-1 space-y-[var(--mobile-space-sm)]">
                   {block.sentences.map((sentence) => {
                     return (
-                      <div key={sentence.id} className="space-y-1">
+                      <div key={sentence.id} className="space-y-[var(--mobile-space-2xs)]">
                         <p
                           data-sentence-id={sentence.id}
                           data-sentence-text={sentence.text}
                           data-sentence-translation={sentence.translation}
                           className={cn(
-                            "cursor-pointer text-[16px] leading-[1.4]",
+                            "cursor-pointer break-words text-[length:var(--mobile-font-body)] leading-[1.42]",
                             isSentencePlaying(sentence.id) && "opacity-80",
                           )}
                           onClick={(event) => {
@@ -1062,7 +1062,7 @@ export function LessonReader({
               </div>
             </article>
 
-            <div className="flex items-center gap-3 px-[5px]">
+            <div className="flex items-center gap-[var(--mobile-space-lg)] px-[var(--mobile-space-xs)]">
               <button
                 type="button"
                 aria-label="翻译"
@@ -1085,7 +1085,7 @@ export function LessonReader({
                 variant="ghost"
                 size="sm"
                 className={cn(
-                  "h-auto px-0 text-[12px] leading-none text-[#8e9aaf] hover:text-[#2c3e50]",
+                  "h-auto px-0 text-[length:var(--mobile-font-meta)] leading-none text-[#8e9aaf] hover:text-[#2c3e50]",
                   isBlockSpeaking && "text-[#4a90e2] hover:text-[#4a90e2]",
                 )}
                 iconClassName="size-3.5"
@@ -1097,7 +1097,7 @@ export function LessonReader({
             </div>
 
             {translationOpen ? (
-              <p className="px-[5px] text-[14px] leading-6 text-[#8e9aaf]">
+              <p className="px-[var(--mobile-space-xs)] text-[length:var(--mobile-font-body-sm)] leading-[1.55] text-[#8e9aaf]">
                 {blockTranslation || "该段翻译暂未提供。"}
               </p>
             ) : null}
@@ -1156,14 +1156,22 @@ export function LessonReader({
 
       <div
         ref={readerRef}
-        className={cn("space-y-5", isMobile && "space-y-1.5")}
+        className={cn(
+          "space-y-[var(--mobile-space-2xl)] overflow-x-hidden",
+          isMobile && "space-y-[var(--mobile-space-sm)]",
+        )}
       >
         {minimalHeader ? (
-          <div className={cn("space-y-2 py-1.5", isMobile ? "px-1" : "px-1.5")}>
+          <div
+            className={cn(
+              "space-y-[var(--mobile-space-sm)] py-[var(--mobile-space-sm)]",
+              isMobile ? "px-[var(--mobile-space-xs)]" : "px-1.5",
+            )}
+          >
             {topRightTool ? (
-              <div className="flex items-center justify-end gap-2">{topRightTool}</div>
+              <div className="flex items-center justify-end gap-[var(--mobile-space-sm)]">{topRightTool}</div>
             ) : null}
-            <div className="flex items-center justify-end gap-2">
+            <div className="flex items-center justify-end gap-[var(--mobile-space-sm)]">
               {headerTools}
               {!isTrainingMode ? (
                 <LoopActionButton
@@ -1174,7 +1182,8 @@ export function LessonReader({
                   className={cn(
                     appleButtonLgClassName,
                     "whitespace-nowrap text-foreground/85",
-                    isMobile && "px-2 py-1 text-[15px]",
+                    isMobile &&
+                      "px-[var(--mobile-space-md)] py-[var(--mobile-space-2xs)] text-[length:var(--mobile-font-body)]",
                   )}
                   iconClassName={cn("size-4", isMobile && "size-3.5")}
                   onClick={toggleSceneLoopPlayback}
@@ -1183,8 +1192,8 @@ export function LessonReader({
             </div>
           </div>
         ) : isDialogueScene && isTrainingMode ? null : isDialogueScene ? (
-          <div className={cn("py-1.5", isMobile ? "px-1" : "px-1.5")}>
-            <div className="flex items-center justify-end gap-2">
+          <div className={cn("py-[var(--mobile-space-sm)]", isMobile ? "px-[var(--mobile-space-xs)]" : "px-1.5")}>
+            <div className="flex items-center justify-end gap-[var(--mobile-space-sm)]">
               {headerTools}
               {!isTrainingMode ? (
                 <LoopActionButton
@@ -1195,7 +1204,8 @@ export function LessonReader({
                   className={cn(
                     appleButtonLgClassName,
                     "whitespace-nowrap text-foreground/85",
-                    isMobile && "px-2 py-1 text-[15px]",
+                    isMobile &&
+                      "px-[var(--mobile-space-md)] py-[var(--mobile-space-2xs)] text-[length:var(--mobile-font-body)]",
                   )}
                   iconClassName={cn("size-4", isMobile && "size-3.5")}
                   onClick={toggleSceneLoopPlayback}
@@ -1213,13 +1223,14 @@ export function LessonReader({
             <CardContent
               className={cn(
                 "space-y-4 p-5 sm:p-6",
-                isMobile && "space-y-1 p-2.5",
+                isMobile &&
+                  "space-y-[var(--mobile-space-sm)] p-[var(--mobile-space-lg)]",
               )}
             >
               {isMobile ? (
                 <>
-                  <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
-                    <h1 className="line-clamp-2 text-[1rem] font-semibold leading-6">
+                  <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-[var(--mobile-space-sm)]">
+                    <h1 className="line-clamp-2 text-[length:var(--mobile-font-title)] font-semibold leading-[1.4]">
                       {lesson.title}
                     </h1>
                     <LoopActionButton
@@ -1227,16 +1238,16 @@ export function LessonReader({
                       loading={isSceneLoopLoading}
                       variant="ghost"
                       size="sm"
-                      className={`h-6 px-1.5 text-[10px] ${APPLE_META_TEXT}`}
+                      className={`h-[var(--mobile-control-height)] px-[var(--mobile-space-sm)] text-[length:var(--mobile-font-caption)] ${APPLE_META_TEXT}`}
                       iconClassName="size-3"
                       onClick={toggleSceneLoopPlayback}
                     />
                   </div>
-                  <p className={`text-[10px] leading-4 whitespace-nowrap ${APPLE_META_TEXT}`}>
+                  <p className={`text-[length:var(--mobile-font-caption)] leading-[1.35] whitespace-nowrap ${APPLE_META_TEXT}`}>
                     {sceneMetaLabel}
                   </p>
                   {headerTools ? (
-                    <div className="flex flex-wrap items-center gap-1.5">
+                    <div className="flex flex-wrap items-center gap-[var(--mobile-space-sm)]">
                       {headerTools}
                     </div>
                   ) : null}
@@ -1296,32 +1307,35 @@ export function LessonReader({
           <div
             className={cn(
               isTrainingMode
-                ? "min-h-[calc(100vh-180px)] bg-[#f4f7f9] pb-28 pt-3"
-                : "space-y-[30px]",
-              isMobile && !isTrainingMode && "space-y-1.5",
+                ? "min-h-[calc(100vh-clamp(150px,38vw,180px))] bg-[#f4f7f9] pb-[calc(var(--mobile-button-height)+64px)] pt-[var(--mobile-space-sm)]"
+                : "space-y-[clamp(20px,5.6vw,30px)]",
+              isMobile && !isTrainingMode && "space-y-[var(--mobile-space-sm)]",
+              "overflow-x-hidden",
             )}
           >
             {isTrainingMode ? (
-              <div className="pb-5">
+              <div className="pb-[var(--mobile-space-2xl)]">
                 <div
-                  className="relative flex min-h-10 items-start justify-center"
+                  className="relative flex min-h-[var(--mobile-control-height)] items-start justify-center"
                   data-current-training-sentence={activeTrainingSentence?.text}
                 >
                   {onBackToList ? (
                     <button
                       type="button"
                       aria-label="返回场景列表"
-                      className="absolute left-0 top-0 inline-flex size-10 items-start justify-start pt-0.5 text-[#2c3e50] transition"
+                      className="absolute left-0 top-0 inline-flex size-[var(--mobile-icon-button)] items-start justify-start pt-[2px] text-[#2c3e50] transition"
                       onClick={onBackToList}
                     >
-                      <ArrowLeft className="size-5" />
+                      <ArrowLeft className="size-4" />
                     </button>
                   ) : null}
-                  <div className="px-12 pt-0.5 text-center">
-                    <h1 className="text-[18px] font-semibold text-[#333]">{resolvedHeaderTitle}</h1>
+                  <div className="w-full min-w-0 max-w-full overflow-hidden px-[var(--mobile-header-side)] pt-0.5 text-center">
+                    <h1 className="truncate whitespace-nowrap text-[length:var(--mobile-font-title)] font-semibold text-[#333]">
+                      {resolvedHeaderTitle}
+                    </h1>
                   </div>
                   {topRightTool ? (
-                    <div className="absolute right-0 top-0 flex items-center gap-2">{topRightTool}</div>
+                    <div className="absolute right-0 top-0 flex items-center gap-[var(--mobile-space-sm)]">{topRightTool}</div>
                   ) : null}
                   {!topRightTool ? (
                     <LoopActionButton
@@ -1332,8 +1346,8 @@ export function LessonReader({
                       iconOnly
                       icon="tts"
                       ariaLabel={isSceneLooping ? "停止循环播放" : "循环播放场景"}
-                      className="absolute right-0 top-0 size-10 text-[#2c3e50]"
-                      iconClassName="size-4"
+                      className="absolute right-0 top-0 size-[var(--mobile-icon-button)] text-[#2c3e50]"
+                      iconClassName="size-3.5"
                       onClick={toggleSceneLoopPlayback}
                     />
                   ) : null}
@@ -1343,8 +1357,8 @@ export function LessonReader({
 
             <div
               className={cn(
-                "space-y-[30px]",
-                isMobile && !isTrainingMode && "space-y-1.5",
+                "space-y-[clamp(20px,5.6vw,30px)]",
+                isMobile && !isTrainingMode && "space-y-[var(--mobile-space-sm)]",
               )}
             >
               {blockOrder.map((block) => renderDialogueBlock(block))}
@@ -1359,7 +1373,7 @@ export function LessonReader({
               );
 
               return (
-                <div key={section.id} className="space-y-1.5">
+                <div key={section.id} className="space-y-[var(--mobile-space-sm)]">
                   {groupedSentences.map((group, groupIndex) => {
                     const groupKey = `${section.id}-group-${groupIndex}`;
                     const groupText = group.map((sentence) => sentence.text).join(" ");
@@ -1381,7 +1395,7 @@ export function LessonReader({
                       <div
                         key={groupKey}
                         className={cn(
-                          "rounded-[var(--app-radius-panel)] px-2 py-1 transition-colors duration-150",
+                          "rounded-[var(--app-radius-panel)] px-[var(--mobile-space-md)] py-[var(--mobile-space-xs)] transition-colors duration-150",
                           groupSelected
                             ? "bg-accent/12"
                             : active
@@ -1389,7 +1403,7 @@ export function LessonReader({
                               : "hover:bg-[var(--app-surface-hover)]",
                         )}
                       >
-                        <div className="px-1.5 py-0.5">
+                        <div className="px-[var(--mobile-space-xs)] py-[clamp(2px,0.6vw,4px)]">
                           <div
                             className={cn(
                               "cursor-pointer transition-colors",
@@ -1397,11 +1411,16 @@ export function LessonReader({
                             )}
                             onClick={() => handleMobileGroupTap(groupContext)}
                           >
-                            <div className={cn("mb-1 flex items-center justify-end gap-2", groupSelected && "text-primary")}>
+                            <div
+                              className={cn(
+                                "mb-[var(--mobile-space-sm)] flex items-center justify-end gap-[var(--mobile-space-sm)]",
+                                groupSelected && "text-primary",
+                              )}
+                            >
                               <button
                                 type="button"
                                 className={cn(
-                                  "inline-flex cursor-pointer items-center gap-1 text-[11px] leading-none transition-colors active:opacity-70",
+                                  "inline-flex cursor-pointer items-center gap-1 text-[length:var(--mobile-font-caption)] leading-none transition-colors active:opacity-70",
                                   groupSelected
                                     ? "text-primary/80 hover:text-primary/95"
                                     : `${APPLE_META_TEXT} hover:text-foreground`,
@@ -1423,7 +1442,7 @@ export function LessonReader({
                                 variant="ghost"
                                 size="sm"
                                 className={cn(
-                                  "h-auto px-0 text-[11px] leading-none",
+                                  "h-auto px-0 text-[length:var(--mobile-font-caption)] leading-none",
                                   groupSelected
                                     ? "text-primary/80 hover:text-primary/95"
                                     : `${APPLE_META_TEXT} hover:text-foreground`,
@@ -1439,16 +1458,16 @@ export function LessonReader({
                             <div
                               className={cn(
                                 "grid overflow-hidden transition-all duration-200",
-                                translationOpen ? "mb-2 grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
+                                translationOpen ? "mb-[var(--mobile-space-md)] grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
                               )}
                             >
-                              <p className={`min-h-0 rounded-[var(--app-radius-panel)] px-2.5 py-1.5 text-[13px] leading-6 ${APPLE_META_TEXT} ${APPLE_PANEL}`}>
+                              <p className={`min-h-0 rounded-[var(--app-radius-panel)] px-[var(--mobile-space-md)] py-[var(--mobile-space-sm)] text-[length:var(--mobile-font-body-sm)] leading-[1.55] ${APPLE_META_TEXT} ${APPLE_PANEL}`}>
                                 {groupTranslation}
                               </p>
                             </div>
                           </div>
 
-                          <div className="space-y-1.5">
+                          <div className="space-y-[var(--mobile-space-sm)]">
                             {group.map((sentence) => {
                               const sentenceSelected = sentence.id === state.activeSentenceId;
                               return (
@@ -1464,7 +1483,7 @@ export function LessonReader({
                                     data-sentence-text={sentence.text}
                                     data-sentence-translation={sentence.translation}
                                     className={cn(
-                                      "cursor-pointer text-[16px] leading-[1.72] font-normal tracking-[0.01em] text-foreground/95",
+                                      "cursor-pointer break-words text-[length:var(--mobile-font-body)] leading-[1.62] font-normal tracking-[0.005em] text-foreground/95",
                                       sentenceSelected && "text-primary",
                                     )}
                                     onClick={() => handleMobileSentenceTap(sentence.id, groupContext)}
@@ -1509,7 +1528,7 @@ export function LessonReader({
                         ))}
                       </div>
 
-                      <div className={`mt-1 flex items-center gap-2 text-[11px] ${APPLE_META_TEXT}`}>
+                      <div className={`mt-1 flex items-center gap-[var(--mobile-space-sm)] text-[length:var(--mobile-font-caption)] ${APPLE_META_TEXT}`}>
                         <button
                           type="button"
                           className="inline-flex cursor-pointer items-center gap-1 transition-colors hover:text-foreground"
@@ -1659,6 +1678,8 @@ export function LessonReader({
     </div>
   );
 }
+
+
 
 
 

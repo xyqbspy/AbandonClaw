@@ -129,7 +129,7 @@ function SceneTrainingCoachFloatingEntry({
       return { x: 0, y: 116 };
     }
     return {
-      x: Math.max(4, window.innerWidth - 152 - 4),
+      x: Math.max(8, window.innerWidth - 152 - 8),
       y: 116,
     };
   });
@@ -168,11 +168,14 @@ function SceneTrainingCoachFloatingEntry({
   const viewportHeight =
     viewportSize.height || (typeof window === "undefined" ? 844 : window.innerHeight);
   const positionStorageKey = `scene-training-fab-position:v3:${sceneId}`;
-  const viewportGap = 4;
+  const viewportGap = 8;
   const topGap = 88;
   const fabWidth = fabSize.width;
   const fabHeight = fabSize.height;
-  const panelWidth = Math.min(viewportWidth - viewportGap * 2, viewportWidth < 640 ? 344 : 360);
+  const panelWidth = Math.min(
+    viewportWidth - viewportGap * 2,
+    viewportWidth < 640 ? Math.max(304, Math.floor(viewportWidth * 0.84)) : 344,
+  );
   const panelMaxHeight = Math.max(260, viewportHeight - topGap - viewportGap * 2);
 
   const rawCompletedMap = useMemo(
@@ -479,7 +482,7 @@ function SceneTrainingCoachFloatingEntry({
             aria-label="训练进度入口"
             aria-expanded={panelOpen}
             data-testid="scene-training-fab"
-            className="inline-flex min-h-10 items-center gap-2.5 rounded-[20px] border border-white/35 bg-[rgba(255,255,255,0.82)] px-3.5 py-2.5 text-left shadow-[0_10px_34px_rgba(15,23,42,0.12)] backdrop-blur-[18px] transition-transform duration-150"
+            className="inline-flex min-h-[var(--mobile-adapt-overlay-trigger-height)] min-w-[var(--mobile-adapt-overlay-trigger-width)] items-center gap-[var(--mobile-adapt-space-sm)] rounded-[var(--mobile-adapt-overlay-trigger-radius)] border border-white/35 bg-[rgba(255,255,255,0.82)] px-[var(--mobile-adapt-space-md)] py-[var(--mobile-adapt-space-sm)] text-left shadow-[0_10px_34px_rgba(15,23,42,0.12)] backdrop-blur-[18px] transition-transform duration-150"
             style={{
               minHeight: `${fabHeight}px`,
               touchAction: "none",
@@ -490,17 +493,17 @@ function SceneTrainingCoachFloatingEntry({
             onPointerUp={handleIconPointerUp}
             onPointerCancel={handleIconPointerCancel}
           >
-            <span className="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-[#E5F1FF]">
-              <span className="size-2 rounded-full bg-[#007AFF]" aria-hidden="true" />
+            <span className="inline-flex size-[var(--mobile-adapt-overlay-trigger-dot)] shrink-0 items-center justify-center rounded-full bg-[#E5F1FF]">
+              <span className="size-[var(--mobile-adapt-overlay-trigger-dot-inner)] rounded-full bg-[#007AFF]" aria-hidden="true" />
             </span>
-            <span className="flex min-w-0 flex-col leading-none">
-              <span className="text-[10px] font-medium text-[#86868B]">本轮训练</span>
-              <span className="mt-1 truncate text-[13px] font-semibold text-[#1D1D1F]">
+            <span className="flex min-w-0 flex-1 flex-col leading-none">
+              <span className="text-[length:var(--mobile-adapt-overlay-meta)] font-medium text-[#86868B]">本轮训练</span>
+              <span className="mt-1 truncate text-[length:var(--mobile-adapt-font-body-sm)] font-semibold text-[#1D1D1F]">
                 {collapsedStepLabel}
               </span>
             </span>
             <ChevronDown
-              className={`size-3.5 shrink-0 text-[#86868B] transition-transform duration-200 ${
+              className={`size-4 shrink-0 text-[#86868B] transition-transform duration-200 ${
                 panelOpen ? "rotate-180" : ""
               }`}
             />
@@ -508,7 +511,7 @@ function SceneTrainingCoachFloatingEntry({
 
           {panelOpen ? (
             <div
-              className="absolute flex flex-col overflow-hidden rounded-[28px] border border-white/35 bg-[rgba(255,255,255,0.82)] shadow-[0_10px_40px_rgba(0,0,0,0.1)] backdrop-blur-[20px] saturate-[1.8]"
+              className="absolute flex flex-col overflow-hidden rounded-[var(--mobile-adapt-overlay-radius)] border border-white/35 bg-[rgba(255,255,255,0.82)] shadow-[0_10px_40px_rgba(0,0,0,0.1)] backdrop-blur-[20px] saturate-[1.8]"
               style={{
                 left: `${panelLeft}px`,
                 top: `${panelTop}px`,
@@ -516,24 +519,24 @@ function SceneTrainingCoachFloatingEntry({
                 maxHeight: `${panelMaxHeight}px`,
               }}
             >
-              <div className="flex shrink-0 items-center justify-between gap-3 px-6 pt-6">
-                <p className="text-[19px] font-bold text-[#1D1D1F]">
+              <div className="flex shrink-0 items-center justify-between gap-[var(--mobile-adapt-space-md)] px-[var(--mobile-adapt-space-sheet)] pt-[var(--mobile-adapt-space-sheet)]">
+                <p className="text-[length:var(--mobile-adapt-overlay-title)] font-bold text-[#1D1D1F]">
                   {sceneDetailMessages.trainingPanelTitle}
                 </p>
                 <button
                   type="button"
                   aria-label="收起训练面板"
-                  className="inline-flex size-7 shrink-0 items-center justify-center rounded-full text-[#86868B] transition-colors hover:bg-white/55 hover:text-[#1D1D1F]"
+                  className="inline-flex size-[var(--mobile-adapt-overlay-close-size)] shrink-0 items-center justify-center rounded-full text-[#86868B] transition-colors hover:bg-white/55 hover:text-[#1D1D1F]"
                   onClick={() => setPanelOpen(false)}
                 >
                   <ChevronDown className="size-4" />
                 </button>
               </div>
 
-              <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-5 pt-5">
-                <div className="relative flex flex-col gap-3">
+              <div className="min-h-0 flex-1 overflow-y-auto px-[var(--mobile-adapt-space-sheet)] pb-[var(--mobile-adapt-space-sheet)] pt-[var(--mobile-adapt-space-sheet)]">
+                <div className="relative flex flex-col gap-[var(--mobile-adapt-space-md)]">
                   <div className="pointer-events-none absolute bottom-[10px] left-[11px] top-[10px] w-[2px] bg-[#E5E5EA]" />
-                  <div className="space-y-3">
+                  <div className="space-y-[var(--mobile-adapt-space-md)]">
                     {normalizedTrainingState.stepStates.map((step, index) => {
                       const done = step.status === "done";
                       const active = step.status === "current";
@@ -542,31 +545,33 @@ function SceneTrainingCoachFloatingEntry({
                       return (
                         <div
                           key={step.key}
-                          className={`relative z-[1] flex items-center gap-3 ${
-                            active ? "-ml-2 rounded-[12px] bg-[#E5F1FF] px-3 py-2" : "px-0 py-1"
+                          className={`relative z-[1] flex items-center gap-[var(--mobile-adapt-space-md)] ${
+                              active
+                              ? "-ml-[var(--mobile-adapt-space-sm)] rounded-[var(--mobile-adapt-overlay-step-radius)] bg-[#E5F1FF] px-[var(--mobile-adapt-space-md)] py-[var(--mobile-adapt-space-sm)]"
+                              : "px-0 py-[var(--mobile-adapt-space-2xs)]"
                           }`}
                         >
                           <div
                             className={`relative shrink-0 ${
                               active
-                                ? "inline-flex size-[22px] items-center justify-center rounded-full bg-[#E5F1FF]"
-                                : "inline-flex size-[22px] items-center justify-center"
+                                ? "inline-flex size-[var(--mobile-adapt-overlay-step-indicator)] items-center justify-center rounded-full bg-[#E5F1FF]"
+                                : "inline-flex size-[var(--mobile-adapt-overlay-step-indicator)] items-center justify-center"
                             }`}
                           >
                             {done ? (
-                              <span className="inline-flex size-[22px] items-center justify-center rounded-full bg-[#34C759] text-[12px] font-semibold text-white">
+                              <span className="inline-flex size-[var(--mobile-adapt-overlay-step-indicator)] items-center justify-center rounded-full bg-[#34C759] text-[length:var(--mobile-adapt-font-meta)] font-semibold text-white">
                                 <Check className="size-3.5" />
                               </span>
                             ) : active ? (
-                              <span className="size-[10px] rounded-full border-[6px] border-[#E5F1FF] bg-[#007AFF] box-content" />
+                              <span className="size-[var(--mobile-adapt-overlay-step-dot)] rounded-full border-[var(--mobile-adapt-overlay-step-dot-ring)] border-[#E5F1FF] bg-[#007AFF] box-content" />
                             ) : (
-                              <span className="size-[18px] rounded-full border-2 border-[#C7C7CC] bg-white" />
+                              <span className="size-[var(--mobile-adapt-overlay-step-pending)] rounded-full border-2 border-[#C7C7CC] bg-white" />
                             )}
                           </div>
 
                           <div className="min-w-0 flex-1">
                             <span
-                              className={`block text-[15px] ${
+                              className={`block text-[length:var(--mobile-adapt-overlay-body)] ${
                                 done
                                   ? "text-[#86868B] line-through"
                                   : active
@@ -579,7 +584,7 @@ function SceneTrainingCoachFloatingEntry({
                             {showPracticeStepAction ? (
                               <button
                                 type="button"
-                                className="mt-2 inline-flex min-h-8 items-center rounded-full border border-black/5 bg-white px-3 py-1 text-xs font-medium text-[#1D1D1F] transition-all duration-200 active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-50"
+                                className="mt-[var(--mobile-adapt-space-sm)] inline-flex min-h-8 items-center rounded-full border border-black/5 bg-white px-[var(--mobile-adapt-space-md)] py-[var(--mobile-adapt-space-2xs)] text-[length:var(--mobile-adapt-font-meta)] font-medium text-[#1D1D1F] transition-all duration-200 active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-50"
                                 disabled={practiceStepAction.disabled}
                                 onClick={() => {
                                   practiceStepAction.onClick();
@@ -600,21 +605,21 @@ function SceneTrainingCoachFloatingEntry({
                   </div>
                 </div>
 
-                <div className="mt-5 border-t border-black/5 pt-4">
-                  <p className="text-[11px] leading-[1.4] text-[#86868B]">
+                <div className="mt-[var(--mobile-adapt-space-sheet)] border-t border-black/5 pt-[var(--mobile-adapt-space-xl)]">
+                  <p className="text-[length:var(--mobile-adapt-overlay-meta)] leading-[1.4] text-[#86868B]">
                     整段播放 {statsSummary.fullPlayCount} 次 · 重点表达 {statsSummary.openedExpressionCount} 个 · 核心句 {statsSummary.practicedSentenceCount} 句
                   </p>
-                  <p className="mt-1 text-[11px] leading-[1.4] text-[#86868B]">
+                  <p className="mt-1 text-[length:var(--mobile-adapt-overlay-meta)] leading-[1.4] text-[#86868B]">
                     练习模块 {statsSummary.practiceModuleCompleted}/1 · 作答 {statsSummary.practiceAttemptCount} 次 · <span className="font-semibold text-[#1D1D1F]">{sceneDetailMessages.panelProgressLabel} {statsSummary.progressPercent}%</span>
                   </p>
                 </div>
               </div>
 
-              <div className="shrink-0 px-6 pb-6">
+              <div className="shrink-0 px-[var(--mobile-adapt-space-sheet)] pb-[var(--mobile-adapt-space-sheet)]">
                 {currentStepActionLabel && onCurrentStepAction ? (
                   <button
                     type="button"
-                    className="inline-flex min-h-[52px] w-full items-center justify-center rounded-[16px] border-0 bg-[#007AFF] px-4 py-3 text-[16px] font-semibold text-white shadow-[0_4px_15px_rgba(0,122,255,0.3)] transition-all duration-200 active:scale-[0.96] active:opacity-80 disabled:cursor-not-allowed disabled:bg-[#D0D7E2] disabled:text-white/80 disabled:shadow-none"
+                    className="inline-flex min-h-[var(--mobile-adapt-button-height)] w-full items-center justify-center rounded-[14px] border-0 bg-[#007AFF] px-[var(--mobile-adapt-space-xl)] py-[var(--mobile-adapt-space-md)] text-[length:var(--mobile-adapt-font-sheet-body)] font-semibold text-white shadow-[0_4px_15px_rgba(0,122,255,0.3)] transition-all duration-200 active:scale-[0.96] active:opacity-80 disabled:cursor-not-allowed disabled:bg-[#D0D7E2] disabled:text-white/80 disabled:shadow-none"
                     disabled={currentStepActionDisabled}
                     onClick={() => {
                       onCurrentStepAction();
@@ -628,7 +633,7 @@ function SceneTrainingCoachFloatingEntry({
                     </LoadingContent>
                   </button>
                 ) : null}
-                <p className="mt-2 text-center text-[12px] text-[#86868B]">
+                <p className="mt-[var(--mobile-adapt-space-sm)] text-center text-[length:var(--mobile-adapt-font-meta)] text-[#86868B]">
                   下一步：{nextStepLabel}
                 </p>
               </div>
@@ -1260,13 +1265,13 @@ export default function SceneDetailClientPage({
   }, [baseLesson, latestVariantSet?.id, latestVariantSet?.status, viewMode]);
 
   if (sceneLoading) {
-    return <LoadingState text={sceneDetailMessages.loading} className="p-4" />;
+    return <LoadingState text={sceneDetailMessages.loading} className="p-[var(--mobile-adapt-space-sheet)]" />;
   }
 
   if (!baseLesson) {
     return (
-      <div className="p-4">
-        <div className={`p-4 ${APPLE_PANEL_RAISED}`}>
+      <div className="p-[var(--mobile-adapt-space-sheet)]">
+        <div className={`p-[var(--mobile-adapt-space-sheet)] ${APPLE_PANEL_RAISED}`}>
           <p className={APPLE_META_TEXT}>{sceneDetailMessages.notFound}</p>
         </div>
       </div>

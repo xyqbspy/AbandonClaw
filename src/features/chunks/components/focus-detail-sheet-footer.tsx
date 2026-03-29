@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
@@ -144,7 +144,7 @@ export function FocusDetailSheetFooter({
             <Button
               type="button"
               variant="ghost"
-              className={`${appleButtonClassName} h-14 rounded-[18px] border-0 bg-[#EDF2F7] px-5 text-[#2C5A7A] shadow-none hover:bg-[#E4ECF6] [@media(max-height:760px)]:h-10 [@media(max-height:760px)]:rounded-[14px] [@media(max-height:760px)]:px-3.5 [@media(max-height:760px)]:text-[13px]`}
+              className={`${appleButtonClassName} h-[var(--mobile-adapt-overlay-footer-button-height)] rounded-[var(--mobile-adapt-overlay-footer-button-radius)] border-0 bg-[#EDF2F7] px-[var(--mobile-space-sheet)] text-[#2C5A7A] shadow-none hover:bg-[#E4ECF6] [@media(max-height:760px)]:h-[var(--mobile-control-height)] [@media(max-height:760px)]:px-[var(--mobile-space-lg)] [@media(max-height:760px)]:text-[length:var(--mobile-font-body-sm)]`}
               disabled={completeAssistDisabled}
               onClick={onCompleteAssist}
             >
@@ -155,11 +155,11 @@ export function FocusDetailSheetFooter({
             <Button
               type="button"
               variant="ghost"
-              className={`${appleButtonClassName} h-14 min-w-0 flex-1 rounded-[18px] bg-[#1A365D] px-7 text-[15px] font-semibold text-white shadow-[0_10px_25px_rgba(26,54,93,0.2)] hover:bg-[#132A46] [@media(max-height:760px)]:h-10 [@media(max-height:760px)]:rounded-[14px] [@media(max-height:760px)]:px-4 [@media(max-height:760px)]:text-[13px]`}
+              className={`${appleButtonClassName} h-[var(--mobile-adapt-overlay-footer-button-height)] min-w-0 flex-1 rounded-[var(--mobile-adapt-overlay-footer-button-radius)] bg-[#1A365D] px-[clamp(16px,4vw,28px)] text-[length:var(--mobile-font-sheet-body)] font-semibold text-white shadow-[0_10px_25px_rgba(26,54,93,0.2)] hover:bg-[#132A46] [@media(max-height:760px)]:h-[var(--mobile-control-height)] [@media(max-height:760px)]:px-[var(--mobile-space-xl)] [@media(max-height:760px)]:text-[length:var(--mobile-font-body-sm)]`}
               aria-label={typeof primaryActionLabel === "string" ? primaryActionLabel : undefined}
               onClick={onPrimaryAction}
             >
-              <span aria-hidden="true">📚</span>
+              <span aria-hidden="true">📝</span>
               <span>{primaryActionLabel}</span>
             </Button>
           ) : null}
@@ -168,3 +168,5 @@ export function FocusDetailSheetFooter({
     />
   );
 }
+
+

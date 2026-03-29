@@ -57,9 +57,9 @@ export function SceneBaseView({
   chunkDetailSheet: ReactNode;
 }) {
   return (
-    <div className="space-y-5">
-      {practiceError ? <p className="text-sm text-destructive">{practiceError}</p> : null}
-      {variantsError ? <p className="text-sm text-destructive">{variantsError}</p> : null}
+    <div className="space-y-[var(--mobile-adapt-space-2xl)]">
+      {practiceError ? <p className="text-[length:var(--mobile-adapt-font-body-sm)] text-destructive">{practiceError}</p> : null}
+      {variantsError ? <p className="text-[length:var(--mobile-adapt-font-body-sm)] text-destructive">{variantsError}</p> : null}
 
       {trainingPanel}
       <div className="relative">

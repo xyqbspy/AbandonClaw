@@ -335,9 +335,28 @@ const mockedModules = {
   "@/lib/cache/scene-cache": {
     clearExpiredSceneCaches: async () => undefined,
     getSceneCache: async () => ({ found: false, isExpired: false, record: null }),
+    getSceneCacheSnapshotSync: () => ({ found: false, isExpired: false, record: null }),
     listRecentSceneCacheKeys: async () => [],
     normalizeSceneSlug: (slug: string) => slug,
     setSceneCache: async () => undefined,
+  },
+  "@/lib/cache/scene-runtime-cache": {
+    getSceneLearningProgressCacheSnapshotSync: () => ({
+      found: true,
+      isExpired: false,
+      record: {
+        data: {
+          state: currentLearningState,
+        },
+      },
+    }),
+    setSceneLearningProgressCache: async () => undefined,
+    getScenePracticeSnapshotCache: async () => ({ found: false, isExpired: false, record: null }),
+    setScenePracticeSnapshotCache: async () => undefined,
+    getSceneVariantRunCache: async () => ({ found: false, isExpired: false, record: null }),
+    setSceneVariantRunCache: async () => undefined,
+    getSceneSavedPhraseTextsCache: async () => ({ found: false, isExpired: false, record: null }),
+    setSceneSavedPhraseTextsCache: async () => undefined,
   },
   "@/lib/cache/scene-prefetch": {
     getPrefetchDebugState: () => ({}),

@@ -35,13 +35,13 @@ export function SelectionToolbar({
   onPronounce,
   loadingPronounce = false,
 }: SelectionToolbarProps) {
-  const toolbarButtonClassName = `${APPLE_BUTTON_BASE} ${APPLE_BUTTON_TEXT_SM} h-7`;
+  const toolbarButtonClassName = `${APPLE_BUTTON_BASE} ${APPLE_BUTTON_TEXT_SM} h-[var(--mobile-adapt-control-height)]`;
 
   return (
     <div
       ref={toolbarRef}
       className={cn(
-        `fixed z-40 hidden w-[256px] items-center gap-1 p-1 backdrop-blur lg:flex ${APPLE_PANEL_RAISED}`,
+        `fixed z-40 hidden w-[clamp(232px,24vw,256px)] items-center gap-[var(--mobile-adapt-space-xs)] p-[var(--mobile-adapt-space-xs)] backdrop-blur lg:flex ${APPLE_PANEL_RAISED}`,
         "transition-all duration-150 ease-out",
         visible
           ? "translate-y-0 opacity-100"
@@ -51,15 +51,15 @@ export function SelectionToolbar({
       role="toolbar"
       aria-label="选中文本操作"
     >
-      <Button size="sm" variant="ghost" className={`${toolbarButtonClassName} flex-1 px-2`} onClick={onExplain}>
+      <Button size="sm" variant="ghost" className={`${toolbarButtonClassName} flex-1 px-[var(--mobile-adapt-space-sm)]`} onClick={onExplain}>
         <BookText className="size-3.5" />
         释义
       </Button>
-      <Button size="sm" variant="ghost" className={`${toolbarButtonClassName} px-2`} onClick={onSave}>
+      <Button size="sm" variant="ghost" className={`${toolbarButtonClassName} px-[var(--mobile-adapt-space-sm)]`} onClick={onSave}>
         <BookmarkPlus className="size-3.5" />
         收藏
       </Button>
-      <Button size="sm" variant="ghost" className={`${toolbarButtonClassName} px-2`} onClick={onReview}>
+      <Button size="sm" variant="ghost" className={`${toolbarButtonClassName} px-[var(--mobile-adapt-space-sm)]`} onClick={onReview}>
         <RotateCcw className="size-3.5" />
         复习
       </Button>
@@ -67,7 +67,7 @@ export function SelectionToolbar({
         loading={loadingPronounce}
         size="sm"
         variant="ghost"
-        className={`px-2 ${APPLE_META_TEXT}`}
+        className={`px-[var(--mobile-adapt-space-sm)] ${APPLE_META_TEXT}`}
         label="朗读"
         activeLabel="停止"
         ariaLabel="朗读"

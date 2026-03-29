@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { ReactNode } from "react";
 import { LoadingContent } from "@/components/shared/action-loading";
@@ -54,12 +54,12 @@ export function SceneVariantsView({
   chunkDetailSheet,
 }: SceneVariantsViewProps) {
   return (
-    <div className="space-y-5">
-      <section className={`space-y-4 p-4 sm:p-5 ${APPLE_PANEL_RAISED}`}>
-        <div className="flex flex-wrap items-center justify-end gap-2">
+    <div className="space-y-[var(--mobile-space-2xl)]">
+      <section className={`space-y-[var(--mobile-space-xl)] p-[var(--mobile-space-sheet)] sm:p-5 ${APPLE_PANEL_RAISED}`}>
+        <div className="flex flex-wrap items-center justify-end gap-[var(--mobile-space-sm)]">
           <button
             type="button"
-            className={`h-8 whitespace-nowrap ${appleButtonSmClassName}`}
+            className={`h-[var(--mobile-control-height)] whitespace-nowrap ${appleButtonSmClassName}`}
             onClick={onBack}
           >
             {labels.back}
@@ -67,7 +67,7 @@ export function SceneVariantsView({
           {variantSet?.status === "completed" && onRepeatVariants ? (
             <button
               type="button"
-              className={`h-8 whitespace-nowrap ${appleButtonSmClassName}`}
+              className={`h-[var(--mobile-control-height)] whitespace-nowrap ${appleButtonSmClassName}`}
               onClick={onRepeatVariants}
             >
               {labels.repeat}
@@ -75,7 +75,7 @@ export function SceneVariantsView({
           ) : (
             <button
               type="button"
-              className={`h-8 whitespace-nowrap ${appleButtonSmClassName} disabled:opacity-60`}
+              className={`h-[var(--mobile-control-height)] whitespace-nowrap ${appleButtonSmClassName} disabled:opacity-60`}
               onClick={onComplete}
               disabled={!variantSet || variantSet.status === "completed"}
             >
@@ -84,7 +84,7 @@ export function SceneVariantsView({
           )}
           <button
             type="button"
-            className={`h-8 whitespace-nowrap px-3 ${appleDangerButtonSmClassName} disabled:opacity-60`}
+            className={`h-[var(--mobile-control-height)] whitespace-nowrap px-[var(--mobile-space-md)] ${appleDangerButtonSmClassName} disabled:opacity-60`}
             onClick={onDeleteSet}
             disabled={!variantSet}
           >
@@ -97,12 +97,12 @@ export function SceneVariantsView({
           <p>{labels.variantsHint}</p>
         </div>
 
-        <div className="space-y-2">
-          <div className="flex items-center justify-between gap-2">
+        <div className="space-y-[var(--mobile-space-sm)]">
+          <div className="flex items-center justify-between gap-[var(--mobile-space-sm)]">
             <h3 className={APPLE_TITLE_MD}>{labels.reusedChunksTitle}</h3>
             <button
               type="button"
-              className={`h-8 whitespace-nowrap ${APPLE_BUTTON_BASE} px-3 text-[11px] font-semibold ${APPLE_META_TEXT} disabled:opacity-60`}
+              className={`h-[var(--mobile-control-height)] whitespace-nowrap ${APPLE_BUTTON_BASE} px-[var(--mobile-space-md)] text-[length:var(--mobile-font-caption)] font-semibold ${APPLE_META_TEXT} disabled:opacity-60`}
               onClick={onOpenExpressionMap}
               disabled={!variantSet || expressionMapLoading}
             >
@@ -112,12 +112,12 @@ export function SceneVariantsView({
             </button>
           </div>
           {variantSet?.reusedChunks?.length ? (
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex flex-wrap gap-[var(--mobile-space-sm)]">
               {variantSet.reusedChunks.map((chunk) => (
                 <button
                   key={chunk}
                   type="button"
-                  className={`${APPLE_BUTTON_BASE} px-2.5 py-1 text-[11px] font-medium`}
+                  className={`${APPLE_BUTTON_BASE} px-[var(--mobile-space-md)] py-[var(--mobile-space-2xs)] text-[length:var(--mobile-font-caption)] font-medium`}
                   onClick={() => onOpenChunk(chunk)}
                 >
                   {chunk}
@@ -131,16 +131,16 @@ export function SceneVariantsView({
       {!variantSet ? (
         <p className={APPLE_META_TEXT}>{labels.empty}</p>
       ) : (
-        <section className={`space-y-3 p-4 sm:p-5 ${APPLE_PANEL_RAISED}`}>
-          <div className="space-y-1">
-            <h3 className={APPLE_TITLE_SM}>变体列表</h3>
-            <p className={APPLE_META_TEXT}>按顺序浏览和完成本轮变体，已完成后可重新开启一轮。</p>
+        <section className={`space-y-[var(--mobile-space-md)] p-[var(--mobile-space-sheet)] sm:p-5 ${APPLE_PANEL_RAISED}`}>
+          <div className="space-y-[var(--mobile-space-2xs)]">
+          <h3 className={APPLE_TITLE_SM}>变体列表</h3>
+          <p className={APPLE_META_TEXT}>按顺序浏览和完成本轮变体，已完成后可重新开启一轮。</p>
           </div>
-          <ul className="space-y-2">
+          <ul className="space-y-[var(--mobile-space-sm)]">
             {variantSet.variants.map((variant) => (
               <li
                 key={variant.id}
-                className={`flex items-center justify-between gap-3 p-3 ${APPLE_LIST_ITEM}`}
+                className={`flex items-center justify-between gap-[var(--mobile-space-md)] p-[var(--mobile-space-md)] ${APPLE_LIST_ITEM}`}
               >
                 <div className="min-w-0 flex-1">
                   <p className={APPLE_TITLE_SM}>{toVariantTitle(variant.lesson.title)}</p>
@@ -151,17 +151,17 @@ export function SceneVariantsView({
                     {labels.statusPrefix}{toVariantStatusLabel(variant.status)}
                   </p>
                 </div>
-                <div className="flex shrink-0 items-center gap-1">
+                <div className="flex shrink-0 items-center gap-[var(--mobile-space-xs)]">
                   <button
                     type="button"
-                    className={`h-8 whitespace-nowrap ${appleButtonSmClassName}`}
+                    className={`h-[var(--mobile-control-height)] whitespace-nowrap ${appleButtonSmClassName}`}
                     onClick={() => onOpenVariant(variant.id)}
                   >
                     {labels.open}
                   </button>
                   <button
                     type="button"
-                    className={`h-8 whitespace-nowrap px-2.5 ${appleDangerButtonSmClassName}`}
+                    className={`h-[var(--mobile-control-height)] whitespace-nowrap px-[var(--mobile-space-sm)] ${appleDangerButtonSmClassName}`}
                     onClick={() => onDeleteVariant(variant.id)}
                   >
                     {labels.delete}
@@ -176,3 +176,4 @@ export function SceneVariantsView({
     </div>
   );
 }
+

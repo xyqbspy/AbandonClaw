@@ -86,14 +86,14 @@ export function ExpressionMapSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="bottom"
-        className={`max-h-[85vh] overflow-y-auto rounded-t-2xl border border-[var(--app-border-soft)] bg-background ${APPLE_PANEL}`}
+        className={`max-h-[var(--mobile-adapt-overlay-sheet-height)] overflow-y-auto rounded-t-[var(--mobile-adapt-overlay-radius)] border border-[var(--app-border-soft)] bg-background ${APPLE_PANEL}`}
       >
-        <SheetHeader className="space-y-1 px-4 pb-3 pt-4">
+        <SheetHeader className="space-y-[var(--mobile-adapt-space-2xs)] px-[var(--mobile-adapt-space-overlay)] pb-[var(--mobile-adapt-space-md)] pt-[var(--mobile-adapt-space-overlay)]">
           <SheetTitle className={APPLE_TITLE_MD}>{labels.title}</SheetTitle>
           <SheetDescription>{labels.description}</SheetDescription>
         </SheetHeader>
 
-        <div className="space-y-4 px-4 pb-4">
+        <div className="space-y-[var(--mobile-adapt-space-xl)] px-[var(--mobile-adapt-space-overlay)] pb-[var(--mobile-adapt-space-overlay)]">
           {loading ? <p className={APPLE_BODY_TEXT}>{labels.loading}</p> : null}
           {!loading && error ? <p className={APPLE_BANNER_DANGER}>{error}</p> : null}
           {!loading && !error && data?.clusters.length === 0 ? (
@@ -101,8 +101,8 @@ export function ExpressionMapSheet({
           ) : null}
 
           {!loading && !error && data?.clusters.length ? (
-            <div className="space-y-4">
-              <div className="flex flex-wrap gap-2">
+            <div className="space-y-[var(--mobile-adapt-space-xl)]">
+              <div className="flex flex-wrap gap-[var(--mobile-adapt-space-sm)]">
                 {data.clusters.map((cluster) => (
                   <Button
                     key={cluster.id}
@@ -122,10 +122,10 @@ export function ExpressionMapSheet({
               </div>
 
               {activeCluster ? (
-                <div className={`space-y-3 p-3 ${APPLE_PANEL}`}>
-                  <div className="space-y-1">
+                <div className={`space-y-[var(--mobile-adapt-space-md)] rounded-[var(--mobile-adapt-overlay-card-radius)] p-[var(--mobile-adapt-space-md)] ${APPLE_PANEL}`}>
+                  <div className="space-y-[var(--mobile-adapt-space-2xs)]">
                     <p className={APPLE_META_TEXT}>{labels.centerExpression}</p>
-                    <p className="text-sm font-medium text-foreground">
+                    <p className="text-[length:var(--mobile-adapt-overlay-body)] font-medium text-foreground">
                       {centerExpressionText || activeCluster.anchor}
                     </p>
                     <p className={APPLE_META_TEXT}>
@@ -134,7 +134,7 @@ export function ExpressionMapSheet({
                   </div>
 
                   <p className={APPLE_META_TEXT}>{labels.relatedExpressions}</p>
-                  <div className="space-y-2">
+                  <div className="space-y-[var(--mobile-adapt-space-sm)]">
                     {displayedClusterExpressions.length === 0 ? (
                       <p className={APPLE_BODY_TEXT}>{labels.clusterEmpty}</p>
                     ) : (
@@ -147,9 +147,9 @@ export function ExpressionMapSheet({
                           text,
                         );
                         return (
-                          <div key={text} className={`p-2.5 ${APPLE_LIST_ITEM}`}>
-                            <div className="flex items-center justify-between gap-2">
-                              <p className="text-sm font-medium text-foreground">{text}</p>
+                          <div key={text} className={`rounded-[var(--mobile-adapt-overlay-card-radius)] p-[var(--mobile-adapt-space-md)] ${APPLE_LIST_ITEM}`}>
+                            <div className="flex items-center justify-between gap-[var(--mobile-adapt-space-sm)]">
+                              <p className="text-[length:var(--mobile-adapt-overlay-body)] font-medium text-foreground">{text}</p>
                               <Badge
                                 variant={status ? "secondary" : "outline"}
                                 className={status ? APPLE_STATUS_BADGE : APPLE_UNKNOWN_BADGE}
@@ -175,8 +175,8 @@ export function ExpressionMapSheet({
           ) : null}
         </div>
 
-        <SheetFooter className="px-4 pt-3 pb-[calc(env(safe-area-inset-bottom)+12px)]">
-          <div className="grid grid-cols-3 gap-2 pb-safe">
+        <SheetFooter className="px-[var(--mobile-adapt-space-overlay)] pt-[var(--mobile-adapt-space-md)] pb-[calc(env(safe-area-inset-bottom)+var(--mobile-adapt-space-md))]">
+          <div className="grid grid-cols-3 gap-[var(--mobile-adapt-space-sm)] pb-safe">
             <Button
               type="button"
               variant="ghost"

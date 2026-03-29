@@ -20,8 +20,8 @@ export function TodayTaskList({
   tasks: DailyTask[];
   onStartTask?: (task: DailyTask) => void;
 }) {
-  const buttonClassName = `${APPLE_BUTTON_BASE} ${APPLE_BUTTON_TEXT_SM} h-8 px-3`;
-  const buttonStrongClassName = `${APPLE_BUTTON_STRONG} ${APPLE_BUTTON_TEXT_SM} h-8 px-3`;
+  const buttonClassName = `${APPLE_BUTTON_BASE} ${APPLE_BUTTON_TEXT_SM} h-[var(--mobile-control-height)] px-[var(--mobile-space-md)]`;
+  const buttonStrongClassName = `${APPLE_BUTTON_STRONG} ${APPLE_BUTTON_TEXT_SM} h-[var(--mobile-control-height)] px-[var(--mobile-space-md)]`;
   const disabledButtonClassName = `${buttonClassName} cursor-not-allowed border-transparent bg-[var(--app-surface-hover)] text-[var(--muted-foreground)] shadow-none`;
 
   return (
@@ -29,18 +29,18 @@ export function TodayTaskList({
       <CardHeader>
         <CardTitle className={APPLE_TITLE_MD}>{"\u4eca\u65e5\u4efb\u52a1"}</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-3">
+      <CardContent className="space-y-[var(--mobile-space-md)]">
         {tasks.map((task, index) => (
           <div
             key={task.id}
-            className={`flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between ${
+            className={`flex flex-col gap-[var(--mobile-space-md)] p-[var(--mobile-space-md)] sm:flex-row sm:items-center sm:justify-between ${
               task.status === "up_next"
                 ? "rounded-[var(--app-radius-panel)] border border-primary/20 bg-primary/[0.05] shadow-[var(--app-shadow-soft)]"
                 : APPLE_PANEL
             }`}
           >
-            <div className="space-y-1">
-              <p className={`flex items-center gap-2 font-semibold ${APPLE_BODY_TEXT}`}>
+            <div className="space-y-[var(--mobile-space-2xs)]">
+              <p className={`flex items-center gap-[var(--mobile-space-sm)] font-semibold ${APPLE_BODY_TEXT}`}>
                 {task.done ? (
                   <CheckCircle2 className="size-4 text-emerald-600" />
                 ) : task.status === "locked" ? (
@@ -48,7 +48,7 @@ export function TodayTaskList({
                 ) : (
                   <Circle className={`size-4 ${APPLE_META_TEXT}`} />
                 )}
-                <span className={`inline-flex size-5 items-center justify-center rounded-full bg-[var(--app-surface)] text-[11px] ${APPLE_META_TEXT}`}>
+                <span className={`inline-flex size-[clamp(18px,4.8vw,20px)] items-center justify-center rounded-full bg-[var(--app-surface)] text-[length:var(--mobile-font-caption)] ${APPLE_META_TEXT}`}>
                   {index + 1}
                 </span>
                 {task.title}

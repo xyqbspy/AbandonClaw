@@ -2,6 +2,7 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 @import "../styles/rhythm.css";
+@import "../styles/mobile-adaptive.css";
 
 @custom-variant dark (&:is(.dark *));
 
