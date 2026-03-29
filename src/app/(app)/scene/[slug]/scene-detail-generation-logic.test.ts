@@ -106,13 +106,18 @@ test("generateScenePracticeSet 会生成基于来源 lesson 的练习集", async
       practiceGenerateFromApi: async () => [
         {
           id: "exercise-1",
-          type: "translation_prompt",
+          type: "chunk_cloze",
           inputMode: "typing",
           sceneId: variantLesson.id,
           sentenceId: "sentence-1",
+          chunkId: "chunk-1",
           prompt: "Prompt",
           answer: {
-            text: "Answer",
+            text: "How are you",
+            acceptedAnswers: ["How are you"],
+          },
+          cloze: {
+            displayText: "____?",
           },
         },
       ],
@@ -125,6 +130,7 @@ test("generateScenePracticeSet 会生成基于来源 lesson 的练习集", async
   assert.equal(result.sourceType, "variant");
   assert.equal(result.sourceVariantId, "variant-1");
   assert.equal(result.exercises.length, 1);
+  assert.equal(result.exercises[0]?.type, "chunk_cloze");
 });
 
 test("generateSceneVariantSet 会生成稳定的变体集", async () => {
@@ -220,4 +226,158 @@ test("ensureSceneExpressionMapData 会在缓存失效时重新生成表达地图
   assert.equal(result?.reused, false);
   assert.equal(result?.variantSetId, "variant-set-1");
   assert.equal(result?.expressionMap.clusters.length, 1);
+});
+
+test("generateScenePracticeSet 会把 chunk_cloze 题面的挖空答案和判题答案自动对齐", async () => {
+  const result = await generateScenePracticeSet({
+    baseLesson,
+    sourceLesson: variantLesson,
+    deps: {
+      mapLessonToParsedScene: () => ({
+        id: variantLesson.id,
+        slug: variantLesson.slug,
+        title: variantLesson.title,
+        type: "dialogue",
+        sections: [
+          {
+            id: "section-1",
+            blocks: [
+              {
+                id: "block-1",
+                type: "dialogue",
+                speaker: "A",
+                sentences: [
+                  {
+                    id: "sentence-1",
+                    text: "Don't burn yourself out.",
+                    translation: "别把自己累垮了。",
+                    chunks: [
+                      {
+                        id: "chunk-1",
+                        key: "burn yourself out",
+                        text: "burn yourself out",
+                        start: 6,
+                        end: 23,
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      }),
+      practiceGenerateFromApi: async () => [
+        {
+          id: "exercise-1",
+          type: "chunk_cloze",
+          inputMode: "typing",
+          sceneId: variantLesson.id,
+          sentenceId: "sentence-1",
+          chunkId: "chunk-1",
+          prompt: "补全句子中的表达",
+          answer: {
+            text: "burn yourself out",
+            acceptedAnswers: ["burn yourself out"],
+          },
+          cloze: {
+            displayText: "Don't ___ yourself out.",
+          },
+        },
+      ],
+      nowIso: () => "2026-03-22T00:00:00.000Z",
+      createId: () => "practice-fixed",
+    },
+  });
+
+  assert.equal(result.exercises[0]?.answer.text, "burn");
+  assert.deepEqual(result.exercises[0]?.answer.acceptedAnswers, ["burn"]);
+  assert.equal(result.exercises[0]?.metadata?.chunkText, "burn");
+  assert.equal(result.exercises[0]?.prompt, "补全句子中的表达");
+});
+
+test("generateScenePracticeSet 会把填空练习模块收敛成纯 chunk_cloze", async () => {
+  const result = await generateScenePracticeSet({
+    baseLesson,
+    sourceLesson: variantLesson,
+    deps: {
+      mapLessonToParsedScene: () => ({
+        id: variantLesson.id,
+        slug: variantLesson.slug,
+        title: variantLesson.title,
+        type: "dialogue",
+        sections: [
+          {
+            id: "section-1",
+            blocks: [
+              {
+                id: "block-1",
+                type: "dialogue",
+                speaker: "A",
+                sentences: [
+                  {
+                    id: "sentence-1",
+                    text: "Don't burn yourself out.",
+                    translation: "别把自己累垮了。",
+                    chunks: [
+                      {
+                        id: "chunk-1",
+                        key: "burn yourself out",
+                        text: "burn yourself out",
+                        start: 6,
+                        end: 23,
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      }),
+      practiceGenerateFromApi: async () => [
+        {
+          id: "exercise-1",
+          type: "chunk_cloze",
+          inputMode: "typing",
+          sceneId: variantLesson.id,
+          sentenceId: "sentence-1",
+          chunkId: "chunk-1",
+          prompt: "补全句子中的表达",
+          answer: {
+            text: "burn yourself out",
+            acceptedAnswers: ["burn yourself out"],
+          },
+          cloze: {
+            displayText: "Don't ___ yourself out.",
+          },
+        },
+        {
+          id: "exercise-2",
+          type: "translation_prompt",
+          inputMode: "typing",
+          sceneId: variantLesson.id,
+          sentenceId: "sentence-1",
+          prompt: "看中文提示，完整复现这句",
+          answer: {
+            text: "Don't burn yourself out.",
+          },
+          cloze: {
+            displayText: "别把自己累垮了。",
+          },
+        },
+      ],
+      nowIso: () => "2026-03-22T00:00:00.000Z",
+      createId: () => "practice-fixed",
+    },
+  });
+
+  assert.deepEqual(
+    result.exercises.map((exercise) => exercise.type),
+    ["chunk_cloze"],
+  );
+  assert.deepEqual(
+    result.modules?.find((module) => module.mode === "cloze")?.exercises.map((exercise) => exercise.type),
+    ["chunk_cloze"],
+  );
 });

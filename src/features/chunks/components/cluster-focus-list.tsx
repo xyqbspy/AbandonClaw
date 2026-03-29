@@ -2,11 +2,17 @@
 
 import { ChevronDown } from "lucide-react";
 import { LoadingState } from "@/components/shared/action-loading";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { normalizePhraseText } from "@/lib/shared/phrases";
-import { APPLE_BODY_TEXT, APPLE_META_TEXT, APPLE_TITLE_SM } from "@/lib/ui/apple-style";
 import { UserPhraseItemResponse } from "@/lib/utils/phrases-api";
+import {
+  ExpressionSummaryCard,
+  ExpressionSummaryGroup,
+  ExpressionSummaryRelatedItem,
+} from "./expression-summary-card";
 import { FocusPreviewItem, SavedRelationRowsBySourceId } from "./types";
+
+const ACTION_ICON_CLASS =
+  "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#EDF2F7] bg-[#F7FAFC] text-[#1F5E7E]";
 
 type ClusterFocusListLabels = {
   loading: string;
@@ -51,12 +57,14 @@ export function ClusterFocusList({
   onOpenMainSimilarTab,
   onOpenPreviewItem,
 }: ClusterFocusListProps) {
+  void appleSurfaceClassName;
+
   if (!ready) {
     return <LoadingState text={labels.loading} className="py-1" />;
   }
 
   return (
-    <>
+    <div className="flex flex-col gap-4 [@media(max-height:760px)]:gap-3">
       {rows.map((row) => {
         const isCurrentMain = row.userPhraseId === currentFocusExpressionId;
         const isExpanded = expandedFocusMainId === row.userPhraseId;
@@ -86,17 +94,23 @@ export function ClusterFocusList({
           : [...savedSimilarItems, ...persistedSimilarItems].filter(
               (item, index, array) =>
                 array.findIndex(
-                  (candidate) => normalizePhraseText(candidate.text) === normalizePhraseText(item.text),
+                  (candidate) =>
+                    normalizePhraseText(candidate.text) === normalizePhraseText(item.text),
                 ) === index,
             );
         const previewSimilarItems = similarItems.slice(0, 6);
 
         return (
-          <Card key={row.userPhraseId} className={`${appleSurfaceClassName} gap-0 overflow-hidden`}>
-            <CardHeader className="px-3 pb-3 pt-2.5">
+          <ExpressionSummaryCard
+            key={row.userPhraseId}
+            title={row.text}
+            translation={row.translation ?? labels.noTranslation}
+            onTitleClick={() => onOpenMainDetail(row)}
+            className="active:scale-[0.98]"
+            action={
               <button
                 type="button"
-                className="flex w-full items-center justify-between gap-2 text-left"
+                className={ACTION_ICON_CLASS}
                 onClick={() => {
                   onToggleMain(row.userPhraseId);
                   onToggleExpanded(row.userPhraseId);
@@ -104,69 +118,45 @@ export function ClusterFocusList({
                 aria-expanded={isExpanded}
                 aria-label={isExpanded ? labels.collapse : labels.expand}
               >
-                <p className={APPLE_META_TEXT}>{labels.title}</p>
                 <ChevronDown
-                  className={`size-4 shrink-0 ${APPLE_META_TEXT} transition-transform duration-200 ${
+                  className={`size-4 transition-transform duration-200 ${
                     isExpanded ? "rotate-180" : "rotate-0"
                   }`}
                 />
               </button>
-              <button
-                type="button"
-                className="mt-0.5 min-w-0 text-left"
-                onClick={() => onOpenMainDetail(row)}
-              >
-                <p className={`leading-snug ${APPLE_TITLE_SM}`}>{row.text}</p>
-                <p className={`mt-0.5 line-clamp-1 leading-5 ${APPLE_META_TEXT}`}>
-                  {row.translation ?? labels.noTranslation}
-                </p>
-              </button>
-            </CardHeader>
-            <div
-              className={`overflow-hidden transition-all duration-200 ${
-                isExpanded ? "max-h-[420px] opacity-100" : "max-h-0 opacity-0"
-              }`}
+            }
+          >
+            <ExpressionSummaryGroup
+              label={`🔆 ${labels.similarTab}${previewSimilarItems.length > 0 ? ` · ${previewSimilarItems.length}` : ""}`}
+              actionLabel={labels.openCurrentDetail}
+              onAction={() => onOpenMainSimilarTab(row)}
             >
-              <CardContent className="px-3 pb-3 pt-0">
+              <div
+                className={`overflow-hidden transition-all duration-200 ${
+                  isExpanded ? "max-h-[640px] opacity-100" : "max-h-0 opacity-0"
+                }`}
+              >
                 {previewSimilarItems.length > 0 ? (
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <p className={`font-medium ${APPLE_BODY_TEXT}`}>{labels.similarTab}</p>
-                      <button
-                        type="button"
-                        className={`font-medium ${APPLE_META_TEXT} transition hover:text-foreground`}
-                        onClick={() => onOpenMainSimilarTab(row)}
-                      >
-                        {labels.openCurrentDetail}
-                      </button>
-                    </div>
-                    <div className="space-y-2">
-                      {previewSimilarItems.map((item, index) => {
-                        const isLast = index === previewSimilarItems.length - 1;
-                        return (
-                          <button
-                            key={item.key}
-                            type="button"
-                            className={`block w-full text-left ${isLast ? "" : "border-b border-[var(--app-border-soft)] pb-2"}`}
-                            onClick={() => onOpenPreviewItem(row, item)}
-                          >
-                            <p className={`font-medium ${APPLE_BODY_TEXT}`}>{item.text}</p>
-                            {item.savedItem?.translation ? (
-                              <p className={`mt-0.5 ${APPLE_META_TEXT}`}>
-                                {item.savedItem.translation}
-                              </p>
-                            ) : null}
-                          </button>
-                        );
-                      })}
-                    </div>
+                  <div className="space-y-0">
+                    {previewSimilarItems.map((item) => (
+                      <ExpressionSummaryRelatedItem
+                        key={item.key}
+                        primary={item.text}
+                        secondary={
+                          item.differenceLabel ?? item.savedItem?.translation ?? labels.openCurrentDetail
+                        }
+                        onClick={() => onOpenPreviewItem(row, item)}
+                      />
+                    ))}
                   </div>
+                ) : isExpanded ? (
+                  <p className="px-1 py-2 text-[13px] text-[#718096]">{labels.noTranslation}</p>
                 ) : null}
-              </CardContent>
-            </div>
-          </Card>
+              </div>
+            </ExpressionSummaryGroup>
+          </ExpressionSummaryCard>
         );
       })}
-    </>
+    </div>
   );
 }

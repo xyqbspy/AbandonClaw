@@ -230,9 +230,11 @@ export function useSceneDetailPlayback({
     (chunk: string, relatedChunks: string[]) => {
       if (!baseLesson) return;
       const variantLessons = latestVariantSet?.variants.map((item) => item.lesson) ?? [];
-      const context = findChunkContext(chunk, baseLesson, variantLessons);
+      const preferredChunk = relatedChunks[0]?.trim() || chunk.trim();
+      if (!preferredChunk) return;
+      const context = findChunkContext(preferredChunk, baseLesson, variantLessons);
       if (!context) return;
-      const detail = getChunkLayerFromLesson(context.lesson, context.sentence, chunk);
+      const detail = getChunkLayerFromLesson(context.lesson, context.sentence, preferredChunk);
       setVariantChunkSentence(context.sentence);
       setVariantChunkDetail(detail);
       setVariantChunkRelatedChunks(relatedChunks);
@@ -240,14 +242,14 @@ export function useSceneDetailPlayback({
       if (process.env.NODE_ENV !== "test") {
         const allSentences = getLessonSentences(context.lesson);
         const sentenceIndex = allSentences.findIndex((item) => item.id === context.sentence.id);
-        const encounterKey = `${context.lesson.slug}:${context.sentence.id}:${chunk.trim().toLowerCase()}`;
+        const encounterKey = `${context.lesson.slug}:${context.sentence.id}:${preferredChunk.toLowerCase()}`;
         if (!trackedChunkKeys[encounterKey]) {
           setTrackedChunkKeys((prev) => ({ ...prev, [encounterKey]: true }));
           void trackChunksFromApi({
             sceneSlug: context.lesson.slug,
             sentenceIndex: sentenceIndex >= 0 ? sentenceIndex : undefined,
             sentenceText: context.sentence.text,
-            chunks: [chunk],
+            chunks: [preferredChunk],
             interactionType: "encounter",
           }).catch(() => {
             setTrackedChunkKeys((prev) => {

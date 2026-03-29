@@ -15,7 +15,7 @@ export function buildFocusDetailContentLabels(labels: FocusDetailSheetLabels, re
     candidateBadge: labels.detailCandidateBadge,
     noTranslation: labels.noTranslation,
     loading: labels.detailLoading,
-    enriching: `${labels.detailRetryEnrichment ?? "补全当前chunk"}...`,
+    enriching: `${labels.detailRetryEnrichment ?? "补全当前 chunk"}...`,
     tabInfo: labels.detailTabInfo,
     tabSimilar: labels.detailTabSavedSimilar,
     tabContrast: labels.detailTabContrast,

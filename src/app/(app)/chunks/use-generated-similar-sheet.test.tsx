@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import test, { afterEach } from "node:test";
-import React from "react";
 import { act, cleanup, renderHook } from "@testing-library/react";
 
 import { useGeneratedSimilarSheet } from "./use-generated-similar-sheet";
@@ -55,6 +54,8 @@ test("useGeneratedSimilarSheet 会打开并加载候选项", async () => {
       onLoadCluster: async () => undefined,
       onApplyClusterFilter: () => undefined,
       deps: {
+        getGeneratedSimilarCache: async () => ({ found: false, record: null, isExpired: false }),
+        setGeneratedSimilarCache: async () => undefined,
         generateSimilarExpressionsFromApi: async () => ({
           version: "v1",
           candidates: [{ text: "wrap it up", differenceLabel: "更偏收尾" }],
@@ -101,6 +102,8 @@ test("useGeneratedSimilarSheet 会保存选中候选并加载 cluster", async ()
       },
       onSuccess: (message) => success.push(message),
       deps: {
+        getGeneratedSimilarCache: async () => ({ found: false, record: null, isExpired: false }),
+        setGeneratedSimilarCache: async () => undefined,
         generateSimilarExpressionsFromApi: async () => ({
           version: "v1",
           candidates: [{ text: "wrap it up", differenceLabel: "更偏收尾" }],
@@ -151,6 +154,8 @@ test("useGeneratedSimilarSheet 在未选中候选时会提示选择", async () =
       onApplyClusterFilter: () => undefined,
       onSelectAtLeastOne: () => messages.push("select"),
       deps: {
+        getGeneratedSimilarCache: async () => ({ found: false, record: null, isExpired: false }),
+        setGeneratedSimilarCache: async () => undefined,
         generateSimilarExpressionsFromApi: async () => ({
           version: "v1",
           candidates: [{ text: "wrap it up", differenceLabel: "更偏收尾" }],
@@ -180,4 +185,55 @@ test("useGeneratedSimilarSheet 在未选中候选时会提示选择", async () =
   });
 
   assert.deepEqual(messages, ["select"]);
+});
+
+test("useGeneratedSimilarSheet 会优先复用缓存候选并跳过接口请求", async () => {
+  let networkCalls = 0;
+  const { result } = renderHook(() =>
+    useGeneratedSimilarSheet({
+      expressionRows,
+      normalizeSimilarLabel: (label) => label ?? "",
+      onLoadCluster: async () => undefined,
+      onApplyClusterFilter: () => undefined,
+      deps: {
+        getGeneratedSimilarCache: async () => ({
+          found: true,
+          isExpired: false,
+          record: {
+            data: {
+              candidates: [{ text: "call it quits", differenceLabel: "更直接" }],
+            },
+          },
+        }),
+        setGeneratedSimilarCache: async () => undefined,
+        generateSimilarExpressionsFromApi: async () => {
+          networkCalls += 1;
+          return {
+            version: "v1",
+            candidates: [],
+          };
+        },
+        savePhraseFromApi: async () => ({
+          created: true,
+          phrase: { id: "phrase-1", normalized_text: "call it a day", display_text: "call it a day" },
+          userPhrase: { id: "saved-1" },
+          expressionClusterId: "cluster-1",
+        }),
+        savePhrasesBatchFromApi: async () => ({
+          items: [],
+        }),
+        enrichSimilarExpressionsBatchFromApi: async () => ({
+          items: [],
+        }),
+        setTimeoutFn: () => 1,
+      },
+    }),
+  );
+
+  await act(async () => {
+    await result.current.openGenerateSimilarSheet(expressionRows[0]);
+  });
+
+  assert.equal(networkCalls, 0);
+  assert.equal(result.current.generatedSimilarCandidates[0]?.text, "call it quits");
 });

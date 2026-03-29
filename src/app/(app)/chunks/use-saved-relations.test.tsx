@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import test, { afterEach } from "node:test";
-import React from "react";
 import { cleanup, renderHook, waitFor } from "@testing-library/react";
 
 import { useSavedRelations } from "./use-saved-relations";
@@ -89,6 +88,8 @@ const expressionRows: UserPhraseItemResponse[] = [
 test("useSavedRelations 会批量预热表达关系并输出 ready 状态", async () => {
   const messages: string[] = [];
   const deps: SavedRelationsDeps = {
+    getPhraseRelationsCache: async () => ({ found: false, record: null, isExpired: false }),
+    setPhraseRelationsCache: async () => undefined,
     getPhraseRelationsBatchFromApi: async (userPhraseIds: string[]) => ({
       rows: [
         {
@@ -126,6 +127,8 @@ test("useSavedRelations 会批量预热表达关系并输出 ready 状态", asyn
 test("useSavedRelations 支持按 id 失效关系缓存并重新预热", async () => {
   const requestedBatches: string[][] = [];
   const deps: SavedRelationsDeps = {
+    getPhraseRelationsCache: async () => ({ found: false, record: null, isExpired: false }),
+    setPhraseRelationsCache: async () => undefined,
     getPhraseRelationsBatchFromApi: async (userPhraseIds: string[]) => {
       requestedBatches.push(userPhraseIds);
       return {
@@ -167,6 +170,8 @@ test("useSavedRelations 支持按 id 失效关系缓存并重新预热", async (
 test("useSavedRelations 会为详情懒加载缺失关系，并在完成后清理 loading key", async () => {
   const requestedIds: string[] = [];
   const deps: SavedRelationsDeps = {
+    getPhraseRelationsCache: async () => ({ found: false, record: null, isExpired: false }),
+    setPhraseRelationsCache: async () => undefined,
     getPhraseRelationsBatchFromApi: async () => ({ rows: [] }),
     getPhraseRelationsFromApi: async (userPhraseId: string) => {
       requestedIds.push(userPhraseId);
@@ -205,6 +210,8 @@ test("useSavedRelations 在请求进行中不会重复拉取同一详情关系",
   let resolveRequest!: (value: { rows: UserPhraseRelationItemResponse[] }) => void;
   const requestedIds: string[] = [];
   const deps: SavedRelationsDeps = {
+    getPhraseRelationsCache: async () => ({ found: false, record: null, isExpired: false }),
+    setPhraseRelationsCache: async () => undefined,
     getPhraseRelationsBatchFromApi: async () => ({ rows: [] }),
     getPhraseRelationsFromApi: async (userPhraseId: string) =>
       await new Promise<{ rows: UserPhraseRelationItemResponse[] }>((resolve) => {
@@ -230,7 +237,9 @@ test("useSavedRelations 在请求进行中不会重复拉取同一详情关系",
   rerender({ focusDetailUserPhraseId: "detail-2" });
   rerender({ focusDetailUserPhraseId: "detail-2" });
 
-  assert.deepEqual(requestedIds, ["detail-2"]);
+  await waitFor(() => {
+    assert.deepEqual(requestedIds, ["detail-2"]);
+  });
 
   resolveRequest({ rows: [] });
 });
@@ -238,6 +247,8 @@ test("useSavedRelations 在请求进行中不会重复拉取同一详情关系",
 test("useSavedRelations 在 onLoadFailed 回调变化时不会重复批量预热", async () => {
   const requestedBatches: string[][] = [];
   const deps: SavedRelationsDeps = {
+    getPhraseRelationsCache: async () => ({ found: false, record: null, isExpired: false }),
+    setPhraseRelationsCache: async () => undefined,
     getPhraseRelationsBatchFromApi: async (userPhraseIds: string[]) => {
       requestedBatches.push(userPhraseIds);
       return { rows: [] };
@@ -270,4 +281,52 @@ test("useSavedRelations 在 onLoadFailed 回调变化时不会重复批量预热
     assert.equal(requestedBatches.length, 1);
   });
   assert.deepEqual(requestedBatches[0], ["p1", "p2"]);
+});
+
+test("useSavedRelations 会优先复用缓存关系并跳过批量请求", async () => {
+  let batchCalls = 0;
+  const deps: SavedRelationsDeps = {
+    getPhraseRelationsCache: async (userPhraseId: string) => ({
+      found: true,
+      isExpired: false,
+      record: {
+        data: {
+          userPhraseId,
+          rows:
+            userPhraseId === "p1"
+              ? [
+                  {
+                    sourceUserPhraseId: userPhraseId,
+                    relationType: "similar",
+                    item: expressionRows[1],
+                  },
+                ]
+              : [],
+        },
+      },
+    }),
+    setPhraseRelationsCache: async () => undefined,
+    getPhraseRelationsBatchFromApi: async () => {
+      batchCalls += 1;
+      return { rows: [] };
+    },
+    getPhraseRelationsFromApi: async () => ({ rows: [] }),
+  };
+
+  const { result } = renderHook(() =>
+    useSavedRelations({
+      contentFilter: "expression",
+      expressionViewMode: "focus",
+      expressionRows,
+      focusDetailUserPhraseId: null,
+      deps,
+    }),
+  );
+
+  await waitFor(() => {
+    assert.equal(result.current.focusRelationsBootstrapDone, true);
+    assert.equal(result.current.savedRelationRowsBySourceId.p1?.length, 1);
+  });
+
+  assert.equal(batchCalls, 0);
 });

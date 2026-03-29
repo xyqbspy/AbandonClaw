@@ -28,7 +28,10 @@ type UseSceneLearningSyncDeps = {
   clearTimeoutFn: (handle: TimeoutHandle) => void;
   setIntervalFn: (callback: () => void, delay: number) => IntervalHandle;
   clearIntervalFn: (handle: IntervalHandle) => void;
+  startCooldownMs: number;
 };
+
+const sceneLearningStartHistory = new Map<string, number>();
 
 const defaultDeps: UseSceneLearningSyncDeps = {
   startSceneLearningFromApi,
@@ -41,18 +44,27 @@ const defaultDeps: UseSceneLearningSyncDeps = {
   clearTimeoutFn: (handle) => window.clearTimeout(handle),
   setIntervalFn: (callback, delay) => window.setInterval(callback, delay),
   clearIntervalFn: (handle) => window.clearInterval(handle),
+  startCooldownMs: 30_000,
+};
+
+export const resetSceneLearningStartThrottleForTests = () => {
+  sceneLearningStartHistory.clear();
 };
 
 export const useSceneLearningSync = ({
   baseLesson,
   viewMode,
   activeVariantId,
+  initialLearningState,
+  hasFreshInitialLearningState = false,
   onLearningStateChange,
   deps = defaultDeps,
 }: {
   baseLesson: Lesson | null;
   viewMode: SceneViewMode;
   activeVariantId?: string | null;
+  initialLearningState?: SceneLearningProgressResponse | null;
+  hasFreshInitialLearningState?: boolean;
   onLearningStateChange?: (state: SceneLearningProgressResponse) => void;
   deps?: UseSceneLearningSyncDeps;
 }) => {
@@ -120,8 +132,22 @@ export const useSceneLearningSync = ({
 
   useEffect(() => {
     if (!baseLesson || learningStartedRef.current) return;
+    if (hasFreshInitialLearningState && initialLearningState) {
+      learningStartedRef.current = true;
+      lastProgressSyncMsRef.current = deps.now();
+      sceneLearningStartHistory.set(baseLesson.slug, deps.now());
+      return;
+    }
+    const now = deps.now();
+    const recentStartAt = sceneLearningStartHistory.get(baseLesson.slug) ?? 0;
+    if (recentStartAt > 0 && now - recentStartAt < deps.startCooldownMs) {
+      learningStartedRef.current = true;
+      lastProgressSyncMsRef.current = now;
+      return;
+    }
     learningStartedRef.current = true;
-    lastProgressSyncMsRef.current = deps.now();
+    lastProgressSyncMsRef.current = now;
+    sceneLearningStartHistory.set(baseLesson.slug, now);
     void deps.startSceneLearningFromApi(baseLesson.slug)
       .then((result) => {
         if (result && onLearningStateChange) {
@@ -131,7 +157,7 @@ export const useSceneLearningSync = ({
       .catch(() => {
         // Non-blocking: scene reading should still work if progress API fails temporarily.
       });
-  }, [baseLesson, deps, onLearningStateChange]);
+  }, [baseLesson, deps, hasFreshInitialLearningState, initialLearningState, onLearningStateChange]);
 
   useEffect(() => {
     currentViewModeRef.current = viewMode;

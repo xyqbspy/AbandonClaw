@@ -5,10 +5,12 @@ import { SceneListItemResponse } from "@/lib/utils/scenes-api";
 
 type ContinueLearningItem = NonNullable<LearningDashboardResponse["continueLearning"]>;
 type LocalRepeatMode = "practice" | "variants";
-type ResolvedContinueLearningItem = ContinueLearningItem & {
+
+export type ResolvedContinueLearningItem = ContinueLearningItem & {
   repeatMode?: LocalRepeatMode | null;
   isRepeat?: boolean;
 };
+
 type ContinueCurrentStep = ContinueLearningItem["currentStep"];
 type ContinueMasteryStage = ContinueLearningItem["masteryStage"];
 
@@ -16,17 +18,17 @@ const SCENE_STEP_LABELS: Record<NonNullable<ContinueCurrentStep>, string> = {
   listen: "听熟这段",
   focus_expression: "看重点表达",
   practice_sentence: "练核心句",
-  scene_practice: "开始练这段",
+  scene_practice: "开始整段练习",
   done: "本轮已完成",
 };
 
 const MASTERY_STAGE_LABELS: Record<ContinueMasteryStage, string> = {
   listening: "先听熟场景",
-  focus: "抓到重点表达",
+  focus: "抓住重点表达",
   sentence_practice: "开始练核心句",
   scene_practice: "进入整段练习",
   variant_unlocked: "可以解锁变体",
-  mastered: "这一组已熟练",
+  mastered: "这一组已经熟练",
 };
 
 const buildFallbackContinueLearning = (
@@ -67,48 +69,42 @@ const buildRepeatContinueCandidate = (
       const latestPracticeSet = generatedState.latestPracticeSet;
 
       if (latestVariantSet?.status === "generated") {
-        const repeatCandidate: ResolvedContinueLearningItem & {
-          repeatStartedAt: string;
-        } = {
+        repeatCandidates.push({
           sceneSlug: scene.slug,
           title: scene.title,
           subtitle: scene.subtitle,
           progressPercent: Math.max(100, scene.progressPercent),
-          masteryStage: "mastered" as const,
+          masteryStage: "mastered",
           masteryPercent: 100,
-          currentStep: "done" as const,
+          currentStep: "done",
           lastViewedAt: latestVariantSet.createdAt,
           lastSentenceIndex: null,
           estimatedMinutes: scene.estimatedMinutes,
           savedPhraseCount: 0,
-          repeatMode: "variants" as const,
+          repeatMode: "variants",
           isRepeat: true,
           repeatStartedAt: latestVariantSet.createdAt,
-        };
-        repeatCandidates.push(repeatCandidate);
+        });
         return;
       }
 
       if (latestPracticeSet?.status === "generated") {
-        const repeatCandidate: ResolvedContinueLearningItem & {
-          repeatStartedAt: string;
-        } = {
+        repeatCandidates.push({
           sceneSlug: scene.slug,
           title: scene.title,
           subtitle: scene.subtitle,
           progressPercent: Math.max(100, scene.progressPercent),
-          masteryStage: "mastered" as const,
+          masteryStage: "mastered",
           masteryPercent: 100,
-          currentStep: "scene_practice" as const,
+          currentStep: "scene_practice",
           lastViewedAt: latestPracticeSet.createdAt,
           lastSentenceIndex: null,
           estimatedMinutes: scene.estimatedMinutes,
           savedPhraseCount: 0,
-          repeatMode: "practice" as const,
+          repeatMode: "practice",
           isRepeat: true,
           repeatStartedAt: latestPracticeSet.createdAt,
-        };
-        repeatCandidates.push(repeatCandidate);
+        });
       }
     });
 
@@ -121,8 +117,23 @@ const buildRepeatContinueCandidate = (
   });
 
   if (repeatCandidates.length === 0) return null;
-  const [{ repeatStartedAt: _repeatStartedAt, ...candidate }] = repeatCandidates;
-  return candidate;
+  const [latestCandidate] = repeatCandidates;
+  if (!latestCandidate) return null;
+  return {
+    sceneSlug: latestCandidate.sceneSlug,
+    title: latestCandidate.title,
+    subtitle: latestCandidate.subtitle,
+    progressPercent: latestCandidate.progressPercent,
+    masteryStage: latestCandidate.masteryStage,
+    masteryPercent: latestCandidate.masteryPercent,
+    currentStep: latestCandidate.currentStep,
+    lastViewedAt: latestCandidate.lastViewedAt,
+    lastSentenceIndex: latestCandidate.lastSentenceIndex,
+    estimatedMinutes: latestCandidate.estimatedMinutes,
+    savedPhraseCount: latestCandidate.savedPhraseCount,
+    repeatMode: latestCandidate.repeatMode,
+    isRepeat: latestCandidate.isRepeat,
+  };
 };
 
 export const resolveContinueLearning = (
@@ -166,23 +177,36 @@ export const getContinueLearningHelperText = (
   sceneTask?: LearningDashboardResponse["todayTasks"]["sceneTask"],
 ) => {
   if (!continueLearning) {
-    return "先完成一个场景输入，再带走表达，最后做一轮回忆。";
+    return "先完成一个场景输入，再带走表达，最后做一轮回忆，让今天的学习真正留下来。";
   }
 
   if (continueLearning.repeatMode === "practice") {
-    return "这不是第一次输入了，直接回到场景练习，把这一段再提取一轮。";
+    return "这不是第一次输入了，直接回到场景练习，把这一段再主动提取一轮。";
   }
 
   if (continueLearning.repeatMode === "variants") {
-    return "基础链路已经走完，这一轮是回炉巩固，继续把核心表达迁移到变体里。";
+    return "基础链路已经走完，这一轮是回炉巩固，把核心表达迁移到变体里继续稳住。";
   }
 
   const stepLabel = getContinueLearningStepLabel(continueLearning, sceneTask);
   const progressPercent = sceneTask?.progressPercent ?? continueLearning.progressPercent;
   if ((sceneTask?.currentStep ?? continueLearning.currentStep) === "done") {
-    return "这轮基础训练已经完成，可以去沉淀表达或进入复习。";
+    return "这轮基础训练已经完成，可以去沉浸表达，或者直接进入回忆复习。";
   }
-  return `当前先${stepLabel}，已经推进到 ${Math.round(progressPercent)}%。`;
+  return `当前先${stepLabel}，已经推进到 ${Math.round(progressPercent)}%，继续一口气把今天这轮做顺。`;
+};
+
+export const getContinueLearningHref = (
+  continueLearning: ResolvedContinueLearningItem | null,
+) => {
+  if (!continueLearning) return "/scenes";
+  if (continueLearning.repeatMode === "practice") {
+    return `/scene/${continueLearning.sceneSlug}?view=practice`;
+  }
+  if (continueLearning.repeatMode === "variants") {
+    return `/scene/${continueLearning.sceneSlug}?view=variants`;
+  }
+  return `/scene/${continueLearning.sceneSlug}`;
 };
 
 export const buildTodayTasks = ({
@@ -217,7 +241,7 @@ export const buildTodayTasks = ({
       : labels.taskSceneDesc,
     durationMinutes: continueLearning?.estimatedMinutes ?? 12,
     done: sceneDone,
-    actionHref: continueLearning ? `/scene/${continueLearning.sceneSlug}` : "/scenes",
+    actionHref: getContinueLearningHref(continueLearning),
     status: sceneDone ? "done" : "up_next",
     actionLabel: sceneDone ? "已完成" : `继续：${continueStepLabel}`,
   };
@@ -247,7 +271,7 @@ export const buildTodayTasks = ({
       : sceneReadyForDownstream
         ? dashboard.todayTasks.reviewTask.dueReviewCount > 0
           ? `当前待回忆 ${dashboard.todayTasks.reviewTask.dueReviewCount} 条，做一轮把输入变成可提取能力。`
-          : "今天先做一轮短回忆，帮助刚学过的表达留下来。"
+          : "今天先做一轮短回忆，帮助刚学过的表达真正留下来。"
         : "先完成场景输入和表达沉淀，再进入回忆环节会更顺。",
     durationMinutes: 8,
     done: reviewDone,
@@ -265,5 +289,5 @@ export const buildTodayTasks = ({
   return [sceneTask, outputTask, reviewTask];
 };
 
-export const getRecommendedScenes = (sceneList: SceneListItemResponse[], limit = 2) =>
+export const getRecommendedScenes = (sceneList: SceneListItemResponse[], limit = 3) =>
   sceneList.slice(0, limit);

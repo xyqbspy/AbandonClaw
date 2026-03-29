@@ -1,5 +1,9 @@
 import { useCallback, useMemo, useState } from "react";
 
+import {
+  getGeneratedSimilarCache,
+  setGeneratedSimilarCache,
+} from "@/lib/cache/chunks-runtime-cache";
 import { normalizePhraseText } from "@/lib/shared/phrases";
 import {
   enrichSimilarExpressionsBatchFromApi,
@@ -11,6 +15,8 @@ import {
 } from "@/lib/utils/phrases-api";
 
 type UseGeneratedSimilarSheetDeps = {
+  getGeneratedSimilarCache: typeof getGeneratedSimilarCache;
+  setGeneratedSimilarCache: typeof setGeneratedSimilarCache;
   generateSimilarExpressionsFromApi: typeof generateSimilarExpressionsFromApi;
   savePhraseFromApi: typeof savePhraseFromApi;
   savePhrasesBatchFromApi: typeof savePhrasesBatchFromApi;
@@ -22,6 +28,8 @@ type UseGeneratedSimilarSheetDeps = {
 };
 
 const defaultDeps: UseGeneratedSimilarSheetDeps = {
+  getGeneratedSimilarCache,
+  setGeneratedSimilarCache,
   generateSimilarExpressionsFromApi,
   savePhraseFromApi,
   savePhrasesBatchFromApi,
@@ -74,11 +82,19 @@ export const useGeneratedSimilarSheet = ({
       setSelectedSimilarMap({});
       setSimilarSheetOpen(true);
       try {
+        const cache = await deps.getGeneratedSimilarCache(item.userPhraseId);
+        if (cache.found && cache.record && !cache.isExpired) {
+          setGeneratedSimilarCandidates(cache.record.data.candidates);
+          return;
+        }
         const response = await deps.generateSimilarExpressionsFromApi({
           baseExpression: item.text,
           existingExpressions: expressionRows.map((row) => row.text),
         });
         setGeneratedSimilarCandidates(response.candidates);
+        void deps.setGeneratedSimilarCache(item.userPhraseId, response.candidates).catch(() => {
+          // Ignore cache failures.
+        });
       } catch (error) {
         onError?.(error instanceof Error ? error.message : "加载失败");
       } finally {

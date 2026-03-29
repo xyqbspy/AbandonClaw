@@ -198,6 +198,32 @@ export async function getSceneCache(slug: string): Promise<{
   };
 }
 
+export function getSceneCacheSnapshotSync(slug: string): {
+  found: boolean;
+  record: SceneCacheRecord<Lesson> | null;
+  isExpired: boolean;
+} {
+  const normalizedSlug = normalizeSceneSlug(slug);
+  const key = sceneKey(normalizedSlug);
+  const record = memorySceneRecords.get(key) ?? null;
+  if (!record) {
+    return { found: false, record: null, isExpired: false };
+  }
+  if (!isRecordSchemaValid(record) || !isRecordPayloadValid(record)) {
+    memorySceneRecords.delete(key);
+    removeQueueItem(key);
+    void Promise.all([idbDeleteSceneRecord(key), persistQueue()]).catch(() => {
+      debugLog("sync snapshot cleanup failed", key);
+    });
+    return { found: false, record: null, isExpired: false };
+  }
+  return {
+    found: true,
+    record,
+    isExpired: record.expiresAt <= nowMs(),
+  };
+}
+
 export async function touchSceneCache(slug: string): Promise<void> {
   const result = await getSceneCache(slug);
   if (!result.found) return;
@@ -304,3 +330,4 @@ export async function listRecentSceneCacheKeys(limit = 5): Promise<string[]> {
   await ensureQueueLoaded();
   return memoryQueue.slice(0, Math.max(1, limit)).map((item) => item.key);
 }
+

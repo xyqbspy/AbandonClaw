@@ -1,4 +1,4 @@
-import assert from "node:assert/strict";
+﻿import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import test, { afterEach } from "node:test";
 import React from "react";
@@ -8,6 +8,12 @@ const localRequire = createRequire(import.meta.url);
 const nodeModule = localRequire("node:module") as typeof import("node:module");
 
 const routerPushCalls: string[] = [];
+const routerPrefetchCalls: string[] = [];
+const detailPrefetchCalls: string[] = [];
+let detailPrefetchImpl = async (slug: string) => {
+  detailPrefetchCalls.push(slug);
+  return true;
+};
 
 const sceneList = [
   {
@@ -46,6 +52,10 @@ const mockedModules = {
       push: (href: string) => {
         routerPushCalls.push(href);
       },
+      prefetch: (href: string) => {
+        routerPrefetchCalls.push(href);
+        return Promise.resolve();
+      },
     }),
   },
   sonner: {
@@ -66,7 +76,12 @@ const mockedModules = {
   "@/lib/cache/scene-list-cache": {
     clearSceneListCache: async () => undefined,
     getSceneListCache: async () => ({ found: false, isExpired: false, record: null }),
+    getSceneListCacheSnapshotSync: () => ({ found: false, isExpired: false, record: null }),
     setSceneListCache: async () => undefined,
+  },
+  "@/lib/cache/scene-prefetch": {
+    prefetchSceneDetail: (slug: string) => detailPrefetchImpl(slug),
+    scheduleScenePrefetch: () => undefined,
   },
 } satisfies Record<string, unknown>;
 
@@ -98,19 +113,68 @@ function getScenesPage() {
 afterEach(() => {
   cleanup();
   routerPushCalls.length = 0;
+  routerPrefetchCalls.length = 0;
+  detailPrefetchCalls.length = 0;
+  detailPrefetchImpl = async (slug: string) => {
+    detailPrefetchCalls.push(slug);
+    return true;
+  };
   ScenesPageModule = null;
 });
 
-test("ScenesPage 点击场景卡片时会显示进入中的覆盖态", async () => {
+test("ScenesPage 点击场景卡片时会显示进入中的覆盖态并预热目标场景", async () => {
   const ScenesPage = getScenesPage();
   render(<ScenesPage />);
 
   await screen.findByText("Coffee Chat");
   fireEvent.click(screen.getByText("Coffee Chat"));
 
-  assert.equal(routerPushCalls.at(-1), "/scene/coffee-chat");
   await waitFor(() => {
     screen.getByText("进入场景中...");
+  });
+
+  await waitFor(() => {
+    assert.equal(routerPushCalls.at(-1), "/scene/coffee-chat");
+    assert.equal(routerPrefetchCalls.includes("/scene/coffee-chat"), true);
+    assert.equal(detailPrefetchCalls.includes("coffee-chat"), true);
+  });
+});
+
+test("ScenesPage 点击场景卡片时会给详情预热一个短暂完成窗口再跳转", async () => {
+  const ScenesPage = getScenesPage();
+  let resolveWarmup: ((value: boolean) => void) | null = null;
+  detailPrefetchImpl = (slug: string) => {
+    detailPrefetchCalls.push(slug);
+    return new Promise<boolean>((resolve) => {
+      resolveWarmup = resolve;
+    });
+  };
+
+  render(<ScenesPage />);
+
+  fireEvent.click(await screen.findByText("Coffee Chat"));
+
+  await waitFor(() => {
+    assert.equal(detailPrefetchCalls.includes("coffee-chat"), true);
+  });
+  assert.equal(routerPushCalls.length, 0);
+
+  resolveWarmup?.(true);
+
+  await waitFor(() => {
+    assert.equal(routerPushCalls.at(-1), "/scene/coffee-chat");
+  });
+});
+
+test("ScenesPage 首屏会立即预热前两个场景详情", async () => {
+  const ScenesPage = getScenesPage();
+  render(<ScenesPage />);
+
+  await screen.findByText("Coffee Chat");
+
+  await waitFor(() => {
+    assert.equal(detailPrefetchCalls.includes("coffee-chat"), true);
+    assert.equal(detailPrefetchCalls.includes("imported-scene"), true);
   });
 });
 
@@ -128,6 +192,7 @@ test("ScenesPage 侧滑后点击删除会弹出二次确认弹框", async () => 
     pointerId: 1,
     pointerType: "touch",
   });
+  assert.equal(detailPrefetchCalls.includes("imported-scene"), true);
   fireEvent.pointerMove(importedCard, {
     clientX: 120,
     clientY: 42,

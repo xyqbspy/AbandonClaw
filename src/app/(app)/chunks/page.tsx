@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Search } from "lucide-react";
-import { TtsActionButton } from "@/components/audio/tts-action-button";
+import { getChunksExpressionMapCache, setChunksExpressionMapCache } from "@/lib/cache/chunks-runtime-cache";
 import { useTtsPlaybackState } from "@/hooks/use-tts-playback-state";
 import { normalizePhraseText } from "@/lib/shared/phrases";
 import { buildChunkAudioKey } from "@/lib/shared/tts";
@@ -28,8 +28,9 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { EmptyState } from "@/components/shared/empty-state";
 import { formatLoadingText, LoadingButton, LoadingState } from "@/components/shared/action-loading";
+import { SegmentedControl } from "@/components/shared/segmented-control";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ExampleSentenceCards } from "@/features/chunks/components/example-sentence-cards";
 import {
   Sheet,
   SheetContent,
@@ -269,7 +270,7 @@ const renderSentenceWithExpressionHighlight = (sentence: string, expression: str
     return (
       <>
         {source.slice(0, directStart)}
-        <mark className="rounded bg-primary/10 px-0.5 text-primary">
+        <mark className="inline-block rounded-[20px] bg-[#EEF6F0] px-2 py-0.5 font-bold text-[#2C6E4F]">
           {source.slice(directStart, directEnd)}
         </mark>
         {source.slice(directEnd)}
@@ -289,7 +290,9 @@ const renderSentenceWithExpressionHighlight = (sentence: string, expression: str
   return (
     <>
       {source.slice(0, start)}
-      <mark className="rounded bg-primary/10 px-0.5 text-primary">{source.slice(start, end)}</mark>
+      <mark className="inline-block rounded-[20px] bg-[#EEF6F0] px-2 py-0.5 font-bold text-[#2C6E4F]">
+        {source.slice(start, end)}
+      </mark>
       {source.slice(end)}
     </>
   );
@@ -304,30 +307,16 @@ const renderExampleSentenceCards = (
     isLoadingText?: (text: string) => boolean;
   },
 ) => {
-  if (examples.length === 0) return null;
   return (
-    <div className="space-y-2">
-      {examples.map((example, index) => (
-        <div key={`${example.en}-${index}`} className={`p-3 ${APPLE_LIST_ITEM}`}>
-          <div className="flex items-start justify-between gap-3">
-            <p className="min-w-0 flex-1 text-sm text-foreground/90">
-              {renderSentenceWithExpressionHighlight(example.en, expression)}
-            </p>
-            {options?.onSpeak ? (
-              <TtsActionButton
-                active={options.isSpeakingText?.(example.en) ?? false}
-                loading={options.isLoadingText?.(example.en) ?? false}
-                onClick={() => options.onSpeak?.(example.en)}
-                className={`mt-0.5 h-auto shrink-0 px-0 ${APPLE_META_TEXT} hover:text-foreground`}
-                iconClassName="size-4"
-                label={zh.speakSentence}
-              />
-            ) : null}
-          </div>
-          <p className={`mt-1 ${APPLE_META_TEXT}`}>{example.zh}</p>
-        </div>
-      ))}
-    </div>
+    <ExampleSentenceCards
+      examples={examples}
+      expression={expression}
+      renderSentenceWithExpressionHighlight={renderSentenceWithExpressionHighlight}
+      speakLabel={zh.speakSentence}
+      onSpeak={options?.onSpeak}
+      isSpeakingText={options?.isSpeakingText}
+      isLoadingText={options?.isLoadingText}
+    />
   );
 };
 
@@ -1011,6 +1000,17 @@ export default function ChunksPage() {
     setMapSourceExpression(expression);
     setActiveClusterId(null);
     try {
+      const cache = await getChunksExpressionMapCache(
+        expression.userPhraseId,
+        expression.expressionClusterId,
+      );
+      if (cache.found && cache.record && !cache.isExpired) {
+        setMapData(cache.record.data.map);
+        setActiveClusterId(cache.record.data.map.clusters[0]?.id ?? null);
+        notifyChunksExpressionMapOpened();
+        return;
+      }
+
       const grouped = expression.expressionClusterId
         ? phrases.filter((row) => row.expressionClusterId === expression.expressionClusterId)
         : [expression];
@@ -1026,6 +1026,13 @@ export default function ChunksPage() {
 
       setMapData(response);
       setActiveClusterId(response.clusters[0]?.id ?? null);
+      void setChunksExpressionMapCache({
+        sourceUserPhraseId: expression.userPhraseId,
+        expressionClusterId: expression.expressionClusterId,
+        map: response,
+      }).catch(() => {
+        // Ignore cache failures.
+      });
       notifyChunksExpressionMapOpened();
     } catch (error) {
       setMapError(error instanceof Error ? error.message : zh.mapFailed);
@@ -1808,96 +1815,77 @@ export default function ChunksPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className={`flex flex-wrap items-center justify-between gap-3 p-3 ${APPLE_PANEL}`}>
-        <div className="relative w-full max-w-sm">
-          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+    <div className="space-y-6 [@media(max-height:760px)]:space-y-3.5">
+      <section className="rounded-[24px] border border-white bg-white p-4 shadow-[0_8px_20px_rgba(0,0,0,0.04)] [@media(max-height:760px)]:rounded-[18px] [@media(max-height:760px)]:p-2.5">
+        <div className="mb-4 flex items-center gap-3 [@media(max-height:760px)]:mb-2.5 [@media(max-height:760px)]:gap-2">
+          <div className="flex h-[42px] w-[42px] items-center justify-center rounded-[14px] bg-[linear-gradient(135deg,#38b2ac,#2c7a7b)] text-[16px] font-bold text-white [@media(max-height:760px)]:h-8 [@media(max-height:760px)]:w-8 [@media(max-height:760px)]:rounded-[10px] [@media(max-height:760px)]:text-[13px]">
+            AC
+          </div>
+          <div className="min-w-0">
+            <p className="text-[16px] font-semibold text-[#1F5E7E] [@media(max-height:760px)]:text-[14px]">{zh.heroTitle}</p>
+            <p className="text-[12px] text-[#718096] [@media(max-height:760px)]:text-[10px]">
+              {zh.heroSubtitle} · {summary}
+            </p>
+          </div>
+        </div>
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-[#718096]" />
           <Input
-            className={`${APPLE_INPUT_PANEL} pl-9`}
-            placeholder={zh.searchPlaceholder}
+            className="h-11 rounded-[16px] border-0 bg-[#F1F5F9] pl-10 text-[14px] text-[#4A5568] shadow-none placeholder:text-[#718096] focus-visible:ring-2 focus-visible:ring-[#cbd5e1] [@media(max-height:760px)]:h-9 [@media(max-height:760px)]:rounded-[12px] [@media(max-height:760px)]:pl-9 [@media(max-height:760px)]:text-[13px]"
+            placeholder={`${zh.searchPlaceholder} · ${summary}`}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
           />
         </div>
+      </section>
+
+      <div className="flex flex-wrap items-center justify-between gap-3 px-1 [@media(max-height:760px)]:gap-1.5">
+        <p className="text-[15px] font-bold text-[#4A5568] [@media(max-height:760px)]:text-[14px]">{zh.coreSection}</p>
         <div className="flex items-center gap-2">
-          <p className={APPLE_META_TEXT}>{summary}</p>
           <Button
             type="button"
             size="sm"
             variant="ghost"
-            className={appleButtonClassName}
+            className="rounded-[10px] bg-[#E6FFFA] px-4 py-2 text-[13px] font-semibold text-[#2C7A7B] hover:bg-[#d8faf3] [@media(max-height:760px)]:rounded-[9px] [@media(max-height:760px)]:px-2.5 [@media(max-height:760px)]:py-1 [@media(max-height:760px)]:text-[11px]"
             onClick={() => setAddSheetOpen(true)}
           >
-            {zh.addExpression}
+            {zh.addLearningContent}
           </Button>
         </div>
       </div>
 
-      <div className={`flex flex-wrap gap-2 p-2 ${APPLE_PANEL}`}>
-        <Button
-          type="button"
-          size="sm"
-          variant="ghost"
-            className={`${appleButtonClassName} ${
-              contentFilter === "expression"
-              ? appleButtonStrongClassName
-              : ""
-          }`}
-          onClick={() => {
-            setContentFilter("expression");
-            setReviewFilter("all");
+      <div className="space-y-3 [@media(max-height:760px)]:space-y-1.5">
+        <SegmentedControl
+          ariaLabel="视图模式"
+          value={expressionViewMode}
+          onChange={(nextMode) => {
+            if (nextMode === "focus") {
+              setContentFilter("expression");
+              setReviewFilter("all");
+            }
+            setExpressionViewMode(nextMode);
           }}
-        >
-          {zh.contentTabExpression}
-        </Button>
-        <Button
-          type="button"
-          size="sm"
-          variant="ghost"
-            className={`${appleButtonClassName} ${
-              contentFilter === "sentence"
-              ? appleButtonStrongClassName
-              : ""
-          }`}
-          onClick={() => {
-            setContentFilter("sentence");
-            setReviewFilter("all");
-          }}
-        >
-          {zh.contentTabSentence}
-        </Button>
-      </div>
+          options={[
+            { value: "focus", label: zh.viewModeFocus },
+            { value: "list", label: zh.viewModeList },
+          ]}
+        />
 
-      {contentFilter === "expression" ? (
-        <div className={`flex flex-wrap gap-2 p-2 ${APPLE_PANEL}`}>
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            className={`${appleButtonClassName} ${
-              expressionViewMode === "focus"
-                ? appleButtonStrongClassName
-                : ""
-            }`}
-            onClick={() => setExpressionViewMode("focus")}
-          >
-            {zh.viewModeFocus}
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            className={`${appleButtonClassName} ${
-              expressionViewMode === "list"
-                ? appleButtonStrongClassName
-                : ""
-            }`}
-            onClick={() => setExpressionViewMode("list")}
-          >
-            {zh.viewModeList}
-          </Button>
-        </div>
-      ) : null}
+        {expressionViewMode === "list" ? (
+          <SegmentedControl
+            ariaLabel="列表内容类型"
+            value={contentFilter}
+            onChange={(nextFilter) => {
+              setContentFilter(nextFilter);
+              setReviewFilter("all");
+            }}
+            options={[
+              { value: "expression", label: zh.contentTabExpression },
+              { value: "sentence", label: zh.contentTabSentence },
+            ]}
+          />
+        ) : null}
+      </div>
 
       {!(contentFilter === "expression" && expressionViewMode === "focus") ? (
         <div className={`flex flex-wrap gap-2 p-2 ${APPLE_PANEL}`}>
@@ -2001,6 +1989,7 @@ export default function ChunksPage() {
 
         </div>
       ) : (
+        <section className="space-y-5">
           <ChunksListView
           phrases={phrases}
           clusterMembersByClusterId={clusterMembersByClusterId}
@@ -2085,6 +2074,7 @@ export default function ChunksPage() {
           applyClusterFilter={applyClusterFilter}
           openGenerateSimilarSheet={openGenerateSimilarSheet}
         />
+        </section>
       )}
 
       <Sheet
@@ -2105,21 +2095,17 @@ export default function ChunksPage() {
           <div className="space-y-4 px-4 pb-4">
             <div className="space-y-1">
               <p className={APPLE_META_TEXT}>{manualSheetState.itemTypeLabel}</p>
-              <Tabs
+              <SegmentedControl
+                ariaLabel={manualSheetState.itemTypeLabel}
                 value={manualItemType}
-                onValueChange={(value) =>
+                onChange={(value) =>
                   setManualItemType(value === "sentence" ? "sentence" : "expression")
                 }
-              >
-                <TabsList className="w-full overflow-y-hidden">
-                  <TabsTrigger value="expression" className="flex-1">
-                    {zh.itemTypeExpression}
-                  </TabsTrigger>
-                  <TabsTrigger value="sentence" className="flex-1">
-                    {zh.itemTypeSentence}
-                  </TabsTrigger>
-                </TabsList>
-              </Tabs>
+                options={[
+                  { value: "expression", label: zh.itemTypeExpression },
+                  { value: "sentence", label: zh.itemTypeSentence },
+                ]}
+              />
             </div>
 
             {manualItemType === "expression" ? (
@@ -2344,21 +2330,17 @@ export default function ChunksPage() {
 
             <div className="space-y-1">
               <p className={APPLE_META_TEXT}>{zh.quickAddRelationTypeLabel}</p>
-              <Tabs
+              <SegmentedControl
+                ariaLabel={zh.quickAddRelationTypeLabel}
                 value={quickAddRelatedType}
-                onValueChange={(value) =>
+                onChange={(value) =>
                   setQuickAddRelatedType(value === "contrast" ? "contrast" : "similar")
                 }
-              >
-                <TabsList className="w-full overflow-y-hidden">
-                  <TabsTrigger value="similar" className="flex-1">
-                    {zh.quickAddSimilar}
-                  </TabsTrigger>
-                  <TabsTrigger value="contrast" className="flex-1">
-                    {zh.quickAddContrast}
-                  </TabsTrigger>
-                </TabsList>
-              </Tabs>
+                options={[
+                  { value: "similar", label: zh.quickAddSimilar },
+                  { value: "contrast", label: zh.quickAddContrast },
+                ]}
+              />
             </div>
           </div>
 

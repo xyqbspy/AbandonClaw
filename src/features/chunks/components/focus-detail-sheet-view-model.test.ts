@@ -54,7 +54,7 @@ test("buildFocusDetailContentLabels 会生成 content 所需文案", () => {
     candidateBadge: "candidate",
     noTranslation: "no translation",
     loading: "loading",
-    enriching: "补全当前chunk...",
+    enriching: "补全当前 chunk...",
     tabInfo: "info",
     tabSimilar: "similar",
     tabContrast: "contrast",

@@ -25,7 +25,7 @@ export function TtsActionButton({
   onClick,
   label = "朗读",
   activeLabel = "停止",
-  loadingLabel = "生成中",
+  loadingLabel = "加载中...",
   ariaLabel,
   variant = "ghost",
   size = "sm",
@@ -46,7 +46,9 @@ export function TtsActionButton({
       {loading ? (
         <Loader2 className={cn("size-3.5 animate-spin", iconClassName)} />
       ) : (
-        <Volume2 className={cn("size-3.5", active && "animate-pulse text-primary", iconClassName)} />
+        <Volume2
+          className={cn("size-3.5", active && "animate-pulse text-primary", iconClassName)}
+        />
       )}
       {resolvedLabel}
     </Button>

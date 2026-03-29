@@ -47,6 +47,11 @@ export const sceneDetailMessages = {
   practiceSentencePrompt: "这句已经开始进入主动提取了。",
   focusStepHint: "先点开一句里的重点短语，再进入下一步。",
   sentenceStepHint: "先在下方训练条里练这句。",
+  continueStepPrompts: {
+    focus_expression: "继续看重点表达",
+    practice_sentence: "继续练核心句",
+    scene_practice: "继续场景练习",
+  },
   sessionCompleted: "这段今天已经认真练过一轮了。",
   sceneMilestones: {
     listen: (sceneTitle: string) => `场景升级：已经听熟《${sceneTitle}》`,
@@ -70,6 +75,10 @@ export const getSceneMilestoneToastMessage = (
   if (step === "done") return sceneDetailMessages.sceneMilestones.done(sceneTitle);
   return sceneDetailMessages.sceneMilestones[step];
 };
+
+export const getSceneContinueStepToastMessage = (
+  step: Exclude<TrainingStepKey, "listen" | "done">,
+) => sceneDetailMessages.continueStepPrompts[step];
 
 export const getSceneTrainingCurrentStepSupportText = ({
   currentStep,

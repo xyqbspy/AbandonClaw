@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { LoadingButton } from "@/components/shared/action-loading";
+import { SegmentedControl } from "@/components/shared/segmented-control";
+import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
@@ -61,10 +63,6 @@ const defaultForm = {
 
 const panelClassName = "rounded-[14px] bg-white p-4 shadow-[0_1px_3px_rgba(0,0,0,0.02)]";
 const labelClassName = "mb-3 block pl-0.5 text-[13px] font-semibold text-[#1d1d1f]";
-const segmentBaseClassName =
-  "rounded-[8px] border-none bg-transparent px-3 py-2 text-[13px] font-medium text-[#1d1d1f] transition-all duration-200";
-const segmentActiveClassName =
-  "bg-white shadow-[0_2px_4px_rgba(0,0,0,0.1)]";
 
 export function GenerateSceneSheet({
   open,
@@ -103,7 +101,7 @@ export function GenerateSceneSheet({
       return;
     }
     if (nextPrompt.length < 3) {
-      setError("再多写一点，至少 3 个字符。");
+      setError("再多写一点，至少 3 个字。");
       return;
     }
 
@@ -152,7 +150,9 @@ export function GenerateSceneSheet({
 
           <div className="px-5 pb-4">
             <h2 className="mb-1 text-[20px] font-bold text-[#1d1d1f]">生成我的场景</h2>
-            <p className="text-[14px] text-[#86868B]">可以用中文或英文描述你最近想练的情境。</p>
+            <p className="text-[14px] text-[#86868B]">
+              可以用中文或英文描述你最近想练的情境。
+            </p>
           </div>
 
           <div className="flex-1 space-y-5 overflow-y-auto px-4 pb-5">
@@ -181,63 +181,36 @@ I want a short scene about canceling plans politely
 
             <div className={panelClassName}>
               <p className={labelClassName}>语气风格</p>
-              <div className="grid grid-cols-4 gap-0.5 rounded-[10px] bg-[#E3E3E8] p-0.5">
-                {toneOptions.map((option) => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    className={cn(
-                      segmentBaseClassName,
-                      tone === option.value && segmentActiveClassName,
-                    )}
-                    onClick={() => setTone(option.value)}
-                    disabled={submitting}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
+              <SegmentedControl
+                ariaLabel="语气风格"
+                value={tone}
+                onChange={setTone}
+                options={toneOptions}
+                disabled={submitting}
+              />
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div className={panelClassName}>
                 <p className={labelClassName}>难度</p>
-                <div className="grid grid-cols-2 gap-0.5 rounded-[10px] bg-[#E3E3E8] p-0.5">
-                  {difficultyOptions.map((option) => (
-                    <button
-                      key={option.value}
-                      type="button"
-                      className={cn(
-                        segmentBaseClassName,
-                        difficulty === option.value && segmentActiveClassName,
-                      )}
-                      onClick={() => setDifficulty(option.value)}
-                      disabled={submitting}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
+                <SegmentedControl
+                  ariaLabel="难度"
+                  value={difficulty}
+                  onChange={setDifficulty}
+                  options={difficultyOptions}
+                  disabled={submitting}
+                />
               </div>
 
               <div className={panelClassName}>
                 <p className={labelClassName}>句数</p>
-                <div className="grid grid-cols-3 gap-0.5 rounded-[10px] bg-[#E3E3E8] p-0.5">
-                  {sentenceCountOptions.map((option) => (
-                    <button
-                      key={option.value}
-                      type="button"
-                      className={cn(
-                        segmentBaseClassName,
-                        sentenceCount === option.value && segmentActiveClassName,
-                      )}
-                      onClick={() => setSentenceCount(option.value)}
-                      disabled={submitting}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
+                <SegmentedControl
+                  ariaLabel="句数"
+                  value={sentenceCount}
+                  onChange={setSentenceCount}
+                  options={sentenceCountOptions}
+                  disabled={submitting}
+                />
               </div>
             </div>
 
@@ -251,7 +224,9 @@ I want a short scene about canceling plans politely
                 disabled={submitting}
               >
                 <div className="flex-1">
-                  <p className="mb-0.5 text-[15px] font-semibold text-[#1d1d1f]">尽量复用我练过的表达</p>
+                  <p className="mb-0.5 text-[15px] font-semibold text-[#1d1d1f]">
+                    尽量复用我练过的表达
+                  </p>
                   <p className="text-[12px] leading-[1.4] text-[#86868B]">
                     更有熟悉感，适合做表达迁移练习。
                   </p>
@@ -280,15 +255,29 @@ I want a short scene about canceling plans politely
           </div>
 
           <div className="bg-[#F2F2F7] px-4 pb-[calc(env(safe-area-inset-bottom)+20px)] pt-3">
-            <LoadingButton
-              type="button"
-              className="h-[50px] w-full rounded-[14px] border-0 bg-[#007AFF] text-[16px] font-semibold text-white shadow-none transition-opacity duration-200 active:scale-[0.98] active:opacity-80"
-              onClick={handleSubmit}
-              loading={submitting}
-              loadingText="生成中..."
-            >
-              生成场景
-            </LoadingButton>
+            <div className="grid grid-cols-2 gap-3">
+              <Button
+                type="button"
+                variant="secondary"
+                radius="lg"
+                className="h-[50px] text-[16px]"
+                onClick={() => onOpenChange(false)}
+                disabled={submitting}
+              >
+                取消
+              </Button>
+              <LoadingButton
+                type="button"
+                variant="default"
+                radius="lg"
+                className="h-[50px] w-full text-[16px]"
+                onClick={handleSubmit}
+                loading={submitting}
+                loadingText="生成中..."
+              >
+                生成场景
+              </LoadingButton>
+            </div>
           </div>
         </div>
       </SheetContent>

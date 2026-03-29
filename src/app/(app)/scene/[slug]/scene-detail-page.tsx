@@ -1,9 +1,17 @@
 ﻿"use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import { Check, ChevronDown, X } from "lucide-react";
+import { Check, ChevronDown } from "lucide-react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { formatLoadingText, LoadingContent, LoadingState } from "@/components/shared/action-loading";
+import {
+  getSceneLearningProgressCacheSnapshotSync,
+  getScenePracticeSnapshotCache,
+  getSceneVariantRunCache,
+  setSceneLearningProgressCache,
+  setScenePracticeSnapshotCache,
+  setSceneVariantRunCache,
+} from "@/lib/cache/scene-runtime-cache";
 import { SelectionDetailSheet } from "@/features/lesson/components/selection-detail-sheet";
 import { SceneExpressionMapView } from "@/features/scene/components/scene-expression-map-view";
 import { ScenePracticeView } from "@/features/scene/components/scene-practice-view";
@@ -22,36 +30,33 @@ import {
   recordScenePracticeAttemptFromApi,
   ScenePracticeSnapshotResponse,
   SceneLearningProgressResponse,
+  SceneVariantRunResponse,
   startScenePracticeRunFromApi,
   startSceneVariantRunFromApi,
 } from "@/lib/utils/learning-api";
 import {
-  APPLE_BODY_TEXT,
-  APPLE_BUTTON_STRONG,
   APPLE_BUTTON_BASE,
   APPLE_BUTTON_DANGER,
   APPLE_META_TEXT,
-  APPLE_PANEL,
   APPLE_PANEL_RAISED,
-  APPLE_TITLE_MD,
   APPLE_BUTTON_TEXT_LG,
   APPLE_BUTTON_TEXT_SM,
 } from "@/lib/ui/apple-style";
 import { cancelScheduledIdleAction, scheduleIdleAction } from "@/lib/utils/resource-actions";
-import { getPracticeModeLabel } from "@/lib/shared/scene-training-copy";
+
 
 import { useSceneDetailActions } from "./use-scene-detail-actions";
 import { SceneBaseView } from "./scene-base-view";
 import { toVariantStatusLabel, toVariantTitle } from "./scene-detail-logic";
 import {
-  getSceneTrainingCurrentStepSupportText,
+
   getSceneTrainingNextStep,
   getSceneTrainingStepTitle,
-  SCENE_TRAINING_STEPS,
   sceneDetailMessages,
   TrainingStepKey,
 } from "./scene-detail-messages";
 import {
+  notifySceneContinueStep,
   notifySceneExpressionFocused,
   notifySceneFocusStepHint,
   notifySceneLoadError,
@@ -78,10 +83,6 @@ import { SceneVariantStudyView } from "./scene-variant-study-view";
 const appleButtonSmClassName = `${APPLE_BUTTON_BASE} ${APPLE_BUTTON_TEXT_SM}`;
 const appleButtonLgClassName = `${APPLE_BUTTON_BASE} ${APPLE_BUTTON_TEXT_LG}`;
 const appleDangerButtonSmClassName = `${APPLE_BUTTON_DANGER} ${APPLE_BUTTON_TEXT_SM}`;
-const trainingStatusDoneClassName =
-  "inline-flex items-center gap-1 rounded-[var(--app-radius-pill)] border border-emerald-700/12 bg-emerald-600/10 px-2 py-1 text-xs font-medium text-emerald-700";
-const trainingStatusCurrentClassName = `rounded-[var(--app-radius-pill)] bg-[var(--app-surface-hover)] px-2 py-1 text-xs ${APPLE_BODY_TEXT}`;
-const trainingStatusPendingClassName = `rounded-[var(--app-radius-pill)] bg-transparent px-2 py-1 text-xs ${APPLE_META_TEXT}`;
 
 type SavePhrasePayload = {
   text: string;
@@ -97,7 +98,6 @@ function SceneTrainingCoachFloatingEntry({
   trainingState,
   variantUnlocked,
   practiceSetStatus,
-  practiceModeKey,
   practiceSnapshot,
   practiceModuleCount,
   currentStepActionLabel,
@@ -110,7 +110,6 @@ function SceneTrainingCoachFloatingEntry({
   trainingState: SceneLearningProgressResponse | null;
   variantUnlocked: boolean;
   practiceSetStatus: "idle" | "generated" | "completed";
-  practiceModeKey?: "cloze" | "guided_recall" | "sentence_recall" | "full_dictation" | null;
   practiceSnapshot: ScenePracticeSnapshotResponse | null;
   practiceModuleCount: number;
   currentStepActionLabel: string | null;
@@ -125,7 +124,15 @@ function SceneTrainingCoachFloatingEntry({
   } | null;
 }) {
   const [panelOpen, setPanelOpen] = useState(false);
-  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [position, setPosition] = useState(() => {
+    if (typeof window === "undefined") {
+      return { x: 0, y: 116 };
+    }
+    return {
+      x: Math.max(4, window.innerWidth - 152 - 4),
+      y: 116,
+    };
+  });
   const [dragActive, setDragActive] = useState(false);
   const [viewportSize, setViewportSize] = useState(() => ({
     width: typeof window === "undefined" ? 0 : window.innerWidth,
@@ -154,18 +161,18 @@ function SceneTrainingCoachFloatingEntry({
     cancelled: false,
     timer: null,
   });
+  const overlayDismissBlockedUntilRef = useRef(0);
 
   const session = trainingState?.session;
-  const progress = trainingState?.progress;
   const viewportWidth = viewportSize.width || (typeof window === "undefined" ? 390 : window.innerWidth);
   const viewportHeight =
     viewportSize.height || (typeof window === "undefined" ? 844 : window.innerHeight);
-  const positionStorageKey = `scene-training-fab-position:${sceneId}`;
-  const viewportGap = 12;
+  const positionStorageKey = `scene-training-fab-position:v3:${sceneId}`;
+  const viewportGap = 4;
   const topGap = 88;
   const fabWidth = fabSize.width;
   const fabHeight = fabSize.height;
-  const panelWidth = Math.min(viewportWidth - viewportGap * 2, viewportWidth < 640 ? 288 : 332);
+  const panelWidth = Math.min(viewportWidth - viewportGap * 2, viewportWidth < 640 ? 344 : 360);
   const panelMaxHeight = Math.max(260, viewportHeight - topGap - viewportGap * 2);
 
   const rawCompletedMap = useMemo(
@@ -209,20 +216,6 @@ function SceneTrainingCoachFloatingEntry({
     [normalizedTrainingState.progressPercent, practiceModuleCount, practiceSnapshot, rawCompletedMap, session],
   );
 
-  const currentStepSupportText = useMemo(() => {
-    const normalizedPracticeModeKey = practiceSnapshot?.run?.currentMode ?? practiceModeKey ?? null;
-    return getSceneTrainingCurrentStepSupportText({
-      currentStep: normalizedTrainingState.currentStep,
-      practiceModeLabel: getPracticeModeLabel(normalizedPracticeModeKey),
-      practiceModeKey: normalizedPracticeModeKey,
-      practiceAttemptCount: practiceSnapshot?.summary.totalAttemptCount ?? 0,
-    });
-  }, [
-    normalizedTrainingState.currentStep,
-    practiceModeKey,
-    practiceSnapshot?.run?.currentMode,
-    practiceSnapshot?.summary.totalAttemptCount,
-  ]);
 
   const clampPosition = useCallback(
     (nextPosition: { x: number; y: number }) => {
@@ -261,14 +254,18 @@ function SceneTrainingCoachFloatingEntry({
     const savedPosition = window.localStorage.getItem(positionStorageKey);
     const fallbackPosition = {
       x: Math.max(viewportGap, window.innerWidth - fabWidth - viewportGap),
-      y: 124,
+      y: 116,
     };
     if (savedPosition) {
       try {
         const parsed = JSON.parse(savedPosition) as { x?: number; y?: number };
+        const parsedX =
+          typeof parsed.x === "number" && parsed.x >= viewportWidth / 2
+            ? parsed.x
+            : fallbackPosition.x;
         setPosition(
           clampPosition({
-            x: typeof parsed.x === "number" ? parsed.x : fallbackPosition.x,
+            x: parsedX,
             y: typeof parsed.y === "number" ? parsed.y : fallbackPosition.y,
           }),
         );
@@ -420,7 +417,12 @@ function SceneTrainingCoachFloatingEntry({
         return;
       }
 
-      setPanelOpen((prev) => !prev);
+      setPanelOpen((prev) => {
+        if (!prev) {
+          overlayDismissBlockedUntilRef.current = Date.now() + 240;
+        }
+        return !prev;
+      });
       resetDragState();
     },
     [
@@ -449,114 +451,135 @@ function SceneTrainingCoachFloatingEntry({
   );
 
   return (
-    <div
-      className="fixed z-40"
-      style={{
-        left: `${position.x}px`,
-        top: `${position.y}px`,
-      }}
-    >
-      <div className="relative">
+    <>
+      {panelOpen ? (
         <button
-          ref={iconButtonRef}
           type="button"
-          aria-label="训练进度入口"
-          data-testid="scene-training-fab"
-          className={`inline-flex min-h-11 items-center gap-2 px-3 py-2 text-left backdrop-blur transition-transform duration-150 ${APPLE_PANEL_RAISED}`}
-          style={{
-            minHeight: `${fabHeight}px`,
-            touchAction: "none",
-            transform: dragActive ? "scale(1.08)" : "scale(1)",
+          aria-label="关闭训练面板遮罩"
+          className="fixed inset-0 z-40 border-0 bg-[rgba(242,242,247,0.42)] backdrop-blur-[4px]"
+          onClick={() => {
+            if (Date.now() < overlayDismissBlockedUntilRef.current) {
+              return;
+            }
+            setPanelOpen(false);
           }}
-          onPointerDown={handleIconPointerDown}
-          onPointerMove={handleIconPointerMove}
-          onPointerUp={handleIconPointerUp}
-          onPointerCancel={handleIconPointerCancel}
-        >
-          <span className="size-2.5 rounded-full bg-primary" aria-hidden="true" />
-          <span className="flex flex-col leading-none">
-            <span className={APPLE_META_TEXT}>当前</span>
-            <span className={`mt-1 ${APPLE_BODY_TEXT} font-medium`}>
-              {collapsedStepLabel}
-            </span>
-          </span>
-          <ChevronDown className={`size-4 ${APPLE_META_TEXT}`} />
-        </button>
-
-        {panelOpen ? (
-          <div
-            className={`absolute flex flex-col overflow-hidden backdrop-blur sm:rounded-3xl ${APPLE_PANEL_RAISED}`}
+        />
+      ) : null}
+      <div
+        className="fixed z-50"
+        style={{
+          left: `${position.x}px`,
+          top: `${position.y}px`,
+        }}
+      >
+        <div className="relative">
+          <button
+            ref={iconButtonRef}
+            type="button"
+            aria-label="训练进度入口"
+            aria-expanded={panelOpen}
+            data-testid="scene-training-fab"
+            className="inline-flex min-h-10 items-center gap-2.5 rounded-[20px] border border-white/35 bg-[rgba(255,255,255,0.82)] px-3.5 py-2.5 text-left shadow-[0_10px_34px_rgba(15,23,42,0.12)] backdrop-blur-[18px] transition-transform duration-150"
             style={{
-              left: `${panelLeft}px`,
-              top: `${panelTop}px`,
-              width: `${panelWidth}px`,
-              maxHeight: `${panelMaxHeight}px`,
+              minHeight: `${fabHeight}px`,
+              touchAction: "none",
+              transform: dragActive ? "scale(1.08)" : "scale(1)",
             }}
+            onPointerDown={handleIconPointerDown}
+            onPointerMove={handleIconPointerMove}
+            onPointerUp={handleIconPointerUp}
+            onPointerCancel={handleIconPointerCancel}
           >
-            <div className="flex shrink-0 items-start justify-between gap-3 px-3 pt-3 sm:px-4 sm:pt-4">
-              <div className="space-y-1">
-                <p className={APPLE_TITLE_MD}>
+            <span className="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-[#E5F1FF]">
+              <span className="size-2 rounded-full bg-[#007AFF]" aria-hidden="true" />
+            </span>
+            <span className="flex min-w-0 flex-col leading-none">
+              <span className="text-[10px] font-medium text-[#86868B]">本轮训练</span>
+              <span className="mt-1 truncate text-[13px] font-semibold text-[#1D1D1F]">
+                {collapsedStepLabel}
+              </span>
+            </span>
+            <ChevronDown
+              className={`size-3.5 shrink-0 text-[#86868B] transition-transform duration-200 ${
+                panelOpen ? "rotate-180" : ""
+              }`}
+            />
+          </button>
+
+          {panelOpen ? (
+            <div
+              className="absolute flex flex-col overflow-hidden rounded-[28px] border border-white/35 bg-[rgba(255,255,255,0.82)] shadow-[0_10px_40px_rgba(0,0,0,0.1)] backdrop-blur-[20px] saturate-[1.8]"
+              style={{
+                left: `${panelLeft}px`,
+                top: `${panelTop}px`,
+                width: `${panelWidth}px`,
+                maxHeight: `${panelMaxHeight}px`,
+              }}
+            >
+              <div className="flex shrink-0 items-center justify-between gap-3 px-6 pt-6">
+                <p className="text-[19px] font-bold text-[#1D1D1F]">
                   {sceneDetailMessages.trainingPanelTitle}
                 </p>
-              </div>
-              <button
-                type="button"
-                aria-label="关闭训练面板"
-                className={`inline-flex size-8 shrink-0 items-center justify-center rounded-full ${APPLE_META_TEXT} transition-colors hover:bg-[var(--app-surface-hover)] hover:text-foreground`}
-                onClick={() => setPanelOpen(false)}
-              >
-                <X className="size-4" />
-              </button>
-            </div>
-
-            <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3 pt-3 sm:px-4 sm:pb-4 sm:pt-4">
-              <div className={`px-3 py-3.5 ${APPLE_PANEL}`}>
-                <p className={APPLE_META_TEXT}>
-                  {sceneDetailMessages.currentStepLabel}
-                </p>
-                <p className={`mt-1 ${APPLE_TITLE_MD}`}>
-                  {getSceneTrainingStepTitle(normalizedTrainingState.currentStep)}
-                </p>
-                <p className={`mt-2 ${APPLE_META_TEXT}`}>
-                  {sceneDetailMessages.nextStepPrefix}
-                  {nextStepLabel}
-                </p>
-                <p className={`mt-2 leading-5 ${APPLE_META_TEXT}`}>
-                  {currentStepSupportText}
-                </p>
+                <button
+                  type="button"
+                  aria-label="收起训练面板"
+                  className="inline-flex size-7 shrink-0 items-center justify-center rounded-full text-[#86868B] transition-colors hover:bg-white/55 hover:text-[#1D1D1F]"
+                  onClick={() => setPanelOpen(false)}
+                >
+                  <ChevronDown className="size-4" />
+                </button>
               </div>
 
-              <div className={`mt-3 px-3 py-3 sm:mt-4 ${APPLE_PANEL}`}>
-                <p className={APPLE_META_TEXT}>{sceneDetailMessages.trainingStepsLabel}</p>
-                <div className="mt-2 space-y-1.5">
-                  {normalizedTrainingState.stepStates.map((step, index) => {
-                    const done = step.status === "done";
-                    const active = step.status === "current";
-                    const showPracticeStepAction = done && step.key === "scene_practice" && practiceStepAction;
-                    return (
-                      <div
-                        key={step.key}
-                        className={`flex items-center justify-between gap-2 rounded-[var(--app-radius-card)] px-2.5 py-2 ${APPLE_PANEL}`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className={APPLE_META_TEXT}>
-                            {index + 1}.
-                          </span>
-                          <span
-                            className={
+              <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-5 pt-5">
+                <div className="relative flex flex-col gap-3">
+                  <div className="pointer-events-none absolute bottom-[10px] left-[11px] top-[10px] w-[2px] bg-[#E5E5EA]" />
+                  <div className="space-y-3">
+                    {normalizedTrainingState.stepStates.map((step, index) => {
+                      const done = step.status === "done";
+                      const active = step.status === "current";
+                      const showPracticeStepAction =
+                        done && step.key === "scene_practice" && practiceStepAction;
+                      return (
+                        <div
+                          key={step.key}
+                          className={`relative z-[1] flex items-center gap-3 ${
+                            active ? "-ml-2 rounded-[12px] bg-[#E5F1FF] px-3 py-2" : "px-0 py-1"
+                          }`}
+                        >
+                          <div
+                            className={`relative shrink-0 ${
                               active
-                                ? `${APPLE_BODY_TEXT} font-medium`
-                                : APPLE_BODY_TEXT
-                            }
+                                ? "inline-flex size-[22px] items-center justify-center rounded-full bg-[#E5F1FF]"
+                                : "inline-flex size-[22px] items-center justify-center"
+                            }`}
                           >
-                            {step.title}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {showPracticeStepAction ? (
+                            {done ? (
+                              <span className="inline-flex size-[22px] items-center justify-center rounded-full bg-[#34C759] text-[12px] font-semibold text-white">
+                                <Check className="size-3.5" />
+                              </span>
+                            ) : active ? (
+                              <span className="size-[10px] rounded-full border-[6px] border-[#E5F1FF] bg-[#007AFF] box-content" />
+                            ) : (
+                              <span className="size-[18px] rounded-full border-2 border-[#C7C7CC] bg-white" />
+                            )}
+                          </div>
+
+                          <div className="min-w-0 flex-1">
+                            <span
+                              className={`block text-[15px] ${
+                                done
+                                  ? "text-[#86868B] line-through"
+                                  : active
+                                    ? "font-bold text-[#1D1D1F]"
+                                    : "text-[#86868B] opacity-60"
+                              }`}
+                            >
+                              {active ? `${index + 1}. ${step.title}` : step.title}
+                            </span>
+                            {showPracticeStepAction ? (
                               <button
                                 type="button"
-                                className={`inline-flex min-h-8 items-center ${APPLE_BUTTON_BASE} px-2.5 py-1 text-xs disabled:cursor-not-allowed disabled:opacity-50`}
+                                className="mt-2 inline-flex min-h-8 items-center rounded-full border border-black/5 bg-white px-3 py-1 text-xs font-medium text-[#1D1D1F] transition-all duration-200 active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-50"
                                 disabled={practiceStepAction.disabled}
                                 onClick={() => {
                                   practiceStepAction.onClick();
@@ -569,70 +592,53 @@ function SceneTrainingCoachFloatingEntry({
                                   {practiceStepAction.label}
                                 </LoadingContent>
                               </button>
-                          ) : null}
-                          <span
-                            className={
-                              done
-                                ? trainingStatusDoneClassName
-                                : active
-                                  ? trainingStatusCurrentClassName
-                                  : trainingStatusPendingClassName
-                            }
-                          >
-                            {done ? (
-                              <>
-                                <Check className="size-3" />
-                                {sceneDetailMessages.stepDone}
-                              </>
-                            ) : active ? (
-                              sceneDetailMessages.stepCurrent
-                            ) : (
-                              sceneDetailMessages.stepPending
-                            )}
-                          </span>
+                            ) : null}
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="mt-5 border-t border-black/5 pt-4">
+                  <p className="text-[11px] leading-[1.4] text-[#86868B]">
+                    整段播放 {statsSummary.fullPlayCount} 次 · 重点表达 {statsSummary.openedExpressionCount} 个 · 核心句 {statsSummary.practicedSentenceCount} 句
+                  </p>
+                  <p className="mt-1 text-[11px] leading-[1.4] text-[#86868B]">
+                    练习模块 {statsSummary.practiceModuleCompleted}/1 · 作答 {statsSummary.practiceAttemptCount} 次 · <span className="font-semibold text-[#1D1D1F]">{sceneDetailMessages.panelProgressLabel} {statsSummary.progressPercent}%</span>
+                  </p>
                 </div>
               </div>
-            </div>
 
-            <div className={`shrink-0 border-t border-[var(--app-border-soft)] px-3 pb-3 pt-3 sm:px-4 sm:pb-4 ${APPLE_META_TEXT}`}>
-              <div className={`flex flex-wrap gap-x-3 gap-y-1 text-xs ${APPLE_META_TEXT}`}>
-                <span>整段播放 {statsSummary.fullPlayCount}</span>
-                <span>重点表达 {statsSummary.openedExpressionCount}</span>
-                <span>核心句 {statsSummary.practicedSentenceCount}</span>
-                <span>练习模块 {statsSummary.practiceModuleCompleted}/1</span>
-                <span>练习层 {statsSummary.practiceModesCompleted}/{statsSummary.practiceModeCount}</span>
-                <span>作答 {statsSummary.practiceAttemptCount}</span>
-                <span>{sceneDetailMessages.panelProgressLabel} {statsSummary.progressPercent}%</span>
-              </div>
-              {currentStepActionLabel && onCurrentStepAction ? (
-                <button
-                  type="button"
-                  className={`mt-3 inline-flex min-h-10 w-full items-center justify-center rounded-[var(--app-radius-card)] px-3 py-2 text-sm font-medium ${APPLE_BUTTON_STRONG} disabled:cursor-not-allowed disabled:border-transparent disabled:bg-[var(--app-surface-hover)] disabled:text-[var(--muted-foreground)]`}
-                  disabled={currentStepActionDisabled}
-                  onClick={() => {
-                    onCurrentStepAction();
-                  }}
-                >
-                  <LoadingContent
-                    loading={Boolean(currentStepActionLoading)}
-                    loadingText={formatLoadingText(currentStepActionLabel, "中...")}
+              <div className="shrink-0 px-6 pb-6">
+                {currentStepActionLabel && onCurrentStepAction ? (
+                  <button
+                    type="button"
+                    className="inline-flex min-h-[52px] w-full items-center justify-center rounded-[16px] border-0 bg-[#007AFF] px-4 py-3 text-[16px] font-semibold text-white shadow-[0_4px_15px_rgba(0,122,255,0.3)] transition-all duration-200 active:scale-[0.96] active:opacity-80 disabled:cursor-not-allowed disabled:bg-[#D0D7E2] disabled:text-white/80 disabled:shadow-none"
+                    disabled={currentStepActionDisabled}
+                    onClick={() => {
+                      onCurrentStepAction();
+                    }}
                   >
-                    {currentStepActionLabel}
-                  </LoadingContent>
-                </button>
-              ) : null}
+                    <LoadingContent
+                      loading={Boolean(currentStepActionLoading)}
+                      loadingText={formatLoadingText(currentStepActionLabel, "中...")}
+                    >
+                      {currentStepActionLabel}
+                    </LoadingContent>
+                  </button>
+                ) : null}
+                <p className="mt-2 text-center text-[12px] text-[#86868B]">
+                  下一步：{nextStepLabel}
+                </p>
+              </div>
             </div>
-          </div>
-        ) : null}
+          ) : null}
+        </div>
       </div>
-    </div>
+    </>
   );
 }
-
 export default function SceneDetailClientPage({
   initialLesson = null,
 }: {
@@ -645,8 +651,7 @@ export default function SceneDetailClientPage({
   const onRouteChangeRef = useRef<() => void>(() => undefined);
   const sessionDoneRef = useRef(false);
   const focusExpressionPromptShownRef = useRef(false);
-  const sceneMilestoneToastRef = useRef<Set<TrainingStepKey>>(new Set());
-  const sceneMilestoneInitializedRef = useRef(false);
+  const sceneResumeToastShownRef = useRef(false);
   const currentTrainingStepRef = useRef<TrainingStepKey | "done">("listen");
   const variantUnlockedRef = useRef(false);
   const latestPracticeStatusRef = useRef<"idle" | "generated" | "completed">("idle");
@@ -658,7 +663,12 @@ export default function SceneDetailClientPage({
   const variantToolActionRef = useRef<() => unknown>(() => undefined);
   const repeatPracticeActionRef = useRef<() => unknown>(() => undefined);
   const repeatVariantsActionRef = useRef<() => unknown>(() => undefined);
-  const [trainingState, setTrainingState] = useState<SceneLearningProgressResponse | null>(null);
+  const initialTrainingStateSnapshot = getSceneLearningProgressCacheSnapshotSync(sceneSlug);
+  const [trainingState, setTrainingState] = useState<SceneLearningProgressResponse | null>(
+    initialTrainingStateSnapshot.found && initialTrainingStateSnapshot.record
+      ? initialTrainingStateSnapshot.record.data.state
+      : null,
+  );
   const [practiceSnapshot, setPracticeSnapshot] = useState<ScenePracticeSnapshotResponse | null>(null);
   const [viewResetVersion, setViewResetVersion] = useState(0);
 
@@ -694,12 +704,32 @@ export default function SceneDetailClientPage({
       focusExpressionPromptShownRef.current = true;
     }
     setTrainingState(nextState);
-  }, []);
+    void setSceneLearningProgressCache(sceneSlug, nextState).catch(() => {
+      // Ignore cache failures.
+    });
+  }, [sceneSlug]);
+
+  useEffect(() => {
+    const snapshot = getSceneLearningProgressCacheSnapshotSync(sceneSlug);
+    if (snapshot.found && snapshot.record) {
+      setTrainingState(snapshot.record.data.state);
+      return;
+    }
+    setTrainingState(null);
+  }, [sceneSlug]);
 
   useSceneLearningSync({
     baseLesson,
     viewMode,
     activeVariantId,
+    initialLearningState:
+      initialTrainingStateSnapshot.found && initialTrainingStateSnapshot.record
+        ? initialTrainingStateSnapshot.record.data.state
+        : null,
+    hasFreshInitialLearningState:
+      initialTrainingStateSnapshot.found &&
+      Boolean(initialTrainingStateSnapshot.record) &&
+      !initialTrainingStateSnapshot.isExpired,
     onLearningStateChange: handleLearningStateChange,
   });
 
@@ -774,8 +804,7 @@ export default function SceneDetailClientPage({
     resetChunkDetailState();
     sessionDoneRef.current = false;
     focusExpressionPromptShownRef.current = false;
-    sceneMilestoneToastRef.current = new Set();
-    sceneMilestoneInitializedRef.current = false;
+    sceneResumeToastShownRef.current = false;
     setTrainingState(null);
     setPracticeSnapshot(null);
     setViewResetVersion((current) => current + 1);
@@ -787,17 +816,27 @@ export default function SceneDetailClientPage({
       return;
     }
     let cancelled = false;
-    void getScenePracticeSnapshotFromApi(baseLesson.slug, {
-      practiceSetId: latestPracticeSet.id,
-    })
-      .then((result) => {
+    void (async () => {
+      const cache = await getScenePracticeSnapshotCache(baseLesson.slug, latestPracticeSet.id);
+      if (!cancelled && cache.found && cache.record && !cache.isExpired) {
+        setPracticeSnapshot(cache.record.data.snapshot);
+        return;
+      }
+
+      try {
+        const result = await getScenePracticeSnapshotFromApi(baseLesson.slug, {
+          practiceSetId: latestPracticeSet.id,
+        });
         if (cancelled) return;
         setPracticeSnapshot(result);
-      })
-      .catch(() => {
-        if (cancelled) return;
+        void setScenePracticeSnapshotCache(baseLesson.slug, latestPracticeSet.id, result).catch(() => {
+          // Ignore cache failures.
+        });
+      } catch {
+        if (cancelled || (cache.found && cache.record && !cache.isExpired)) return;
         setPracticeSnapshot(null);
-      });
+      }
+    })();
     return () => {
       cancelled = true;
     };
@@ -822,35 +861,36 @@ export default function SceneDetailClientPage({
 
   useEffect(() => {
     if (!baseLesson) return;
-    if (!sceneMilestoneInitializedRef.current) {
-      (Object.keys(sceneRawCompletedMap) as TrainingStepKey[]).forEach((key) => {
-        if (sceneRawCompletedMap[key]) {
-          sceneMilestoneToastRef.current.add(key);
-        }
-      });
-      sceneMilestoneInitializedRef.current = true;
+    if (sceneResumeToastShownRef.current) return;
+    const currentStep = sceneTrainingState.currentStep;
+    if (
+      currentStep === "listen" ||
+      currentStep === "done" ||
+      !trainingState
+    ) {
       return;
     }
-
-    (Object.keys(sceneRawCompletedMap) as TrainingStepKey[]).forEach((key) => {
-      if (!sceneRawCompletedMap[key]) return;
-      if (sceneMilestoneToastRef.current.has(key)) return;
-      sceneMilestoneToastRef.current.add(key);
-      notifySceneMilestone(key, baseLesson.title);
-    });
-  }, [baseLesson, sceneRawCompletedMap]);
+    sceneResumeToastShownRef.current = true;
+    notifySceneContinueStep(currentStep);
+  }, [baseLesson, sceneTrainingState.currentStep, trainingState]);
 
   const handleSceneFullPlay = useCallback(() => {
     if (!baseLesson) return;
+    const shouldNotifyMilestone = (trainingState?.session?.fullPlayCount ?? 0) < 1;
     notifySceneLoopPrompt();
     void recordSceneTrainingEventFromApi(baseLesson.slug, {
       event: "full_play",
     })
-      .then(handleLearningStateChange)
+      .then((nextState) => {
+        handleLearningStateChange(nextState);
+        if (shouldNotifyMilestone && (nextState.session?.fullPlayCount ?? 0) >= 1) {
+          notifySceneMilestone("listen", baseLesson.title);
+        }
+      })
       .catch(() => {
         // Non-blocking.
       });
-  }, [baseLesson, handleLearningStateChange]);
+  }, [baseLesson, handleLearningStateChange, trainingState?.session?.fullPlayCount]);
 
   const handleBaseChunkEncounter = useCallback(
     (payload: {
@@ -861,6 +901,7 @@ export default function SceneDetailClientPage({
       source?: "direct" | "related";
     }) => {
       if (payload.lesson.slug !== baseLesson?.slug) return;
+      const shouldNotifyMilestone = (trainingState?.session?.openedExpressionCount ?? 0) < 1;
       if (payload.source !== "related" && !focusExpressionPromptShownRef.current) {
         notifySceneExpressionFocused();
         focusExpressionPromptShownRef.current = true;
@@ -869,25 +910,36 @@ export default function SceneDetailClientPage({
         event: "open_expression",
         selectedBlockId: payload.blockId,
       })
-        .then(handleLearningStateChange)
+        .then((nextState) => {
+          handleLearningStateChange(nextState);
+          if (shouldNotifyMilestone && (nextState.session?.openedExpressionCount ?? 0) >= 1) {
+            notifySceneMilestone("focus_expression", payload.lesson.title);
+          }
+        })
         .catch(() => {
           // Non-blocking.
         });
     },
-    [baseLesson?.slug, handleLearningStateChange],
+    [baseLesson?.slug, handleLearningStateChange, trainingState?.session?.openedExpressionCount],
   );
 
   const handleSentencePracticed = useCallback(() => {
     if (!baseLesson) return;
+    const shouldNotifyMilestone = (trainingState?.session?.practicedSentenceCount ?? 0) < 1;
     notifySceneSentencePracticed();
     void recordSceneTrainingEventFromApi(baseLesson.slug, {
       event: "practice_sentence",
     })
-      .then(handleLearningStateChange)
+      .then((nextState) => {
+        handleLearningStateChange(nextState);
+        if (shouldNotifyMilestone && (nextState.session?.practicedSentenceCount ?? 0) >= 1) {
+          notifySceneMilestone("practice_sentence", baseLesson.title);
+        }
+      })
       .catch(() => {
         // Non-blocking.
       });
-  }, [baseLesson, handleLearningStateChange]);
+  }, [baseLesson, handleLearningStateChange, trainingState?.session?.practicedSentenceCount]);
 
   const savePhraseForScene = useCallback(
     async (payload: SavePhrasePayload) => {
@@ -1142,20 +1194,35 @@ export default function SceneDetailClientPage({
     if (!baseLesson || !latestVariantSet) return;
     let cancelled = false;
 
-    void getSceneVariantRunSnapshotFromApi(baseLesson.slug, {
-      variantSetId: latestVariantSet.id,
-    })
-      .then((result) => {
-        if (cancelled || !result.run) return;
+    void (async () => {
+      const applyVariantRun = (result: SceneVariantRunResponse) => {
+        if (!result.run) return;
         hydrateVariantSetFromRun(baseLesson.id, latestVariantSet.id, result.run);
         refreshGeneratedState(baseLesson.id);
         if (!activeVariantId && !searchParams.get("variant") && result.run.activeVariantId) {
           setActiveVariantId(result.run.activeVariantId);
         }
-      })
-      .catch(() => {
+      };
+
+      const cache = await getSceneVariantRunCache(baseLesson.slug, latestVariantSet.id);
+      if (!cancelled && cache.found && cache.record && !cache.isExpired) {
+        applyVariantRun(cache.record.data.snapshot);
+        return;
+      }
+
+      try {
+        const result = await getSceneVariantRunSnapshotFromApi(baseLesson.slug, {
+          variantSetId: latestVariantSet.id,
+        });
+        if (cancelled) return;
+        applyVariantRun(result);
+        void setSceneVariantRunCache(baseLesson.slug, latestVariantSet.id, result).catch(() => {
+          // Ignore cache failures.
+        });
+      } catch {
         // Non-blocking.
-      });
+      }
+    })();
 
     return () => {
       cancelled = true;
@@ -1181,9 +1248,15 @@ export default function SceneDetailClientPage({
 
     void startSceneVariantRunFromApi(baseLesson.slug, {
       variantSetId: latestVariantSet.id,
-    }).catch(() => {
-      // Non-blocking.
-    });
+    })
+      .then((result) => {
+        void setSceneVariantRunCache(baseLesson.slug, latestVariantSet.id, result).catch(() => {
+          // Ignore cache failures.
+        });
+      })
+      .catch(() => {
+        // Non-blocking.
+      });
   }, [baseLesson, latestVariantSet?.id, latestVariantSet?.status, viewMode]);
 
   if (sceneLoading) {
@@ -1206,7 +1279,6 @@ export default function SceneDetailClientPage({
       trainingState={trainingState}
       variantUnlocked={variantUnlocked}
       practiceSetStatus={generatedState.practiceStatus}
-      practiceModeKey={latestPracticeSet?.mode ?? null}
       practiceSnapshot={practiceSnapshot}
       practiceModuleCount={latestPracticeSet?.modules?.length ?? 0}
       currentStepActionLabel={currentStepAction.label}
@@ -1285,6 +1357,7 @@ export default function SceneDetailClientPage({
       onHoverChunk={setVariantChunkHoveredKey}
       playingChunkKey={playbackState.kind === "chunk" ? (playbackState.text ?? null) : null}
       showSentenceSection={false}
+      showRelatedChunkAudio={false}
     />
   );
 
@@ -1303,7 +1376,11 @@ export default function SceneDetailClientPage({
           onBack={() => setViewModeWithRoute("scene")}
           onDelete={handleDeletePracticeSet}
           onComplete={() => {
+            const shouldNotifyMilestone = !sceneRawCompletedMap.scene_practice;
             if (!latestPracticeSet) {
+              if (shouldNotifyMilestone) {
+                notifySceneMilestone("scene_practice", baseLesson.title);
+              }
               handleMarkPracticeComplete();
               return;
             }
@@ -1311,34 +1388,57 @@ export default function SceneDetailClientPage({
               practiceSetId: latestPracticeSet.id,
             })
               .then((result) => {
-                setPracticeSnapshot((current) =>
-                  current
-                    ? {
-                        ...current,
-                        run: result.run,
-                      }
-                    : { run: result.run, latestAttempt: null, summary: { completedModeCount: result.run.completedModes.length, totalAttemptCount: 0, correctAttemptCount: 0, latestAssessmentLevel: null } },
-                );
+                setPracticeSnapshot((current) => {
+                  const next =
+                    current
+                      ? {
+                          ...current,
+                          run: result.run,
+                        }
+                      : {
+                          run: result.run,
+                          latestAttempt: null,
+                          summary: {
+                            completedModeCount: result.run.completedModes.length,
+                            totalAttemptCount: 0,
+                            correctAttemptCount: 0,
+                            latestAssessmentLevel: null,
+                          },
+                        };
+                  void setScenePracticeSnapshotCache(baseLesson.slug, latestPracticeSet.id, next).catch(() => {
+                    // Ignore cache failures.
+                  });
+                  return next;
+                });
               })
               .catch(() => {
               // Non-blocking.
               });
+            if (shouldNotifyMilestone) {
+              notifySceneMilestone("scene_practice", baseLesson.title);
+            }
             handleMarkPracticeComplete();
           }}
           onSentencePracticed={handleSentencePracticed}
           onPracticeRunStart={(payload) => {
             void startScenePracticeRunFromApi(baseLesson.slug, payload)
               .then((result) => {
-                setPracticeSnapshot((current) => ({
-                  run: result.run,
-                  latestAttempt: current?.latestAttempt ?? null,
-                  summary: current?.summary ?? {
-                    completedModeCount: result.run.completedModes.length,
-                    totalAttemptCount: 0,
-                    correctAttemptCount: 0,
-                    latestAssessmentLevel: null,
-                  },
-                }));
+                setPracticeSnapshot((current) => {
+                  const next = {
+                    run: result.run,
+                    latestAttempt: current?.latestAttempt ?? null,
+                    summary: current?.summary ?? {
+                      completedModeCount: result.run.completedModes.length,
+                      totalAttemptCount: 0,
+                      correctAttemptCount: 0,
+                      latestAssessmentLevel: null,
+                    },
+                  };
+                  void setScenePracticeSnapshotCache(baseLesson.slug, payload.practiceSetId, next).catch(() => {
+                    // Ignore cache failures.
+                  });
+                  return next;
+                });
               })
               .catch(() => {
                 // Non-blocking.
@@ -1348,17 +1448,23 @@ export default function SceneDetailClientPage({
             if (!payload.practiceSetId) return;
             void recordScenePracticeAttemptFromApi(baseLesson.slug, payload)
               .then((result) => {
-                setPracticeSnapshot((current) => ({
-                  run: result.run,
-                  latestAttempt: result.attempt,
-                  summary: {
-                    completedModeCount: current?.summary.completedModeCount ?? result.run.completedModes.length,
-                    totalAttemptCount: (current?.summary.totalAttemptCount ?? 0) + 1,
-                    correctAttemptCount:
-                      (current?.summary.correctAttemptCount ?? 0) + (result.attempt.isCorrect ? 1 : 0),
-                    latestAssessmentLevel: result.attempt.assessmentLevel,
-                  },
-                }));
+                setPracticeSnapshot((current) => {
+                  const next = {
+                    run: result.run,
+                    latestAttempt: result.attempt,
+                    summary: {
+                      completedModeCount: current?.summary.completedModeCount ?? result.run.completedModes.length,
+                      totalAttemptCount: (current?.summary.totalAttemptCount ?? 0) + 1,
+                      correctAttemptCount:
+                        (current?.summary.correctAttemptCount ?? 0) + (result.attempt.isCorrect ? 1 : 0),
+                      latestAssessmentLevel: result.attempt.assessmentLevel,
+                    },
+                  };
+                  void setScenePracticeSnapshotCache(baseLesson.slug, payload.practiceSetId, next).catch(() => {
+                    // Ignore cache failures.
+                  });
+                  return next;
+                });
               })
               .catch(() => {
                 // Non-blocking.
@@ -1367,16 +1473,22 @@ export default function SceneDetailClientPage({
           onPracticeModeComplete={(payload) => {
             void markScenePracticeModeCompleteFromApi(baseLesson.slug, payload)
               .then((result) => {
-                setPracticeSnapshot((current) => ({
-                  run: result.run,
-                  latestAttempt: current?.latestAttempt ?? null,
-                  summary: {
-                    completedModeCount: result.run.completedModes.length,
-                    totalAttemptCount: current?.summary.totalAttemptCount ?? 0,
-                    correctAttemptCount: current?.summary.correctAttemptCount ?? 0,
-                    latestAssessmentLevel: current?.summary.latestAssessmentLevel ?? null,
-                  },
-                }));
+                setPracticeSnapshot((current) => {
+                  const next = {
+                    run: result.run,
+                    latestAttempt: current?.latestAttempt ?? null,
+                    summary: {
+                      completedModeCount: result.run.completedModes.length,
+                      totalAttemptCount: current?.summary.totalAttemptCount ?? 0,
+                      correctAttemptCount: current?.summary.correctAttemptCount ?? 0,
+                      latestAssessmentLevel: current?.summary.latestAssessmentLevel ?? null,
+                    },
+                  };
+                  void setScenePracticeSnapshotCache(baseLesson.slug, payload.practiceSetId, next).catch(() => {
+                    // Ignore cache failures.
+                  });
+                  return next;
+                });
               })
               .catch(() => {
                 // Non-blocking.
@@ -1501,6 +1613,10 @@ export default function SceneDetailClientPage({
       />
   );
 }
+
+
+
+
 
 
 

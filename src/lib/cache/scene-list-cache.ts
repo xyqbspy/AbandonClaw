@@ -80,6 +80,29 @@ export async function getSceneListCache(): Promise<{
   };
 }
 
+export function getSceneListCacheSnapshotSync(): {
+  found: boolean;
+  record: SceneListCacheRecord | null;
+  isExpired: boolean;
+} {
+  const record = memorySceneListRecord;
+  if (!record) {
+    return { found: false, record: null, isExpired: false };
+  }
+  if (!isSceneListCacheValid(record)) {
+    memorySceneListRecord = null;
+    void idbDeleteSceneRecord(CACHE_KEY).catch(() => {
+      debugLog("sync cleanup failed");
+    });
+    return { found: false, record: null, isExpired: false };
+  }
+  return {
+    found: true,
+    record,
+    isExpired: record.expiresAt <= nowMs(),
+  };
+}
+
 export async function setSceneListCache(rows: SceneListItemResponse[]): Promise<void> {
   if (!Array.isArray(rows) || !rows.every(isSceneListItemValid)) {
     debugLog("skip invalid scene list cache payload");

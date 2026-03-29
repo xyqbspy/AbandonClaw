@@ -1,14 +1,17 @@
 import assert from "node:assert/strict";
 import test, { afterEach } from "node:test";
-import React from "react";
 import { cleanup, renderHook } from "@testing-library/react";
 
 import { Lesson } from "@/lib/types";
 
-import { useSceneLearningSync } from "./use-scene-learning-sync";
+import {
+  resetSceneLearningStartThrottleForTests,
+  useSceneLearningSync,
+} from "./use-scene-learning-sync";
 
 afterEach(() => {
   cleanup();
+  resetSceneLearningStartThrottleForTests();
 });
 
 type HookProps = {
@@ -145,6 +148,7 @@ test("useSceneLearningSync 会启动学习、同步进度，并在卸载时带 p
     clearIntervalFn: (handle) => {
       intervals.delete(handle as number);
     },
+    startCooldownMs: 30_000,
   };
 
   const { rerender, unmount } = renderHook(
@@ -203,4 +207,141 @@ test("useSceneLearningSync 会启动学习、同步进度，并在卸载时带 p
   assert.equal(updateCalls[3]?.payload.progressPercent, 65);
   assert.equal(updateCalls[3]?.payload.studySecondsDelta, 0);
   assert.deepEqual(pauseCalls, ["scene-1"]);
+});
+
+test("useSceneLearningSync 在冷却窗口内重复进入时不会重复 start", async () => {
+  let now = 5_000;
+  const startCalls: string[] = [];
+
+  const deps: LearningSyncDeps = {
+    startSceneLearningFromApi: async (slug: string) => {
+      startCalls.push(slug);
+      return buildLearningProgressResponse();
+    },
+    pauseSceneLearningFromApi: async () => buildLearningProgressResponse(),
+    updateSceneLearningProgressFromApi: async () => buildLearningProgressResponse(),
+    shouldFlushSceneLearningDelta: () => false,
+    buildSceneLearningUpdatePayload: () => ({
+      progressPercent: 20,
+    }),
+    now: () => now,
+    setTimeoutFn: () => 1,
+    clearTimeoutFn: () => undefined,
+    setIntervalFn: () => 1,
+    clearIntervalFn: () => undefined,
+    startCooldownMs: 30_000,
+  };
+
+  const first = renderHook(() =>
+    useSceneLearningSync({
+      baseLesson: lesson,
+      viewMode: "scene",
+      activeVariantId: null,
+      deps,
+    }),
+  );
+
+  assert.deepEqual(startCalls, ["scene-1"]);
+  first.unmount();
+  await Promise.resolve();
+
+  now = 8_000;
+  const second = renderHook(() =>
+    useSceneLearningSync({
+      baseLesson: lesson,
+      viewMode: "scene",
+      activeVariantId: null,
+      deps,
+    }),
+  );
+
+  assert.deepEqual(startCalls, ["scene-1"]);
+  second.unmount();
+});
+
+test("useSceneLearningSync 超过冷却窗口后会重新 start", async () => {
+  let now = 10_000;
+  const startCalls: string[] = [];
+
+  const deps: LearningSyncDeps = {
+    startSceneLearningFromApi: async (slug: string) => {
+      startCalls.push(slug);
+      return buildLearningProgressResponse();
+    },
+    pauseSceneLearningFromApi: async () => buildLearningProgressResponse(),
+    updateSceneLearningProgressFromApi: async () => buildLearningProgressResponse(),
+    shouldFlushSceneLearningDelta: () => false,
+    buildSceneLearningUpdatePayload: () => ({
+      progressPercent: 20,
+    }),
+    now: () => now,
+    setTimeoutFn: () => 1,
+    clearTimeoutFn: () => undefined,
+    setIntervalFn: () => 1,
+    clearIntervalFn: () => undefined,
+    startCooldownMs: 10_000,
+  };
+
+  const first = renderHook(() =>
+    useSceneLearningSync({
+      baseLesson: lesson,
+      viewMode: "scene",
+      activeVariantId: null,
+      deps,
+    }),
+  );
+
+  assert.deepEqual(startCalls, ["scene-1"]);
+  first.unmount();
+  await Promise.resolve();
+
+  now = 20_500;
+  const second = renderHook(() =>
+    useSceneLearningSync({
+      baseLesson: lesson,
+      viewMode: "scene",
+      activeVariantId: null,
+      deps,
+    }),
+  );
+
+  assert.deepEqual(startCalls, ["scene-1", "scene-1"]);
+  second.unmount();
+});
+
+test("useSceneLearningSync 在有新鲜学习态缓存时不会立刻重复 start", () => {
+  const startCalls: string[] = [];
+
+  const deps: LearningSyncDeps = {
+    startSceneLearningFromApi: async (slug: string) => {
+      startCalls.push(slug);
+      return buildLearningProgressResponse();
+    },
+    pauseSceneLearningFromApi: async () => buildLearningProgressResponse(),
+    updateSceneLearningProgressFromApi: async () => buildLearningProgressResponse(),
+    shouldFlushSceneLearningDelta: () => false,
+    buildSceneLearningUpdatePayload: () => ({
+      progressPercent: 20,
+    }),
+    now: () => 10_000,
+    setTimeoutFn: () => 1,
+    clearTimeoutFn: () => undefined,
+    setIntervalFn: () => 1,
+    clearIntervalFn: () => undefined,
+    startCooldownMs: 30_000,
+  };
+
+  const hook = renderHook(() =>
+    useSceneLearningSync({
+      baseLesson: lesson,
+      viewMode: "scene",
+      activeVariantId: null,
+      initialLearningState: buildLearningProgressResponse(),
+      hasFreshInitialLearningState: true,
+      deps,
+    }),
+  );
+
+  assert.deepEqual(startCalls, []);
+  hook.unmount();
 });

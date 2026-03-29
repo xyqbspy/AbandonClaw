@@ -140,6 +140,49 @@ test("FocusDetailContent 会处理朗读和 tab 切换", () => {
   assert.deepEqual(tabChanges, ["similar", "contrast"]);
 });
 
+test("FocusDetailContent 的分段器和面板在窄屏下保持纵向文档流", () => {
+  render(
+    <FocusDetailContent
+      detail={{
+        text: "burn yourself out",
+        kind: "current",
+        savedItem: createRow({
+          userPhraseId: "saved-1",
+          text: "burn yourself out",
+          translation: "把自己耗尽",
+        }),
+      }}
+      activeAssistItem={null}
+      focusDetailTab="similar"
+      focusDetailLoading={false}
+      isDetailSpeaking={false}
+      detailSpeakText="burn yourself out"
+      similarRows={[createRelatedItem()]}
+      contrastRows={[]}
+      isSavedRelatedLoading={false}
+      usageHint="提醒别透支自己"
+      typicalScenario="长期加班时"
+      semanticFocus="过度消耗"
+      reviewHint="准备复习"
+      exampleCards={<div>example cards</div>}
+      labels={labels}
+      onSpeak={() => undefined}
+      onTabChange={() => undefined}
+      onOpenSimilarRow={() => undefined}
+      onOpenContrastRow={() => undefined}
+    />,
+  );
+
+  const tabList = screen.getByRole("tablist");
+  const root = tabList.parentElement;
+  const panel = screen.getByRole("tabpanel");
+
+  assert.ok(root?.className.includes("flex-col"));
+  assert.ok(tabList.className.includes("grid"));
+  assert.ok(panel.className.includes("flex-1"));
+  assert.ok(panel.className.includes("overflow-y-auto"));
+});
+
 test("FocusDetailContent 候选态会隐藏朗读入口，并在无例句时使用来源 fallback", () => {
   render(
     <FocusDetailContent

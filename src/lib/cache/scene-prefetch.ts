@@ -19,6 +19,7 @@ type IdleHandle = number;
 
 const pendingQueue: string[] = [];
 const inFlightPrefetchSet = new Set<string>();
+const inFlightPrefetchPromiseMap = new Map<string, Promise<boolean>>();
 const recentPrefetchedAt = new Map<string, number>();
 let idleHandle: IdleHandle | null = null;
 let inFlightKey: string | null = null;
@@ -45,7 +46,6 @@ const getCancelIdleCallback = () =>
 
 const debugLog = (...args: unknown[]) => {
   if (process.env.NODE_ENV !== "development") return;
-  // eslint-disable-next-line no-console
   console.debug("[scene-prefetch]", ...args);
 };
 
@@ -146,29 +146,38 @@ export async function shouldPrefetchScene(slug: string, options?: PrefetchOption
 
 export async function prefetchSceneDetail(slug: string, options?: PrefetchOptions) {
   const normalized = normalizeSceneSlug(slug);
-  const allowed = await shouldPrefetchScene(normalized, options);
-  if (!allowed) return false;
-
-  inFlightPrefetchSet.add(normalized);
-  inFlightKey = normalized;
-  try {
-    const scene = await getSceneDetailBySlugFromApi(normalized);
-    await setSceneCache(normalized, scene);
-    scheduleLessonAudioWarmup(scene, {
-      sentenceLimit: 1,
-      chunkLimit: 2,
-      key: `scene-prefetch-audio:${normalized}`,
-    });
-    recentPrefetchedAt.set(normalized, Date.now());
-    debugLog("prefetched", normalized);
-    return true;
-  } catch (error) {
-    debugLog("prefetch failed", normalized, error);
-    return false;
-  } finally {
-    inFlightPrefetchSet.delete(normalized);
-    inFlightKey = null;
+  const existingPromise = inFlightPrefetchPromiseMap.get(normalized);
+  if (existingPromise) {
+    return existingPromise;
   }
+  const task = (async () => {
+    const allowed = await shouldPrefetchScene(normalized, options);
+    if (!allowed) return false;
+    inFlightPrefetchSet.add(normalized);
+    inFlightKey = normalized;
+    try {
+      const scene = await getSceneDetailBySlugFromApi(normalized);
+      await setSceneCache(normalized, scene);
+      scheduleLessonAudioWarmup(scene, {
+        sentenceLimit: 1,
+        chunkLimit: 2,
+        key: `scene-prefetch-audio:${normalized}`,
+      });
+      recentPrefetchedAt.set(normalized, Date.now());
+      debugLog("prefetched", normalized);
+      return true;
+    } catch (error) {
+      debugLog("prefetch failed", normalized, error);
+      return false;
+    } finally {
+      inFlightPrefetchSet.delete(normalized);
+      inFlightPrefetchPromiseMap.delete(normalized);
+      inFlightKey = null;
+    }
+  })();
+
+  inFlightPrefetchPromiseMap.set(normalized, task);
+  return task;
 }
 
 const flushPrefetchQueue = async (options: PrefetchOptions) => {
@@ -215,6 +224,7 @@ export function resetScenePrefetchSchedulerForTests() {
   clearIdleRun();
   pendingQueue.length = 0;
   inFlightPrefetchSet.clear();
+  inFlightPrefetchPromiseMap.clear();
   recentPrefetchedAt.clear();
   inFlightKey = null;
 }

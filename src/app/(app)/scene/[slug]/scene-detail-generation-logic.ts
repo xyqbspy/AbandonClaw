@@ -1,9 +1,11 @@
 ﻿import { mapLessonToParsedScene } from "@/lib/adapters/scene-parser-adapter";
+import { buildExerciseSpecsFromScene } from "@/lib/server/exercises/spec-builder";
 import { Lesson } from "@/lib/types";
 import { PracticeSet, VariantSet } from "@/lib/types/learning-flow";
 import { ExpressionMapResponse } from "@/lib/types/expression-map";
 import { generateExpressionMapFromApi } from "@/lib/utils/expression-map-api";
 import { practiceGenerateFromApi } from "@/lib/utils/practice-generate-api";
+import { normalizePracticeExercisesForScene } from "@/lib/shared/scene-practice-exercises";
 import {
   generateSceneVariantsFromApi,
   getSceneVariantsFromApi,
@@ -56,10 +58,16 @@ export const generateScenePracticeSet = async ({
   };
 }): Promise<PracticeSet> => {
   const parsedScene = (deps?.mapLessonToParsedScene ?? mapLessonToParsedScene)(sourceLesson);
-  const exercises = await (deps?.practiceGenerateFromApi ?? practiceGenerateFromApi)({
+  const generatedExercises = await (deps?.practiceGenerateFromApi ?? practiceGenerateFromApi)({
     scene: parsedScene,
     exerciseCount: 8,
   });
+  const normalizedExercises = normalizePracticeExercisesForScene(parsedScene, generatedExercises);
+  const clozeExercises = normalizedExercises.filter((exercise) => exercise.type === "chunk_cloze");
+  const exercises =
+    clozeExercises.length > 0
+      ? clozeExercises
+      : buildExerciseSpecsFromScene(parsedScene, 8);
 
   return buildPracticeSet({
     baseLesson,

@@ -10,6 +10,7 @@ import {
   LoadingOverlay,
   LoadingState,
 } from "@/components/shared/action-loading";
+import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
   deleteSceneBySlugFromApi,
@@ -20,8 +21,10 @@ import {
 import {
   clearSceneListCache,
   getSceneListCache,
+  getSceneListCacheSnapshotSync,
   setSceneListCache,
 } from "@/lib/cache/scene-list-cache";
+import { prefetchSceneDetail, scheduleScenePrefetch } from "@/lib/cache/scene-prefetch";
 import {
   APPLE_BANNER_DANGER,
   APPLE_BANNER_INFO,
@@ -55,6 +58,7 @@ const ACTION_WIDTH = 96;
 const OPEN_THRESHOLD = 48;
 const QUICK_OPEN_THRESHOLD = 24;
 const MAX_OVERSHOOT = 18;
+const SCENE_ENTRY_WARMUP_WAIT_MS = 180;
 const sheetPanelClassName = "rounded-[14px] bg-white p-4 shadow-[0_1px_3px_rgba(0,0,0,0.02)]";
 const sheetLabelClassName = "mb-3 block pl-0.5 text-[13px] font-semibold text-[#1d1d1f]";
 type TopTaskStatus = "running" | "done" | "failed";
@@ -74,14 +78,20 @@ type GestureState = {
 
 export default function ScenesPage() {
   const router = useRouter();
+  const initialListSnapshot = getSceneListCacheSnapshotSync();
+  const initialScenes = initialListSnapshot.found && initialListSnapshot.record
+    ? initialListSnapshot.record.data
+    : [];
   const [dialogOpen, setDialogOpen] = useState(false);
   const [generateSheetOpen, setGenerateSheetOpen] = useState(false);
   const [input, setInput] = useState("");
   const [error, setError] = useState("");
   const [importing, setImporting] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [allScenes, setAllScenes] = useState<SceneListItemResponse[]>([]);
-  const [listDataSource, setListDataSource] = useState<"none" | "cache" | "network">("none");
+  const [loading, setLoading] = useState(!initialListSnapshot.found);
+  const [allScenes, setAllScenes] = useState<SceneListItemResponse[]>(initialScenes);
+  const [listDataSource, setListDataSource] = useState<"none" | "cache" | "network">(
+    initialListSnapshot.found ? "cache" : "none",
+  );
   const [pendingDeleteSceneId, setPendingDeleteSceneId] = useState<string | null>(null);
   const [deletingSceneId, setDeletingSceneId] = useState<string | null>(null);
   const [removingSceneId, setRemovingSceneId] = useState<string | null>(null);
@@ -90,12 +100,29 @@ export default function ScenesPage() {
   const [topTask, setTopTask] = useState<TopTask | null>(null);
   const [openingSceneTarget, setOpeningSceneTarget] = useState<string | null>(null);
   const activeLoadTokenRef = useRef(0);
+  const visibleSceneCountRef = useRef(initialScenes.length);
   const gestureRef = useRef<GestureState | null>(null);
   const removingTimerRef = useRef<number | null>(null);
 
-  const openSceneRoute = (href: string) => {
+  const warmSceneEntry = useCallback((href: string, sceneSlug: string) => {
+    void router.prefetch?.(href);
+    return prefetchSceneDetail(sceneSlug);
+  }, [router]);
+
+  const openSceneRoute = async (href: string, sceneSlug: string) => {
     if (openingSceneTarget === href) return;
     setOpeningSceneTarget(href);
+    const warmupTask = warmSceneEntry(href, sceneSlug);
+    try {
+      await Promise.race([
+        warmupTask,
+        new Promise<void>((resolve) => {
+          window.setTimeout(resolve, SCENE_ENTRY_WARMUP_WAIT_MS);
+        }),
+      ]);
+    } catch {
+      // Non-blocking: route entry should not be blocked by warmup failure.
+    }
     router.push(href);
   };
 
@@ -135,14 +162,15 @@ export default function ScenesPage() {
       ? allScenes.find((scene) => scene.id === pendingDeleteSceneId) ?? null
       : null;
 
-  const refreshScenes = async (options?: { preferCache?: boolean; forceNetwork?: boolean }) => {
+  const refreshScenes = useCallback(async (options?: { preferCache?: boolean; forceNetwork?: boolean }) => {
     const token = activeLoadTokenRef.current + 1;
     activeLoadTokenRef.current = token;
     let hasCacheFallback = false;
     let cacheFresh = false;
     const preferCache = options?.preferCache ?? false;
     const forceNetwork = options?.forceNetwork ?? false;
-    setLoading(true);
+    const keepVisibleContent = preferCache && visibleSceneCountRef.current > 0;
+    setLoading(!keepVisibleContent);
     if (!preferCache) {
       setListDataSource("none");
     }
@@ -163,7 +191,7 @@ export default function ScenesPage() {
         // Non-blocking.
       }
       if (cacheFresh) {
-        // Stale-while-revalidate: render cache first, then refresh from network.
+        return;
       }
     }
 
@@ -183,11 +211,23 @@ export default function ScenesPage() {
         setLoading(false);
       }
     }
-  };
+  }, []);
 
   useEffect(() => {
     void refreshScenes({ preferCache: true });
-  }, [closeOpenedSwipe]);
+  }, [refreshScenes]);
+
+  useEffect(() => {
+    if (allScenes.length === 0) return;
+    const topSceneSlugs = allScenes.slice(0, 2).map((scene) => scene.slug);
+    scheduleScenePrefetch(topSceneSlugs);
+    for (const scene of allScenes.slice(0, 2)) {
+      void router.prefetch?.(`/scene/${scene.slug}`);
+      void prefetchSceneDetail(scene.slug).catch(() => {
+        // Non-blocking.
+      });
+    }
+  }, [allScenes, router]);
 
   useEffect(() => {
     const handlePullRefresh = async (event: Event) => {
@@ -211,7 +251,7 @@ export default function ScenesPage() {
     return () => {
       window.removeEventListener("app:pull-refresh", handlePullRefresh as EventListener);
     };
-  }, [closeOpenedSwipe]);
+  }, [refreshScenes]);
 
   useEffect(() => {
     if (!dialogOpen) return;
@@ -412,6 +452,7 @@ export default function ScenesPage() {
                   touchAction: "pan-y",
                 }}
                 onPointerDown={(event) => {
+                  warmSceneEntry(`/scene/${scene.slug}`, scene.slug);
                   if (!swipeEnabled) return;
                   if (event.pointerType === "mouse" && event.button !== 0) return;
                   gestureRef.current = {
@@ -484,7 +525,13 @@ export default function ScenesPage() {
                     closeSwipe(scene.id);
                     return;
                   }
-                  openSceneRoute(`/scene/${scene.slug}`);
+                  void openSceneRoute(`/scene/${scene.slug}`, scene.slug);
+                }}
+                onPointerEnter={() => {
+                  warmSceneEntry(`/scene/${scene.slug}`, scene.slug);
+                }}
+                onFocus={() => {
+                  warmSceneEntry(`/scene/${scene.slug}`, scene.slug);
                 }}
               >
                 <LoadingOverlay
@@ -515,11 +562,20 @@ export default function ScenesPage() {
                         type="button"
                         data-scene-variant-view="true"
                         className="inline-flex h-6 items-center rounded-full bg-[#F2F2F7] px-[10px] text-[11px] font-bold whitespace-nowrap text-[#636366] transition-colors hover:bg-[#EAEAF0] hover:text-[#1D1D1F]"
-                        onPointerDown={(event) => event.stopPropagation()}
+                        onPointerDown={(event) => {
+                          event.stopPropagation();
+                          warmSceneEntry(`/scene/${scene.slug}?view=variants`, scene.slug);
+                        }}
                         onClick={(event) => {
                           event.preventDefault();
                           event.stopPropagation();
-                          openSceneRoute(`/scene/${scene.slug}?view=variants`);
+                          void openSceneRoute(`/scene/${scene.slug}?view=variants`, scene.slug);
+                        }}
+                        onPointerEnter={() => {
+                          warmSceneEntry(`/scene/${scene.slug}?view=variants`, scene.slug);
+                        }}
+                        onFocus={() => {
+                          warmSceneEntry(`/scene/${scene.slug}?view=variants`, scene.slug);
                         }}
                       >
                         查看变体
@@ -555,22 +611,25 @@ export default function ScenesPage() {
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3 pb-4">
-        <button
+        <Button
           type="button"
-          className="flex h-11 cursor-pointer items-center justify-center gap-1.5 rounded-[12px] border-0 bg-[#007AFF] text-[14px] font-semibold text-white shadow-[0_4px_12px_rgba(0,122,255,0.3)] transition-all duration-200 ease-[cubic-bezier(0.4,0,0.2,1)] active:scale-[0.96] active:opacity-80"
+          radius="lg"
+          className="h-11 gap-1.5 text-[14px]"
           onClick={() => setGenerateSheetOpen(true)}
         >
           <Sparkles className="size-4" />
           生成场景
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
-          className="flex h-11 cursor-pointer items-center justify-center gap-1.5 rounded-[12px] border border-black/5 bg-white text-[14px] font-semibold text-[#1d1d1f] transition-all duration-200 ease-[cubic-bezier(0.4,0,0.2,1)] active:scale-[0.96] active:opacity-80"
+          variant="secondary"
+          radius="lg"
+          className="h-11 gap-1.5 text-[14px]"
           onClick={() => setDialogOpen(true)}
         >
           <Plus className="size-4" />
           导入自定义
-        </button>
+        </Button>
       </div>
 
       {topTask ? (
@@ -654,17 +713,21 @@ export default function ScenesPage() {
 
               <div className="bg-[#F2F2F7] px-4 pb-[calc(env(safe-area-inset-bottom)+20px)] pt-3">
                 <div className="grid grid-cols-2 gap-3">
-                  <button
+                  <Button
                     type="button"
-                    className="h-[50px] cursor-pointer rounded-[14px] border border-black/5 bg-white text-[16px] font-semibold text-[#1d1d1f] transition-all duration-200 ease-[cubic-bezier(0.4,0,0.2,1)] active:scale-[0.98] active:opacity-80"
+                    variant="secondary"
+                    radius="lg"
+                    className="h-[50px] text-[16px]"
                     onClick={closeDialog}
                     disabled={importing}
                   >
                     取消
-                  </button>
+                  </Button>
                   <LoadingButton
                     type="button"
-                    className="h-[50px] w-full rounded-[14px] border-0 bg-[#007AFF] text-[16px] font-semibold text-white shadow-none transition-opacity duration-200 active:scale-[0.98] active:opacity-80"
+                    variant="default"
+                    radius="lg"
+                    className="h-[50px] w-full text-[16px]"
                     onClick={handleImport}
                     loading={importing}
                     loadingText="导入中..."
@@ -725,3 +788,9 @@ export default function ScenesPage() {
     </div>
   );
 }
+
+
+
+
+
+

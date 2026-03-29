@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, MoreHorizontal } from "lucide-react";
 import { LoadingContent } from "@/components/shared/action-loading";
 import { Button } from "@/components/ui/button";
 import { APPLE_PANEL_RAISED } from "@/lib/ui/apple-style";
@@ -19,6 +19,7 @@ type FocusDetailActionsLabels = {
 type FocusDetailActionsProps = {
   open: boolean;
   show: boolean;
+  compactTrigger?: boolean;
   canShowFindRelations: boolean;
   canShowManualAddRelated: boolean;
   canShowRegenerateAudio: boolean;
@@ -49,6 +50,7 @@ type FocusDetailActionsProps = {
 export function FocusDetailActions({
   open,
   show,
+  compactTrigger = false,
   canShowFindRelations,
   canShowManualAddRelated,
   canShowRegenerateAudio,
@@ -77,23 +79,37 @@ export function FocusDetailActions({
 }: FocusDetailActionsProps) {
   if (!show) return <div />;
   const menuItemClassName =
-    "flex w-full items-center rounded-[var(--app-radius-panel)] px-3 py-2.5 text-left text-sm text-foreground transition hover:bg-[var(--app-surface-hover)] disabled:text-muted-foreground";
+    "flex w-full items-center rounded-[20px] px-3 py-2.5 text-left text-sm text-[#1F4F6E] transition hover:bg-[#EEF3FA] disabled:text-muted-foreground";
 
   return (
     <div className="relative">
       <Button
         type="button"
         variant="ghost"
-        className={appleButtonClassName}
+        className={
+          compactTrigger
+            ? `${appleButtonClassName} h-14 w-14 rounded-[18px] border-0 bg-[#EDF2F7] px-0 text-[#2C5A7A] shadow-none hover:bg-[#E4ECF6]`
+            : `${appleButtonClassName} h-10 rounded-full border border-[#E6EDF6] bg-[#F0F4FC] px-4 text-[#2C5A7A] shadow-none hover:bg-[#E4ECF6]`
+        }
         onClick={onToggleOpen}
         aria-expanded={open}
+        aria-label={labels.moreActions}
       >
-        {labels.moreActions}
-        <ChevronDown className={`size-4 transition-transform ${open ? "rotate-180" : ""}`} />
+        {compactTrigger ? (
+          <>
+            <MoreHorizontal className="size-5" />
+            <span className="sr-only">{labels.moreActions}</span>
+          </>
+        ) : (
+          <>
+            {labels.moreActions}
+            <ChevronDown className={`size-4 transition-transform ${open ? "rotate-180" : ""}`} />
+          </>
+        )}
       </Button>
 
       {open ? (
-        <div className={`absolute bottom-full left-0 z-10 mb-2 min-w-[200px] overflow-hidden p-1 ${APPLE_PANEL_RAISED}`}>
+        <div className={`absolute bottom-full left-0 z-10 mb-2 min-w-[220px] overflow-hidden rounded-[24px] p-2 ${APPLE_PANEL_RAISED}`}>
           {canShowFindRelations ? (
             <button
               type="button"
@@ -148,7 +164,7 @@ export function FocusDetailActions({
           {canSetCurrentClusterMain ? (
             <button
               type="button"
-              className="flex w-full items-center rounded-[var(--app-radius-panel)] px-3 py-2.5 text-left text-sm text-foreground transition hover:bg-[var(--app-surface-hover)]"
+              className={menuItemClassName}
               disabled={!hasFocusDetailText}
               onClick={onRequestSetCurrentClusterMain}
             >

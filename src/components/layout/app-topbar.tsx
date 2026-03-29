@@ -5,7 +5,7 @@ import { Bell } from "lucide-react";
 import { toast } from "sonner";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
+import { Button, IconButton } from "@/components/ui/button";
 
 export function AppTopbar() {
   const router = useRouter();
@@ -32,10 +32,10 @@ export function AppTopbar() {
           <p className="text-sm font-medium text-muted-foreground">今日学习空间</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button size="icon" variant="outline">
+          <IconButton size="icon" variant="outline" label="通知">
             <Bell className="size-4" />
-          </Button>
-          <Button size="sm" variant="outline" onClick={() => void handleLogout()}>
+          </IconButton>
+          <Button size="sm" variant="outline" radius="pill" onClick={() => void handleLogout()}>
             退出登录
           </Button>
           <Avatar className="size-8">

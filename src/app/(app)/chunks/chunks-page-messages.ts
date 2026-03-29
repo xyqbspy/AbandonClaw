@@ -1,4 +1,8 @@
 export const chunksPageMessages = {
+  heroTitle: "\u5b66\u4e60\u7a7a\u95f4",
+  heroSubtitle: "\u5df2\u4fdd\u5b58\u7684\u6838\u5fc3\u79ef\u7d2f",
+  coreSection: "\ud83d\udccc \u6838\u5fc3\u79ef\u7d2f",
+  addLearningContent: "\u6dfb\u52a0\u5b66\u4e60\u5185\u5bb9",
   loadFailed: "\u52a0\u8f7d\u8868\u8fbe\u5931\u8d25\u3002",
   loading: "\u52a0\u8f7d\u4e2d...",
   total: "\u5171",

@@ -70,6 +70,7 @@ const stopCalls: string[] = [];
 const loopCalls: boolean[] = [];
 const prefetchSentenceCalls: Array<{ sceneSlug: string; sentenceId: string; text: string }> = [];
 const prefetchChunkCalls: Array<{ chunkText: string; chunkKey: string }> = [];
+const chunkLayerCalls: string[] = [];
 
 let playbackState = {
   text: null as string | null,
@@ -89,7 +90,13 @@ const mockedModules = {
     useTtsPlaybackState: () => playbackState,
   },
   "@/lib/data/mock-lessons": {
-    getChunkLayerFromLesson: () => detail,
+    getChunkLayerFromLesson: (_lesson: Lesson, _sentence: LessonSentence, chunkText: string) => {
+      chunkLayerCalls.push(chunkText);
+      return {
+        ...detail,
+        text: chunkText,
+      };
+    },
   },
   "@/lib/shared/lesson-content": {
     getLessonSentences: () => [sentence],
@@ -155,6 +162,7 @@ afterEach(() => {
   loopCalls.length = 0;
   prefetchSentenceCalls.length = 0;
   prefetchChunkCalls.length = 0;
+  chunkLayerCalls.length = 0;
   playbackState = {
     text: null,
     kind: null,
@@ -247,4 +255,33 @@ test("useSceneDetailPlayback 会按当前上下文播放 chunk 和 sentence", as
   });
   assert.deepEqual(loopCalls.slice(-2), [true, false]);
   assert.ok(stopCalls.length >= 2);
+});
+
+test("useSceneDetailPlayback 会在有本轮相关短语时默认选中第一个 chunk", async () => {
+  const useSceneDetailPlayback = getUseSceneDetailPlayback();
+  const variantSetWithMultipleChunks: VariantSet = {
+    ...variantSet,
+    reusedChunks: ["burn out", "call it a day"],
+  };
+
+  const { result } = renderHook(() =>
+    useSceneDetailPlayback({
+      sceneSlug: "scene-1",
+      viewMode: "variants",
+      baseLesson: lesson,
+      activeVariantLesson: null,
+      latestVariantSet: variantSetWithMultipleChunks,
+    }),
+  );
+
+  act(() => {
+    result.current.handleOpenVariantChunk("call it a day");
+  });
+
+  await waitFor(() => {
+    assert.equal(result.current.variantChunkDetail?.text, "burn out");
+    assert.deepEqual(result.current.variantChunkRelatedChunks, ["burn out", "call it a day"]);
+  });
+
+  assert.deepEqual(chunkLayerCalls, ["burn out"]);
 });

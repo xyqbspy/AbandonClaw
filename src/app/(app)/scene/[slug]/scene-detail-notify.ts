@@ -1,7 +1,12 @@
 "use client";
 
 import { toast } from "sonner";
-import { getSceneMilestoneToastMessage, sceneDetailMessages, TrainingStepKey } from "./scene-detail-messages";
+import {
+  getSceneContinueStepToastMessage,
+  getSceneMilestoneToastMessage,
+  sceneDetailMessages,
+  TrainingStepKey,
+} from "./scene-detail-messages";
 
 export const notifySceneSessionCompleted = () => {
   toast.success(sceneDetailMessages.sessionCompleted);
@@ -9,6 +14,12 @@ export const notifySceneSessionCompleted = () => {
 
 export const notifySceneMilestone = (step: TrainingStepKey, sceneTitle: string) => {
   toast.success(getSceneMilestoneToastMessage(step, sceneTitle));
+};
+
+export const notifySceneContinueStep = (
+  step: Exclude<TrainingStepKey, "listen" | "done">,
+) => {
+  toast.message(getSceneContinueStepToastMessage(step));
 };
 
 export const notifySceneLoopPrompt = () => {

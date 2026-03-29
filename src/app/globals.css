@@ -33,38 +33,45 @@
 }
 
 :root {
-  --background: rgb(255 255 255);
-  --foreground: oklch(0.24 0.02 245);
+  --background: rgb(244 247 249);
+  --foreground: oklch(0.3 0.03 248);
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", "PingFang SC",
     "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", Arial, sans-serif;
   --font-serif: ui-serif, Georgia, "Times New Roman", "Songti SC", "STSong",
     "Noto Serif CJK SC", serif;
-  --card: oklch(0.998 0.005 95);
-  --card-foreground: oklch(0.24 0.02 245);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.24 0.02 245);
-  --primary: oklch(0.29 0.03 248);
+  --card: rgb(255 255 255 / 0.94);
+  --card-foreground: oklch(0.3 0.03 248);
+  --popover: rgb(255 255 255 / 0.96);
+  --popover-foreground: oklch(0.3 0.03 248);
+  --primary: oklch(0.31 0.04 248);
   --primary-foreground: oklch(0.985 0.003 95);
-  --secondary: oklch(0.95 0.008 95);
-  --secondary-foreground: oklch(0.3 0.02 245);
-  --muted: oklch(0.962 0.006 95);
-  --muted-foreground: oklch(0.51 0.018 250);
-  --accent: oklch(0.94 0.018 208);
-  --accent-foreground: oklch(0.24 0.02 245);
+  --secondary: rgb(236 242 246);
+  --secondary-foreground: oklch(0.34 0.03 248);
+  --muted: rgb(235 241 245);
+  --muted-foreground: oklch(0.56 0.02 248);
+  --accent: rgb(226 239 255);
+  --accent-foreground: oklch(0.3 0.03 248);
   --destructive: oklch(0.62 0.2 24);
-  --border: oklch(0.9 0.01 95);
-  --input: oklch(0.92 0.01 95);
-  --ring: oklch(0.67 0.04 220);
+  --border: rgb(212 221 230 / 0.9);
+  --input: rgb(226 234 241);
+  --ring: oklch(0.7 0.05 225);
   --radius: 1rem;
-  --app-surface: rgb(246 246 246);
-  --app-surface-subtle: rgb(240 240 240);
-  --app-surface-hover: rgb(238 240 242);
-  --app-surface-strong: rgb(32 44 60);
-  --app-surface-strong-hover: rgb(25 36 50);
-  --app-border-soft: rgb(15 23 42 / 0.08);
-  --app-border-strong: rgb(15 23 42 / 0.14);
-  --app-shadow-soft: 0 1px 3px rgba(15, 23, 42, 0.06);
-  --app-shadow-raised: 0 16px 36px rgba(15, 23, 42, 0.08);
+  --app-surface: rgb(255 255 255 / 0.88);
+  --app-surface-subtle: rgb(239 244 247 / 0.92);
+  --app-surface-hover: rgb(232 239 244 / 0.96);
+  --app-page-background: rgb(244 247 249);
+  --app-surface-strong: rgb(44 62 80);
+  --app-surface-strong-hover: rgb(36 52 68);
+  --app-border-soft: rgb(142 154 175 / 0.14);
+  --app-border-strong: rgb(142 154 175 / 0.24);
+  --app-shadow-soft: 0 4px 15px rgba(0, 0, 0, 0.03);
+  --app-shadow-raised: 0 14px 34px rgba(44, 62, 80, 0.08);
+  --app-button-primary: #007aff;
+  --app-button-primary-hover: #006ae0;
+  --app-button-primary-shadow: 0 8px 18px rgba(74, 144, 226, 0.22);
+  --app-button-secondary-bg: #ffffff;
+  --app-button-secondary-text: #1d1d1f;
+  --app-button-secondary-border: rgba(142, 154, 175, 0.16);
   --app-radius-pill: 999px;
   --app-radius-card: 1.25rem;
   --app-radius-panel: 1rem;
@@ -99,12 +106,19 @@
   --app-surface: oklch(0.27 0.02 250);
   --app-surface-subtle: oklch(0.31 0.02 250);
   --app-surface-hover: oklch(0.34 0.025 250);
+  --app-page-background: oklch(0.24 0.02 250);
   --app-surface-strong: oklch(0.9 0.008 95);
   --app-surface-strong-hover: oklch(0.84 0.01 95);
   --app-border-soft: oklch(1 0 0 / 0.08);
   --app-border-strong: oklch(1 0 0 / 0.14);
   --app-shadow-soft: 0 1px 3px rgba(0, 0, 0, 0.24);
   --app-shadow-raised: 0 14px 32px rgba(0, 0, 0, 0.28);
+  --app-button-primary: #4da3ff;
+  --app-button-primary-hover: #3a95f7;
+  --app-button-primary-shadow: 0 8px 18px rgba(77, 163, 255, 0.28);
+  --app-button-secondary-bg: oklch(0.28 0.02 250);
+  --app-button-secondary-text: oklch(0.97 0.008 95);
+  --app-button-secondary-border: rgba(255, 255, 255, 0.08);
 }
 
 @layer base {
@@ -114,11 +128,12 @@
 
   html {
     font-family: var(--font-sans), sans-serif;
+    background: var(--app-page-background);
   }
 
   body {
     @apply bg-background text-foreground;
-    background-image: none;
+    background: var(--app-page-background);
     min-height: 100vh;
     line-height: 1.6;
   }
@@ -135,6 +150,7 @@
 @layer components {
   .app-container {
     @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
+    background: var(--app-page-background);
   }
 
   .app-surface {
@@ -266,6 +282,97 @@
     outline: none;
     border-color: var(--app-border-strong);
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 18%, transparent 82%);
+  }
+
+  .app-button {
+    border-radius: 12px;
+    font-weight: 600;
+    transition:
+      transform 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+      opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+      background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+      border-color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+      box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+      color 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .app-button:active {
+    transform: scale(0.96);
+    opacity: 0.8;
+  }
+
+  .app-button:focus-visible {
+    outline: none;
+    box-shadow:
+      0 0 0 3px color-mix(in srgb, var(--ring) 24%, transparent 76%),
+      var(--app-button-shadow, 0 0 transparent);
+  }
+
+  .app-button:disabled {
+    box-shadow: none;
+  }
+
+  .app-button-primary {
+    background: var(--app-button-primary);
+    color: white;
+    border-color: transparent;
+    box-shadow: var(--app-button-primary-shadow);
+    --app-button-shadow: var(--app-button-primary-shadow);
+  }
+
+  .app-button-primary:hover {
+    background: var(--app-button-primary-hover);
+  }
+
+  .app-button-secondary {
+    background: var(--app-button-secondary-bg);
+    color: var(--app-button-secondary-text);
+    border-color: var(--app-button-secondary-border);
+    box-shadow: none;
+    --app-button-shadow: 0 0 transparent;
+  }
+
+  .app-button-secondary:hover {
+    background: color-mix(in srgb, var(--app-button-secondary-bg) 94%, black 6%);
+  }
+
+  .app-button-danger {
+    background: color-mix(in srgb, #ff3b30 10%, white 90%);
+    color: #d92d20;
+    border-color: color-mix(in srgb, #ff3b30 18%, transparent 82%);
+    box-shadow: none;
+    --app-button-shadow: 0 0 transparent;
+  }
+
+  .app-button-danger:hover {
+    background: color-mix(in srgb, #ff3b30 16%, white 84%);
+    border-color: color-mix(in srgb, #ff3b30 24%, transparent 76%);
+  }
+
+  .app-button-outline {
+    background: color-mix(in srgb, var(--app-button-secondary-bg) 92%, transparent 8%);
+    color: var(--app-button-secondary-text);
+    border-color: color-mix(in srgb, var(--app-button-secondary-border) 100%, transparent 0%);
+    box-shadow: none;
+    --app-button-shadow: 0 0 transparent;
+  }
+
+  .app-button-outline:hover,
+  .app-button-outline[aria-expanded="true"] {
+    background: color-mix(in srgb, var(--app-button-secondary-bg) 86%, black 14%);
+  }
+
+  .app-button-ghost {
+    background: transparent;
+    color: var(--app-button-secondary-text);
+    border-color: transparent;
+    box-shadow: none;
+    --app-button-shadow: 0 0 transparent;
+  }
+
+  .app-button-ghost:hover,
+  .app-button-ghost[aria-expanded="true"] {
+    background: color-mix(in srgb, var(--app-button-secondary-bg) 74%, transparent 26%);
   }
 
   .cn-toast {

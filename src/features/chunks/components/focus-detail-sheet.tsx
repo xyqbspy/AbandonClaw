@@ -1,7 +1,7 @@
 "use client";
 
 import { ManualExpressionAssistResponse, UserPhraseItemResponse } from "@/lib/utils/phrases-api";
-import { FocusDetailRelatedItem } from "./focus-detail-selectors";
+import { DetailSheetShell } from "@/components/shared/detail-sheet-shell";
 import { FocusDetailConfirm } from "./focus-detail-confirm";
 import { FocusDetailContent } from "./focus-detail-content";
 import { FocusDetailSheetFooter } from "./focus-detail-sheet-footer";
@@ -11,7 +11,7 @@ import {
   buildFocusDetailConfirmState,
   buildFocusDetailContentLabels,
 } from "./focus-detail-sheet-view-model";
-import { DetailSheetShell } from "@/components/shared/detail-sheet-shell";
+import { FocusDetailRelatedItem } from "./focus-detail-selectors";
 
 type FocusDetailTabValue = "info" | "similar" | "contrast";
 type FocusDetailConfirmAction = "set-cluster-main" | "set-standalone-main";
@@ -162,23 +162,27 @@ export function FocusDetailSheet({
         onOpenChange={onOpenChange}
         ariaLabel={labels.title}
         closeLabel="关闭详情"
-        panelClassName="!h-[88dvh] !min-h-[88dvh] !max-h-[88dvh] md:!h-[88vh] md:!min-h-[88vh] md:!max-h-[88vh]"
-        bodyClassName="min-h-0 min-w-0 flex-1 overflow-hidden px-4 pb-4 pt-4"
+        closeOnBackdropClick={false}
+        showCloseButton={false}
+        panelClassName="!h-[100dvh] !min-h-[100dvh] !max-h-[100dvh] rounded-none md:!h-[100vh] md:!min-h-[100vh] md:!max-h-[100vh] md:!rounded-t-[28px]"
+        bodyClassName="min-h-0 min-w-0 flex flex-1 flex-col overflow-hidden px-6 pb-4 pt-2 [@media(max-height:760px)]:px-4 [@media(max-height:760px)]:pb-2 [@media(max-height:760px)]:pt-1"
         header={
           <FocusDetailSheetHeader
             title={labels.title}
+            detailText={detail?.text ?? ""}
             trailLength={trailLength}
             backToCurrentLabel={labels.backToCurrent}
             canShowSiblingNav={canShowSiblingNav}
             prevLabel={labels.prev}
             nextLabel={labels.next}
             appleButtonClassName={appleButtonClassName}
+            onClose={() => onOpenChange(false)}
             onReopenPrevTrail={onReopenPrevTrail}
             onOpenPrevSibling={onOpenPrevSibling}
             onOpenNextSibling={onOpenNextSibling}
           />
         }
-        headerClassName="border-b border-[rgb(236,238,240)] bg-[rgb(250,250,250)]"
+        headerClassName="border-b-0 bg-transparent px-6 pb-2 pt-5 [@media(max-height:760px)]:px-4 [@media(max-height:760px)]:pb-1 [@media(max-height:760px)]:pt-3"
         footer={
           <FocusDetailSheetFooter
             detail={detail}
@@ -215,14 +219,14 @@ export function FocusDetailSheet({
             findRelationsLabel={labels.findRelations}
             manualAddRelatedLabel={labels.detailManualAddRelated ?? "添加关联表达"}
             regenerateAudioLabel={labels.detailRegenerateAudio ?? "重新生成音频"}
-            retryEnrichmentLabel={labels.detailRetryEnrichment ?? "补全当前chunk"}
+            retryEnrichmentLabel={labels.detailRetryEnrichment ?? "补全当前 chunk"}
             openAsMainLabel={labels.detailOpenAsMain}
             moveIntoClusterLabel={labels.moveIntoCluster}
             detachClusterMemberLabel={labels.detachClusterMember}
             completeAssistLabel={labels.completeAssist ?? "完成"}
           />
         }
-        footerClassName="border-t border-[rgb(236,238,240)] bg-[rgb(250,250,250)]"
+        footerClassName="!border-t-0 !bg-transparent px-6 pb-6 pt-2 [@media(max-height:760px)]:px-4 [@media(max-height:760px)]:pb-3 [@media(max-height:760px)]:pt-1"
       >
         {detail ? (
           <FocusDetailContent

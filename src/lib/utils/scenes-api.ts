@@ -20,6 +20,7 @@ export interface SceneListItemResponse {
 }
 
 let scenesListInFlightPromise: Promise<SceneListItemResponse[]> | null = null;
+const sceneDetailInFlightPromiseMap = new Map<string, Promise<Lesson>>();
 
 const extractError = async (response: Response, fallback: string) => {
   let message = fallback;
@@ -64,15 +65,28 @@ export async function getScenesFromApi(options?: { noStore?: boolean }) {
 }
 
 export async function getSceneDetailBySlugFromApi(slug: string): Promise<Lesson> {
-  const response = await fetch(`/api/scenes/${encodeURIComponent(slug)}`, {
-    method: "GET",
-  });
-  if (!response.ok) {
-    throw new Error(await extractError(response, "Failed to load scene detail."));
+  const normalizedSlug = slug.trim().toLowerCase();
+  const inFlight = sceneDetailInFlightPromiseMap.get(normalizedSlug);
+  if (inFlight) {
+    return inFlight;
   }
-  const data = (await response.json()) as { scene?: Lesson };
-  if (!data.scene) throw new Error("Invalid scene detail response.");
-  return data.scene;
+
+  const task = (async () => {
+    const response = await fetch(`/api/scenes/${encodeURIComponent(normalizedSlug)}`, {
+      method: "GET",
+    });
+    if (!response.ok) {
+      throw new Error(await extractError(response, "Failed to load scene detail."));
+    }
+    const data = (await response.json()) as { scene?: Lesson };
+    if (!data.scene) throw new Error("Invalid scene detail response.");
+    return data.scene;
+  })().finally(() => {
+    sceneDetailInFlightPromiseMap.delete(normalizedSlug);
+  });
+
+  sceneDetailInFlightPromiseMap.set(normalizedSlug, task);
+  return task;
 }
 
 export async function importSceneFromApi(payload: {

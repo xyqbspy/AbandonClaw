@@ -2,6 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { SavedRelationRowsBySourceId } from "@/features/chunks/components/types";
 import {
+  getPhraseRelationsCache,
+  setPhraseRelationsCache,
+} from "@/lib/cache/chunks-runtime-cache";
+import {
   getPhraseRelationsBatchFromApi,
   getPhraseRelationsFromApi,
   UserPhraseItemResponse,
@@ -14,11 +18,15 @@ export type SavedRelationCacheEntry = {
 };
 
 type UseSavedRelationsDeps = {
+  getPhraseRelationsCache: typeof getPhraseRelationsCache;
+  setPhraseRelationsCache: typeof setPhraseRelationsCache;
   getPhraseRelationsBatchFromApi: typeof getPhraseRelationsBatchFromApi;
   getPhraseRelationsFromApi: typeof getPhraseRelationsFromApi;
 };
 
 const defaultDeps: UseSavedRelationsDeps = {
+  getPhraseRelationsCache,
+  setPhraseRelationsCache,
   getPhraseRelationsBatchFromApi,
   getPhraseRelationsFromApi,
 };
@@ -38,7 +46,7 @@ export const useSavedRelations = ({
   onLoadFailed?: (message: string) => void;
   deps?: UseSavedRelationsDeps;
 }) => {
-  const [savedRelationCache, setSavedRelationCache] = useState<
+  const [savedRelationCache, setSavedRelationCacheState] = useState<
     Record<string, SavedRelationCacheEntry>
   >({});
   const [savedRelationLoadingKey, setSavedRelationLoadingKey] = useState<string | null>(null);
@@ -50,25 +58,68 @@ export const useSavedRelations = ({
     onLoadFailedRef.current = onLoadFailed;
   }, [onLoadFailed]);
 
+  const applyLoadedRelations = useCallback(
+    (entries: Array<{ userPhraseId: string; rows: UserPhraseRelationItemResponse[] }>) => {
+      if (entries.length === 0) return;
+      setSavedRelationCacheState((current) => {
+        const next = { ...current };
+        for (const entry of entries) {
+          next[entry.userPhraseId] = {
+            loaded: true,
+            rows: entry.rows,
+          };
+        }
+        return next;
+      });
+    },
+    [],
+  );
+
   useEffect(() => {
     if (contentFilter !== "expression" || expressionRows.length === 0) return;
-    const pendingIds = expressionRows
-      .map((row) => row.userPhraseId)
-      .filter(
-        (userPhraseId) =>
-          !savedRelationCache[userPhraseId]?.loaded &&
-          !pendingRelationRequestIdsRef.current.has(userPhraseId),
-      );
-    if (pendingIds.length === 0) return;
-
-    for (const userPhraseId of pendingIds) {
-      pendingRelationRequestIdsRef.current.add(userPhraseId);
-    }
-
     let cancelled = false;
-    void deps
-      .getPhraseRelationsBatchFromApi(pendingIds)
-      .then((response) => {
+
+    void (async () => {
+      const candidateIds = expressionRows
+        .map((row) => row.userPhraseId)
+        .filter(
+          (userPhraseId) =>
+            !savedRelationCache[userPhraseId]?.loaded &&
+            !pendingRelationRequestIdsRef.current.has(userPhraseId),
+        );
+      if (candidateIds.length === 0) return;
+
+      const cacheResults = await Promise.all(
+        candidateIds.map(async (userPhraseId) => ({
+          userPhraseId,
+          cache: await deps.getPhraseRelationsCache(userPhraseId),
+        })),
+      );
+      if (cancelled) return;
+
+      applyLoadedRelations(
+        cacheResults
+          .filter((item) => item.cache.found && item.cache.record && !item.cache.isExpired)
+          .map((item) => ({
+            userPhraseId: item.userPhraseId,
+            rows: item.cache.record?.data.rows ?? [],
+          })),
+      );
+
+      const pendingIds = cacheResults
+        .filter((item) => !item.cache.found || item.cache.isExpired || !item.cache.record)
+        .map((item) => item.userPhraseId);
+      if (pendingIds.length === 0) {
+        setFocusRelationsBootstrapDone(true);
+        return;
+      }
+
+      for (const userPhraseId of pendingIds) {
+        pendingRelationRequestIdsRef.current.add(userPhraseId);
+      }
+
+      try {
+        const response = await deps.getPhraseRelationsBatchFromApi(pendingIds);
         if (cancelled) return;
         const grouped = new Map<string, UserPhraseRelationItemResponse[]>();
         for (const row of response.rows) {
@@ -76,45 +127,40 @@ export const useSavedRelations = ({
           bucket.push(row);
           grouped.set(row.sourceUserPhraseId, bucket);
         }
-        setSavedRelationCache((current) => {
-          const next = { ...current };
-          for (const userPhraseId of pendingIds) {
-            next[userPhraseId] = {
-              loaded: true,
-              rows: grouped.get(userPhraseId) ?? [],
-            };
-          }
-          return next;
-        });
+        const loadedEntries = pendingIds.map((userPhraseId) => ({
+          userPhraseId,
+          rows: grouped.get(userPhraseId) ?? [],
+        }));
+        applyLoadedRelations(loadedEntries);
+        for (const entry of loadedEntries) {
+          void deps.setPhraseRelationsCache(entry.userPhraseId, entry.rows).catch(() => {
+            // Ignore cache failures.
+          });
+        }
         setFocusRelationsBootstrapDone(true);
-      })
-      .catch((error) => {
+      } catch (error) {
         if (cancelled) return;
         onLoadFailedRef.current?.(
           error instanceof Error ? error.message : "加载表达关系失败。",
         );
-        setSavedRelationCache((current) => {
-          const next = { ...current };
-          for (const userPhraseId of pendingIds) {
-            next[userPhraseId] = {
-              loaded: true,
-              rows: [],
-            };
-          }
-          return next;
-        });
+        applyLoadedRelations(
+          pendingIds.map((userPhraseId) => ({
+            userPhraseId,
+            rows: [],
+          })),
+        );
         setFocusRelationsBootstrapDone(true);
-      })
-      .finally(() => {
+      } finally {
         for (const userPhraseId of pendingIds) {
           pendingRelationRequestIdsRef.current.delete(userPhraseId);
         }
-      });
+      }
+    })();
 
     return () => {
       cancelled = true;
     };
-  }, [contentFilter, deps, expressionRows, savedRelationCache]);
+  }, [applyLoadedRelations, contentFilter, deps, expressionRows, savedRelationCache]);
 
   useEffect(() => {
     if (contentFilter !== "expression") {
@@ -145,44 +191,63 @@ export const useSavedRelations = ({
     }
 
     let cancelled = false;
-    pendingRelationRequestIdsRef.current.add(userPhraseId);
-    setSavedRelationLoadingKey(userPhraseId);
+    void (async () => {
+      const cache = await deps.getPhraseRelationsCache(userPhraseId);
+      if (cancelled) return;
+      if (cache.found && cache.record && !cache.isExpired) {
+        applyLoadedRelations([
+          {
+            userPhraseId,
+            rows: cache.record.data.rows,
+          },
+        ]);
+        return;
+      }
 
-    void deps
-      .getPhraseRelationsFromApi(userPhraseId)
-      .then((response) => {
+      pendingRelationRequestIdsRef.current.add(userPhraseId);
+      setSavedRelationLoadingKey(userPhraseId);
+
+      try {
+        const response = await deps.getPhraseRelationsFromApi(userPhraseId);
         if (cancelled) return;
-        setSavedRelationCache((current) => ({
-          ...current,
-          [userPhraseId]: {
-            loaded: true,
+        applyLoadedRelations([
+          {
+            userPhraseId,
             rows: response.rows,
           },
-        }));
-      })
-      .catch((error) => {
+        ]);
+        void deps.setPhraseRelationsCache(userPhraseId, response.rows).catch(() => {
+          // Ignore cache failures.
+        });
+      } catch (error) {
         if (cancelled) return;
         onLoadFailedRef.current?.(
           error instanceof Error ? error.message : "加载表达关系失败。",
         );
-        setSavedRelationCache((current) => ({
-          ...current,
-          [userPhraseId]: {
-            loaded: true,
+        applyLoadedRelations([
+          {
+            userPhraseId,
             rows: [],
           },
-        }));
-      })
-      .finally(() => {
+        ]);
+      } finally {
         pendingRelationRequestIdsRef.current.delete(userPhraseId);
         if (cancelled) return;
         setSavedRelationLoadingKey((current) => (current === userPhraseId ? null : current));
-      });
+      }
+    })();
 
     return () => {
       cancelled = true;
     };
-  }, [contentFilter, deps, expressionViewMode, focusDetailUserPhraseId, savedRelationCache]);
+  }, [
+    applyLoadedRelations,
+    contentFilter,
+    deps,
+    expressionViewMode,
+    focusDetailUserPhraseId,
+    savedRelationCache,
+  ]);
 
   const savedRelationRowsBySourceId: SavedRelationRowsBySourceId = useMemo(
     () =>
@@ -195,7 +260,7 @@ export const useSavedRelations = ({
   const invalidateSavedRelations = useCallback((userPhraseIds: string[]) => {
     const uniqueIds = Array.from(new Set(userPhraseIds.map((item) => item.trim()).filter(Boolean)));
     if (uniqueIds.length === 0) return;
-    setSavedRelationCache((current) => {
+    setSavedRelationCacheState((current) => {
       const next = { ...current };
       for (const userPhraseId of uniqueIds) {
         delete next[userPhraseId];

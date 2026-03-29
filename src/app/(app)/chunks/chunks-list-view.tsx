@@ -10,12 +10,23 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import {
+  ExpressionSummaryCard,
+  ExpressionSummaryGroup,
+  ExpressionSummaryRelatedItem,
+} from "@/features/chunks/components/expression-summary-card";
+import {
   APPLE_BODY_TEXT,
   APPLE_LIST_ITEM,
   APPLE_META_TEXT,
   APPLE_PANEL,
   APPLE_TITLE_SM,
 } from "@/lib/ui/apple-style";
+
+const LIST_WRAPPER_CLASS = "flex flex-col gap-[18px] [@media(max-height:760px)]:gap-3";
+const EXPR_TAG_CLASS =
+  "inline-flex items-center rounded-full bg-[#EBF8FF] px-2.5 py-1 text-[11px] font-bold text-[#3182CE] [@media(max-height:760px)]:px-2 [@media(max-height:760px)]:py-0.5 [@media(max-height:760px)]:text-[10px]";
+const EXPAND_BUTTON_CLASS =
+  "mt-3 w-full border-t border-[#EDF2F7] pt-2 text-center text-[13px] font-semibold text-[#2C8C6E] [@media(max-height:760px)]:mt-2 [@media(max-height:760px)]:pt-1.5 [@media(max-height:760px)]:text-[12px]";
 
 const APPLE_STATUS_BADGE =
   "border-[var(--app-border-soft)] bg-[var(--app-surface-subtle)] text-foreground";
@@ -157,7 +168,7 @@ export function ChunksListView({
   openGenerateSimilarSheet,
 }: ChunksListViewProps) {
   return (
-    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+    <div className={LIST_WRAPPER_CLASS}>
       {phrases.map((item) => {
         const sentenceExpressions =
           item.learningItemType === "sentence" ? extractExpressionsFromSentenceItem(item) : [];
@@ -174,10 +185,134 @@ export function ChunksListView({
           hasSimilarPreview && item.aiEnrichmentStatus === "pending"
             ? buildDifferenceNote(item.text, similarPreview[0].text)
             : null;
+        const cardExpanded = Boolean(expandedCardIds[item.userPhraseId]);
+
+        if (item.learningItemType === "expression") {
+          return (
+            <ExpressionSummaryCard
+              key={item.userPhraseId}
+              title={item.text}
+              translation={
+                item.translation ??
+                (item.aiEnrichmentStatus === "pending"
+                  ? labels.learningInfoPending
+                  : item.aiEnrichmentStatus === "failed"
+                    ? labels.learningInfoFailed
+                    : labels.noTranslation)
+              }
+              onTitleClick={() => toggleCardExpanded(item.userPhraseId)}
+              badge={<span className={EXPR_TAG_CLASS}>{reviewStatusLabel[item.reviewStatus]}</span>}
+            >
+              <ExpressionSummaryGroup
+                label={
+                  hasSimilarPreview
+                    ? `🔗 ${labels.similarExpressions} · ${similarPreview.length}`
+                    : `🔗 ${labels.similarExpressions}`
+                }
+                actionLabel="查看详情"
+                onAction={() =>
+                  item.expressionClusterId
+                    ? applyClusterFilter(item.expressionClusterId, item.text)
+                    : void openGenerateSimilarSheet(item)
+                }
+                footer={
+                  <button
+                    type="button"
+                    className={EXPAND_BUTTON_CLASS}
+                    onClick={() => toggleSimilarExpanded(item.userPhraseId)}
+                    aria-expanded={isSimilarExpanded}
+                    aria-label={`${labels.similarExpressions} ${isSimilarExpanded ? labels.hideSimilar : labels.showSimilar}`}
+                  >
+                    {isSimilarExpanded ? "📘 收起同类表达" : "📖 展开同类表达"}
+                  </button>
+                }
+              >
+                {isSimilarExpanded ? (
+                  hasSimilarPreview ? (
+                    <div className="space-y-0">
+                      {similarPreview.map((similarItem) => (
+                        <ExpressionSummaryRelatedItem
+                          key={similarItem.userPhraseId}
+                          primary={similarItem.text}
+                          secondary={buildDifferenceNote(item.text, similarItem.text)}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <p className={APPLE_META_TEXT}>{labels.similarEmpty}</p>
+                  )
+                ) : null}
+              </ExpressionSummaryGroup>
+
+              <div
+                className={`overflow-hidden transition-all duration-200 ${
+                  cardExpanded
+                    ? "max-h-[720px] pt-4 opacity-100 [@media(max-height:760px)]:pt-3"
+                    : "max-h-0 pt-0 opacity-0"
+                }`}
+              >
+                <div className="space-y-3.5 [@media(max-height:760px)]:space-y-2.5">
+                  {item.aiEnrichmentStatus === "pending" ? (
+                    <div className={`space-y-1 p-2.5 ${APPLE_PANEL}`}>
+                      <p className={APPLE_META_TEXT}>{labels.learningInfoPending}</p>
+                      <p className="text-sm font-medium text-foreground">{item.text}</p>
+                      <p className={APPLE_META_TEXT}>{labels.learningInfoPendingHint}</p>
+                      <p className={APPLE_META_TEXT}>
+                        {labels.reviewStage}：{getReviewActionHint(item.reviewStatus)}
+                      </p>
+                      {pendingSimilarDiffLabel ? (
+                        <p className={APPLE_META_TEXT}>
+                          {labels.similarExpressions}：{pendingSimilarDiffLabel}
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : null}
+                  <div className="space-y-0.5">
+                    <p className={APPLE_META_TEXT}>{labels.usageHint}</p>
+                    <p className={`line-clamp-2 ${APPLE_BODY_TEXT}`}>{getUsageHint(item)}</p>
+                  </div>
+                  <div className="space-y-0.5">
+                    <p className={APPLE_META_TEXT}>{labels.sourceSentence}</p>
+                    <p className={`line-clamp-2 text-sm ${APPLE_META_TEXT}`}>
+                      {item.sourceSentenceText
+                        ? renderSentenceWithExpressionHighlight(item.sourceSentenceText, item.text)
+                        : item.aiEnrichmentStatus === "pending"
+                          ? labels.learningInfoPending
+                          : labels.noSourceSentence}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2 pt-1 [@media(max-height:760px)]:gap-1.5 [@media(max-height:760px)]:pt-0.5">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className={appleButtonClassName}
+                      onClick={() => startReviewFromCard(item)}
+                    >
+                      {getPrimaryActionLabel(item)}
+                    </Button>
+                    <LoadingButton
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className={appleButtonClassName}
+                      disabled={!item.expressionClusterId}
+                      loading={mapOpeningForId === item.userPhraseId}
+                      loadingText={labels.mapPending}
+                      onClick={() => void openExpressionMap(item)}
+                    >
+                      {!item.expressionClusterId ? labels.mapUnavailable : labels.openMap}
+                    </LoadingButton>
+                  </div>
+                </div>
+              </div>
+            </ExpressionSummaryCard>
+          );
+        }
 
         return (
           <Card key={item.userPhraseId} className={`h-full overflow-hidden ${appleSurfaceClassName}`}>
-            <CardHeader className="px-3 py-2.5">
+            <CardHeader className="px-3 py-2.5 [@media(max-height:760px)]:px-2.5 [@media(max-height:760px)]:py-2">
               <button
                 type="button"
                 className="w-full text-left"
@@ -185,12 +320,14 @@ export function ChunksListView({
                 aria-expanded={Boolean(expandedCardIds[item.userPhraseId])}
                 aria-label={item.text}
               >
-                <div className="flex items-start justify-between gap-2">
+                <div className="flex items-start justify-between gap-2 [@media(max-height:760px)]:gap-1.5">
                   <div className="min-w-0">
                     <p className={APPLE_META_TEXT}>
                       {item.learningItemType === "sentence" ? labels.sentenceUnit : labels.expressionUnit}
                     </p>
-                    <p className={`mt-0.5 leading-snug ${APPLE_TITLE_SM}`}>{item.text}</p>
+                    <p className={`mt-0.5 leading-snug ${APPLE_TITLE_SM} [@media(max-height:760px)]:text-[15px]`}>
+                      {item.text}
+                    </p>
                     <p className={`mt-0.5 line-clamp-1 ${APPLE_META_TEXT}`}>
                       {item.translation ??
                         (item.aiEnrichmentStatus === "pending"
@@ -200,7 +337,7 @@ export function ChunksListView({
                             : labels.noTranslation)}
                     </p>
                   </div>
-                  <div className="mt-0.5 flex shrink-0 items-center gap-1.5">
+                  <div className="mt-0.5 flex shrink-0 items-center gap-1.5 [@media(max-height:760px)]:gap-1">
                     <Badge variant="secondary" className={APPLE_STATUS_BADGE}>
                       {reviewStatusLabel[item.reviewStatus]}
                     </Badge>
@@ -220,10 +357,12 @@ export function ChunksListView({
             </CardHeader>
             <div
               className={`overflow-hidden transition-all duration-200 ${
-                expandedCardIds[item.userPhraseId] ? "max-h-[780px] opacity-100" : "max-h-0 opacity-0"
+                expandedCardIds[item.userPhraseId]
+                  ? "max-h-[780px] opacity-100"
+                  : "max-h-0 opacity-0"
               }`}
             >
-              <CardContent className="space-y-3.5 p-3 pb-2 pt-2.5">
+              <CardContent className="space-y-3.5 p-3 pb-2 pt-2.5 [@media(max-height:760px)]:space-y-2.5 [@media(max-height:760px)]:p-2.5 [@media(max-height:760px)]:pb-2 [@media(max-height:760px)]:pt-2">
                 {item.learningItemType === "sentence" ? (
                   <>
                     <div className="space-y-0.5">
@@ -250,7 +389,7 @@ export function ChunksListView({
                             return (
                               <div
                                 key={key}
-                                className={`flex items-center gap-1 rounded-full px-2 py-1 ${APPLE_PANEL}`}
+                                className={`flex items-center gap-1 rounded-full px-2 py-1 [@media(max-height:760px)]:px-1.5 [@media(max-height:760px)]:py-0.5 ${APPLE_PANEL}`}
                               >
                                 <span className={APPLE_BODY_TEXT}>{expression}</span>
                                 <LoadingButton
@@ -314,7 +453,7 @@ export function ChunksListView({
                           loading={ttsLoadingText === (item.exampleSentences[0]?.en ?? item.sourceSentenceText ?? "").trim()}
                           size="sm"
                           variant="ghost"
-                          className="h-6 px-2 text-xs"
+                          className="h-6 px-2 text-xs [@media(max-height:760px)]:h-5 [@media(max-height:760px)]:px-1.5 [@media(max-height:760px)]:text-[11px]"
                           iconClassName="size-3"
                           onClick={() =>
                             handlePronounceSentence(item.exampleSentences[0]?.en ?? item.sourceSentenceText)
@@ -359,7 +498,7 @@ export function ChunksListView({
                           (item.aiEnrichmentStatus === "pending" ? labels.typicalScenarioPending : labels.diffRelated)}
                       </p>
                     </div>
-                    <div className={`space-y-1.5 p-2.5 ${APPLE_PANEL}`}>
+                    <div className={`space-y-1.5 p-2.5 [@media(max-height:760px)]:space-y-1 [@media(max-height:760px)]:p-2 ${APPLE_PANEL}`}>
                       <button
                         type="button"
                         className="flex w-full items-center justify-between text-left"
@@ -373,9 +512,12 @@ export function ChunksListView({
                       </button>
                       {isSimilarExpanded ? (
                         hasSimilarPreview ? (
-                          <div className="space-y-2">
+                          <div className="space-y-2 [@media(max-height:760px)]:space-y-1.5">
                             {similarPreview.map((similarItem) => (
-                              <div key={similarItem.userPhraseId} className={`px-2 py-1.5 ${APPLE_LIST_ITEM}`}>
+                              <div
+                                key={similarItem.userPhraseId}
+                                className={`px-2 py-1.5 [@media(max-height:760px)]:px-1.5 [@media(max-height:760px)]:py-1 ${APPLE_LIST_ITEM}`}
+                              >
                                 <p className={`font-medium ${APPLE_BODY_TEXT}`}>{similarItem.text}</p>
                                 <p className={APPLE_META_TEXT}>
                                   {buildDifferenceNote(item.text, similarItem.text)}
@@ -397,7 +539,7 @@ export function ChunksListView({
                             </Button>
                           </div>
                         ) : (
-                          <div className="space-y-2">
+                          <div className="space-y-2 [@media(max-height:760px)]:space-y-1.5">
                             <p className={APPLE_META_TEXT}>{labels.similarEmpty}</p>
                             <LoadingButton
                               type="button"
@@ -431,7 +573,7 @@ export function ChunksListView({
                   <p className={APPLE_META_TEXT}>{getReviewActionHint(item.reviewStatus)}</p>
                 </div>
                 {item.usageNote && item.usageNote.trim().length > 70 ? (
-                  <div className="space-y-1.5">
+                  <div className="space-y-1.5 [@media(max-height:760px)]:space-y-1">
                     <Button
                       type="button"
                       size="sm"
@@ -442,7 +584,7 @@ export function ChunksListView({
                       {expandedIds[item.userPhraseId] ? labels.collapseDetail : labels.expandDetail}
                     </Button>
                     {expandedIds[item.userPhraseId] ? (
-                      <div className="space-y-1.5 pt-0.5">
+                      <div className="space-y-1.5 pt-0.5 [@media(max-height:760px)]:space-y-1">
                         <p className={APPLE_META_TEXT}>{labels.inThisSentence}</p>
                         <p className={APPLE_BODY_TEXT}>{item.translation ?? labels.noTranslation}</p>
                         <p className={APPLE_META_TEXT}>{labels.commonUsage}</p>
@@ -452,7 +594,7 @@ export function ChunksListView({
                   </div>
                 ) : null}
               </CardContent>
-              <CardFooter className="flex flex-wrap gap-2 px-3 py-2.5">
+              <CardFooter className="flex flex-wrap gap-2 px-3 py-2.5 [@media(max-height:760px)]:gap-1.5 [@media(max-height:760px)]:px-2.5 [@media(max-height:760px)]:py-2">
                 {item.learningItemType === "sentence" ? (
                   <Button
                     type="button"
@@ -522,5 +664,3 @@ export function ChunksListView({
     </div>
   );
 }
-
-

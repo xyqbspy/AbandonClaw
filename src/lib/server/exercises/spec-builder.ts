@@ -47,6 +47,7 @@ export const buildExerciseSpecsFromScene = (
           metadata: {
             source: "scene_chunk",
             sceneType: normalized.type,
+            chunkText: chunk.text,
           },
         });
 
