@@ -55,7 +55,7 @@ export function SceneVariantsView({
 }: SceneVariantsViewProps) {
   return (
     <div className="space-y-[var(--mobile-space-2xl)]">
-      <section className={`space-y-[var(--mobile-space-xl)] p-[var(--mobile-space-sheet)] sm:p-5 ${APPLE_PANEL_RAISED}`}>
+      <section className={`space-y-[var(--mobile-space-xl)] p-[var(--mobile-space-sheet)] sm:p-[var(--mobile-space-sheet)] ${APPLE_PANEL_RAISED}`}>
         <div className="flex flex-wrap items-center justify-end gap-[var(--mobile-space-sm)]">
           <button
             type="button"
@@ -131,7 +131,7 @@ export function SceneVariantsView({
       {!variantSet ? (
         <p className={APPLE_META_TEXT}>{labels.empty}</p>
       ) : (
-        <section className={`space-y-[var(--mobile-space-md)] p-[var(--mobile-space-sheet)] sm:p-5 ${APPLE_PANEL_RAISED}`}>
+        <section className={`space-y-[var(--mobile-space-md)] p-[var(--mobile-space-sheet)] sm:p-[var(--mobile-space-sheet)] ${APPLE_PANEL_RAISED}`}>
           <div className="space-y-[var(--mobile-space-2xs)]">
           <h3 className={APPLE_TITLE_SM}>变体列表</h3>
           <p className={APPLE_META_TEXT}>按顺序浏览和完成本轮变体，已完成后可重新开启一轮。</p>
@@ -176,4 +176,3 @@ export function SceneVariantsView({
     </div>
   );
 }
-

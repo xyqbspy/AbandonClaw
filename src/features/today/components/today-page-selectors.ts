@@ -209,6 +209,42 @@ export const getContinueLearningHref = (
   return `/scene/${continueLearning.sceneSlug}`;
 };
 
+export const getContinueLearningCardState = ({
+  continueLearning,
+  sceneTask,
+  isPending,
+  emptyTitle,
+  emptyDesc,
+}: {
+  continueLearning: ResolvedContinueLearningItem | null;
+  sceneTask: LearningDashboardResponse["todayTasks"]["sceneTask"];
+  isPending: boolean;
+  emptyTitle: string;
+  emptyDesc: string;
+}) => {
+  if (isPending) {
+    return {
+      title: "正在恢复今天的学习进度",
+      subtitle: "稍等一下，正在同步你上次学到的场景和步骤。",
+      stepLabel: "正在加载",
+      helperText: "正在恢复继续学习入口，避免把你暂时带回开始新场景。",
+      href: "#",
+      ctaLabel: "正在恢复进度...",
+      isPending: true,
+    };
+  }
+
+  return {
+    title: continueLearning?.title ?? emptyTitle,
+    subtitle: continueLearning?.subtitle ?? emptyDesc,
+    stepLabel: getContinueLearningStepLabel(continueLearning, sceneTask),
+    helperText: getContinueLearningHelperText(continueLearning, sceneTask),
+    href: getContinueLearningHref(continueLearning),
+    ctaLabel: continueLearning ? "▶ 继续学习" : "▶ 去选场景",
+    isPending: false,
+  };
+};
+
 export const buildTodayTasks = ({
   dashboard,
   continueLearning,

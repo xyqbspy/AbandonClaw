@@ -276,7 +276,7 @@ const renderSentenceWithExpressionHighlight = (sentence: string, expression: str
     return (
       <>
         {source.slice(0, directStart)}
-        <mark className="inline-block rounded-[20px] bg-[#EEF6F0] px-2 py-0.5 font-bold text-[#2C6E4F]">
+        <mark className="inline-block rounded-[var(--app-radius-pill)] bg-[#EEF6F0] px-[var(--mobile-adapt-space-sm)] py-[2px] font-bold text-[#2C6E4F]">
           {source.slice(directStart, directEnd)}
         </mark>
         {source.slice(directEnd)}
@@ -296,7 +296,7 @@ const renderSentenceWithExpressionHighlight = (sentence: string, expression: str
   return (
     <>
       {source.slice(0, start)}
-      <mark className="inline-block rounded-[20px] bg-[#EEF6F0] px-2 py-0.5 font-bold text-[#2C6E4F]">
+      <mark className="inline-block rounded-[var(--app-radius-pill)] bg-[#EEF6F0] px-[var(--mobile-adapt-space-sm)] py-[2px] font-bold text-[#2C6E4F]">
         {source.slice(start, end)}
       </mark>
       {source.slice(end)}
@@ -1842,23 +1842,23 @@ export default function ChunksPage() {
   };
 
   return (
-    <div className="space-y-6 [@media(max-height:760px)]:space-y-3.5">
-      <section className="rounded-[24px] border border-white bg-white p-4 shadow-[0_8px_20px_rgba(0,0,0,0.04)] [@media(max-height:760px)]:rounded-[18px] [@media(max-height:760px)]:p-2.5">
-        <div className="mb-4 flex items-center gap-3 [@media(max-height:760px)]:mb-2.5 [@media(max-height:760px)]:gap-2">
-          <div className="flex h-[42px] w-[42px] items-center justify-center rounded-[14px] bg-[linear-gradient(135deg,#38b2ac,#2c7a7b)] text-[16px] font-bold text-white [@media(max-height:760px)]:h-8 [@media(max-height:760px)]:w-8 [@media(max-height:760px)]:rounded-[10px] [@media(max-height:760px)]:text-[13px]">
+    <div className="space-y-[var(--mobile-adapt-space-xl)] [@media(max-height:760px)]:space-y-[var(--mobile-adapt-space-md)]">
+      <section className="rounded-[var(--app-radius-card)] border border-white bg-white p-[var(--mobile-adapt-space-md)] shadow-[0_8px_20px_rgba(0,0,0,0.04)] [@media(max-height:760px)]:rounded-[var(--mobile-adapt-overlay-card-radius)] [@media(max-height:760px)]:p-[var(--mobile-adapt-space-sm)]">
+        <div className="mb-[var(--mobile-adapt-space-md)] flex items-center gap-[var(--mobile-adapt-space-md)] [@media(max-height:760px)]:mb-[var(--mobile-adapt-space-sm)] [@media(max-height:760px)]:gap-[var(--mobile-adapt-space-sm)]">
+          <div className="flex h-[clamp(36px,9vw,42px)] w-[clamp(36px,9vw,42px)] items-center justify-center rounded-[clamp(10px,2.8vw,14px)] bg-[linear-gradient(135deg,#38b2ac,#2c7a7b)] text-[length:var(--mobile-adapt-font-body-sm)] font-bold text-white">
             AC
           </div>
           <div className="min-w-0">
-            <p className="text-[16px] font-semibold text-[#1F5E7E] [@media(max-height:760px)]:text-[14px]">{zh.heroTitle}</p>
-            <p className="text-[12px] text-[#718096] [@media(max-height:760px)]:text-[10px]">
+            <p className="text-[length:var(--mobile-adapt-font-body)] font-semibold text-[#1F5E7E]">{zh.heroTitle}</p>
+            <p className="text-[length:var(--mobile-adapt-font-meta)] text-[#718096]">
               {zh.heroSubtitle} · {summary}
             </p>
           </div>
         </div>
         <div className="relative">
-          <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-[#718096]" />
+          <Search className="pointer-events-none absolute left-[var(--mobile-adapt-space-md)] top-1/2 size-[clamp(14px,4vw,16px)] -translate-y-1/2 text-[#718096]" />
           <Input
-            className="h-11 rounded-[16px] border-0 bg-[#F1F5F9] pl-10 text-[14px] text-[#4A5568] shadow-none placeholder:text-[#718096] focus-visible:ring-2 focus-visible:ring-[#cbd5e1] [@media(max-height:760px)]:h-9 [@media(max-height:760px)]:rounded-[12px] [@media(max-height:760px)]:pl-9 [@media(max-height:760px)]:text-[13px]"
+            className="h-[var(--mobile-adapt-button-height)] rounded-[var(--mobile-adapt-overlay-card-radius)] border-0 bg-[#F1F5F9] pl-[calc(var(--mobile-adapt-space-xl)+var(--mobile-adapt-space-sm))] text-[length:var(--mobile-adapt-font-body-sm)] text-[#4A5568] shadow-none placeholder:text-[#718096] focus-visible:ring-2 focus-visible:ring-[#cbd5e1]"
             placeholder={`${zh.searchPlaceholder} · ${summary}`}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
@@ -1866,14 +1866,14 @@ export default function ChunksPage() {
         </div>
       </section>
 
-      <div className="flex flex-wrap items-center justify-between gap-3 px-1 [@media(max-height:760px)]:gap-1.5">
-        <p className="text-[15px] font-bold text-[#4A5568] [@media(max-height:760px)]:text-[14px]">{zh.coreSection}</p>
-        <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-[var(--mobile-adapt-space-md)] px-1 [@media(max-height:760px)]:gap-[var(--mobile-adapt-space-sm)]">
+        <p className="text-[length:var(--mobile-adapt-font-body)] font-bold text-[#4A5568]">{zh.coreSection}</p>
+        <div className="flex items-center gap-[var(--mobile-adapt-space-sm)]">
           <Button
             type="button"
             size="sm"
             variant="ghost"
-            className="rounded-[10px] bg-[#E6FFFA] px-4 py-2 text-[13px] font-semibold text-[#2C7A7B] hover:bg-[#d8faf3] [@media(max-height:760px)]:rounded-[9px] [@media(max-height:760px)]:px-2.5 [@media(max-height:760px)]:py-1 [@media(max-height:760px)]:text-[11px]"
+            className="rounded-[var(--mobile-adapt-overlay-card-radius)] bg-[#E6FFFA] px-[var(--mobile-adapt-space-lg)] py-[var(--mobile-adapt-space-sm)] text-[length:var(--mobile-adapt-font-body-sm)] font-semibold text-[#2C7A7B] hover:bg-[#d8faf3]"
             onClick={() => setAddSheetOpen(true)}
           >
             {zh.addLearningContent}
@@ -1915,7 +1915,7 @@ export default function ChunksPage() {
       </div>
 
       {!(contentFilter === "expression" && expressionViewMode === "focus") ? (
-        <div className={`flex flex-wrap gap-2 p-2 ${APPLE_PANEL}`}>
+        <div className={`flex flex-wrap gap-[var(--mobile-adapt-space-sm)] p-[var(--mobile-adapt-space-sm)] ${APPLE_PANEL}`}>
           {[
             { key: "all", label: zh.tabs.all },
             { key: "saved", label: zh.tabs.saved },
@@ -1941,10 +1941,10 @@ export default function ChunksPage() {
       ) : null}
 
       {expressionClusterFilterId ? (
-        <div className={`flex flex-wrap items-center gap-2 px-3 py-2 ${APPLE_PANEL}`}>
+        <div className={`flex flex-wrap items-center gap-[var(--mobile-adapt-space-sm)] px-[var(--mobile-adapt-space-md)] py-[var(--mobile-adapt-space-sm)] ${APPLE_PANEL}`}>
           <p className={APPLE_META_TEXT}>{zh.viewingClusterFilter}</p>
           {clusterFilterExpressionLabel ? (
-            <p className="text-xs text-foreground/90">
+            <p className="text-[length:var(--mobile-adapt-font-meta)] text-foreground/90">
               {zh.filteredClusterPrefix}
               <span className="font-medium"> {clusterFilterExpressionLabel} </span>
               {zh.filteredClusterSuffix}
@@ -1957,7 +1957,7 @@ export default function ChunksPage() {
       ) : null}
 
         {loading ? (
-          <LoadingState text={zh.listLoading} className="py-2" />
+          <LoadingState text={zh.listLoading} className="py-[var(--mobile-adapt-space-sm)]" />
         ) : phrases.length === 0 ? (
           <EmptyState title={zh.emptyTitle} description={zh.emptyDesc} />
         ) : contentFilter === "expression" && expressionViewMode === "focus" && focusExpression ? (

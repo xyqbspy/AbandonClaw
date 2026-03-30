@@ -45,6 +45,59 @@ const recentPhraseRows = [
   },
 ];
 
+const createDashboardResponse = () => ({
+  overview: {
+    streakDays: 3,
+    completedScenesCount: 2,
+    inProgressScenesCount: 1,
+    savedPhraseCount: 12,
+    recentStudyMinutes: 15,
+    reviewAccuracy: 92,
+  },
+  continueLearning: null,
+  todayTasks: {
+    sceneTask: {
+      done: false,
+      continueSceneSlug: null,
+      currentStep: null,
+      masteryStage: null,
+      progressPercent: 0,
+    },
+    reviewTask: { done: false, reviewItemsCompleted: 0, dueReviewCount: 2 },
+    outputTask: { done: false, phrasesSavedToday: 1 },
+  },
+});
+
+const defaultDashboardCacheResult = { found: false, isExpired: false, record: null };
+const defaultPhraseCacheResult = {
+  found: true,
+  isExpired: false,
+  record: {
+    data: {
+      rows: recentPhraseRows,
+    },
+  },
+};
+const defaultSceneCacheResult = {
+  found: true,
+  isExpired: false,
+  record: {
+    data: [],
+  },
+};
+
+let mockGetLearningDashboardCache = async () => defaultDashboardCacheResult;
+let mockGetPhraseListCache = async () => defaultPhraseCacheResult;
+let mockGetSceneListCache = async () => defaultSceneCacheResult;
+let mockGetLearningDashboardFromApi = async () => createDashboardResponse();
+let mockGetMyPhrasesFromApi = async () => ({
+  rows: recentPhraseRows,
+  total: recentPhraseRows.length,
+  page: 1,
+  limit: 3,
+});
+let mockGetScenesFromApi = async () => [];
+
 const mockedModules = {
   "next/link": {
     __esModule: true,
@@ -69,62 +122,22 @@ const mockedModules = {
     },
   },
   "@/lib/cache/learning-dashboard-cache": {
-    getLearningDashboardCache: async () => ({ found: false, isExpired: false, record: null }),
+    getLearningDashboardCache: () => mockGetLearningDashboardCache(),
     setLearningDashboardCache: async () => undefined,
   },
   "@/lib/cache/phrase-list-cache": {
-    getPhraseListCache: async () => ({
-      found: true,
-      isExpired: false,
-      record: {
-        data: {
-          rows: recentPhraseRows,
-        },
-      },
-    }),
+    getPhraseListCache: () => mockGetPhraseListCache(),
     setPhraseListCache: async () => undefined,
   },
   "@/lib/cache/scene-list-cache": {
-    getSceneListCache: async () => ({
-      found: true,
-      isExpired: false,
-      record: {
-        data: [],
-      },
-    }),
+    getSceneListCache: () => mockGetSceneListCache(),
     setSceneListCache: async () => undefined,
   },
   "@/lib/utils/learning-api": {
-    getLearningDashboardFromApi: async () => ({
-      overview: {
-        streakDays: 3,
-        completedScenesCount: 2,
-        inProgressScenesCount: 1,
-        savedPhraseCount: 12,
-        recentStudyMinutes: 15,
-        reviewAccuracy: 92,
-      },
-      continueLearning: null,
-      todayTasks: {
-        sceneTask: {
-          done: false,
-          continueSceneSlug: null,
-          currentStep: null,
-          masteryStage: null,
-          progressPercent: 0,
-        },
-        reviewTask: { done: false, reviewItemsCompleted: 0, dueReviewCount: 2 },
-        outputTask: { done: false, phrasesSavedToday: 1 },
-      },
-    }),
+    getLearningDashboardFromApi: () => mockGetLearningDashboardFromApi(),
   },
   "@/lib/utils/phrases-api": {
-    getMyPhrasesFromApi: async () => ({
-      rows: recentPhraseRows,
-      total: recentPhraseRows.length,
-      page: 1,
-      limit: 3,
-    }),
+    getMyPhrasesFromApi: () => mockGetMyPhrasesFromApi(),
   },
   "@/lib/utils/review-session": {
     startReviewSession: () => undefined,
@@ -133,7 +146,7 @@ const mockedModules = {
     warmupContinueLearningScene: () => undefined,
   },
   "@/lib/utils/scenes-api": {
-    getScenesFromApi: async () => [],
+    getScenesFromApi: () => mockGetScenesFromApi(),
   },
   "@/components/shared/action-loading": {
     LoadingState: ({ text }: { text: string }) => React.createElement("div", null, text),
@@ -166,6 +179,17 @@ afterEach(() => {
   cleanup();
   routerPushCalls.length = 0;
   TodayPageClientModule = null;
+  mockGetLearningDashboardCache = async () => defaultDashboardCacheResult;
+  mockGetPhraseListCache = async () => defaultPhraseCacheResult;
+  mockGetSceneListCache = async () => defaultSceneCacheResult;
+  mockGetLearningDashboardFromApi = async () => createDashboardResponse();
+  mockGetMyPhrasesFromApi = async () => ({
+    rows: recentPhraseRows,
+    total: recentPhraseRows.length,
+    page: 1,
+    limit: 3,
+  });
+  mockGetScenesFromApi = async () => [];
 });
 
 test("TodayPageClient 会优先展示最近表达预览", async () => {

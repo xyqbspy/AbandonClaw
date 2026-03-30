@@ -78,8 +78,9 @@ export function FocusDetailActions({
   onRequestSetStandaloneMain,
 }: FocusDetailActionsProps) {
   if (!show) return <div />;
+
   const menuItemClassName =
-    "flex w-full items-center rounded-[20px] px-3 py-2.5 text-left text-sm text-[#1F4F6E] transition hover:bg-[#EEF3FA] disabled:text-muted-foreground";
+    "flex w-full items-center rounded-[var(--mobile-adapt-overlay-card-radius)] px-[var(--mobile-adapt-space-md)] py-[var(--mobile-adapt-space-sm)] text-left text-[length:var(--mobile-adapt-font-body-sm)] text-[#1F4F6E] transition hover:bg-[#EEF3FA] disabled:text-muted-foreground";
 
   return (
     <div className="relative">
@@ -88,8 +89,8 @@ export function FocusDetailActions({
         variant="ghost"
         className={
           compactTrigger
-            ? `${appleButtonClassName} h-14 w-14 rounded-[18px] border-0 bg-[#EDF2F7] px-0 text-[#2C5A7A] shadow-none hover:bg-[#E4ECF6]`
-            : `${appleButtonClassName} h-10 rounded-full border border-[#E6EDF6] bg-[#F0F4FC] px-4 text-[#2C5A7A] shadow-none hover:bg-[#E4ECF6]`
+            ? `${appleButtonClassName} h-[var(--mobile-adapt-button-height)] w-[var(--mobile-adapt-button-height)] rounded-[var(--mobile-adapt-overlay-card-radius)] border-0 bg-[#EDF2F7] px-0 text-[#2C5A7A] shadow-none hover:bg-[#E4ECF6]`
+            : `${appleButtonClassName} h-[var(--mobile-adapt-control-height)] rounded-full border border-[#E6EDF6] bg-[#F0F4FC] px-[var(--mobile-adapt-space-lg)] text-[length:var(--mobile-adapt-font-body-sm)] text-[#2C5A7A] shadow-none hover:bg-[#E4ECF6]`
         }
         onClick={onToggleOpen}
         aria-expanded={open}
@@ -97,19 +98,21 @@ export function FocusDetailActions({
       >
         {compactTrigger ? (
           <>
-            <MoreHorizontal className="size-5" />
+            <MoreHorizontal className="size-[clamp(18px,4.8vw,20px)]" />
             <span className="sr-only">{labels.moreActions}</span>
           </>
         ) : (
           <>
             {labels.moreActions}
-            <ChevronDown className={`size-4 transition-transform ${open ? "rotate-180" : ""}`} />
+            <ChevronDown
+              className={`size-[clamp(14px,3.8vw,16px)] transition-transform ${open ? "rotate-180" : ""}`}
+            />
           </>
         )}
       </Button>
 
       {open ? (
-        <div className={`absolute bottom-full left-0 z-10 mb-2 min-w-[220px] overflow-hidden rounded-[24px] p-2 ${APPLE_PANEL_RAISED}`}>
+        <div className={`absolute bottom-full left-0 z-10 mb-[var(--mobile-adapt-space-sm)] min-w-[clamp(208px,56vw,240px)] overflow-hidden rounded-[var(--mobile-adapt-overlay-radius)] p-[var(--mobile-adapt-space-sm)] ${APPLE_PANEL_RAISED}`}>
           {canShowFindRelations ? (
             <button
               type="button"
@@ -117,10 +120,7 @@ export function FocusDetailActions({
               disabled={focusAssistLoading}
               onClick={onRequestFindRelations}
             >
-              <LoadingContent
-                loading={focusAssistLoading}
-                loadingText={`${labels.findRelations}...`}
-              >
+              <LoadingContent loading={focusAssistLoading} loadingText={`${labels.findRelations}...`}>
                 {labels.findRelations}
               </LoadingContent>
             </button>
@@ -157,8 +157,8 @@ export function FocusDetailActions({
               onClick={onRequestRetryEnrichment}
             >
               {retryingEnrichment
-                ? `${labels.retryEnrichment ?? "补全当前chunk"}...`
-                : labels.retryEnrichment ?? "补全当前chunk"}
+                ? `${labels.retryEnrichment ?? "补全当前 chunk"}...`
+                : labels.retryEnrichment ?? "补全当前 chunk"}
             </button>
           ) : null}
           {canSetCurrentClusterMain ? (

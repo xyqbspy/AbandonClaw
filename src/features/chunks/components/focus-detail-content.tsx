@@ -89,9 +89,13 @@ type FocusDetailContentProps = {
 
 const CANDIDATE_BADGE_CLASS = "border-[#DCE8F5] bg-[#EEF3FC] text-[#2C6E9E]";
 const DETAIL_CARD_CLASS =
-  "relative overflow-hidden rounded-[32px] border border-[#E6EDF6] bg-white px-[var(--mobile-space-xl)] py-[var(--mobile-space-xl)] shadow-[0_20px_40px_-10px_rgba(49,130,206,0.15)]";
+  "relative overflow-hidden rounded-[var(--mobile-adapt-overlay-radius)] border border-[#E6EDF6] bg-white px-[var(--mobile-adapt-space-xl)] py-[var(--mobile-adapt-space-xl)] shadow-[0_20px_40px_-10px_rgba(49,130,206,0.15)]";
 const BODY_CLASS =
   "text-[length:var(--mobile-font-sheet-body)] leading-[var(--mobile-adapt-overlay-body-line-height)] text-[#2C4F6E]";
+const RELATED_ROW_CLASS =
+  "rounded-[var(--mobile-adapt-overlay-card-radius)] border border-[#FCFCFD] bg-white px-[var(--mobile-adapt-space-sheet)] py-[var(--mobile-adapt-overlay-related-row-py)] shadow-[0_10px_30px_-5px_rgba(0,0,0,0.04)]";
+const RELATED_TEXT_CLASS =
+  "text-[length:var(--mobile-adapt-overlay-body)] font-bold text-[#2D3748]";
 
 function getRelatedActionLabel(
   labels: FocusDetailContentLabels,
@@ -140,21 +144,18 @@ export function FocusDetailContent({
 
     if (kind === "contrast") {
       return (
-        <div
-          key={row.key}
-          className="rounded-[22px] border border-[#FCFCFD] bg-white px-[var(--mobile-space-sheet)] py-[var(--mobile-adapt-overlay-related-row-py)] shadow-[0_10px_30px_-5px_rgba(0,0,0,0.04)]"
-        >
-          <div className="flex items-start justify-between gap-3">
+        <div key={row.key} className={RELATED_ROW_CLASS}>
+          <div className="flex items-start justify-between gap-[var(--mobile-adapt-space-sm)]">
             {canOpenDetail ? (
               <button
                 type="button"
                 className="min-w-0 flex-1 text-left"
                 onClick={() => onOpenContrastRow(row)}
               >
-                <span className="text-[clamp(15px,4vw,17px)] font-bold text-[#2D3748]">{row.text}</span>
+                <span className={RELATED_TEXT_CLASS}>{row.text}</span>
               </button>
             ) : (
-              <span className="text-[clamp(15px,4vw,17px)] font-bold text-[#2D3748]">{row.text}</span>
+              <span className={RELATED_TEXT_CLASS}>{row.text}</span>
             )}
             {!isSaved ? (
               <Button
@@ -181,22 +182,19 @@ export function FocusDetailContent({
     }
 
     return (
-      <div
-        key={row.key}
-        className="rounded-[22px] border border-[#FCFCFD] bg-white px-[var(--mobile-space-sheet)] py-[var(--mobile-adapt-overlay-related-row-py)] shadow-[0_10px_30px_-5px_rgba(0,0,0,0.04)]"
-      >
-        <div className="flex items-start justify-between gap-3">
+      <div key={row.key} className={RELATED_ROW_CLASS}>
+        <div className="flex items-start justify-between gap-[var(--mobile-adapt-space-sm)]">
           {canOpenDetail ? (
             <button
               type="button"
               className="min-w-0 flex-1 text-left transition hover:text-[#1F4F6E]/80"
               onClick={() => onOpenSimilarRow(row)}
             >
-              <p className="text-[clamp(15px,4vw,17px)] font-bold text-[#2D3748]">{row.text}</p>
+              <p className={RELATED_TEXT_CLASS}>{row.text}</p>
             </button>
           ) : (
             <div className="min-w-0 flex-1">
-              <p className="text-[clamp(15px,4vw,17px)] font-bold text-[#2D3748]">{row.text}</p>
+              <p className={RELATED_TEXT_CLASS}>{row.text}</p>
             </div>
           )}
           {isSaved ? (
@@ -227,7 +225,7 @@ export function FocusDetailContent({
   };
 
   return (
-    <div className="flex h-full min-h-0 min-w-0 flex-col gap-4 bg-[#F2F2F7] [@media(max-height:760px)]:gap-2.5">
+    <div className="flex h-full min-h-0 min-w-0 flex-col gap-[var(--mobile-adapt-space-md)] bg-[#F2F2F7] [@media(max-height:760px)]:gap-[var(--mobile-adapt-space-sm)]">
       <div className={`${DETAIL_CARD_CLASS} shrink-0`}>
         <span
           aria-hidden="true"
@@ -243,7 +241,7 @@ export function FocusDetailContent({
                   {labels.candidateBadge}
                 </Badge>
               ) : null}
-              <p className="truncate text-[clamp(22px,6vw,26px)] font-[850] tracking-[-0.05em] text-[#1A365D] [@media(max-height:760px)]:text-[clamp(18px,5.2vw,20px)] [@media(max-height:760px)]:leading-tight">
+              <p className="truncate text-[length:clamp(1.25rem,6vw,1.625rem)] font-[850] tracking-[-0.05em] text-[#1A365D] [@media(max-height:760px)]:text-[length:clamp(1.05rem,5.2vw,1.25rem)] [@media(max-height:760px)]:leading-tight">
                 {detail.text}
               </p>
             </div>
@@ -258,7 +256,7 @@ export function FocusDetailContent({
               />
             ) : null}
           </div>
-          <p className="text-[clamp(15px,4.2vw,18px)] font-medium text-[#718096] [@media(max-height:760px)]:text-[length:var(--mobile-font-body)] [@media(max-height:760px)]:leading-5">
+          <p className="text-[length:clamp(0.95rem,4.2vw,1.125rem)] font-medium text-[#718096] [@media(max-height:760px)]:text-[length:var(--mobile-font-body)] [@media(max-height:760px)]:leading-5">
             {retryingEnrichment
               ? labels.enriching
               : detail.savedItem?.translation ??
@@ -304,7 +302,7 @@ export function FocusDetailContent({
             ) : (
               <div className="space-y-4">
                 <DetailInfoBlock title={labels.semanticFocus} icon={<span>🎯</span>}>
-                  <div className="rounded-[20px] bg-[#F0F6FE] px-[var(--mobile-space-xl)] py-[var(--mobile-space-lg)]">
+                  <div className="rounded-[var(--mobile-adapt-overlay-card-radius)] bg-[#F0F6FE] px-[var(--mobile-adapt-space-xl)] py-[var(--mobile-adapt-space-lg)]">
                     <p className={BODY_CLASS}>{semanticFocus || labels.semanticFocusPending}</p>
                   </div>
                 </DetailInfoBlock>
@@ -324,7 +322,7 @@ export function FocusDetailContent({
               <p className="text-[length:var(--mobile-font-body)] font-semibold text-[#1F4B6E]">📖 {labels.sourceSentence}</p>
               {retryingEnrichment ? (
                 <div
-                  className="animate-pulse rounded-[24px] border border-[#EEF3FC] bg-[#FAFDFF] p-[var(--mobile-space-xl)]"
+                  className="animate-pulse rounded-[var(--mobile-adapt-overlay-card-radius)] border border-[#EEF3FC] bg-[#FAFDFF] p-[var(--mobile-adapt-space-xl)]"
                   aria-label="例句补全中"
                 >
                   <div className="h-4 w-4/5 rounded bg-[var(--app-surface-hover)]" />

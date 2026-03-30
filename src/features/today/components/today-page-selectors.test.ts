@@ -7,6 +7,7 @@ import { SceneListItemResponse } from "@/lib/utils/scenes-api";
 
 import {
   buildTodayTasks,
+  getContinueLearningCardState,
   getContinueLearningHelperText,
   getContinueLearningHref,
   getContinueLearningStepLabel,
@@ -184,6 +185,22 @@ test("today continue helper 会优先读取 today sceneTask 里的训练状态",
 
   assert.equal(getContinueLearningStepLabel(continueLearning, taskScene), "看重点表达");
   assert.match(getContinueLearningHelperText(continueLearning, taskScene), /35%/);
+});
+
+test("continue learning card 在等待数据时不会回退成开始一个新场景", () => {
+  const cardState = getContinueLearningCardState({
+    continueLearning: null,
+    sceneTask: dashboard.todayTasks.sceneTask,
+    isPending: true,
+    emptyTitle: "从一个场景开始今天的输入",
+    emptyDesc: "你还没有进行中的场景，先选一个真实语境开始。",
+  });
+
+  assert.equal(cardState.isPending, true);
+  assert.equal(cardState.title, "正在恢复今天的学习进度");
+  assert.equal(cardState.stepLabel, "正在加载");
+  assert.equal(cardState.ctaLabel, "正在恢复进度...");
+  assert.notEqual(cardState.stepLabel, "开始一个新场景");
 });
 
 test("resolveContinueLearning 会在没有服务端 continue 时优先接住本地回炉练习", () => {
