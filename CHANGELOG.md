@@ -32,6 +32,8 @@
 - 在 `docs/project-maintenance-playbook.md` 中补充 archive 前检查入口
 - 已归档 `unify-detail-footer-actions`，主 specs 新增 `detail-footer-actions`
 - 补充 `openspec/specs/detail-footer-actions/spec.md` 的正式 Purpose 说明
+- 新建第二条 OpenSpec change：`consolidate-detail-composition`
+- 为 lesson/chunks 详情组件的共享基元边界与领域差异边界补充了 proposal、design、tasks 和 delta specs
 
 影响范围：
 
@@ -46,6 +48,7 @@
 - 已执行 `pnpm run spec:validate`
 - 已执行 `openspec change validate unify-detail-footer-actions --strict --no-interactive`
 - 已执行 `openspec archive unify-detail-footer-actions --yes`
+- 已执行 `openspec change validate consolidate-detail-composition --strict --no-interactive`
 
 备注：
 
