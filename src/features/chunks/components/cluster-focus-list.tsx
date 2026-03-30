@@ -12,7 +12,7 @@ import {
 import { FocusPreviewItem, SavedRelationRowsBySourceId } from "./types";
 
 const ACTION_ICON_CLASS =
-  "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#EDF2F7] bg-[#F7FAFC] text-[#1F5E7E]";
+  "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--app-chunks-sheet-secondary-border)] bg-[var(--app-chunks-sheet-info-soft)] text-[var(--app-chunks-sheet-info-text)]";
 
 type ClusterFocusListLabels = {
   loading: string;
@@ -150,7 +150,7 @@ export function ClusterFocusList({
                     ))}
                   </div>
                 ) : isExpanded ? (
-                  <p className="px-1 py-[var(--mobile-space-sm)] text-[length:var(--mobile-font-body-sm)] text-[#718096]">{labels.noTranslation}</p>
+                  <p className="px-1 py-[var(--mobile-space-sm)] text-[length:var(--mobile-font-body-sm)] text-[var(--app-chunks-sheet-muted)]">{labels.noTranslation}</p>
                 ) : null}
               </div>
             </ExpressionSummaryGroup>
@@ -160,5 +160,4 @@ export function ClusterFocusList({
     </div>
   );
 }
-
 

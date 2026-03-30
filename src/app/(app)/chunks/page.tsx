@@ -60,6 +60,7 @@ import {
 import {
   APPLE_BANNER_DANGER,
   APPLE_BANNER_INFO,
+  APPLE_BADGE_SUCCESS,
   APPLE_BUTTON_BASE,
   APPLE_BUTTON_STRONG,
   APPLE_INPUT_PANEL,
@@ -276,7 +277,7 @@ const renderSentenceWithExpressionHighlight = (sentence: string, expression: str
     return (
       <>
         {source.slice(0, directStart)}
-        <mark className="inline-block rounded-[var(--app-radius-pill)] bg-[#EEF6F0] px-[var(--mobile-adapt-space-sm)] py-[2px] font-bold text-[#2C6E4F]">
+        <mark className={`inline-block px-[var(--mobile-adapt-space-sm)] py-[2px] font-bold ${APPLE_BADGE_SUCCESS}`}>
           {source.slice(directStart, directEnd)}
         </mark>
         {source.slice(directEnd)}
@@ -296,7 +297,7 @@ const renderSentenceWithExpressionHighlight = (sentence: string, expression: str
   return (
     <>
       {source.slice(0, start)}
-      <mark className="inline-block rounded-[var(--app-radius-pill)] bg-[#EEF6F0] px-[var(--mobile-adapt-space-sm)] py-[2px] font-bold text-[#2C6E4F]">
+      <mark className={`inline-block px-[var(--mobile-adapt-space-sm)] py-[2px] font-bold ${APPLE_BADGE_SUCCESS}`}>
         {source.slice(start, end)}
       </mark>
       {source.slice(end)}
@@ -1843,22 +1844,22 @@ export default function ChunksPage() {
 
   return (
     <div className="space-y-[var(--mobile-adapt-space-xl)] [@media(max-height:760px)]:space-y-[var(--mobile-adapt-space-md)]">
-      <section className="rounded-[var(--app-radius-card)] border border-white bg-white p-[var(--mobile-adapt-space-md)] shadow-[0_8px_20px_rgba(0,0,0,0.04)] [@media(max-height:760px)]:rounded-[var(--mobile-adapt-overlay-card-radius)] [@media(max-height:760px)]:p-[var(--mobile-adapt-space-sm)]">
+      <section className="rounded-[var(--app-radius-card)] border border-[var(--app-chunks-hero-border)] bg-[var(--app-chunks-hero-bg)] p-[var(--mobile-adapt-space-md)] shadow-[var(--app-chunks-hero-shadow)] [@media(max-height:760px)]:rounded-[var(--mobile-adapt-overlay-card-radius)] [@media(max-height:760px)]:p-[var(--mobile-adapt-space-sm)]">
         <div className="mb-[var(--mobile-adapt-space-md)] flex items-center gap-[var(--mobile-adapt-space-md)] [@media(max-height:760px)]:mb-[var(--mobile-adapt-space-sm)] [@media(max-height:760px)]:gap-[var(--mobile-adapt-space-sm)]">
-          <div className="flex h-[clamp(36px,9vw,42px)] w-[clamp(36px,9vw,42px)] items-center justify-center rounded-[clamp(10px,2.8vw,14px)] bg-[linear-gradient(135deg,#38b2ac,#2c7a7b)] text-[length:var(--mobile-adapt-font-body-sm)] font-bold text-white">
+          <div className="flex h-[clamp(36px,9vw,42px)] w-[clamp(36px,9vw,42px)] items-center justify-center rounded-[clamp(10px,2.8vw,14px)] bg-[linear-gradient(135deg,var(--app-chunks-hero-icon-start),var(--app-chunks-hero-icon-end))] text-[length:var(--mobile-adapt-font-body-sm)] font-bold text-white">
             AC
           </div>
           <div className="min-w-0">
-            <p className="text-[length:var(--mobile-adapt-font-body)] font-semibold text-[#1F5E7E]">{zh.heroTitle}</p>
-            <p className="text-[length:var(--mobile-adapt-font-meta)] text-[#718096]">
+            <p className="text-[length:var(--mobile-adapt-font-body)] font-semibold text-[var(--app-chunks-hero-title)]">{zh.heroTitle}</p>
+            <p className="text-[length:var(--mobile-adapt-font-meta)] text-[var(--app-chunks-hero-subtitle)]">
               {zh.heroSubtitle} · {summary}
             </p>
           </div>
         </div>
         <div className="relative">
-          <Search className="pointer-events-none absolute left-[var(--mobile-adapt-space-md)] top-1/2 size-[clamp(14px,4vw,16px)] -translate-y-1/2 text-[#718096]" />
+          <Search className="pointer-events-none absolute left-[var(--mobile-adapt-space-md)] top-1/2 size-[clamp(14px,4vw,16px)] -translate-y-1/2 text-[var(--app-chunks-search-icon)]" />
           <Input
-            className="h-[var(--mobile-adapt-button-height)] rounded-[var(--mobile-adapt-overlay-card-radius)] border-0 bg-[#F1F5F9] pl-[calc(var(--mobile-adapt-space-xl)+var(--mobile-adapt-space-sm))] text-[length:var(--mobile-adapt-font-body-sm)] text-[#4A5568] shadow-none placeholder:text-[#718096] focus-visible:ring-2 focus-visible:ring-[#cbd5e1]"
+            className="h-[var(--mobile-adapt-button-height)] rounded-[var(--mobile-adapt-overlay-card-radius)] border-0 bg-[var(--app-chunks-search-bg)] pl-[calc(var(--mobile-adapt-space-xl)+var(--mobile-adapt-space-sm))] text-[length:var(--mobile-adapt-font-body-sm)] text-[var(--app-chunks-search-text)] shadow-none placeholder:text-[var(--app-chunks-search-placeholder)] focus-visible:ring-2 focus-visible:ring-[var(--app-chunks-search-ring)]"
             placeholder={`${zh.searchPlaceholder} · ${summary}`}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
@@ -1867,13 +1868,13 @@ export default function ChunksPage() {
       </section>
 
       <div className="flex flex-wrap items-center justify-between gap-[var(--mobile-adapt-space-md)] px-1 [@media(max-height:760px)]:gap-[var(--mobile-adapt-space-sm)]">
-        <p className="text-[length:var(--mobile-adapt-font-body)] font-bold text-[#4A5568]">{zh.coreSection}</p>
+        <p className="text-[length:var(--mobile-adapt-font-body)] font-bold text-[var(--app-chunks-section-title)]">{zh.coreSection}</p>
         <div className="flex items-center gap-[var(--mobile-adapt-space-sm)]">
           <Button
             type="button"
             size="sm"
             variant="ghost"
-            className="rounded-[var(--mobile-adapt-overlay-card-radius)] bg-[#E6FFFA] px-[var(--mobile-adapt-space-lg)] py-[var(--mobile-adapt-space-sm)] text-[length:var(--mobile-adapt-font-body-sm)] font-semibold text-[#2C7A7B] hover:bg-[#d8faf3]"
+            className="rounded-[var(--mobile-adapt-overlay-card-radius)] bg-[var(--app-chunks-entry-accent-bg)] px-[var(--mobile-adapt-space-lg)] py-[var(--mobile-adapt-space-sm)] text-[length:var(--mobile-adapt-font-body-sm)] font-semibold text-[var(--app-chunks-entry-accent-text)] hover:bg-[var(--app-chunks-entry-accent-hover)]"
             onClick={() => setAddSheetOpen(true)}
           >
             {zh.addLearningContent}
@@ -2113,7 +2114,7 @@ export default function ChunksPage() {
       >
         <SheetContent
           side="bottom"
-          className={`max-h-[85vh] overflow-y-auto rounded-t-2xl border border-[var(--app-border-soft)] bg-background ${APPLE_PANEL}`}
+          className={`max-h-[85vh] overflow-y-auto rounded-t-2xl border border-[var(--app-chunks-sheet-card-border)] bg-[var(--app-chunks-sheet-bg)] ${APPLE_PANEL}`}
         >
           <SheetHeader className="space-y-1 px-4 pb-3 pt-4">
             <SheetTitle>{manualSheetState.title}</SheetTitle>
@@ -2317,7 +2318,7 @@ export default function ChunksPage() {
         <SheetContent
           side="bottom"
           overlayClassName="z-[80]"
-          className={`z-[81] max-h-[85vh] overflow-y-auto rounded-t-2xl border border-[var(--app-border-soft)] bg-background ${APPLE_PANEL}`}
+          className={`z-[81] max-h-[85vh] overflow-y-auto rounded-t-2xl border border-[var(--app-chunks-sheet-card-border)] bg-[var(--app-chunks-sheet-bg)] ${APPLE_PANEL}`}
         >
           <SheetHeader className="space-y-1 px-4 pb-3 pt-4">
             <SheetTitle>{zh.quickAddRelatedTitle}</SheetTitle>
@@ -2403,7 +2404,7 @@ export default function ChunksPage() {
       >
         <SheetContent
           side="bottom"
-          className={`max-h-[85vh] overflow-y-auto rounded-t-2xl border border-[var(--app-border-soft)] bg-background ${APPLE_PANEL}`}
+          className={`max-h-[85vh] overflow-y-auto rounded-t-2xl border border-[var(--app-chunks-sheet-card-border)] bg-[var(--app-chunks-sheet-bg)] ${APPLE_PANEL}`}
         >
           <SheetHeader className="space-y-1 px-4 pb-3 pt-4">
             <SheetTitle>{generatedSimilarSheetState.title}</SheetTitle>

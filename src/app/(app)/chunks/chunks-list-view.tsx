@@ -15,23 +15,24 @@ import {
   ExpressionSummaryRelatedItem,
 } from "@/features/chunks/components/expression-summary-card";
 import {
+  APPLE_BADGE_INFO,
+  APPLE_BADGE_SUBTLE,
   APPLE_BODY_TEXT,
   APPLE_LIST_ITEM,
   APPLE_META_TEXT,
   APPLE_PANEL,
+  APPLE_PANEL_INFO,
   APPLE_TITLE_SM,
 } from "@/lib/ui/apple-style";
 
 const LIST_WRAPPER_CLASS = "flex flex-col gap-[18px] [@media(max-height:760px)]:gap-3";
 const EXPR_TAG_CLASS =
-  "inline-flex items-center rounded-full bg-[#EBF8FF] px-2.5 py-1 text-[11px] font-bold text-[#3182CE] [@media(max-height:760px)]:px-2 [@media(max-height:760px)]:py-0.5 [@media(max-height:760px)]:text-[10px]";
+  `inline-flex items-center px-2.5 py-1 text-[11px] font-bold [@media(max-height:760px)]:px-2 [@media(max-height:760px)]:py-0.5 [@media(max-height:760px)]:text-[10px] ${APPLE_BADGE_INFO}`;
 const EXPAND_BUTTON_CLASS =
-  "mt-3 w-full border-t border-[#EDF2F7] pt-2 text-center text-[13px] font-semibold text-[#2C8C6E] [@media(max-height:760px)]:mt-2 [@media(max-height:760px)]:pt-1.5 [@media(max-height:760px)]:text-[12px]";
+  "mt-3 w-full border-t border-[var(--app-chunks-sheet-card-border)] pt-2 text-center text-[13px] font-semibold text-[var(--app-feedback-success-text)] [@media(max-height:760px)]:mt-2 [@media(max-height:760px)]:pt-1.5 [@media(max-height:760px)]:text-[12px]";
 
-const APPLE_STATUS_BADGE =
-  "border-[var(--app-border-soft)] bg-[var(--app-surface-subtle)] text-foreground";
-const APPLE_PENDING_BADGE =
-  "border-[var(--app-border-soft)] bg-[var(--app-surface)] text-[var(--muted-foreground)]";
+const APPLE_STATUS_BADGE = APPLE_BADGE_INFO;
+const APPLE_PENDING_BADGE = APPLE_BADGE_SUBTLE;
 
 type ChunksListViewLabels = {
   sentenceUnit: string;
@@ -253,7 +254,7 @@ export function ChunksListView({
               >
                 <div className="space-y-3.5 [@media(max-height:760px)]:space-y-2.5">
                   {item.aiEnrichmentStatus === "pending" ? (
-                    <div className={`space-y-1 p-2.5 ${APPLE_PANEL}`}>
+                    <div className={`space-y-1 p-2.5 ${APPLE_PANEL_INFO}`}>
                       <p className={APPLE_META_TEXT}>{labels.learningInfoPending}</p>
                       <p className="text-sm font-medium text-foreground">{item.text}</p>
                       <p className={APPLE_META_TEXT}>{labels.learningInfoPendingHint}</p>
@@ -389,7 +390,7 @@ export function ChunksListView({
                             return (
                               <div
                                 key={key}
-                                className={`flex items-center gap-1 rounded-full px-2 py-1 [@media(max-height:760px)]:px-1.5 [@media(max-height:760px)]:py-0.5 ${APPLE_PANEL}`}
+                                className={`flex items-center gap-1 rounded-full px-2 py-1 [@media(max-height:760px)]:px-1.5 [@media(max-height:760px)]:py-0.5 ${APPLE_BADGE_SUBTLE}`}
                               >
                                 <span className={APPLE_BODY_TEXT}>{expression}</span>
                                 <LoadingButton
@@ -416,7 +417,7 @@ export function ChunksListView({
                 ) : (
                   <>
                     {item.aiEnrichmentStatus === "pending" ? (
-                      <div className={`space-y-1 p-2.5 ${APPLE_PANEL}`}>
+                      <div className={`space-y-1 p-2.5 ${APPLE_PANEL_INFO}`}>
                         <p className={APPLE_META_TEXT}>{labels.learningInfoPending}</p>
                         <p className="text-sm font-medium text-foreground">{item.text}</p>
                         <p className={APPLE_META_TEXT}>{labels.learningInfoPendingHint}</p>

@@ -37,7 +37,7 @@ export function FocusDetailSheetHeader({
           type="button"
           size="sm"
           variant="ghost"
-          className={`${appleButtonClassName} h-[var(--mobile-button-height)] w-[var(--mobile-button-height)] rounded-[14px] border border-[#F3F6FA] bg-white px-0 text-[#2C6E9E] shadow-[0_10px_30px_-12px_rgba(0,0,0,0.16)] hover:bg-[#EFF3FA] [@media(max-height:760px)]:h-[var(--mobile-icon-button)] [@media(max-height:760px)]:w-[var(--mobile-icon-button)] [@media(max-height:760px)]:rounded-[11px]`}
+          className={`${appleButtonClassName} h-[var(--mobile-button-height)] w-[var(--mobile-button-height)] rounded-[14px] border border-[var(--app-chunks-sheet-card-border)] bg-[var(--app-chunks-sheet-card-bg)] px-0 text-[var(--app-chunks-sheet-info-text)] shadow-[var(--app-chunks-hero-shadow)] hover:bg-[var(--app-chunks-sheet-info-soft)] [@media(max-height:760px)]:h-[var(--mobile-icon-button)] [@media(max-height:760px)]:w-[var(--mobile-icon-button)] [@media(max-height:760px)]:rounded-[11px]`}
           onClick={trailLength > 1 ? onReopenPrevTrail : onClose}
           aria-label={trailLength > 1 ? backToCurrentLabel : "杩斿洖"}
         >
@@ -46,11 +46,11 @@ export function FocusDetailSheetHeader({
       </div>
       <div className="flex min-w-0 items-center justify-end gap-[var(--mobile-adapt-space-md)] [@media(max-height:760px)]:gap-[var(--mobile-adapt-space-sm)]">
         <div className="min-w-0 text-right">
-          <p className="text-[length:var(--mobile-adapt-overlay-meta)] font-extrabold uppercase tracking-[0.22em] text-[#7C97B0] [@media(max-height:760px)]:text-[length:var(--mobile-font-meta)] [@media(max-height:760px)]:tracking-[0.16em]">
+          <p className="text-[length:var(--mobile-adapt-overlay-meta)] font-extrabold uppercase tracking-[0.22em] text-[var(--app-chunks-sheet-subtitle)] [@media(max-height:760px)]:text-[length:var(--mobile-font-meta)] [@media(max-height:760px)]:tracking-[0.16em]">
             {title}
           </p>
           {detailText ? (
-            <p className="truncate text-[length:var(--mobile-adapt-overlay-body)] text-[#9AAEC2] [@media(max-height:760px)]:hidden">{detailText}</p>
+            <p className="truncate text-[length:var(--mobile-adapt-overlay-body)] text-[var(--app-chunks-sheet-muted)] [@media(max-height:760px)]:hidden">{detailText}</p>
           ) : null}
         </div>
         {canShowSiblingNav ? (
@@ -59,7 +59,7 @@ export function FocusDetailSheetHeader({
               type="button"
               size="sm"
               variant="ghost"
-              className={`${appleButtonClassName} h-[var(--mobile-control-height)] rounded-full border border-[#E6EDF6] bg-white/90 px-[var(--mobile-adapt-space-xl)] text-[length:var(--mobile-adapt-overlay-body)] text-[#2C6E9E] shadow-none hover:bg-[#EFF3FA] [@media(max-height:760px)]:h-[var(--mobile-icon-button)] [@media(max-height:760px)]:px-[var(--mobile-adapt-space-md)] [@media(max-height:760px)]:text-[length:var(--mobile-font-caption)]`}
+              className={`${appleButtonClassName} h-[var(--mobile-control-height)] rounded-full border border-[var(--app-chunks-sheet-secondary-border)] bg-[var(--app-chunks-sheet-card-bg)] px-[var(--mobile-adapt-space-xl)] text-[length:var(--mobile-adapt-overlay-body)] text-[var(--app-chunks-sheet-info-text)] shadow-none hover:bg-[var(--app-chunks-sheet-info-soft)] [@media(max-height:760px)]:h-[var(--mobile-icon-button)] [@media(max-height:760px)]:px-[var(--mobile-adapt-space-md)] [@media(max-height:760px)]:text-[length:var(--mobile-font-caption)]`}
               onClick={onOpenPrevSibling}
             >
               {prevLabel}
@@ -68,7 +68,7 @@ export function FocusDetailSheetHeader({
               type="button"
               size="sm"
               variant="ghost"
-              className={`${appleButtonClassName} h-[var(--mobile-control-height)] rounded-full border border-[#E6EDF6] bg-white/90 px-[var(--mobile-adapt-space-xl)] text-[length:var(--mobile-adapt-overlay-body)] text-[#2C6E9E] shadow-none hover:bg-[#EFF3FA] [@media(max-height:760px)]:h-[var(--mobile-icon-button)] [@media(max-height:760px)]:px-[var(--mobile-adapt-space-md)] [@media(max-height:760px)]:text-[length:var(--mobile-font-caption)]`}
+              className={`${appleButtonClassName} h-[var(--mobile-control-height)] rounded-full border border-[var(--app-chunks-sheet-secondary-border)] bg-[var(--app-chunks-sheet-card-bg)] px-[var(--mobile-adapt-space-xl)] text-[length:var(--mobile-adapt-overlay-body)] text-[var(--app-chunks-sheet-info-text)] shadow-none hover:bg-[var(--app-chunks-sheet-info-soft)] [@media(max-height:760px)]:h-[var(--mobile-icon-button)] [@media(max-height:760px)]:px-[var(--mobile-adapt-space-md)] [@media(max-height:760px)]:text-[length:var(--mobile-font-caption)]`}
               onClick={onOpenNextSibling}
             >
               {nextLabel}
@@ -79,7 +79,7 @@ export function FocusDetailSheetHeader({
             type="button"
             size="sm"
             variant="ghost"
-            className={`${appleButtonClassName} h-[var(--mobile-control-height)] rounded-full border border-[#E6EDF6] bg-white/90 px-[var(--mobile-adapt-space-xl)] text-[length:var(--mobile-adapt-overlay-body)] text-[#2C6E9E] shadow-none hover:bg-[#EFF3FA] [@media(max-height:760px)]:h-[var(--mobile-icon-button)] [@media(max-height:760px)]:px-[var(--mobile-adapt-space-md)] [@media(max-height:760px)]:text-[length:var(--mobile-font-caption)]`}
+            className={`${appleButtonClassName} h-[var(--mobile-control-height)] rounded-full border border-[var(--app-chunks-sheet-secondary-border)] bg-[var(--app-chunks-sheet-card-bg)] px-[var(--mobile-adapt-space-xl)] text-[length:var(--mobile-adapt-overlay-body)] text-[var(--app-chunks-sheet-info-text)] shadow-none hover:bg-[var(--app-chunks-sheet-info-soft)] [@media(max-height:760px)]:h-[var(--mobile-icon-button)] [@media(max-height:760px)]:px-[var(--mobile-adapt-space-md)] [@media(max-height:760px)]:text-[length:var(--mobile-font-caption)]`}
             onClick={onReopenPrevTrail}
           >
             {backToCurrentLabel}

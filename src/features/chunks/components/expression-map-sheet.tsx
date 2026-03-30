@@ -13,6 +13,8 @@ import {
 } from "@/components/ui/sheet";
 import {
   APPLE_BANNER_DANGER,
+  APPLE_BADGE_SUBTLE,
+  APPLE_BADGE_SUCCESS,
   APPLE_BUTTON_STRONG,
   APPLE_BODY_TEXT,
   APPLE_LIST_ITEM,
@@ -59,10 +61,8 @@ type ExpressionMapSheetProps = {
   onAddCluster: () => void;
 };
 
-const APPLE_STATUS_BADGE =
-  "border-[var(--app-border-soft)] bg-[var(--app-surface-subtle)] text-foreground";
-const APPLE_UNKNOWN_BADGE =
-  "border-[var(--app-border-soft)] bg-[var(--app-surface)] text-[var(--muted-foreground)]";
+const APPLE_STATUS_BADGE = APPLE_BADGE_SUCCESS;
+const APPLE_UNKNOWN_BADGE = APPLE_BADGE_SUBTLE;
 export function ExpressionMapSheet({
   open,
   loading,
@@ -86,7 +86,7 @@ export function ExpressionMapSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="bottom"
-        className={`max-h-[var(--mobile-adapt-overlay-sheet-height)] overflow-y-auto rounded-t-[var(--mobile-adapt-overlay-radius)] border border-[var(--app-border-soft)] bg-background ${APPLE_PANEL}`}
+        className={`max-h-[var(--mobile-adapt-overlay-sheet-height)] overflow-y-auto rounded-t-[var(--mobile-adapt-overlay-radius)] border border-[var(--app-chunks-sheet-card-border)] bg-[var(--app-chunks-sheet-bg)] ${APPLE_PANEL}`}
       >
         <SheetHeader className="space-y-[var(--mobile-adapt-space-2xs)] px-[var(--mobile-adapt-space-overlay)] pb-[var(--mobile-adapt-space-md)] pt-[var(--mobile-adapt-space-overlay)]">
           <SheetTitle className={APPLE_TITLE_MD}>{labels.title}</SheetTitle>
@@ -122,10 +122,10 @@ export function ExpressionMapSheet({
               </div>
 
               {activeCluster ? (
-                <div className={`space-y-[var(--mobile-adapt-space-md)] rounded-[var(--mobile-adapt-overlay-card-radius)] p-[var(--mobile-adapt-space-md)] ${APPLE_PANEL}`}>
+                <div className={`space-y-[var(--mobile-adapt-space-md)] rounded-[var(--mobile-adapt-overlay-card-radius)] border border-[var(--app-chunks-sheet-card-border)] bg-[var(--app-chunks-sheet-card-bg)] p-[var(--mobile-adapt-space-md)] shadow-[var(--app-shadow-soft)]`}>
                   <div className="space-y-[var(--mobile-adapt-space-2xs)]">
                     <p className={APPLE_META_TEXT}>{labels.centerExpression}</p>
-                    <p className="text-[length:var(--mobile-adapt-overlay-body)] font-medium text-foreground">
+                    <p className="text-[length:var(--mobile-adapt-overlay-body)] font-medium text-[var(--app-chunks-sheet-title)]">
                       {centerExpressionText || activeCluster.anchor}
                     </p>
                     <p className={APPLE_META_TEXT}>
@@ -149,7 +149,7 @@ export function ExpressionMapSheet({
                         return (
                           <div key={text} className={`rounded-[var(--mobile-adapt-overlay-card-radius)] p-[var(--mobile-adapt-space-md)] ${APPLE_LIST_ITEM}`}>
                             <div className="flex items-center justify-between gap-[var(--mobile-adapt-space-sm)]">
-                              <p className="text-[length:var(--mobile-adapt-overlay-body)] font-medium text-foreground">{text}</p>
+                              <p className="text-[length:var(--mobile-adapt-overlay-body)] font-medium text-[var(--app-chunks-sheet-body)]">{text}</p>
                               <Badge
                                 variant={status ? "secondary" : "outline"}
                                 className={status ? APPLE_STATUS_BADGE : APPLE_UNKNOWN_BADGE}

@@ -5,6 +5,8 @@ import { LoadingContent } from "@/components/shared/action-loading";
 import { Lesson } from "@/lib/types";
 import { VariantSet } from "@/lib/types/learning-flow";
 import {
+  APPLE_BADGE_INFO,
+  APPLE_BADGE_SUBTLE,
   APPLE_BUTTON_BASE,
   APPLE_LIST_ITEM,
   APPLE_META_TEXT,
@@ -53,6 +55,9 @@ export function SceneVariantsView({
   toVariantStatusLabel,
   chunkDetailSheet,
 }: SceneVariantsViewProps) {
+  const sceneVariantChipClassName =
+    `${APPLE_BADGE_SUBTLE} px-[var(--mobile-space-md)] py-[var(--mobile-space-2xs)] text-[length:var(--mobile-font-caption)] font-medium`;
+
   return (
     <div className="space-y-[var(--mobile-space-2xl)]">
       <section className={`space-y-[var(--mobile-space-xl)] p-[var(--mobile-space-sheet)] sm:p-[var(--mobile-space-sheet)] ${APPLE_PANEL_RAISED}`}>
@@ -102,7 +107,7 @@ export function SceneVariantsView({
             <h3 className={APPLE_TITLE_MD}>{labels.reusedChunksTitle}</h3>
             <button
               type="button"
-              className={`h-[var(--mobile-control-height)] whitespace-nowrap ${APPLE_BUTTON_BASE} px-[var(--mobile-space-md)] text-[length:var(--mobile-font-caption)] font-semibold ${APPLE_META_TEXT} disabled:opacity-60`}
+              className={`h-[var(--mobile-control-height)] whitespace-nowrap ${APPLE_BUTTON_BASE} px-[var(--mobile-space-md)] text-[length:var(--mobile-font-caption)] font-semibold disabled:opacity-60`}
               onClick={onOpenExpressionMap}
               disabled={!variantSet || expressionMapLoading}
             >
@@ -117,7 +122,7 @@ export function SceneVariantsView({
                 <button
                   key={chunk}
                   type="button"
-                  className={`${APPLE_BUTTON_BASE} px-[var(--mobile-space-md)] py-[var(--mobile-space-2xs)] text-[length:var(--mobile-font-caption)] font-medium`}
+                  className={sceneVariantChipClassName}
                   onClick={() => onOpenChunk(chunk)}
                 >
                   {chunk}
@@ -133,8 +138,8 @@ export function SceneVariantsView({
       ) : (
         <section className={`space-y-[var(--mobile-space-md)] p-[var(--mobile-space-sheet)] sm:p-[var(--mobile-space-sheet)] ${APPLE_PANEL_RAISED}`}>
           <div className="space-y-[var(--mobile-space-2xs)]">
-          <h3 className={APPLE_TITLE_SM}>变体列表</h3>
-          <p className={APPLE_META_TEXT}>按顺序浏览和完成本轮变体，已完成后可重新开启一轮。</p>
+            <h3 className={APPLE_TITLE_SM}>变体列表</h3>
+            <p className={APPLE_META_TEXT}>按顺序浏览和完成本轮变体，已完成后可重新开启一轮。</p>
           </div>
           <ul className="space-y-[var(--mobile-space-sm)]">
             {variantSet.variants.map((variant) => (
@@ -147,9 +152,15 @@ export function SceneVariantsView({
                   <p className={`mt-0.5 line-clamp-2 ${APPLE_META_TEXT}`}>
                     {variant.lesson.sections[0]?.summary ?? variant.lesson.subtitle}
                   </p>
-                  <p className={`mt-1 ${APPLE_META_TEXT}`}>
-                    {labels.statusPrefix}{toVariantStatusLabel(variant.status)}
-                  </p>
+                  <div className="mt-1">
+                    <span
+                      className={`px-[var(--mobile-space-md)] py-[var(--mobile-space-2xs)] text-[length:var(--mobile-font-caption)] font-semibold ${
+                        variant.status === "completed" ? APPLE_BADGE_INFO : APPLE_BADGE_SUBTLE
+                      }`}
+                    >
+                      {labels.statusPrefix}{toVariantStatusLabel(variant.status)}
+                    </span>
+                  </div>
                 </div>
                 <div className="flex shrink-0 items-center gap-[var(--mobile-space-xs)]">
                   <button

@@ -39,33 +39,33 @@ export function FocusDetailConfirm({
         className="absolute inset-0"
         onClick={onClose}
       />
-      <div className="relative z-10 w-full max-w-md overflow-hidden rounded-[var(--mobile-adapt-overlay-radius)] border border-[#EDF2F7] bg-white shadow-[0_18px_40px_rgba(0,0,0,0.08)] animate-in slide-in-from-bottom-6 fade-in-0 duration-200 sm:slide-in-from-bottom-0 sm:zoom-in-95">
-        <div className="space-y-[var(--mobile-space-md)] border-b border-[#EFF3FC] px-[var(--mobile-space-sheet)] pb-[var(--mobile-space-xl)] pt-[var(--mobile-space-sheet)]">
+      <div className="relative z-10 w-full max-w-md overflow-hidden rounded-[var(--mobile-adapt-overlay-radius)] border border-[var(--app-chunks-sheet-card-border)] bg-[var(--app-chunks-sheet-card-bg)] shadow-[var(--app-chunks-sheet-card-shadow)] animate-in slide-in-from-bottom-6 fade-in-0 duration-200 sm:slide-in-from-bottom-0 sm:zoom-in-95">
+        <div className="space-y-[var(--mobile-space-md)] border-b border-[var(--app-chunks-sheet-info-border)] px-[var(--mobile-space-sheet)] pb-[var(--mobile-space-xl)] pt-[var(--mobile-space-sheet)]">
           <div>
-            <p className="text-[length:clamp(18px,4.8vw,20px)] font-bold tracking-[-0.02em] text-[#1F4B6E]">
+            <p className="text-[length:clamp(18px,4.8vw,20px)] font-bold tracking-[-0.02em] text-[var(--app-chunks-sheet-title)]">
               {title}
             </p>
-            <p className="mt-[var(--mobile-space-sm)] text-[length:var(--mobile-font-body)] leading-6 text-[#7C97B0]">
+            <p className="mt-[var(--mobile-space-sm)] text-[length:var(--mobile-font-body)] leading-6 text-[var(--app-chunks-sheet-subtitle)]">
               {description}
             </p>
           </div>
         </div>
         <div className="space-y-[var(--mobile-space-md)] px-[var(--mobile-space-sheet)] py-[var(--mobile-space-xl)]">
-          <div className="rounded-[var(--mobile-adapt-overlay-card-radius)] border border-[#EEF3FC] bg-[#FAFDFF] p-[var(--mobile-space-sheet)]">
-            <p className="text-[length:clamp(16px,4.4vw,18px)] font-bold text-[#1F4F6E]">{text}</p>
+          <div className="rounded-[var(--mobile-adapt-overlay-card-radius)] border border-[var(--app-chunks-sheet-info-border)] bg-[var(--app-chunks-sheet-card-bg)] p-[var(--mobile-space-sheet)]">
+            <p className="text-[length:clamp(16px,4.4vw,18px)] font-bold text-[var(--app-chunks-sheet-body)]">{text}</p>
             {translation ? (
-              <p className="mt-[var(--mobile-space-sm)] border-l-2 border-[#D4E2F0] pl-[var(--mobile-space-md)] text-[length:var(--mobile-font-body)] text-[#6B8AAE]">
+              <p className="mt-[var(--mobile-space-sm)] border-l-2 border-[var(--app-chunks-sheet-info-border)] pl-[var(--mobile-space-md)] text-[length:var(--mobile-font-body)] text-[var(--app-chunks-sheet-muted)]">
                 {translation}
               </p>
             ) : null}
           </div>
         </div>
-        <div className="flex justify-end gap-[var(--mobile-space-sm)] border-t border-[#EFF3FC] bg-[#F8FAFC] px-[var(--mobile-space-sheet)] py-[var(--mobile-space-xl)]">
+        <div className="flex justify-end gap-[var(--mobile-space-sm)] border-t border-[var(--app-chunks-sheet-info-border)] bg-[var(--app-chunks-sheet-bg)] px-[var(--mobile-space-sheet)] py-[var(--mobile-space-xl)]">
           <Button
             type="button"
             variant="ghost"
             onClick={onClose}
-            className={`${appleButtonClassName} h-[var(--mobile-control-height)] rounded-full border border-[#E6EDF6] bg-[#F0F4FC] px-[var(--mobile-space-sheet)] text-[#2C5A7A] shadow-none hover:bg-[#E4ECF6]`}
+            className={`${appleButtonClassName} h-[var(--mobile-control-height)] rounded-full border border-[var(--app-chunks-sheet-secondary-border)] bg-[var(--app-chunks-sheet-info-soft)] px-[var(--mobile-space-sheet)] text-[var(--app-chunks-sheet-secondary-text)] shadow-none hover:bg-[var(--app-chunks-sheet-secondary-hover)]`}
           >
             {cancelLabel}
           </Button>
@@ -74,7 +74,7 @@ export function FocusDetailConfirm({
             variant="ghost"
             onClick={onConfirm}
             disabled={submitting}
-            className={`${appleButtonClassName} h-[var(--mobile-control-height)] rounded-full bg-[#2C6E9E] px-[var(--mobile-adapt-space-xl)] text-white shadow-[0_2px_8px_rgba(44,110,158,0.2)] hover:bg-[#1F557C]`}
+            className={`${appleButtonClassName} h-[var(--mobile-control-height)] rounded-full bg-[var(--app-chunks-sheet-primary-bg)] px-[var(--mobile-adapt-space-xl)] text-[var(--app-chunks-sheet-primary-text)] shadow-[var(--app-chunks-sheet-primary-shadow)] hover:bg-[var(--app-chunks-sheet-primary-hover)]`}
           >
             {submitting ? `${confirmLabel}...` : confirmLabel}
           </Button>

@@ -87,15 +87,16 @@ type FocusDetailContentProps = {
   onSaveContrastRow?: (row: FocusDetailRelatedItem) => void;
 };
 
-const CANDIDATE_BADGE_CLASS = "border-[#DCE8F5] bg-[#EEF3FC] text-[#2C6E9E]";
+const CANDIDATE_BADGE_CLASS =
+  "border-[var(--app-chunks-sheet-info-border)] bg-[var(--app-chunks-sheet-info-soft)] text-[var(--app-chunks-sheet-info-text)]";
 const DETAIL_CARD_CLASS =
-  "relative overflow-hidden rounded-[var(--mobile-adapt-overlay-radius)] border border-[#E6EDF6] bg-white px-[var(--mobile-adapt-space-xl)] py-[var(--mobile-adapt-space-xl)] shadow-[0_20px_40px_-10px_rgba(49,130,206,0.15)]";
+  "relative overflow-hidden rounded-[var(--mobile-adapt-overlay-radius)] border border-[var(--app-chunks-sheet-card-border)] bg-[var(--app-chunks-sheet-card-bg)] px-[var(--mobile-adapt-space-xl)] py-[var(--mobile-adapt-space-xl)] shadow-[var(--app-chunks-sheet-card-shadow)]";
 const BODY_CLASS =
-  "text-[length:var(--mobile-font-sheet-body)] leading-[var(--mobile-adapt-overlay-body-line-height)] text-[#2C4F6E]";
+  "text-[length:var(--mobile-font-sheet-body)] leading-[var(--mobile-adapt-overlay-body-line-height)] text-[var(--app-chunks-sheet-body)]";
 const RELATED_ROW_CLASS =
-  "rounded-[var(--mobile-adapt-overlay-card-radius)] border border-[#FCFCFD] bg-white px-[var(--mobile-adapt-space-sheet)] py-[var(--mobile-adapt-overlay-related-row-py)] shadow-[0_10px_30px_-5px_rgba(0,0,0,0.04)]";
+  "rounded-[var(--mobile-adapt-overlay-card-radius)] border border-[var(--app-chunks-sheet-card-border)] bg-[var(--app-chunks-sheet-card-bg)] px-[var(--mobile-adapt-space-sheet)] py-[var(--mobile-adapt-overlay-related-row-py)] shadow-[var(--app-shadow-soft)]";
 const RELATED_TEXT_CLASS =
-  "text-[length:var(--mobile-adapt-overlay-body)] font-bold text-[#2D3748]";
+  "text-[length:var(--mobile-adapt-overlay-body)] font-bold text-[var(--app-chunks-sheet-title)]";
 
 function getRelatedActionLabel(
   labels: FocusDetailContentLabels,
@@ -162,19 +163,19 @@ export function FocusDetailContent({
                 type="button"
                 size="sm"
                 variant="ghost"
-                className="h-[var(--mobile-control-height)] rounded-full border border-[#E6EDF6] bg-[#F0F4FC] px-[var(--mobile-space-md)] text-[length:var(--mobile-font-caption)] text-[#2C5A7A] shadow-none hover:bg-[#E4ECF6]"
+                className="h-[var(--mobile-control-height)] rounded-full border border-[var(--app-chunks-sheet-secondary-border)] bg-[var(--app-chunks-sheet-info-soft)] px-[var(--mobile-space-md)] text-[length:var(--mobile-font-caption)] text-[var(--app-chunks-sheet-secondary-text)] shadow-none hover:bg-[var(--app-chunks-sheet-secondary-hover)]"
                 disabled={isSaving}
                 onClick={() => onSaveContrastRow(row)}
               >
                 {actionLabel}
               </Button>
             ) : (
-              <span className="inline-flex size-[var(--mobile-icon-button)] items-center justify-center rounded-full bg-[#F0FFF4] text-[length:var(--mobile-font-body)] text-[#38A169]">
+              <span className="inline-flex size-[var(--mobile-icon-button)] items-center justify-center rounded-full bg-[var(--app-chunks-sheet-success-soft)] text-[length:var(--mobile-font-body)] text-[var(--app-chunks-sheet-success-text)]">
                 ✓
               </span>
             )}
           </div>
-          <p className="mt-1 text-[length:var(--mobile-font-body-sm)] text-[#718096]">
+          <p className="mt-1 text-[length:var(--mobile-font-body-sm)] text-[var(--app-chunks-sheet-muted)]">
             {row.translation ?? row.differenceLabel ?? labels.emptyContrast}
           </p>
         </div>
@@ -187,7 +188,7 @@ export function FocusDetailContent({
           {canOpenDetail ? (
             <button
               type="button"
-              className="min-w-0 flex-1 text-left transition hover:text-[#1F4F6E]/80"
+              className="min-w-0 flex-1 text-left transition hover:opacity-80"
               onClick={() => onOpenSimilarRow(row)}
             >
               <p className={RELATED_TEXT_CLASS}>{row.text}</p>
@@ -198,7 +199,7 @@ export function FocusDetailContent({
             </div>
           )}
           {isSaved ? (
-            <span className="inline-flex size-[var(--mobile-icon-button)] shrink-0 items-center justify-center rounded-full bg-[#F0FFF4] text-[length:var(--mobile-font-body)] text-[#38A169]">
+            <span className="inline-flex size-[var(--mobile-icon-button)] shrink-0 items-center justify-center rounded-full bg-[var(--app-chunks-sheet-success-soft)] text-[length:var(--mobile-font-body)] text-[var(--app-chunks-sheet-success-text)]">
               ✓           </span>
           ) : (
             <Button
@@ -206,7 +207,7 @@ export function FocusDetailContent({
               size="sm"
               variant="ghost"
               aria-label={actionLabel}
-              className="size-[var(--mobile-icon-button)] shrink-0 rounded-full bg-[#F0FFF4] px-0 text-[length:var(--mobile-font-body)] text-[#38A169] shadow-none hover:bg-[#E6FFFA]"
+              className="size-[var(--mobile-icon-button)] shrink-0 rounded-full bg-[var(--app-chunks-sheet-success-soft)] px-0 text-[length:var(--mobile-font-body)] text-[var(--app-chunks-sheet-success-text)] shadow-none hover:bg-[var(--app-chunks-sheet-success-hover)]"
               disabled={isSaving}
               onClick={() => {
                 if (isSaving) return;
@@ -217,7 +218,7 @@ export function FocusDetailContent({
             </Button>
           )}
         </div>
-        <p className="mt-1 text-[length:var(--mobile-font-body-sm)] text-[#718096]">
+        <p className="mt-1 text-[length:var(--mobile-font-body-sm)] text-[var(--app-chunks-sheet-muted)]">
           {row.translation ?? row.differenceLabel ?? labels.emptySimilar}
         </p>
       </div>
@@ -225,11 +226,11 @@ export function FocusDetailContent({
   };
 
   return (
-    <div className="flex h-full min-h-0 min-w-0 flex-col gap-[var(--mobile-adapt-space-md)] bg-[#F2F2F7] [@media(max-height:760px)]:gap-[var(--mobile-adapt-space-sm)]">
+    <div className="flex h-full min-h-0 min-w-0 flex-col gap-[var(--mobile-adapt-space-md)] bg-[var(--app-chunks-sheet-bg)] [@media(max-height:760px)]:gap-[var(--mobile-adapt-space-sm)]">
       <div className={`${DETAIL_CARD_CLASS} shrink-0`}>
         <span
           aria-hidden="true"
-          className="pointer-events-none absolute right-[-6px] top-[-18px] text-[112px] leading-none text-[#F7FAFC] [@media(max-height:760px)]:hidden"
+          className="pointer-events-none absolute right-[-6px] top-[-18px] text-[112px] leading-none text-[var(--app-chunks-sheet-info-soft)] [@media(max-height:760px)]:hidden"
         >
           &quot;
         </span>
@@ -241,7 +242,7 @@ export function FocusDetailContent({
                   {labels.candidateBadge}
                 </Badge>
               ) : null}
-              <p className="truncate text-[length:clamp(1.25rem,6vw,1.625rem)] font-[850] tracking-[-0.05em] text-[#1A365D] [@media(max-height:760px)]:text-[length:clamp(1.05rem,5.2vw,1.25rem)] [@media(max-height:760px)]:leading-tight">
+              <p className="truncate text-[length:clamp(1.25rem,6vw,1.625rem)] font-[850] tracking-[-0.05em] text-[var(--app-chunks-sheet-title)] [@media(max-height:760px)]:text-[length:clamp(1.05rem,5.2vw,1.25rem)] [@media(max-height:760px)]:leading-tight">
                 {detail.text}
               </p>
             </div>
@@ -251,12 +252,12 @@ export function FocusDetailContent({
                 onClick={() => onSpeak(detailSpeakText)}
                 label={labels.speakSentence}
                 ariaLabel={labels.speakSentence}
-                className="h-[var(--mobile-control-height)] rounded-full border border-[#E6EDF6] bg-[#F0F4FC] px-[var(--mobile-space-xl)] text-[#2C5A7A] shadow-none hover:bg-[#E4ECF6] [@media(max-height:760px)]:h-[var(--mobile-icon-button)] [@media(max-height:760px)]:px-[var(--mobile-space-md)] [@media(max-height:760px)]:text-[length:var(--mobile-font-caption)]"
+                className="h-[var(--mobile-control-height)] rounded-full border border-[var(--app-chunks-sheet-secondary-border)] bg-[var(--app-chunks-sheet-info-soft)] px-[var(--mobile-space-xl)] text-[var(--app-chunks-sheet-secondary-text)] shadow-none hover:bg-[var(--app-chunks-sheet-secondary-hover)] [@media(max-height:760px)]:h-[var(--mobile-icon-button)] [@media(max-height:760px)]:px-[var(--mobile-space-md)] [@media(max-height:760px)]:text-[length:var(--mobile-font-caption)]"
                 iconClassName="size-4"
               />
             ) : null}
           </div>
-          <p className="text-[length:clamp(0.95rem,4.2vw,1.125rem)] font-medium text-[#718096] [@media(max-height:760px)]:text-[length:var(--mobile-font-body)] [@media(max-height:760px)]:leading-5">
+          <p className="text-[length:clamp(0.95rem,4.2vw,1.125rem)] font-medium text-[var(--app-chunks-sheet-muted)] [@media(max-height:760px)]:text-[length:var(--mobile-font-body)] [@media(max-height:760px)]:leading-5">
             {retryingEnrichment
               ? labels.enriching
               : detail.savedItem?.translation ??
@@ -265,7 +266,7 @@ export function FocusDetailContent({
           </p>
         </div>
         {detail.differenceLabel ? (
-          <p className="mt-3 text-[length:var(--mobile-font-body-sm)] leading-5 text-[#718096] [@media(max-height:760px)]:mt-2">{detail.differenceLabel}</p>
+          <p className="mt-3 text-[length:var(--mobile-font-body-sm)] leading-5 text-[var(--app-chunks-sheet-muted)] [@media(max-height:760px)]:mt-2">{detail.differenceLabel}</p>
         ) : null}
       </div>
 
@@ -284,7 +285,7 @@ export function FocusDetailContent({
         </SegmentedTabsList>
 
         {focusDetailTab === "similar" || focusDetailTab === "contrast" ? (
-          <p className="mb-3 shrink-0 px-1 text-[length:var(--mobile-font-body-sm)] leading-6 text-[#718096] [@media(max-height:760px)]:mb-1.5 [@media(max-height:760px)]:text-[length:var(--mobile-font-meta)] [@media(max-height:760px)]:leading-4">
+          <p className="mb-3 shrink-0 px-1 text-[length:var(--mobile-font-body-sm)] leading-6 text-[var(--app-chunks-sheet-muted)] [@media(max-height:760px)]:mb-1.5 [@media(max-height:760px)]:text-[length:var(--mobile-font-meta)] [@media(max-height:760px)]:leading-4">
             {focusDetailTab === "similar" ? labels.similarHint : labels.contrastHint}
           </p>
         ) : null}
@@ -302,7 +303,7 @@ export function FocusDetailContent({
             ) : (
               <div className="space-y-4">
                 <DetailInfoBlock title={labels.semanticFocus} icon={<span>🎯</span>}>
-                  <div className="rounded-[var(--mobile-adapt-overlay-card-radius)] bg-[#F0F6FE] px-[var(--mobile-adapt-space-xl)] py-[var(--mobile-adapt-space-lg)]">
+                  <div className="rounded-[var(--mobile-adapt-overlay-card-radius)] bg-[var(--app-chunks-sheet-info-bg)] px-[var(--mobile-adapt-space-xl)] py-[var(--mobile-adapt-space-lg)]">
                     <p className={BODY_CLASS}>{semanticFocus || labels.semanticFocusPending}</p>
                   </div>
                 </DetailInfoBlock>
@@ -319,10 +320,10 @@ export function FocusDetailContent({
             )}
 
             <div className="space-y-2">
-              <p className="text-[length:var(--mobile-font-body)] font-semibold text-[#1F4B6E]">📖 {labels.sourceSentence}</p>
+              <p className="text-[length:var(--mobile-font-body)] font-semibold text-[var(--app-chunks-sheet-title)]">📖 {labels.sourceSentence}</p>
               {retryingEnrichment ? (
                 <div
-                  className="animate-pulse rounded-[var(--mobile-adapt-overlay-card-radius)] border border-[#EEF3FC] bg-[#FAFDFF] p-[var(--mobile-adapt-space-xl)]"
+                  className="animate-pulse rounded-[var(--mobile-adapt-overlay-card-radius)] border border-[var(--app-chunks-sheet-info-border)] bg-[var(--app-chunks-sheet-card-bg)] p-[var(--mobile-adapt-space-xl)]"
                   aria-label="例句补全中"
                 >
                   <div className="h-4 w-4/5 rounded bg-[var(--app-surface-hover)]" />

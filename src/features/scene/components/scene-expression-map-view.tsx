@@ -3,6 +3,8 @@
 import { ReactNode } from "react";
 import { ExpressionCluster } from "@/lib/types/expression-map";
 import {
+  APPLE_BANNER_DANGER,
+  APPLE_BADGE_SUBTLE,
   APPLE_BUTTON_BASE,
   APPLE_LIST_ITEM,
   APPLE_META_TEXT,
@@ -43,7 +45,7 @@ export function SceneExpressionMapView({
           </button>
         </div>
         <p className={APPLE_META_TEXT}>{labels.description}</p>
-        {error ? <p className={`font-medium text-destructive ${APPLE_META_TEXT}`}>{error}</p> : null}
+        {error ? <p className={APPLE_BANNER_DANGER}>{error}</p> : null}
       </section>
 
       <section className={`space-y-[var(--mobile-adapt-space-md)] p-[var(--mobile-adapt-space-sheet)] ${APPLE_PANEL_RAISED}`}>
@@ -63,7 +65,7 @@ export function SceneExpressionMapView({
                     <button
                       key={`${cluster.id}-${expression}`}
                       type="button"
-                      className={`${APPLE_BUTTON_BASE} px-[var(--mobile-adapt-space-sm)] py-[var(--mobile-adapt-space-2xs)] text-[length:var(--mobile-adapt-font-meta)]`}
+                      className={`${APPLE_BUTTON_BASE} px-[var(--mobile-adapt-space-sm)] py-[var(--mobile-adapt-space-2xs)] text-[length:var(--mobile-adapt-font-meta)] ${APPLE_BADGE_SUBTLE}`}
                       onClick={() => onOpenExpressionDetail(expression, cluster.expressions)}
                     >
                       {expression}

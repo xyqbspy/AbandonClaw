@@ -18,6 +18,7 @@ import {
   importSceneFromApi,
   SceneListItemResponse,
 } from "@/lib/utils/scenes-api";
+import { SCENE_STATUS_TEXT_CLASSNAME } from "@/features/scene/scene-status-theme";
 import {
   clearSceneListCache,
   getSceneListCache,
@@ -47,12 +48,6 @@ const learningStatusLabel: Record<SceneListItemResponse["learningStatus"], strin
   completed: "已完成",
   paused: "已暂停",
 };
-const statusClassName: Record<SceneListItemResponse["learningStatus"], string> = {
-  not_started: "text-[#86868B]",
-  in_progress: "text-[#FF9500]",
-  completed: "text-[#34C759]",
-  paused: "text-[#FF9500]",
-};
 
 const placeholderExample = `A: Are we still on for dinner?
 B: I was just about to text you. Something came up at work.
@@ -67,20 +62,22 @@ const sheetPanelClassName = `${APPLE_PANEL_RAISED} rounded-[var(--mobile-adapt-o
 const sheetLabelClassName =
   "mb-[var(--mobile-adapt-space-sm)] block pl-0.5 text-[length:var(--mobile-adapt-font-body-sm)] font-semibold text-[#1d1d1f]";
 const sceneActionButtonClassName = `h-[var(--mobile-adapt-button-height)] gap-[var(--mobile-adapt-space-sm)] text-[length:var(--mobile-adapt-font-body-sm)] ${APPLE_BUTTON_TEXT_MD}`;
+const sceneSecondaryActionButtonClassName =
+  `${sceneActionButtonClassName} bg-[var(--app-button-secondary-bg)] text-[var(--app-button-secondary-text)] border-[var(--app-button-secondary-border)]`;
 const sceneCardClassName =
-  `${APPLE_CARD_INTERACTIVE} relative z-10 flex cursor-pointer justify-between gap-[var(--mobile-adapt-space-md)] rounded-[var(--app-radius-card)] p-[var(--mobile-adapt-space-sheet)] will-change-transform transition-[transform,box-shadow,opacity] duration-[280ms]`;
+  `${APPLE_CARD_INTERACTIVE} relative z-10 flex cursor-pointer justify-between gap-[var(--mobile-adapt-space-md)] rounded-[var(--app-radius-card)] bg-[var(--app-scene-card-bg)] p-[var(--mobile-adapt-space-sheet)] will-change-transform transition-[transform,box-shadow,opacity] duration-[280ms]`;
 const sceneMetaPillClassName =
-  "inline-flex min-h-[clamp(24px,6vw,28px)] items-center rounded-full bg-[#F2F2F7] px-[var(--mobile-adapt-space-md)] text-[length:var(--mobile-adapt-font-caption)] font-bold whitespace-nowrap text-[#636366]";
+  "inline-flex min-h-[clamp(24px,6vw,28px)] items-center rounded-full bg-[var(--app-scene-card-meta-bg)] px-[var(--mobile-adapt-space-md)] text-[length:var(--mobile-adapt-font-caption)] font-bold whitespace-nowrap text-[var(--app-scene-card-meta-text)]";
 const sceneMetaTextClassName =
   `inline-flex items-center gap-[var(--mobile-adapt-space-2xs)] text-[length:var(--mobile-adapt-font-caption)] font-bold whitespace-nowrap ${APPLE_META_TEXT}`;
 const sceneTitleClassName =
   "mb-[var(--mobile-adapt-space-2xs)] text-[length:clamp(0.98rem,4.4vw,1.05rem)] leading-[1.35] font-extrabold tracking-[-0.025em] text-[#1D1D1F]";
 const sceneSubtitleClassName =
-  `mb-[var(--mobile-adapt-space-lg)] text-[length:var(--mobile-adapt-font-body-sm)] leading-[1.45] ${APPLE_META_TEXT}`;
+  "mb-[var(--mobile-adapt-space-lg)] text-[length:var(--mobile-adapt-font-body-sm)] leading-[1.45] text-[var(--app-scene-card-subtitle)]";
 const sceneStatusClassName =
   "mb-[var(--mobile-adapt-space-2xs)] text-[length:var(--mobile-adapt-font-meta)] font-extrabold tracking-[-0.01em]";
 const sceneProgressClassName =
-  "text-[length:clamp(1.5rem,7vw,1.75rem)] leading-none font-extrabold tracking-[-0.04em] text-[#1D1D1F]";
+  "text-[length:clamp(1.5rem,7vw,1.75rem)] leading-none font-extrabold tracking-[-0.04em] text-[var(--app-scene-card-progress)]";
 const sceneSheetClassName =
   "flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-[var(--mobile-adapt-overlay-radius)] bg-[#F2F2F7] sm:rounded-[var(--mobile-adapt-overlay-radius)]";
 const sceneSheetTitleClassName =
@@ -455,7 +452,7 @@ export default function ScenesPage() {
             <div
               key={scene.id}
               data-swipe-row="true"
-              className={`relative mb-4 overflow-hidden rounded-[24px] transition-[max-height,margin,opacity] duration-250 ease-out ${removingSceneId === scene.id ? "max-h-0 opacity-0 mb-0" : "max-h-[180px]"
+              className={`relative mb-4 overflow-hidden rounded-[24px] bg-[var(--app-scene-card-bg)] transition-[max-height,margin,opacity] duration-250 ease-out ${removingSceneId === scene.id ? "max-h-0 opacity-0 mb-0" : "max-h-[180px]"
                 }`}
             >
               {isImported ? (
@@ -464,7 +461,7 @@ export default function ScenesPage() {
                     type="button"
                     data-scene-delete="true"
                     aria-label="删除"
-                    className="flex h-full w-full items-center justify-center bg-linear-to-b from-[#ff5d55] to-[#FF3B30] text-[15px] font-bold tracking-[-0.01em] text-white"
+                    className="flex h-full w-full items-center justify-center bg-linear-to-b from-[var(--app-scene-delete-start)] to-[var(--app-scene-delete-end)] text-[15px] font-bold tracking-[-0.01em] text-white"
                     onClick={(event) => {
                       event.preventDefault();
                       event.stopPropagation();
@@ -619,12 +616,14 @@ export default function ScenesPage() {
                   </div>
                 </div>
 
-                <div className="min-w-[clamp(68px,18vw,84px)] shrink-0 pt-[2px] text-right">
-                  <div className={`${sceneStatusClassName} ${statusClassName[scene.learningStatus]}`}>
+                <div className="flex min-w-[clamp(68px,18vw,84px)] shrink-0 flex-col text-right">
+                  <div className={`${sceneStatusClassName} ${SCENE_STATUS_TEXT_CLASSNAME[scene.learningStatus]}`}>
                     {learningStatusLabel[scene.learningStatus]}
                   </div>
-                  <div className={sceneProgressClassName}>
-                    {Math.round(scene.progressPercent)}%
+                  <div className="mt-auto flex justify-end">
+                    <div className={sceneProgressClassName}>
+                      {Math.round(scene.progressPercent)}%
+                    </div>
                   </div>
                 </div>
               </article>
@@ -659,7 +658,7 @@ export default function ScenesPage() {
           type="button"
           variant="secondary"
           radius="lg"
-          className={sceneActionButtonClassName}
+          className={sceneSecondaryActionButtonClassName}
           onClick={() => setDialogOpen(true)}
         >
           <Plus className="size-[clamp(14px,4vw,16px)]" />
@@ -708,7 +707,7 @@ export default function ScenesPage() {
               data-import-dialog="true"
               className={sceneSheetClassName}
             >
-              <div className="mx-auto my-[var(--mobile-adapt-space-sm)] h-[clamp(4px,1vw,5px)] w-[clamp(32px,9vw,36px)] rounded-full bg-[#C7C7CC]" />
+              <div className="mx-auto my-[var(--mobile-adapt-space-sm)] h-[clamp(4px,1vw,5px)] w-[clamp(32px,9vw,36px)] rounded-full bg-[var(--app-scene-panel-pending-border)]" />
 
               <div className="px-[var(--mobile-adapt-space-sheet)] pb-[var(--mobile-adapt-space-md)]">
                 <h2 className={sceneSheetTitleClassName}>导入自定义场景</h2>
@@ -739,13 +738,13 @@ export default function ScenesPage() {
                 </div>
 
                 {error ? (
-                  <div className="rounded-[var(--mobile-adapt-overlay-card-radius)] bg-[#fff1f0] px-[var(--mobile-adapt-space-md)] py-[var(--mobile-adapt-space-sm)] text-[length:var(--mobile-adapt-font-body-sm)] text-[#d93025]">
+                  <div className={APPLE_BANNER_DANGER}>
                     {error}
                   </div>
                 ) : null}
               </div>
 
-              <div className="bg-[#F2F2F7] px-[var(--mobile-adapt-space-md)] pb-[calc(env(safe-area-inset-bottom)+var(--mobile-adapt-space-lg))] pt-[var(--mobile-adapt-space-sm)]">
+              <div className="bg-[var(--app-surface-subtle)] px-[var(--mobile-adapt-space-md)] pb-[calc(env(safe-area-inset-bottom)+var(--mobile-adapt-space-lg))] pt-[var(--mobile-adapt-space-sm)]">
                 <div className="grid grid-cols-2 gap-[var(--mobile-adapt-space-sm)]">
                   <Button
                     type="button"

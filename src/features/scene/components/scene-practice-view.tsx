@@ -8,6 +8,15 @@ import {
   MoreHorizontal,
 } from "lucide-react";
 import {
+  APPLE_BADGE_INFO,
+  APPLE_BADGE_SUBTLE,
+  APPLE_BUTTON_BASE,
+  APPLE_BUTTON_STRONG,
+  APPLE_PANEL_INFO,
+  APPLE_PANEL_RAISED,
+  APPLE_PANEL_WARNING,
+} from "@/lib/ui/apple-style";
+import {
   PracticeAssessmentLevel,
   PracticeMode,
   PracticeSet,
@@ -104,9 +113,13 @@ export function ScenePracticeView({
   const moduleChipBaseClassName =
     "relative rounded-[12px] border-2 px-[var(--mobile-space-md)] py-[var(--mobile-space-md)] text-center text-[length:var(--mobile-font-body-sm)] font-bold transition-all duration-200";
   const panelClassName =
-    "rounded-[24px] border border-white/80 bg-white shadow-[0_10px_25px_-5px_rgba(0,0,0,0.05)]";
+    `${APPLE_PANEL_RAISED} rounded-[24px]`;
   const softPanelClassName =
-    "rounded-[18px] border border-[#EDF2F7] bg-[#F8FAFC] shadow-[0_4px_12px_rgba(0,0,0,0.02)]";
+    `${APPLE_PANEL_INFO} rounded-[18px] shadow-[var(--app-shadow-soft)]`;
+  const secondaryActionButtonClassName =
+    `${APPLE_BUTTON_BASE} h-[var(--mobile-button-height)] rounded-[14px] px-[var(--mobile-space-xl)] text-[length:var(--mobile-font-body-sm)] font-bold`;
+  const primaryActionButtonClassName =
+    `${APPLE_BUTTON_STRONG} h-[var(--mobile-button-height)] rounded-[14px] px-[var(--mobile-space-xl)] text-[length:var(--mobile-font-body-sm)] font-bold`;
   const assessmentTextClassName = (assessment: PracticeAssessmentLevel | null | undefined) => {
     if (assessment === "complete") return "text-emerald-700";
     if (assessment === "structure") return "text-sky-700";
@@ -461,12 +474,12 @@ export function ScenePracticeView({
         : "border-[#E2E8F0] text-[#1A365D] focus:border-[#3182CE] focus:ring-4 focus:ring-[#DBEAFE]";
 
   return (
-    <div className="bg-[#F6F8FA] pb-10">
+    <div className="bg-[var(--app-page-background)] pb-10">
       <div className="mx-auto w-full max-w-[480px] space-y-[var(--mobile-space-md)] px-[var(--mobile-space-sheet)] pt-[var(--mobile-space-sheet)]">
         <header className="flex flex-nowrap items-center justify-between gap-[var(--mobile-space-md)] py-[var(--mobile-space-2xs)]">
           <button
             type="button"
-            className="inline-flex shrink-0 items-center gap-[var(--mobile-space-sm)] whitespace-nowrap text-[length:var(--mobile-font-body-sm)] font-semibold text-[#718096]"
+            className="inline-flex shrink-0 items-center gap-[var(--mobile-space-sm)] whitespace-nowrap text-[length:var(--mobile-font-body-sm)] font-semibold text-[var(--muted-foreground)]"
             onClick={onBack}
           >
             <ArrowLeft className="size-4" />
@@ -474,7 +487,7 @@ export function ScenePracticeView({
           </button>
 
           <div className="min-w-0 flex-1 overflow-hidden text-center">
-            <p className="truncate whitespace-nowrap text-[length:var(--mobile-font-title)] font-extrabold text-[#1E3A8A]">
+            <p className="truncate whitespace-nowrap text-[length:var(--mobile-font-title)] font-extrabold text-foreground">
               {localizedPracticeModeLabel}
             </p>
           </div>
@@ -484,7 +497,7 @@ export function ScenePracticeView({
               type="button"
               aria-label="打开练习菜单"
               aria-expanded={headerMenuOpen}
-            className="inline-flex size-[var(--mobile-icon-button)] items-center justify-center rounded-full text-[#718096] transition-colors hover:bg-white/80 disabled:opacity-50"
+            className="inline-flex size-[var(--mobile-icon-button)] items-center justify-center rounded-full text-[var(--muted-foreground)] transition-colors hover:bg-[var(--app-button-secondary-bg)]/80 disabled:opacity-50"
               onClick={() => setHeaderMenuOpen((open) => !open)}
               disabled={!practiceSet}
             >
@@ -499,10 +512,10 @@ export function ScenePracticeView({
                   className="fixed inset-0 z-10"
                   onClick={() => setHeaderMenuOpen(false)}
                 />
-                <div className="absolute right-0 top-10 z-20 min-w-[clamp(160px,42vw,172px)] overflow-hidden rounded-[18px] border border-white/80 bg-white shadow-[0_18px_36px_rgba(15,23,42,0.12)]">
+                <div className="absolute right-0 top-10 z-20 min-w-[clamp(160px,42vw,172px)] overflow-hidden rounded-[18px] border border-[var(--app-border-soft)] bg-[var(--app-surface)] shadow-[var(--app-shadow-raised)]">
                   <button
                     type="button"
-                    className="flex w-full items-center justify-between px-[var(--mobile-space-xl)] py-[var(--mobile-space-md)] text-left text-[length:var(--mobile-font-body-sm)] font-semibold text-[#334155] transition-colors hover:bg-[#F8FAFC]"
+                    className="flex w-full items-center justify-between px-[var(--mobile-space-xl)] py-[var(--mobile-space-md)] text-left text-[length:var(--mobile-font-body-sm)] font-semibold text-foreground transition-colors hover:bg-[var(--app-surface-subtle)]"
                     onClick={() => {
                       setHeaderMenuOpen(false);
                       onDelete();
@@ -512,7 +525,7 @@ export function ScenePracticeView({
                   </button>
                   <button
                     type="button"
-                    className="flex w-full items-center justify-between border-t border-[#EDF2F7] px-[var(--mobile-space-xl)] py-[var(--mobile-space-md)] text-left text-[length:var(--mobile-font-body-sm)] font-semibold text-[#334155] transition-colors hover:bg-[#F8FAFC] disabled:text-[#A0AEC0]"
+                    className="flex w-full items-center justify-between border-t border-[var(--app-border-soft)] px-[var(--mobile-space-xl)] py-[var(--mobile-space-md)] text-left text-[length:var(--mobile-font-body-sm)] font-semibold text-foreground transition-colors hover:bg-[var(--app-surface-subtle)] disabled:text-[var(--muted-foreground)]"
                     onClick={() => {
                       setHeaderMenuOpen(false);
                       onComplete();
@@ -540,10 +553,10 @@ export function ScenePracticeView({
                   type="button"
                   className={`${moduleChipBaseClassName} ${
                     active
-                      ? "border-[#3B82F6] bg-[#EFF6FF] text-[#3B82F6]"
+                      ? "border-[var(--app-scene-panel-accent)] bg-[var(--app-scene-panel-accent-soft)] text-[var(--app-scene-panel-accent)]"
                       : unlocked
-                        ? "border-transparent bg-white text-[#1E3A8A] shadow-[0_10px_15px_-3px_rgba(0,0,0,0.04)]"
-                        : "border-transparent bg-[#E2E8F0] text-[#64748B] opacity-60"
+                        ? "border-transparent bg-[var(--app-surface)] text-foreground shadow-[var(--app-shadow-soft)]"
+                        : "border-transparent bg-[var(--app-surface-subtle)] text-[var(--muted-foreground)] opacity-60"
                   } min-w-[clamp(112px,30vw,124px)] shrink-0`}
                   disabled={!unlocked}
                   onClick={() => {
@@ -551,7 +564,7 @@ export function ScenePracticeView({
                     setActiveExerciseIndex(0);
                   }}
                 >
-                  {!unlocked ? <Lock className="absolute right-1.5 top-1.5 size-3 text-[#94A3B8]" /> : null}
+                  {!unlocked ? <Lock className="absolute right-1.5 top-1.5 size-3 text-[var(--muted-foreground)]" /> : null}
                   <span className="block">{getPracticeModeLabel(module.mode)}</span>
                   <span className="mt-1 block text-[length:var(--mobile-font-caption)] font-medium opacity-80">
                     {done ? "已完成" : unlocked ? "进行中" : "未解锁"}
@@ -564,7 +577,7 @@ export function ScenePracticeView({
         ) : null}
 
         <section className="space-y-[var(--mobile-space-sm)]">
-          <div className="flex items-center justify-between gap-[var(--mobile-space-md)] text-[length:var(--mobile-font-meta)] font-bold text-[#64748B]">
+          <div className="flex items-center justify-between gap-[var(--mobile-space-md)] text-[length:var(--mobile-font-meta)] font-bold text-[var(--muted-foreground)]">
             <p>
               {labels.currentQuestionLabel}：{currentQuestionNumber}/{exercises.length}
             </p>
@@ -572,32 +585,32 @@ export function ScenePracticeView({
               {Math.floor(currentQuestionProgress)}%
             </p>
           </div>
-          <div className="h-1.5 overflow-hidden rounded-full bg-[#E2E8F0]">
+          <div className="h-1.5 overflow-hidden rounded-full bg-[var(--app-surface-subtle)]">
             <div
-              className="h-full rounded-full bg-[#3182CE] transition-[width] duration-300"
+              className="h-full rounded-full bg-[var(--app-scene-panel-accent)] transition-[width] duration-300"
               style={{ width: `${currentQuestionProgress}%` }}
             />
           </div>
         </section>
 
         {practiceSet ? (
-          <p className="text-[length:var(--mobile-font-meta)] leading-5 text-[#718096]">
+          <p className="text-[length:var(--mobile-font-meta)] leading-5 text-[var(--muted-foreground)]">
             {practiceSet.sourceType === "variant" ? labels.basedOnVariantPrefix : labels.basedOnScenePrefix}
-            <span className="font-semibold text-[#2D3748]">{sourceText}</span>
+            <span className="font-semibold text-foreground">{sourceText}</span>
           </p>
         ) : null}
 
         {!practiceSet ? (
           <section className={`p-[var(--mobile-space-sheet)] ${panelClassName}`}>
-            <p className="text-[length:var(--mobile-font-body-sm)] text-[#64748B]">{labels.empty}</p>
+            <p className="text-[length:var(--mobile-font-body-sm)] text-[var(--muted-foreground)]">{labels.empty}</p>
           </section>
         ) : (
           <>
             <section className={`px-[var(--mobile-space-sheet)] py-[clamp(24px,6.4vw,32px)] text-center ${panelClassName}`}>
-              <div className="flex items-center justify-between gap-[var(--mobile-space-md)] text-[length:var(--mobile-font-body-sm)] font-semibold text-[#64748B]">
+              <div className="flex items-center justify-between gap-[var(--mobile-space-md)] text-[length:var(--mobile-font-body-sm)] font-semibold text-[var(--muted-foreground)]">
                 <button
                   type="button"
-                  className="rounded-full bg-[#F8FAFC] px-[var(--mobile-space-md)] py-[var(--mobile-space-2xs)] text-[length:var(--mobile-font-meta)] text-[#64748B] disabled:opacity-50"
+                  className={`${APPLE_BADGE_SUBTLE} px-[var(--mobile-space-md)] py-[var(--mobile-space-2xs)] text-[length:var(--mobile-font-meta)] disabled:opacity-50`}
                   disabled={safeActiveExerciseIndex <= 0}
                   onClick={() => setActiveExerciseIndex((current) => Math.max(0, current - 1))}
                 >
@@ -608,7 +621,7 @@ export function ScenePracticeView({
                 </span>
                 <button
                   type="button"
-                  className="rounded-full bg-[#F8FAFC] px-[var(--mobile-space-md)] py-[var(--mobile-space-2xs)] text-[length:var(--mobile-font-meta)] text-[#64748B] disabled:opacity-50"
+                  className={`${APPLE_BADGE_SUBTLE} px-[var(--mobile-space-md)] py-[var(--mobile-space-2xs)] text-[length:var(--mobile-font-meta)] disabled:opacity-50`}
                   disabled={safeActiveExerciseIndex >= exercises.length - 1}
                   onClick={() =>
                     setActiveExerciseIndex((current) => Math.min(exercises.length - 1, current + 1))
@@ -621,15 +634,15 @@ export function ScenePracticeView({
               {activeExercise ? (
                 <>
                   {activeExercise.cloze?.displayText ? (
-                    <h3 className="mt-[var(--mobile-space-xl)] text-[length:clamp(1.25rem,5.8vw,1.5rem)] font-extrabold leading-[1.3] tracking-[-0.03em] text-[#1A365D]">
+                    <h3 className="mt-[var(--mobile-space-xl)] text-[length:clamp(1.25rem,5.8vw,1.5rem)] font-extrabold leading-[1.3] tracking-[-0.03em] text-foreground">
                       {activeExercise.cloze.displayText}
                     </h3>
                   ) : null}
 
-                  <div className="mt-[var(--mobile-space-xl)] rounded-[12px] bg-[#F8FAFC] p-[var(--mobile-space-md)] text-left text-[length:var(--mobile-font-body-sm)] leading-6 text-[#718096]">
+                  <div className="mt-[var(--mobile-space-xl)] rounded-[12px] bg-[var(--app-surface-subtle)] p-[var(--mobile-space-md)] text-left text-[length:var(--mobile-font-body-sm)] leading-6 text-[var(--muted-foreground)]">
                     {activeExercise.hint ? (
                       <p>
-                        <span className="mr-1 font-bold text-[#3B82F6]">含义:</span>
+                        <span className="mr-1 font-bold text-[var(--app-scene-panel-accent)]">含义:</span>
                         {activeExercise.hint}
                       </p>
                     ) : null}
@@ -664,28 +677,28 @@ export function ScenePracticeView({
                       <div className="mt-[var(--mobile-space-sheet)] grid grid-cols-[1.5fr_1fr_1fr] gap-[var(--mobile-space-md)]">
                         <button
                           type="submit"
-                          className="h-[var(--mobile-button-height)] rounded-[14px] bg-[#1A365D] px-[var(--mobile-space-xl)] text-[length:var(--mobile-font-body-sm)] font-bold text-white transition-transform active:scale-[0.98] disabled:opacity-50"
+                          className={`${primaryActionButtonClassName} transition-transform active:scale-[0.98] disabled:opacity-50`}
                           disabled={!activeAnswerValue.trim()}
                         >
                           {labels.checkAnswer}
                         </button>
                         <button
                           type="button"
-                          className="h-[var(--mobile-button-height)] rounded-[14px] bg-[#EDF2F7] px-[var(--mobile-space-xl)] text-[length:var(--mobile-font-body-sm)] font-bold text-[#2D3748] transition-transform active:scale-[0.98]"
+                          className={`${secondaryActionButtonClassName} transition-transform active:scale-[0.98]`}
                           onClick={() => handleResetAnswer(activeExercise.id)}
                         >
                           {labels.resetAnswer}
                         </button>
                         <button
                           type="button"
-                          className="h-[var(--mobile-button-height)] rounded-[14px] bg-[#EDF2F7] px-[var(--mobile-space-xl)] text-[length:var(--mobile-font-body-sm)] font-bold text-[#2D3748] transition-transform active:scale-[0.98]"
+                          className={`${secondaryActionButtonClassName} transition-transform active:scale-[0.98]`}
                           onClick={() => onToggleAnswer(activeExercise.id)}
                         >
                           {showAnswerMap[activeExercise.id] ? labels.hideAnswer : labels.showAnswer}
                         </button>
                       </div>
 
-                      <p className="mt-[var(--mobile-space-xl)] text-[length:var(--mobile-font-meta)] text-[#718096]">
+                      <p className="mt-[var(--mobile-space-xl)] text-[length:var(--mobile-font-meta)] text-[var(--muted-foreground)]">
                         {labels.currentAttemptsLabel}：{activeAttemptCount} 次 | {labels.currentIncorrectLabel}：
                         {activeIncorrectCount} 次
                       </p>
@@ -697,11 +710,11 @@ export function ScenePracticeView({
                       ) : null}
 
                       {showAnswerMap[activeExercise.id] ? (
-                        <div className="mt-[var(--mobile-space-xl)] rounded-[12px] bg-[#F8FAFC] p-[var(--mobile-space-xl)] text-left">
-                          <p className="text-[length:var(--mobile-font-meta)] font-bold uppercase tracking-[0.12em] text-[#94A3B8]">
+                        <div className="mt-[var(--mobile-space-xl)] rounded-[12px] bg-[var(--app-surface-subtle)] p-[var(--mobile-space-xl)] text-left">
+                          <p className="text-[length:var(--mobile-font-meta)] font-bold uppercase tracking-[0.12em] text-[var(--muted-foreground)]">
                             {labels.answerLabel}
                           </p>
-                          <p className="mt-2 text-[length:var(--mobile-font-body)] font-semibold text-[#1A365D]">
+                          <p className="mt-2 text-[length:var(--mobile-font-body)] font-semibold text-foreground">
                             {getExerciseCanonicalAnswer(activeExercise)}
                           </p>
                         </div>
@@ -710,24 +723,24 @@ export function ScenePracticeView({
                   ) : null}
                 </>
               ) : (
-                <p className="py-[clamp(32px,8vw,40px)] text-[length:var(--mobile-font-body-sm)] text-[#64748B]">{labels.finishQuestionSet}</p>
+                <p className="py-[clamp(32px,8vw,40px)] text-[length:var(--mobile-font-body-sm)] text-[var(--muted-foreground)]">{labels.finishQuestionSet}</p>
               )}
           </section>
 
           <section className={`p-[var(--mobile-space-xl)] ${softPanelClassName}`}>
-            <div className="flex items-center justify-between gap-[var(--mobile-space-md)] text-[length:var(--mobile-font-body-sm)] font-bold text-[#1E293B]">
+            <div className="flex items-center justify-between gap-[var(--mobile-space-md)] text-[length:var(--mobile-font-body-sm)] font-bold text-foreground">
               <span>📊 本轮进度</span>
-              <span className="text-[#3B82F6]">
+              <span className="text-[var(--app-scene-panel-accent)]">
                 关键词 {sentenceMilestoneSummary.keywordCount} | 骨架 {sentenceMilestoneSummary.structureCount} |
                 复现 {sentenceMilestoneSummary.completeCount}
               </span>
             </div>
-            <p className="mt-2 border-t border-[#F1F5F9] pt-2 text-center text-[length:var(--mobile-font-caption)] text-[#64748B]">
+            <p className="mt-2 border-t border-[var(--app-border-soft)] pt-2 text-center text-[length:var(--mobile-font-caption)] text-[var(--muted-foreground)]">
               完成当前题型所有题目后自动解锁下一题型
             </p>
           </section>
 
-          <section className="px-1 text-[length:var(--mobile-font-meta)] text-[#64748B]">
+          <section className="px-1 text-[length:var(--mobile-font-meta)] text-[var(--muted-foreground)]">
             <div className="flex items-center justify-between gap-[var(--mobile-space-md)]">
               <span>📋 当前题型进度：{correctCount}/{typingCount}</span>
               <span>✅ 提交次数：{overallAttempts}</span>
@@ -740,26 +753,26 @@ export function ScenePracticeView({
 
             {practiceSet && summaryAllModulesCompleted ? (
               <section className={`p-[var(--mobile-space-xl)] ${panelClassName}`}>
-                  <div className="flex items-center gap-[var(--mobile-space-sm)] text-[#1A365D]">
+                  <div className="flex items-center gap-[var(--mobile-space-sm)] text-foreground">
                     <CheckCircle2 className="size-4" />
                     <p className="text-[length:var(--mobile-font-body-sm)] font-bold">{labels.summaryTitle}</p>
                   </div>
-                  <div className="mt-[var(--mobile-space-xl)] space-y-[var(--mobile-space-sm)] text-[length:var(--mobile-font-body-sm)] text-[#64748B]">
+                  <div className="mt-[var(--mobile-space-xl)] space-y-[var(--mobile-space-sm)] text-[length:var(--mobile-font-body-sm)] text-[var(--muted-foreground)]">
                     <p>
                       {labels.summaryCompleted}：
-                      <span className="font-semibold text-[#1A365D]">
+                      <span className="font-semibold text-foreground">
                         {overallCorrectCount}/{overallTypingCount}
                       </span>
                     </p>
                     <p>
                       {labels.summaryAttempts}：
-                      <span className="font-semibold text-[#1A365D]">{overallAttempts}</span>
+                      <span className="font-semibold text-foreground">{overallAttempts}</span>
                     </p>
                     <p>
                       {labels.summaryIncorrect}：
-                      <span className="font-semibold text-[#1A365D]">{overallIncorrectAttempts}</span>
+                      <span className="font-semibold text-foreground">{overallIncorrectAttempts}</span>
                     </p>
-                    <p className="pt-1 font-semibold text-[#1A365D]">{labels.summaryMistakeChunks}</p>
+                    <p className="pt-1 font-semibold text-foreground">{labels.summaryMistakeChunks}</p>
                     {incorrectExercisesAcrossModules.length === 0 ? (
                       <>
                         <p>{labels.summaryNoMistakes}</p>
@@ -768,7 +781,7 @@ export function ScenePracticeView({
                           {isCompletedPractice ? (
                             <button
                               type="button"
-                              className="rounded-full bg-[#EDF2F7] px-[var(--mobile-space-xl)] py-[var(--mobile-space-sm)] text-[length:var(--mobile-font-body-sm)] font-semibold text-[#334155]"
+                              className={secondaryActionButtonClassName}
                               onClick={() => onRepeatPractice?.()}
                             >
                               {labels.summaryRepeatAction}
@@ -776,7 +789,7 @@ export function ScenePracticeView({
                           ) : null}
                           <button
                             type="button"
-                            className="rounded-full bg-[#1A365D] px-[var(--mobile-space-xl)] py-[var(--mobile-space-sm)] text-[length:var(--mobile-font-body-sm)] font-semibold text-white"
+                            className={primaryActionButtonClassName}
                             onClick={onOpenVariants}
                           >
                             {labels.summaryVariantAction}
@@ -804,7 +817,7 @@ export function ScenePracticeView({
                           {isCompletedPractice ? (
                             <button
                               type="button"
-                              className="rounded-full bg-[#EDF2F7] px-[var(--mobile-space-xl)] py-[var(--mobile-space-sm)] text-[length:var(--mobile-font-body-sm)] font-semibold text-[#334155]"
+                              className={secondaryActionButtonClassName}
                               onClick={() => onRepeatPractice?.()}
                             >
                               {labels.summaryRepeatAction}
@@ -812,7 +825,7 @@ export function ScenePracticeView({
                           ) : null}
                           <button
                             type="button"
-                            className="rounded-full bg-[#1A365D] px-[var(--mobile-space-xl)] py-[var(--mobile-space-sm)] text-[length:var(--mobile-font-body-sm)] font-semibold text-white"
+                            className={primaryActionButtonClassName}
                             onClick={onReviewScene}
                           >
                             {labels.summaryReviewAction}
@@ -828,8 +841,8 @@ export function ScenePracticeView({
 
         {practiceSet ? (
           <details className={`p-[var(--mobile-space-xl)] ${panelClassName}`}>
-            <summary className="cursor-pointer text-[length:var(--mobile-font-body-sm)] font-semibold text-[#1A365D]">练习调试视图</summary>
-            <div className="mt-[var(--mobile-space-md)] space-y-[var(--mobile-space-sm)] text-[length:var(--mobile-font-caption)] text-[#64748B]">
+            <summary className="cursor-pointer text-[length:var(--mobile-font-body-sm)] font-semibold text-foreground">练习调试视图</summary>
+            <div className="mt-[var(--mobile-space-md)] space-y-[var(--mobile-space-sm)] text-[length:var(--mobile-font-caption)] text-[var(--muted-foreground)]">
               <p>practiceSetId: {practiceSet.id}</p>
               <p>sourceType: {practiceSet.sourceType}</p>
               <p>当前模块: {activeModule?.mode ?? "-"}</p>

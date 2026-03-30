@@ -80,7 +80,7 @@ export function FocusDetailActions({
   if (!show) return <div />;
 
   const menuItemClassName =
-    "flex w-full items-center rounded-[var(--mobile-adapt-overlay-card-radius)] px-[var(--mobile-adapt-space-md)] py-[var(--mobile-adapt-space-sm)] text-left text-[length:var(--mobile-adapt-font-body-sm)] text-[#1F4F6E] transition hover:bg-[#EEF3FA] disabled:text-muted-foreground";
+    "flex w-full items-center rounded-[var(--mobile-adapt-overlay-card-radius)] px-[var(--mobile-adapt-space-md)] py-[var(--mobile-adapt-space-sm)] text-left text-[length:var(--mobile-adapt-font-body-sm)] text-[var(--app-chunks-sheet-body)] transition hover:bg-[var(--app-chunks-sheet-info-soft)] disabled:text-muted-foreground";
 
   return (
     <div className="relative">
@@ -89,8 +89,8 @@ export function FocusDetailActions({
         variant="ghost"
         className={
           compactTrigger
-            ? `${appleButtonClassName} h-[var(--mobile-adapt-button-height)] w-[var(--mobile-adapt-button-height)] rounded-[var(--mobile-adapt-overlay-card-radius)] border-0 bg-[#EDF2F7] px-0 text-[#2C5A7A] shadow-none hover:bg-[#E4ECF6]`
-            : `${appleButtonClassName} h-[var(--mobile-adapt-control-height)] rounded-full border border-[#E6EDF6] bg-[#F0F4FC] px-[var(--mobile-adapt-space-lg)] text-[length:var(--mobile-adapt-font-body-sm)] text-[#2C5A7A] shadow-none hover:bg-[#E4ECF6]`
+            ? `${appleButtonClassName} h-[var(--mobile-adapt-button-height)] w-[var(--mobile-adapt-button-height)] rounded-[var(--mobile-adapt-overlay-card-radius)] border-0 bg-[var(--app-chunks-sheet-secondary-bg)] px-0 text-[var(--app-chunks-sheet-secondary-text)] shadow-none hover:bg-[var(--app-chunks-sheet-secondary-hover)]`
+            : `${appleButtonClassName} h-[var(--mobile-adapt-control-height)] rounded-full border border-[var(--app-chunks-sheet-secondary-border)] bg-[var(--app-chunks-sheet-info-soft)] px-[var(--mobile-adapt-space-lg)] text-[length:var(--mobile-adapt-font-body-sm)] text-[var(--app-chunks-sheet-secondary-text)] shadow-none hover:bg-[var(--app-chunks-sheet-secondary-hover)]`
         }
         onClick={onToggleOpen}
         aria-expanded={open}

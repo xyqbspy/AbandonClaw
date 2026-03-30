@@ -73,6 +73,83 @@
   --app-button-secondary-bg: #ffffff;
   --app-button-secondary-text: #1d1d1f;
   --app-button-secondary-border: rgba(142, 154, 175, 0.16);
+  --app-feedback-info-bg: color-mix(in srgb, #e8f2ff 82%, white 18%);
+  --app-feedback-info-border: color-mix(in srgb, #007aff 18%, transparent 82%);
+  --app-feedback-info-text: #1d1d1f;
+  --app-feedback-success-bg: color-mix(in srgb, #dff4e3 82%, white 18%);
+  --app-feedback-success-border: color-mix(in srgb, #15803d 18%, transparent 82%);
+  --app-feedback-success-text: #14532d;
+  --app-feedback-warning-bg: color-mix(in srgb, #fff4d6 82%, white 18%);
+  --app-feedback-warning-border: color-mix(in srgb, #d97706 20%, transparent 80%);
+  --app-feedback-warning-text: #92400e;
+  --app-feedback-danger-bg: color-mix(in srgb, #fde8e8 84%, white 16%);
+  --app-feedback-danger-border: color-mix(in srgb, oklch(0.62 0.2 24) 18%, transparent 82%);
+  --app-feedback-danger-text: oklch(0.62 0.2 24);
+  --app-scene-card-bg: #ffffff;
+  --app-scene-card-meta-bg: #f2f2f7;
+  --app-scene-card-meta-text: #636366;
+  --app-scene-card-subtitle: #86868b;
+  --app-scene-card-progress: #1d1d1f;
+  --app-scene-status-not-started: #86868b;
+  --app-scene-status-in-progress: #007aff;
+  --app-scene-status-completed: #34c759;
+  --app-scene-status-paused: #ff9500;
+  --app-scene-delete-start: #ff5d55;
+  --app-scene-delete-end: #ff3b30;
+  --app-scene-panel-bg: rgba(255, 255, 255, 0.82);
+  --app-scene-panel-border: rgba(255, 255, 255, 0.35);
+  --app-scene-panel-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+  --app-scene-panel-accent-soft: #e5f1ff;
+  --app-scene-panel-accent: #007aff;
+  --app-scene-panel-muted: #86868b;
+  --app-scene-panel-track: #e5e5ea;
+  --app-scene-panel-pending-border: #c7c7cc;
+  --app-scene-panel-cta-disabled: #d0d7e2;
+  --app-chunks-hero-bg: #ffffff;
+  --app-chunks-hero-border: rgba(255, 255, 255, 0.9);
+  --app-chunks-hero-shadow: 0 8px 20px rgba(0, 0, 0, 0.04);
+  --app-chunks-hero-icon-start: #38b2ac;
+  --app-chunks-hero-icon-end: #2c7a7b;
+  --app-chunks-hero-title: #1f5e7e;
+  --app-chunks-hero-subtitle: #718096;
+  --app-chunks-search-bg: #f1f5f9;
+  --app-chunks-search-text: #4a5568;
+  --app-chunks-search-placeholder: #718096;
+  --app-chunks-search-icon: #718096;
+  --app-chunks-search-ring: #cbd5e1;
+  --app-chunks-entry-accent-bg: #e6fffa;
+  --app-chunks-entry-accent-hover: #d8faf3;
+  --app-chunks-entry-accent-text: #2c7a7b;
+  --app-chunks-section-title: #4a5568;
+  --app-chunks-sheet-bg: #f2f2f7;
+  --app-chunks-sheet-card-bg: #ffffff;
+  --app-chunks-sheet-card-border: #e6edf6;
+  --app-chunks-sheet-card-shadow: 0 20px 40px -10px rgba(49, 130, 206, 0.15);
+  --app-chunks-sheet-title: #1a365d;
+  --app-chunks-sheet-body: #2c4f6e;
+  --app-chunks-sheet-muted: #718096;
+  --app-chunks-sheet-subtitle: #7c97b0;
+  --app-chunks-sheet-secondary-text: #2c5a7a;
+  --app-chunks-sheet-secondary-bg: #edf2f7;
+  --app-chunks-sheet-secondary-hover: #e4ecf6;
+  --app-chunks-sheet-secondary-border: #e6edf6;
+  --app-chunks-sheet-primary-bg: #1a365d;
+  --app-chunks-sheet-primary-hover: #132a46;
+  --app-chunks-sheet-primary-text: #ffffff;
+  --app-chunks-sheet-primary-shadow: 0 10px 25px rgba(26, 54, 93, 0.2);
+  --app-chunks-sheet-info-soft: #eef3fc;
+  --app-chunks-sheet-info-bg: #f0f6fe;
+  --app-chunks-sheet-info-border: #dce8f5;
+  --app-chunks-sheet-info-text: #2c6e9e;
+  --app-chunks-sheet-badge-soft: #f3f7fb;
+  --app-chunks-sheet-badge-text: #5b7f9e;
+  --app-chunks-sheet-success-soft: #f0fff4;
+  --app-chunks-sheet-success-hover: #e6fffa;
+  --app-chunks-sheet-success-text: #38a169;
+  --app-chunks-sheet-warning-bg: #fef8e7;
+  --app-chunks-sheet-warning-border: #e7b85e;
+  --app-chunks-sheet-warning-text: #b8772e;
+  --app-chunks-sheet-warning-body: #7a5d3a;
   --app-radius-pill: 999px;
   --app-radius-card: 1.25rem;
   --app-radius-panel: 1rem;
@@ -120,6 +197,83 @@
   --app-button-secondary-bg: oklch(0.28 0.02 250);
   --app-button-secondary-text: oklch(0.97 0.008 95);
   --app-button-secondary-border: rgba(255, 255, 255, 0.08);
+  --app-feedback-info-bg: color-mix(in srgb, #1a2a40 72%, transparent 28%);
+  --app-feedback-info-border: color-mix(in srgb, #4da3ff 36%, transparent 64%);
+  --app-feedback-info-text: oklch(0.97 0.008 95);
+  --app-feedback-success-bg: color-mix(in srgb, #123221 72%, transparent 28%);
+  --app-feedback-success-border: color-mix(in srgb, #5bd37f 36%, transparent 64%);
+  --app-feedback-success-text: #c8f7d3;
+  --app-feedback-warning-bg: color-mix(in srgb, #3b2c14 72%, transparent 28%);
+  --app-feedback-warning-border: color-mix(in srgb, #ffb347 38%, transparent 62%);
+  --app-feedback-warning-text: #ffe0a6;
+  --app-feedback-danger-bg: color-mix(in srgb, #3a1717 74%, transparent 26%);
+  --app-feedback-danger-border: color-mix(in srgb, #ff6b63 36%, transparent 64%);
+  --app-feedback-danger-text: #ffd1cd;
+  --app-scene-card-bg: oklch(0.29 0.02 250);
+  --app-scene-card-meta-bg: oklch(0.34 0.02 250);
+  --app-scene-card-meta-text: oklch(0.8 0.01 95);
+  --app-scene-card-subtitle: oklch(0.74 0.01 95);
+  --app-scene-card-progress: oklch(0.97 0.008 95);
+  --app-scene-status-not-started: oklch(0.72 0.01 95);
+  --app-scene-status-in-progress: #4da3ff;
+  --app-scene-status-completed: #5bd37f;
+  --app-scene-status-paused: #ffb347;
+  --app-scene-delete-start: #ff6b63;
+  --app-scene-delete-end: #ff5448;
+  --app-scene-panel-bg: color-mix(in srgb, var(--app-surface) 88%, transparent 12%);
+  --app-scene-panel-border: rgba(255, 255, 255, 0.14);
+  --app-scene-panel-shadow: 0 12px 34px rgba(0, 0, 0, 0.28);
+  --app-scene-panel-accent-soft: color-mix(in srgb, var(--app-scene-status-in-progress) 18%, transparent 82%);
+  --app-scene-panel-accent: var(--app-scene-status-in-progress);
+  --app-scene-panel-muted: oklch(0.78 0.01 95);
+  --app-scene-panel-track: oklch(0.42 0.02 250);
+  --app-scene-panel-pending-border: oklch(0.56 0.01 250);
+  --app-scene-panel-cta-disabled: oklch(0.42 0.02 250);
+  --app-chunks-hero-bg: oklch(0.29 0.02 250);
+  --app-chunks-hero-border: rgba(255, 255, 255, 0.08);
+  --app-chunks-hero-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
+  --app-chunks-hero-icon-start: #45c4bd;
+  --app-chunks-hero-icon-end: #2f8a8b;
+  --app-chunks-hero-title: oklch(0.94 0.01 95);
+  --app-chunks-hero-subtitle: oklch(0.78 0.01 95);
+  --app-chunks-search-bg: oklch(0.34 0.02 250);
+  --app-chunks-search-text: oklch(0.93 0.01 95);
+  --app-chunks-search-placeholder: oklch(0.76 0.01 95);
+  --app-chunks-search-icon: oklch(0.76 0.01 95);
+  --app-chunks-search-ring: color-mix(in srgb, #4da3ff 32%, transparent 68%);
+  --app-chunks-entry-accent-bg: color-mix(in srgb, #12352f 82%, transparent 18%);
+  --app-chunks-entry-accent-hover: color-mix(in srgb, #18443c 84%, transparent 16%);
+  --app-chunks-entry-accent-text: #8be3dc;
+  --app-chunks-section-title: oklch(0.9 0.01 95);
+  --app-chunks-sheet-bg: oklch(0.24 0.02 250);
+  --app-chunks-sheet-card-bg: oklch(0.29 0.02 250);
+  --app-chunks-sheet-card-border: rgba(255, 255, 255, 0.08);
+  --app-chunks-sheet-card-shadow: 0 16px 34px rgba(0, 0, 0, 0.22);
+  --app-chunks-sheet-title: oklch(0.96 0.008 95);
+  --app-chunks-sheet-body: oklch(0.9 0.01 95);
+  --app-chunks-sheet-muted: oklch(0.78 0.01 95);
+  --app-chunks-sheet-subtitle: oklch(0.72 0.01 95);
+  --app-chunks-sheet-secondary-text: oklch(0.93 0.01 95);
+  --app-chunks-sheet-secondary-bg: oklch(0.36 0.02 250);
+  --app-chunks-sheet-secondary-hover: oklch(0.4 0.02 250);
+  --app-chunks-sheet-secondary-border: rgba(255, 255, 255, 0.08);
+  --app-chunks-sheet-primary-bg: #2b5ea8;
+  --app-chunks-sheet-primary-hover: #244e8b;
+  --app-chunks-sheet-primary-text: #ffffff;
+  --app-chunks-sheet-primary-shadow: 0 10px 25px rgba(43, 94, 168, 0.26);
+  --app-chunks-sheet-info-soft: color-mix(in srgb, #4da3ff 14%, transparent 86%);
+  --app-chunks-sheet-info-bg: color-mix(in srgb, #4da3ff 18%, transparent 82%);
+  --app-chunks-sheet-info-border: color-mix(in srgb, #4da3ff 28%, transparent 72%);
+  --app-chunks-sheet-info-text: #b8dbff;
+  --app-chunks-sheet-badge-soft: color-mix(in srgb, #4da3ff 10%, transparent 90%);
+  --app-chunks-sheet-badge-text: #d8ebff;
+  --app-chunks-sheet-success-soft: color-mix(in srgb, #5bd37f 14%, transparent 86%);
+  --app-chunks-sheet-success-hover: color-mix(in srgb, #5bd37f 18%, transparent 82%);
+  --app-chunks-sheet-success-text: #c8f7d3;
+  --app-chunks-sheet-warning-bg: color-mix(in srgb, #ffb347 18%, transparent 82%);
+  --app-chunks-sheet-warning-border: color-mix(in srgb, #ffb347 34%, transparent 66%);
+  --app-chunks-sheet-warning-text: #ffd79a;
+  --app-chunks-sheet-warning-body: #ffe7bf;
 }
 
 @layer base {
@@ -223,20 +377,77 @@
   }
 
   .app-banner-info {
-    background: var(--app-surface);
-    color: var(--foreground);
+    background: var(--app-feedback-info-bg);
+    border-color: var(--app-feedback-info-border);
+    color: var(--app-feedback-info-text);
   }
 
   .app-banner-success {
-    background: color-mix(in srgb, #dff4e3 82%, white 18%);
-    border-color: color-mix(in srgb, #15803d 18%, transparent 82%);
-    color: var(--foreground);
+    background: var(--app-feedback-success-bg);
+    border-color: var(--app-feedback-success-border);
+    color: var(--app-feedback-success-text);
+  }
+
+  .app-banner-warning {
+    background: var(--app-feedback-warning-bg);
+    border-color: var(--app-feedback-warning-border);
+    color: var(--app-feedback-warning-text);
   }
 
   .app-banner-danger {
-    background: color-mix(in srgb, #fde8e8 84%, white 16%);
-    border-color: color-mix(in srgb, oklch(0.62 0.2 24) 18%, transparent 82%);
-    color: var(--destructive);
+    background: var(--app-feedback-danger-bg);
+    border-color: var(--app-feedback-danger-border);
+    color: var(--app-feedback-danger-text);
+  }
+
+  .app-badge {
+    display: inline-flex;
+    align-items: center;
+    border-radius: var(--app-radius-pill);
+    border: 1px solid transparent;
+    font-weight: 600;
+  }
+
+  .app-badge-subtle {
+    background: var(--app-chunks-sheet-badge-soft);
+    border-color: var(--app-chunks-sheet-secondary-border);
+    color: var(--app-chunks-sheet-badge-text);
+  }
+
+  .app-badge-info {
+    background: var(--app-chunks-sheet-info-soft);
+    border-color: var(--app-chunks-sheet-info-border);
+    color: var(--app-chunks-sheet-info-text);
+  }
+
+  .app-badge-success {
+    background: var(--app-chunks-sheet-success-soft);
+    border-color: color-mix(in srgb, var(--app-chunks-sheet-success-text) 28%, transparent 72%);
+    color: var(--app-chunks-sheet-success-text);
+  }
+
+  .app-badge-warning {
+    background: var(--app-feedback-warning-bg);
+    border-color: var(--app-feedback-warning-border);
+    color: var(--app-feedback-warning-text);
+  }
+
+  .app-panel-info {
+    background: var(--app-chunks-sheet-info-bg);
+    border: 1px solid var(--app-chunks-sheet-info-border);
+    color: var(--app-chunks-sheet-body);
+  }
+
+  .app-panel-success {
+    background: var(--app-feedback-success-bg);
+    border: 1px solid var(--app-feedback-success-border);
+    color: var(--app-feedback-success-text);
+  }
+
+  .app-panel-warning {
+    background: var(--app-chunks-sheet-warning-bg);
+    border: 1px solid var(--app-chunks-sheet-warning-border);
+    color: var(--app-chunks-sheet-warning-body);
   }
 
   .app-list-item {
