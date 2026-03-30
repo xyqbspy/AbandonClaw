@@ -226,7 +226,7 @@ export function FocusDetailSheet({
             completeAssistLabel={labels.completeAssist ?? "完成"}
           />
         }
-        footerClassName="!border-t-0 !bg-transparent px-[var(--mobile-adapt-space-overlay)] pb-[calc(env(safe-area-inset-bottom)+var(--mobile-adapt-space-overlay))] pt-[var(--mobile-adapt-space-sm)] [@media(max-height:760px)]:px-[var(--mobile-adapt-space-sheet)] [@media(max-height:760px)]:pb-[calc(env(safe-area-inset-bottom)+var(--mobile-adapt-space-md))] [@media(max-height:760px)]:pt-[var(--mobile-adapt-space-2xs)]"
+        footerClassName="border-t border-[var(--app-border-soft)] !bg-white p-4"
       >
         {detail ? (
           <FocusDetailContent

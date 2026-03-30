@@ -1,0 +1,39 @@
+schema: spec-driven
+context: |
+  项目类型: 面向中文学习者的英语学习产品，采用场景学习驱动。
+  技术栈: Next.js 16 App Router、React 19、TypeScript、Tailwind CSS 4、Supabase、Sonner、lucide-react。
+  产品闭环: scenes -> scene 学习 -> chunks 沉淀 -> review 复习 -> today/progress 汇总。
+  主要目录:
+    - src/app/(app): 页面路由与页面级编排
+    - src/features: 功能模块、组件、selectors、controller、labels
+    - src/lib/server: 服务端领域服务、数据聚合、AI/缓存/学习链路
+    - src/lib/cache: 前端缓存与预取
+    - supabase/sql: 数据库演进脚本
+  页面约定:
+    - page.tsx 保持薄，只做路由、状态编排和组装
+    - 派生逻辑优先放 selectors/logic
+    - 动作判断优先放 controller/actions
+    - 复杂 UI 放独立组件并补相应测试
+  工程约定:
+    - 所有说明与输出使用中文
+    - 统一使用 UTF-8
+    - 优先小而明确、可维护、可测试的实现
+    - 每次实际改动后都要更新根目录 CHANGELOG.md
+  测试约定:
+    - *.test.ts 主要覆盖纯逻辑
+    - *.test.tsx 主要覆盖交互和 DOM
+    - 变更时优先跑受影响链路的测试，再评估是否需要更大范围回归
+
+rules:
+  proposal:
+    - 先写清改动背景、目标、非目标和受影响链路。
+    - 明确这次改动会触达哪些页面、服务、缓存、测试或数据库层。
+  spec:
+    - Requirement 要写成稳定规则，不写临时实现细节。
+    - Scenario 要覆盖用户视角或维护视角下的关键行为。
+  design:
+    - 先描述现有链路，再说明拟修改点，避免只讲局部补丁。
+    - 明确数据流、状态流、缓存影响和回归风险。
+  tasks:
+    - 任务必须包含测试校验。
+    - 任务必须包含 CHANGELOG.md 更新。

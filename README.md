@@ -73,7 +73,35 @@ This creates:
   - fallback to GLM call
   - write back to DB
 
-## 5.1) Testing
+## 5.1) OpenSpec Maintenance Workflow
+
+This repo now includes OpenSpec for brownfield maintenance and change control.
+
+Key paths:
+
+- `openspec/config.yaml`
+- `openspec/specs/`
+- `openspec/changes/`
+- `docs/project-maintenance-playbook.md`
+- `docs/openspec-workflow.md`
+- `CHANGELOG.md`
+
+Recommended workflow:
+
+```bash
+pnpm run spec:list
+pnpm run spec:validate
+node_modules\\.bin\\openspec.CMD new change <change-name>
+```
+
+Rules:
+
+- Use OpenSpec first for non-trivial changes affecting behavior, data flow, cache, tests, or cross-page UI consistency.
+- After every real code or documentation change, update `CHANGELOG.md`.
+- Prefer reading `docs/project-maintenance-playbook.md` before touching `scene`, `chunks`, `review`, or `today` flows.
+- Before archiving a change, check `docs/openspec-workflow.md`.
+
+## 5.2) Testing
 
 Run:
 

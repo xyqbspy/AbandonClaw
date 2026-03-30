@@ -15,3 +15,4 @@ Use `apply_patch` for precise changes whenever possible, and avoid large-scale r
 - 做之前需要考虑全流程功能逻辑，不能按惯性去做。
 - 任何改动都要评估功能连续性，避免只修局部导致链路断裂。
 - 任何改动都要考虑测试影响：已有测试是否需要更新，是否需要补充回归测试，是否会引入未覆盖风险。
+- 每次完成实际改动后，都要同步维护根目录 `CHANGELOG.md`，记录本次变更内容、影响范围、验证情况与日期，方便回溯。

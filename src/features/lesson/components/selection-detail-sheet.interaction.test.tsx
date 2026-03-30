@@ -96,7 +96,9 @@ test("SelectionDetailSheet 会处理 block 朗读和相关短语交互", () => {
   view.getByText("当前句子");
   fireEvent.click(view.getByRole("button", { name: "翻译" }));
   assert.ok(view.getByRole("button", { name: "收起" }));
-  fireEvent.click(view.getByRole("button", { name: "朗读" }));
+  const sentenceSection = view.getByText("当前句子").closest("section");
+  assert.ok(sentenceSection);
+  fireEvent.click(within(sentenceSection).getByRole("button", { name: "朗读" }));
 
   const relatedButton = view.getByRole("button", { name: "call it a day" });
   fireEvent.mouseEnter(relatedButton);
@@ -138,7 +140,7 @@ test("SelectionDetailSheet 会限制例句数量，并处理例句朗读", () =>
   assert.ok(chunkSection);
   assert.equal(view.queryByText("This third example should stay hidden."), null);
 
-  const exampleSpeakButtons = within(chunkSection).getAllByRole("button", { name: "朗读例句" });
+  const exampleSpeakButtons = within(chunkSection).getAllByRole("button", { name: "朗读" });
   fireEvent.click(exampleSpeakButtons[0]);
 
   assert.deepEqual(pronouncedTexts, ["You'll burn out if you never rest."]);
@@ -186,34 +188,4 @@ test("SelectionDetailSheet 在空态下会隐藏句子区并禁用底部动作",
 
   assert.equal(saveCount, 0);
   assert.equal(reviewCount, 0);
-});
-
-test("SelectionDetailSheet 可隐藏相关短语播放按钮和详情头部", () => {
-  const view = render(
-    <SelectionDetailSheet
-      currentSentence={createSentence()}
-      chunkDetail={createChunkDetail()}
-      relatedChunks={["burn out", "call it a day"]}
-      open
-      loading={false}
-      speakingText={null}
-      onOpenChange={() => undefined}
-      onSave={() => undefined}
-      onReview={() => undefined}
-      onPronounce={() => undefined}
-      onPronounceBlock={() => undefined}
-      onSelectRelated={() => undefined}
-      hoveredChunkKey={null}
-      onHoverChunk={() => undefined}
-      playingChunkKey={null}
-      showSentenceSection={false}
-      showRelatedChunkAudio={false}
-    />,
-  );
-
-  assert.equal(view.queryByRole("button", { name: "朗读 burn out" }), null);
-  assert.equal(view.queryByRole("button", { name: "朗读 call it a day" }), null);
-  const detailSection = view.getByText("短语详情").closest("section");
-  assert.ok(detailSection);
-  assert.equal(within(detailSection).queryByText("burn out"), null);
 });

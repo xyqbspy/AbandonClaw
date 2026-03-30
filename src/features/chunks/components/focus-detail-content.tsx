@@ -252,8 +252,9 @@ export function FocusDetailContent({
                 onClick={() => onSpeak(detailSpeakText)}
                 label={labels.speakSentence}
                 ariaLabel={labels.speakSentence}
-                className="h-[var(--mobile-control-height)] rounded-full border border-[var(--app-chunks-sheet-secondary-border)] bg-[var(--app-chunks-sheet-info-soft)] px-[var(--mobile-space-xl)] text-[var(--app-chunks-sheet-secondary-text)] shadow-none hover:bg-[var(--app-chunks-sheet-secondary-hover)] [@media(max-height:760px)]:h-[var(--mobile-icon-button)] [@media(max-height:760px)]:px-[var(--mobile-space-md)] [@media(max-height:760px)]:text-[length:var(--mobile-font-caption)]"
+                className="size-[var(--mobile-control-height)] rounded-full border border-[var(--app-chunks-sheet-secondary-border)] bg-[var(--app-chunks-sheet-info-soft)] px-0 text-[var(--app-chunks-sheet-secondary-text)] shadow-none hover:bg-[var(--app-chunks-sheet-secondary-hover)] [@media(max-height:760px)]:size-[var(--mobile-icon-button)]"
                 iconClassName="size-4"
+                iconOnly
               />
             ) : null}
           </div>
@@ -294,26 +295,27 @@ export function FocusDetailContent({
           <div className="space-y-4 pb-6 [@media(max-height:760px)]:space-y-3 [@media(max-height:760px)]:pb-4">
             {retryingEnrichment ? (
               <div className="grid gap-4 sm:grid-cols-2">
-                {[labels.commonUsage, labels.typicalScenario, labels.semanticFocus, labels.reviewStage].map(
-                  (title) => (
-                    <DetailLoadingBlock key={title} title={title} />
-                  ),
-                )}
+                {[
+                  { title: labels.semanticFocus, icon: "🎯" },
+                  { title: labels.reviewStage, icon: "🪜" },
+                  { title: labels.commonUsage, icon: "💡" },
+                  { title: labels.typicalScenario, icon: "🧭" },
+                ].map(({ title, icon }) => (
+                  <DetailLoadingBlock key={title} title={title} icon={<span>{icon}</span>} />
+                ))}
               </div>
             ) : (
               <div className="space-y-4">
                 <DetailInfoBlock title={labels.semanticFocus} icon={<span>🎯</span>}>
-                  <div className="rounded-[var(--mobile-adapt-overlay-card-radius)] bg-[var(--app-chunks-sheet-info-bg)] px-[var(--mobile-adapt-space-xl)] py-[var(--mobile-adapt-space-lg)]">
-                    <p className={BODY_CLASS}>{semanticFocus || labels.semanticFocusPending}</p>
-                  </div>
+                  <p className={BODY_CLASS}>{semanticFocus || labels.semanticFocusPending}</p>
                 </DetailInfoBlock>
-                <DetailStageBlock title={labels.reviewStage}>
+                <DetailStageBlock title={labels.reviewStage} icon={<span>🪜</span>}>
                   {reviewHint || labels.reviewHintFallback}
                 </DetailStageBlock>
-                <DetailInfoBlock title={labels.commonUsage}>
+                <DetailInfoBlock title={labels.commonUsage} icon={<span>💡</span>}>
                   <p className={BODY_CLASS}>{usageHint || labels.usageHintFallback}</p>
                 </DetailInfoBlock>
-                <DetailInfoBlock title={labels.typicalScenario}>
+                <DetailInfoBlock title={labels.typicalScenario} icon={<span>🧭</span>}>
                   <p className={BODY_CLASS}>{typicalScenario || labels.typicalScenarioPending}</p>
                 </DetailInfoBlock>
               </div>

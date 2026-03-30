@@ -17,6 +17,7 @@ type TtsActionButtonProps = {
   size?: "sm" | "default" | "icon" | "icon-sm";
   className?: string;
   iconClassName?: string;
+  iconOnly?: boolean;
 };
 
 export function TtsActionButton({
@@ -31,6 +32,7 @@ export function TtsActionButton({
   size = "sm",
   className,
   iconClassName,
+  iconOnly = false,
 }: TtsActionButtonProps) {
   const resolvedLabel = loading ? loadingLabel : active ? activeLabel : label;
 
@@ -50,7 +52,7 @@ export function TtsActionButton({
           className={cn("size-3.5", active && "animate-pulse text-primary", iconClassName)}
         />
       )}
-      {resolvedLabel}
+      {iconOnly ? null : resolvedLabel}
     </Button>
   );
 }

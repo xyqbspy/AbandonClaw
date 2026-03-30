@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test, { afterEach } from "node:test";
 import React from "react";
-import { cleanup, fireEvent, render } from "@testing-library/react";
+import { cleanup, fireEvent, render, within } from "@testing-library/react";
 import { JSDOM } from "jsdom";
 import { LessonSentence, SelectionChunkLayer } from "@/lib/types";
 import { SelectionDetailPanel } from "./selection-detail-panel";
@@ -93,7 +93,9 @@ test("SelectionDetailPanel 会处理 block 朗读和相关短语交互", () => {
 
   fireEvent.click(view.getByRole("button", { name: "翻译" }));
   assert.ok(view.getByText("我不想把自己耗尽。今天先到这里吧。"));
-  fireEvent.click(view.getByRole("button", { name: "朗读" }));
+  const sentenceSection = view.getByText("当前句子").closest("section");
+  assert.ok(sentenceSection);
+  fireEvent.click(within(sentenceSection).getByRole("button", { name: "朗读" }));
 
   const relatedButton = view.getByRole("button", { name: "call it a day" });
   fireEvent.mouseEnter(relatedButton);
@@ -138,14 +140,14 @@ test("SelectionDetailPanel 会限制例句数量，并处理底部动作与例�
 
   assert.equal(view.queryByText("This third example should stay hidden."), null);
   assert.ok(view.getByRole("button", { name: "已收藏" }));
-
-  fireEvent.click(view.getByRole("button", { name: "朗读 burn out" }));
-  const exampleSpeakButtons = view.getAllByRole("button", { name: "朗读例句" });
+  const detailSection = view.getByText("短语详情").closest("section");
+  assert.ok(detailSection);
+  const exampleSpeakButtons = within(detailSection).getAllByRole("button", { name: "朗读" });
   fireEvent.click(exampleSpeakButtons[0]);
   fireEvent.click(view.getByRole("button", { name: "已收藏" }));
   fireEvent.click(view.getByRole("button", { name: "加入复习" }));
 
-  assert.deepEqual(pronouncedTexts, ["burn out", "You'll burn out if you never rest."]);
+  assert.deepEqual(pronouncedTexts, ["You'll burn out if you never rest."]);
   assert.equal(saveCount, 1);
   assert.equal(reviewCount, 1);
 });

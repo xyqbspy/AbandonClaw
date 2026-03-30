@@ -20,10 +20,13 @@
     "phrases:enrich-missing": "npx tsx scripts/enrich-missing-phrases.ts",
     "scenes:repair-duplicate-sentences": "npx tsx scripts/repair-generated-scene-duplicate-sentences.ts",
     "tts:warmup": "node scripts/warmup-tts.mjs",
-    "tts:warmup:scene-full": "node scripts/warmup-scene-full-tts.mjs"
+    "tts:warmup:scene-full": "node scripts/warmup-scene-full-tts.mjs",
+    "spec:list": "openspec list --specs",
+    "spec:validate": "openspec validate --specs --strict --no-interactive"
   },
   "dependencies": {
     "@base-ui/react": "^1.2.0",
+    "@fission-ai/openspec": "^1.2.0",
     "@supabase/ssr": "^0.9.0",
     "@supabase/supabase-js": "^2.98.0",
     "class-variance-authority": "^0.7.1",
