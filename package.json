@@ -10,6 +10,7 @@
     "test": "pnpm run test:unit",
     "test:unit": "node --import tsx --test src/**/*.test.ts",
     "test:interaction": "node --import tsx --import ./src/test/setup-dom.ts --test src/**/*.test.tsx",
+    "test:interaction:cache-refresh": "node --import tsx --import ./src/test/setup-dom.ts --test \"src/components/layout/pull-to-refresh.test.tsx\" \"src/app/(app)/scenes/page.interaction.test.tsx\" \"src/app/(app)/review/page.interaction.test.tsx\" \"src/app/(app)/chunks/page.interaction.test.tsx\" \"src/app/(app)/chunks/use-chunks-list-data.test.tsx\"",
     "test:all": "pnpm run test:unit && pnpm run test:interaction",
     "text:check-mojibake": "node --import tsx scripts/check-mojibake.ts",
     "phrases:infer-relations": "npx tsx scripts/infer-missing-phrase-relations.ts",

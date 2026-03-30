@@ -10,6 +10,13 @@ const nodeModule = localRequire("node:module") as typeof import("node:module");
 const routerPushCalls: string[] = [];
 const routerPrefetchCalls: string[] = [];
 const detailPrefetchCalls: string[] = [];
+const getScenesCallOptions: Array<{ noStore?: boolean } | undefined> = [];
+let clearSceneListCacheCalls = 0;
+let importSceneCalls = 0;
+let deleteSceneCalls = 0;
+let generatedSceneCalls = 0;
+let importSceneError: Error | null = null;
+let deleteSceneError: Error | null = null;
 let detailPrefetchImpl = async (slug: string) => {
   detailPrefetchCalls.push(slug);
   return true;
@@ -66,15 +73,48 @@ const mockedModules = {
     },
   },
   "@/components/scenes/generate-scene-sheet": {
-    GenerateSceneSheet: () => null,
+    GenerateSceneSheet: ({
+      open,
+      onGenerated,
+    }: {
+      open: boolean;
+      onGenerated: (scene: { slug: string; title: string }) => Promise<void> | void;
+    }) =>
+      open
+        ? (
+            <button
+              type="button"
+              onClick={() => {
+                generatedSceneCalls += 1;
+                void onGenerated({
+                  slug: "generated-scene",
+                  title: "Generated Scene",
+                });
+              }}
+            >
+              触发生成成功
+            </button>
+          )
+        : null,
   },
   "@/lib/utils/scenes-api": {
-    getScenesFromApi: async () => sceneList,
-    importSceneFromApi: async () => undefined,
-    deleteSceneBySlugFromApi: async () => undefined,
+    getScenesFromApi: async (options?: { noStore?: boolean }) => {
+      getScenesCallOptions.push(options);
+      return sceneList;
+    },
+    importSceneFromApi: async () => {
+      importSceneCalls += 1;
+      if (importSceneError) throw importSceneError;
+    },
+    deleteSceneBySlugFromApi: async () => {
+      deleteSceneCalls += 1;
+      if (deleteSceneError) throw deleteSceneError;
+    },
   },
   "@/lib/cache/scene-list-cache": {
-    clearSceneListCache: async () => undefined,
+    clearSceneListCache: async () => {
+      clearSceneListCacheCalls += 1;
+    },
     getSceneListCache: async () => ({ found: false, isExpired: false, record: null }),
     getSceneListCacheSnapshotSync: () => ({ found: false, isExpired: false, record: null }),
     setSceneListCache: async () => undefined,
@@ -115,6 +155,13 @@ afterEach(() => {
   routerPushCalls.length = 0;
   routerPrefetchCalls.length = 0;
   detailPrefetchCalls.length = 0;
+  getScenesCallOptions.length = 0;
+  clearSceneListCacheCalls = 0;
+  importSceneCalls = 0;
+  deleteSceneCalls = 0;
+  generatedSceneCalls = 0;
+  importSceneError = null;
+  deleteSceneError = null;
   detailPrefetchImpl = async (slug: string) => {
     detailPrefetchCalls.push(slug);
     return true;
@@ -217,5 +264,182 @@ test("ScenesPage 侧滑后点击删除会弹出二次确认弹框", async () => 
   await waitFor(() => {
     screen.getByText("删除场景？");
     screen.getByRole("button", { name: "取消" });
+  });
+});
+
+test("ScenesPage 会处理尾斜杠路径的下拉刷新并强制走网络请求", async () => {
+  const ScenesPage = getScenesPage();
+  render(<ScenesPage />);
+
+  await screen.findByText("Coffee Chat");
+
+  const refreshDetail = {
+    pathname: "/scenes/",
+    handled: false,
+  };
+  window.dispatchEvent(new CustomEvent("app:pull-refresh", { detail: refreshDetail }));
+
+  await waitFor(() => {
+    assert.equal(refreshDetail.handled, true);
+    assert.equal(clearSceneListCacheCalls, 1);
+    assert.equal(
+      getScenesCallOptions.some((options) => options?.noStore === true),
+      true,
+    );
+  });
+});
+
+test("ScenesPage 导入成功后会清缓存并强制重新拉取列表", async () => {
+  const ScenesPage = getScenesPage();
+  render(<ScenesPage />);
+
+  await screen.findByText("Coffee Chat");
+  getScenesCallOptions.length = 0;
+
+  fireEvent.click(screen.getByRole("button", { name: "导入自定义" }));
+
+  const textarea = await screen.findByLabelText("场景文本");
+  fireEvent.change(textarea, {
+    target: { value: "A: Are we still on for dinner?\nB: Something came up." },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "导入场景" }));
+
+  await waitFor(() => {
+    assert.equal(importSceneCalls, 1);
+    assert.equal(clearSceneListCacheCalls, 1);
+    assert.equal(
+      getScenesCallOptions.some((options) => options?.noStore === true),
+      true,
+    );
+  });
+});
+
+test("ScenesPage 删除成功后会清缓存并强制重新拉取列表", async () => {
+  const ScenesPage = getScenesPage();
+  render(<ScenesPage />);
+
+  const importedCard = (await screen.findByText("Imported Scene")).closest("article");
+  assert.ok(importedCard instanceof HTMLElement);
+  getScenesCallOptions.length = 0;
+
+  fireEvent.pointerDown(importedCard, {
+    button: 0,
+    clientX: 220,
+    clientY: 40,
+    pointerId: 1,
+    pointerType: "touch",
+  });
+  fireEvent.pointerMove(importedCard, {
+    clientX: 120,
+    clientY: 42,
+    pointerId: 1,
+    pointerType: "touch",
+  });
+  fireEvent.pointerUp(importedCard, {
+    clientX: 120,
+    clientY: 42,
+    pointerId: 1,
+    pointerType: "touch",
+  });
+
+  const swipeRow = importedCard.closest("[data-swipe-row]");
+  assert.ok(swipeRow instanceof HTMLElement);
+  fireEvent.click(within(swipeRow).getByRole("button", { name: "删除" }));
+  const deleteModal = document.querySelector("[data-delete-modal='true']");
+  assert.ok(deleteModal instanceof HTMLElement);
+  fireEvent.click(within(deleteModal).getByRole("button", { name: "删除" }));
+
+  await waitFor(() => {
+    assert.equal(deleteSceneCalls, 1);
+    assert.equal(clearSceneListCacheCalls, 1);
+    assert.equal(
+      getScenesCallOptions.some((options) => options?.noStore === true),
+      true,
+    );
+  });
+});
+
+test("ScenesPage 生成成功后会清缓存并强制重新拉取列表", async () => {
+  const ScenesPage = getScenesPage();
+  render(<ScenesPage />);
+
+  await screen.findByText("Coffee Chat");
+  getScenesCallOptions.length = 0;
+
+  fireEvent.click(screen.getByRole("button", { name: "生成场景" }));
+  fireEvent.click(await screen.findByRole("button", { name: "触发生成成功" }));
+
+  await waitFor(() => {
+    assert.equal(generatedSceneCalls, 1);
+    assert.equal(clearSceneListCacheCalls, 1);
+    assert.equal(
+      getScenesCallOptions.some((options) => options?.noStore === true),
+      true,
+    );
+  });
+});
+
+test("ScenesPage 导入失败时不会误清缓存或强制刷新列表", async () => {
+  importSceneError = new Error("import failed");
+  const ScenesPage = getScenesPage();
+  render(<ScenesPage />);
+
+  await screen.findByText("Coffee Chat");
+  getScenesCallOptions.length = 0;
+
+  fireEvent.click(screen.getByRole("button", { name: "导入自定义" }));
+  const textarea = await screen.findByLabelText("场景文本");
+  fireEvent.change(textarea, {
+    target: { value: "A: failed import" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "导入场景" }));
+
+  await waitFor(() => {
+    assert.equal(importSceneCalls, 1);
+    assert.equal(clearSceneListCacheCalls, 0);
+    assert.deepEqual(getScenesCallOptions, []);
+  });
+});
+
+test("ScenesPage 删除失败时不会误清缓存或强制刷新列表", async () => {
+  deleteSceneError = new Error("delete failed");
+  const ScenesPage = getScenesPage();
+  render(<ScenesPage />);
+
+  const importedCard = (await screen.findByText("Imported Scene")).closest("article");
+  assert.ok(importedCard instanceof HTMLElement);
+  getScenesCallOptions.length = 0;
+
+  fireEvent.pointerDown(importedCard, {
+    button: 0,
+    clientX: 220,
+    clientY: 40,
+    pointerId: 1,
+    pointerType: "touch",
+  });
+  fireEvent.pointerMove(importedCard, {
+    clientX: 120,
+    clientY: 42,
+    pointerId: 1,
+    pointerType: "touch",
+  });
+  fireEvent.pointerUp(importedCard, {
+    clientX: 120,
+    clientY: 42,
+    pointerId: 1,
+    pointerType: "touch",
+  });
+
+  const swipeRow = importedCard.closest("[data-swipe-row]");
+  assert.ok(swipeRow instanceof HTMLElement);
+  fireEvent.click(within(swipeRow).getByRole("button", { name: "删除" }));
+  const deleteModal = document.querySelector("[data-delete-modal='true']");
+  assert.ok(deleteModal instanceof HTMLElement);
+  fireEvent.click(within(deleteModal).getByRole("button", { name: "删除" }));
+
+  await waitFor(() => {
+    assert.equal(deleteSceneCalls, 1);
+    assert.equal(clearSceneListCacheCalls, 0);
+    assert.deepEqual(getScenesCallOptions, []);
   });
 });

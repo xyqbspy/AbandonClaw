@@ -1,7 +1,11 @@
 ﻿"use client";
 
-import { ReactNode, useEffect, useMemo, useRef, useState } from "react";
-import { getReviewPageCache, setReviewPageCache } from "@/lib/cache/review-page-cache";
+import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  clearAllReviewPageCache,
+  getReviewPageCache,
+  setReviewPageCache,
+} from "@/lib/cache/review-page-cache";
 import { LoadingButton, LoadingState } from "@/components/shared/action-loading";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
@@ -67,6 +71,11 @@ import {
 
 const REVIEW_LIMIT = 20;
 
+const normalizePathname = (pathname?: string | null) => {
+  if (typeof pathname !== "string") return "/";
+  return pathname.replace(/\/+$/, "") || "/";
+};
+
 const ExpressionWordMark = ({ children }: { children: ReactNode }) => (
   <span className="rounded bg-primary/10 px-1 py-0.5 text-primary">{children}</span>
 );
@@ -95,7 +104,7 @@ export default function ReviewPage() {
   } | null>(null);
   const activeLoadTokenRef = useRef(0);
 
-  const loadData = async (options?: { preferCache?: boolean }) => {
+  const loadData = useCallback(async (options?: { preferCache?: boolean }) => {
     const token = activeLoadTokenRef.current + 1;
     activeLoadTokenRef.current = token;
     const canApply = () => activeLoadTokenRef.current === token;
@@ -188,11 +197,30 @@ export default function ReviewPage() {
     } finally {
       if (canApply()) setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     void loadData({ preferCache: true });
-  }, []);
+  }, [loadData]);
+
+  useEffect(() => {
+    const handlePullRefresh = async (event: Event) => {
+      const customEvent = event as CustomEvent<{ pathname?: string; handled?: boolean }>;
+      if (normalizePathname(customEvent.detail?.pathname) !== "/review") return;
+      customEvent.detail.handled = true;
+      try {
+        await clearAllReviewPageCache();
+        await loadData({ preferCache: false });
+      } catch (error) {
+        notifyReviewLoadFailed(error instanceof Error ? error.message : zh.loadFailed);
+      }
+    };
+
+    window.addEventListener("app:pull-refresh", handlePullRefresh as EventListener);
+    return () => {
+      window.removeEventListener("app:pull-refresh", handlePullRefresh as EventListener);
+    };
+  }, [loadData]);
 
   const current = items[0] ?? null;
   const currentItemId = current?.userPhraseId ?? null;
@@ -345,13 +373,12 @@ export default function ReviewPage() {
         await completeScenePracticeRunFromApi(item.sceneSlug, {
           practiceSetId,
         });
-        setScenePracticeItems((prev) =>
-          prev.filter(
-            (currentItem) => buildScenePracticeReviewItemKey(currentItem) !== itemKey,
-          ),
-        );
+        await clearAllReviewPageCache();
+        await loadData({ preferCache: false });
         notifyInlinePracticeCompleted(zh);
       } else {
+        await clearAllReviewPageCache();
+        await loadData({ preferCache: false });
         notifyInlinePracticeRecorded(zh);
       }
     } catch (error) {

@@ -81,6 +81,7 @@ Run:
 pnpm test
 pnpm run test:unit
 pnpm run test:interaction
+pnpm run test:interaction:cache-refresh
 pnpm run test:all
 pnpm run build
 ```
@@ -89,6 +90,7 @@ Notes:
 - `pnpm test` defaults to unit tests only.
 - `*.test.ts` is for pure unit tests.
 - `*.test.tsx` is for DOM / interaction tests.
+- `pnpm run test:interaction:cache-refresh` runs the focused cache-refresh regression set for `scenes` / `review` / `chunks` and shared pull-to-refresh behavior.
 - See [test.md](./test.md) for the project testing conventions.
 
 ## 6) Auth Flow

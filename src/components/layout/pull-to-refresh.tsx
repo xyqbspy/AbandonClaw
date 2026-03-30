@@ -6,8 +6,10 @@ import { cn } from "@/lib/utils";
 
 const PULL_THRESHOLD = 72;
 
+const normalizePathname = (pathname: string) => pathname.replace(/\/+$/, "") || "/";
+
 const shouldEnablePullRefresh = (pathname: string) => {
-  const normalized = pathname.replace(/\/+$/, "") || "/";
+  const normalized = normalizePathname(pathname);
   const exact = new Set([
     "/scenes",
     "/chunks",
@@ -67,7 +69,7 @@ export function PullToRefresh({ children }: { children: ReactNode }) {
     setRefreshing(true);
     window.setTimeout(() => {
       const refreshDetail = {
-        pathname,
+        pathname: normalizePathname(pathname),
         handled: false,
       };
       window.dispatchEvent(

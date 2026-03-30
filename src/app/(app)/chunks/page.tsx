@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Search } from "lucide-react";
+import { clearAllPhraseListCache } from "@/lib/cache/phrase-list-cache";
 import { getChunksExpressionMapCache, setChunksExpressionMapCache } from "@/lib/cache/chunks-runtime-cache";
 import { useTtsPlaybackState } from "@/hooks/use-tts-playback-state";
 import { normalizePhraseText } from "@/lib/shared/phrases";
@@ -133,6 +134,11 @@ const reviewStatusLabel: Record<PhraseReviewStatus, string> = {
   reviewing: zh.tabs.reviewing,
   mastered: zh.tabs.mastered,
   archived: "\u5df2\u5f52\u6863",
+};
+
+const normalizePathname = (pathname?: string | null) => {
+  if (typeof pathname !== "string") return "/";
+  return pathname.replace(/\/+$/, "") || "/";
 };
 
 const isContrastDerivedExpression = (sourceNote: string | null | undefined) => {
@@ -439,6 +445,27 @@ export default function ChunksPage() {
       notifyChunksLoadFailed(message);
     },
   });
+
+  useEffect(() => {
+    const handlePullRefresh = async (event: Event) => {
+      const customEvent = event as CustomEvent<{ pathname?: string; handled?: boolean }>;
+      if (normalizePathname(customEvent.detail?.pathname) !== "/chunks") return;
+      customEvent.detail.handled = true;
+      try {
+        await clearAllPhraseListCache();
+        await loadPhrases(query, reviewFilter, contentFilter, expressionClusterFilterId, {
+          preferCache: false,
+        });
+      } catch (error) {
+        notifyChunksLoadFailed(error instanceof Error ? error.message : null);
+      }
+    };
+
+    window.addEventListener("app:pull-refresh", handlePullRefresh as EventListener);
+    return () => {
+      window.removeEventListener("app:pull-refresh", handlePullRefresh as EventListener);
+    };
+  }, [contentFilter, expressionClusterFilterId, loadPhrases, query, reviewFilter]);
 
   const summary = useMemo(() => {
     return buildChunksSummary({

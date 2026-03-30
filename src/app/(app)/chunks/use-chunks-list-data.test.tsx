@@ -331,3 +331,88 @@ test("useChunksListData 在 onLoadFailed 回调变化时不会重复自动请求
     assert.deepEqual(requestedQueries, ["same"]);
   });
 });
+
+test("useChunksListData 在 preferCache=false 时会跳过读缓存并强制走网络后回写缓存", async () => {
+  let getCacheCalls = 0;
+  const timers = new Map<number, () => void>();
+  let timerId = 0;
+  const setCachePayloads: Array<{
+    params: Record<string, unknown>;
+    payload: { rows: UserPhraseItemResponse[]; total: number; page: number; limit: number };
+  }> = [];
+
+  const deps: ChunksListDeps = {
+    getPhraseListCache: async () => {
+      getCacheCalls += 1;
+      return { found: true, record: buildCacheRecord(rows, 1), isExpired: false };
+    },
+    setPhraseListCache: async (params, payload) => {
+      setCachePayloads.push({
+        params: params as Record<string, unknown>,
+        payload,
+      });
+    },
+    getMyPhrasesFromApi: async () => ({
+      rows: [{ ...rows[0], userPhraseId: "p2", phraseId: "phrase-2", text: "wrap up" }],
+      total: 1,
+      page: 1,
+      limit: 100,
+    }),
+    buildChunksListRequestParams: ({ query, reviewFilter, contentFilter, expressionClusterFilterId }) => ({
+      query: query.trim(),
+      limit: 100,
+      page: 1,
+      status: "saved",
+      reviewStatus: reviewFilter,
+      learningItemType: contentFilter,
+      expressionClusterId: expressionClusterFilterId || undefined,
+    }),
+    resolveChunksCachePresentation: ({ cacheFound }) => ({
+      hasCacheFallback: cacheFound,
+      nextDataSource: cacheFound ? "cache" : "none",
+      shouldStopLoading: cacheFound,
+    }),
+    resolveChunksNetworkFailure: ({ error }) => ({
+      shouldClearRows: true,
+      shouldStopLoading: true,
+      message: error instanceof Error ? error.message : "load failed",
+    }),
+    setTimeoutFn: (callback: () => void) => {
+      timerId += 1;
+      timers.set(timerId, callback);
+      return timerId;
+    },
+    clearTimeoutFn: (handle) => {
+      timers.delete(handle as number);
+    },
+  };
+
+  const { result } = renderHook(() =>
+    useChunksListData({
+      query: "first",
+      reviewFilter: "all",
+      contentFilter: "expression",
+      expressionClusterFilterId: "",
+      deps,
+    }),
+  );
+
+  assert.equal(timers.size, 1);
+  assert.equal(getCacheCalls, 0);
+
+  await result.current.loadPhrases("force refresh", "reviewing", "sentence", "cluster-1", {
+    preferCache: false,
+  });
+
+  await waitFor(() => {
+    assert.equal(result.current.listDataSource, "network");
+    assert.equal(result.current.phrases[0]?.text, "wrap up");
+    assert.equal(getCacheCalls, 0);
+    assert.equal(setCachePayloads.length, 1);
+    assert.equal(setCachePayloads[0]?.params.query, "force refresh");
+    assert.equal(setCachePayloads[0]?.params.reviewStatus, "reviewing");
+    assert.equal(setCachePayloads[0]?.params.learningItemType, "sentence");
+    assert.equal(setCachePayloads[0]?.params.expressionClusterId, "cluster-1");
+    assert.equal(setCachePayloads[0]?.payload.rows[0]?.text, "wrap up");
+  });
+});

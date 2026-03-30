@@ -76,6 +76,11 @@ type GestureState = {
   verticalCancelled: boolean;
 };
 
+const normalizePathname = (pathname?: string | null) => {
+  if (typeof pathname !== "string") return "/";
+  return pathname.replace(/\/+$/, "") || "/";
+};
+
 export default function ScenesPage() {
   const router = useRouter();
   const initialListSnapshot = getSceneListCacheSnapshotSync();
@@ -232,7 +237,7 @@ export default function ScenesPage() {
   useEffect(() => {
     const handlePullRefresh = async (event: Event) => {
       const customEvent = event as CustomEvent<{ pathname?: string; handled?: boolean }>;
-      if (customEvent.detail?.pathname !== "/scenes") return;
+      if (normalizePathname(customEvent.detail?.pathname) !== "/scenes") return;
       customEvent.detail.handled = true;
       setTopTask({ status: "running", message: "正在刷新场景列表..." });
       try {
