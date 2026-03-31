@@ -40,6 +40,7 @@ import {
   notifyPracticeSentenceMilestone,
 } from "./scene-practice-notify";
 import {
+  didSentenceReachCompleteMilestone,
   deriveBestSentenceAssessment,
   derivePracticeModuleCompletionMap,
   derivePracticeModules,
@@ -58,7 +59,7 @@ type ScenePracticeViewProps = {
   onBack: () => void;
   onDelete: () => void;
   onComplete: () => void;
-  onSentencePracticed?: (payload: {
+  onSentenceCompleted?: (payload: {
     exerciseId: string;
     sentenceId?: string | null;
   }) => void;
@@ -101,7 +102,7 @@ export function ScenePracticeView({
   onBack,
   onDelete,
   onComplete,
-  onSentencePracticed,
+  onSentenceCompleted,
   onPracticeRunStart,
   onPracticeAttempt,
   onPracticeModeComplete,
@@ -450,8 +451,14 @@ export function ScenePracticeView({
       return;
     }
 
-    if (!wasAlreadyCorrect) {
-      onSentencePracticed?.({
+    if (
+      !wasAlreadyCorrect &&
+      didSentenceReachCompleteMilestone({
+        previous: previousSentenceAssessment,
+        next: assessment,
+      })
+    ) {
+      onSentenceCompleted?.({
         exerciseId,
         sentenceId: activeExercise.sentenceId,
       });

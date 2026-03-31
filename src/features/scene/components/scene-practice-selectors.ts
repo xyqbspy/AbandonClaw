@@ -111,3 +111,11 @@ export const deriveBestSentenceAssessment = ({
       if (!best) return current;
       return getPracticeAssessmentRank(current) > getPracticeAssessmentRank(best) ? current : best;
     }, null);
+
+export const didSentenceReachCompleteMilestone = ({
+  previous,
+  next,
+}: {
+  previous: PracticeAssessmentLevel | null | undefined;
+  next: PracticeAssessmentLevel | null | undefined;
+}) => previous !== "complete" && next === "complete";

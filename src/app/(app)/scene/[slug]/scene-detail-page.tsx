@@ -926,7 +926,7 @@ export default function SceneDetailClientPage({
     [baseLesson?.slug, handleLearningStateChange, trainingState?.session?.openedExpressionCount],
   );
 
-  const handleSentencePracticed = useCallback(() => {
+  const handleSentenceCompleted = useCallback(() => {
     if (!baseLesson) return;
     const shouldNotifyMilestone = (trainingState?.session?.practicedSentenceCount ?? 0) < 1;
     notifySceneSentencePracticed();
@@ -1030,15 +1030,22 @@ export default function SceneDetailClientPage({
     }
     if (currentStep === "practice_sentence" || currentStep === "scene_practice") {
       const practiceSetStatus = latestPracticeSet?.status ?? generatedState.practiceStatus;
+      const isSentenceEntryStep = currentStep === "practice_sentence";
       return {
         label:
           practiceSetStatus === "completed"
-            ? "再练场景练习"
+            ? isSentenceEntryStep
+              ? "再练句子练习"
+              : "再练整段练习"
             : practiceSetStatus === "generated"
-              ? "开始场景练习"
+              ? isSentenceEntryStep
+                ? "进入句子练习"
+                : "继续整段练习"
             : practiceLoading
               ? "练习准备中..."
-              : "生成并开始练习",
+              : isSentenceEntryStep
+                ? "生成并进入句子练习"
+                : "生成并完成整段练习",
         onClick: () => {
           if (practiceSetStatus === "completed") {
             handleRepeatPractice();
@@ -1405,7 +1412,7 @@ export default function SceneDetailClientPage({
             }
             handleMarkPracticeComplete();
           }}
-          onSentencePracticed={handleSentencePracticed}
+          onSentenceCompleted={handleSentenceCompleted}
           onPracticeRunStart={(payload) => {
             void startScenePracticeRunFromApi(baseLesson.slug, payload)
               .then((result) => {
@@ -1594,7 +1601,7 @@ export default function SceneDetailClientPage({
         onReviewPhrase={savePhraseForScene}
         onSceneLoopPlayback={handleSceneFullPlay}
         onChunkEncounter={handleBaseChunkEncounter}
-        onSentencePracticeComplete={handleSentencePracticed}
+        onSentencePracticeComplete={handleSentenceCompleted}
         chunkDetailSheet={chunkDetailSheet}
       />
   );

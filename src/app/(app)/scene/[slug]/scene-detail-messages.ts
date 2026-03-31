@@ -48,14 +48,14 @@ export const sceneDetailMessages = {
   focusStepHint: "先点开一句里的重点短语，再进入下一步。",
   continueStepPrompts: {
     focus_expression: "继续看重点表达",
-    practice_sentence: "继续开始练习",
-    scene_practice: "继续场景练习",
+    practice_sentence: "继续进入句子练习",
+    scene_practice: "继续完成整段练习",
   },
   sessionCompleted: "这段今天已经认真练过一轮了。",
   sceneMilestones: {
     listen: (sceneTitle: string) => `场景升级：已经听熟《${sceneTitle}》。`,
     focus_expression: "场景升级：已经抓到这段里的重点表达。",
-    practice_sentence: "场景升级：已经进入练习阶段了。",
+    practice_sentence: "场景升级：已经进入句子练习阶段了。",
     scene_practice: "场景升级：已经完成本轮练习。",
     done: (sceneTitle: string) => `场景通关：今天已经练通《${sceneTitle}》。`,
   },
@@ -90,9 +90,13 @@ export const getSceneTrainingCurrentStepSupportText = ({
   practiceModeKey?: "cloze" | "guided_recall" | "sentence_recall" | "full_dictation" | null;
   practiceAttemptCount: number;
 }) => {
-  if (currentStep === "scene_practice" || currentStep === "practice_sentence") {
+  if (currentStep === "practice_sentence") {
     const modeText = practiceModeLabel?.trim() || getPracticeModeLabel(practiceModeKey);
-    return `练习阶段会按顺序推进。当前建议继续做${modeText}，系统已记录 ${practiceAttemptCount} 次作答。`;
+    return `你已经进入句子练习阶段。先把至少一句推进到完整复现，当前建议继续做${modeText}，系统已记录 ${practiceAttemptCount} 次作答。`;
+  }
+  if (currentStep === "scene_practice") {
+    const modeText = practiceModeLabel?.trim() || getPracticeModeLabel(practiceModeKey);
+    return `你已经完成句子入门阶段，接下来要把整轮题型做完。当前建议继续做${modeText}，系统已记录 ${practiceAttemptCount} 次作答。`;
   }
   if (currentStep === "done") {
     return "这一轮基础训练已经闭环，可以继续进入变体迁移。";

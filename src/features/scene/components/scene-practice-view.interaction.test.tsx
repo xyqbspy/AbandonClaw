@@ -834,3 +834,87 @@ test("ScenePracticeView 总结区动作按钮会触发对应回调", async () =>
   fireEvent.click(screen.getByRole("button", { name: "再练一遍" }));
   assert.equal(repeatCount, 1);
 });
+
+test("ScenePracticeView 只会在句子首次达到 complete 里程碑时回调一次", async () => {
+  const sentenceCompletePayloads: string[] = [];
+
+  render(
+    <ScenePracticeView
+      practiceSet={{
+        ...practiceSet,
+        modules: [
+          {
+            mode: "cloze",
+            modeLabel: "填空练习",
+            title: "开始练习",
+            exercises: [
+              {
+                id: "exercise-1",
+                type: "chunk_cloze",
+                inputMode: "typing",
+                sceneId: "scene-1",
+                sentenceId: "sentence-1",
+                chunkId: "chunk-1",
+                prompt: "补全句子中的表达",
+                answer: {
+                  text: "call it a day",
+                  acceptedAnswers: ["call it a day"],
+                },
+                cloze: {
+                  displayText: "I should ____ now.",
+                },
+              },
+            ],
+          },
+          {
+            mode: "sentence_recall",
+            modeLabel: "整句复现",
+            title: "开始练习",
+            exercises: [
+              {
+                id: "recall-1",
+                type: "translation_prompt",
+                inputMode: "typing",
+                sceneId: "scene-1",
+                sentenceId: "sentence-1",
+                prompt: "看中文提示，完整复现这句",
+                hint: "我现在该收工了。",
+                answer: {
+                  text: "I should call it a day now.",
+                  acceptedAnswers: ["I should call it a day now."],
+                },
+              },
+            ],
+          },
+        ],
+      }}
+      showAnswerMap={{}}
+      appleButtonSmClassName="btn"
+      appleDangerButtonSmClassName="danger"
+      labels={sceneViewLabels.practice}
+      onBack={() => undefined}
+      onDelete={() => undefined}
+      onComplete={() => undefined}
+      onSentenceCompleted={({ sentenceId }) => {
+        if (sentenceId) sentenceCompletePayloads.push(sentenceId);
+      }}
+      onReviewScene={() => undefined}
+      onOpenVariants={() => undefined}
+      onToggleAnswer={() => undefined}
+    />,
+  );
+
+  fillCurrentAnswer("call it a day");
+
+  await waitFor(() => {
+    const sentenceRecallButton = screen.getByRole("button", { name: /整句复现/ });
+    assert.equal(sentenceRecallButton.hasAttribute("disabled"), false);
+  });
+
+  fireEvent.click(screen.getByRole("button", { name: /整句复现/ }));
+  fillCurrentAnswer("I should call it a day now.");
+
+  await waitFor(() => {
+    assert.deepEqual(sentenceCompletePayloads, ["sentence-1"]);
+  });
+});

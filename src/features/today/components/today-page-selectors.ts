@@ -1,4 +1,8 @@
 import { DailyTask } from "@/lib/types";
+import {
+  getSceneMasteryStageLabel,
+  getSceneProgressStepLabel,
+} from "@/lib/shared/scene-progression";
 import { LearningDashboardResponse } from "@/lib/utils/learning-api";
 import { getSceneGeneratedState } from "@/lib/utils/scene-learning-flow-storage";
 import { SceneListItemResponse } from "@/lib/utils/scenes-api";
@@ -9,26 +13,6 @@ type LocalRepeatMode = "practice" | "variants";
 export type ResolvedContinueLearningItem = ContinueLearningItem & {
   repeatMode?: LocalRepeatMode | null;
   isRepeat?: boolean;
-};
-
-type ContinueCurrentStep = ContinueLearningItem["currentStep"];
-type ContinueMasteryStage = ContinueLearningItem["masteryStage"];
-
-const SCENE_STEP_LABELS: Record<NonNullable<ContinueCurrentStep>, string> = {
-  listen: "听熟这段",
-  focus_expression: "看重点表达",
-  practice_sentence: "开始练习",
-  scene_practice: "开始练习",
-  done: "本轮已完成",
-};
-
-const MASTERY_STAGE_LABELS: Record<ContinueMasteryStage, string> = {
-  listening: "先听熟场景",
-  focus: "抓住重点表达",
-  sentence_practice: "开始练习",
-  scene_practice: "进入整段练习",
-  variant_unlocked: "可以解锁变体",
-  mastered: "这一组已经练熟",
 };
 
 const buildFallbackContinueLearning = (
@@ -148,10 +132,10 @@ const resolveStepLabelFromSceneTask = (
   sceneTask: LearningDashboardResponse["todayTasks"]["sceneTask"],
 ) => {
   if (sceneTask.currentStep) {
-    return SCENE_STEP_LABELS[sceneTask.currentStep];
+    return getSceneProgressStepLabel(sceneTask.currentStep);
   }
   if (sceneTask.masteryStage) {
-    return MASTERY_STAGE_LABELS[sceneTask.masteryStage];
+    return getSceneMasteryStageLabel(sceneTask.masteryStage);
   }
   return null;
 };
@@ -167,9 +151,9 @@ export const getContinueLearningStepLabel = (
   if (taskLabel) return taskLabel;
   if (!continueLearning) return "开始一个新场景";
   if (continueLearning.currentStep) {
-    return SCENE_STEP_LABELS[continueLearning.currentStep];
+    return getSceneProgressStepLabel(continueLearning.currentStep) ?? "开始一个新场景";
   }
-  return MASTERY_STAGE_LABELS[continueLearning.masteryStage];
+  return getSceneMasteryStageLabel(continueLearning.masteryStage) ?? "开始一个新场景";
 };
 
 export const getContinueLearningHelperText = (
@@ -190,8 +174,15 @@ export const getContinueLearningHelperText = (
 
   const stepLabel = getContinueLearningStepLabel(continueLearning, sceneTask);
   const progressPercent = sceneTask?.progressPercent ?? continueLearning.progressPercent;
-  if ((sceneTask?.currentStep ?? continueLearning.currentStep) === "done") {
-    return "这轮基础训练已经完成，可以去沉浸表达，或者直接进入回忆复习。";
+  const currentStep = sceneTask?.currentStep ?? continueLearning.currentStep;
+  if (currentStep === "practice_sentence") {
+    return `当前先${stepLabel}，至少先把一句推进到完整复现，再继续收束整轮练习。`;
+  }
+  if (currentStep === "scene_practice") {
+    return `当前先${stepLabel}，把这一轮题型完整做完，再进入后续沉淀或变体。`;
+  }
+  if (currentStep === "done") {
+    return "这轮基础训练已经完成，可以去沉淀表达，或者直接进入回忆复习。";
   }
   return `当前先${stepLabel}，已经推进到 ${Math.round(progressPercent)}%，继续一口气把今天这轮做顺。`;
 };
@@ -240,7 +231,7 @@ export const getContinueLearningCardState = ({
     stepLabel: getContinueLearningStepLabel(continueLearning, sceneTask),
     helperText: getContinueLearningHelperText(continueLearning, sceneTask),
     href: getContinueLearningHref(continueLearning),
-    ctaLabel: continueLearning ? "▶ 继续学习" : "▶ 去选场景",
+    ctaLabel: continueLearning ? "继续学习" : "去选场景",
     isPending: false,
   };
 };

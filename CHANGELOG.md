@@ -2,6 +2,22 @@
 
 ## 2026-03-31
 
+### Scene / Today 句子练习链路解释收口
+- 把 `today` 和 `scene` 对练习阶段的解释统一成同一套口径：进入句子练习、继续整段练习、本轮已完成不再混成同一个“开始练习”状态。
+- 场景训练浮层 CTA 会根据当前阶段区分“进入句子练习”和“继续整段练习”，减少用户在场景页里的链路跳变感。
+- 句子完成回调改成只在同一句第一次达到 `complete` 里程碑时触发，避免一句被重复计入完成。
+
+影响范围：
+- `scene` 训练浮层当前步骤说明与主 CTA
+- `today` 继续学习卡片与任务入口文案
+- 句子练习完成回调与句子里程碑推进
+
+验证情况：
+- `node --import tsx --test "src/app/(app)/scene/[[]slug[]]/scene-detail-selectors.test.ts" "src/features/scene/components/scene-practice-selectors.test.ts"`
+- `node --import tsx --import ./src/test/setup-dom.ts --test "src/features/today/components/today-page-selectors.test.ts" "src/features/scene/components/scene-practice-view.interaction.test.tsx" "src/app/(app)/scene/[[]slug[]]/page.regression.test.tsx"`
+
+## 2026-03-31
+
 ### Scenes / Scene Detail / Audio 缓存刷新稳定性优化
 - 调整 `scenes` 列表与 `scene detail` 的缓存策略：命中新鲜本地缓存时，页面会先展示缓存结果，再继续执行后台网络刷新，不再因为 TTL 未过期就直接停止联网。
 - 统一 `/api/scenes/[slug]` 与 `/api/phrases/mine` 的 `Cache-Control: no-store` 语义，并让对应客户端请求显式使用 `cache: "no-store"`，减少浏览器默认缓存与前端自管缓存叠加造成的陈旧状态。
