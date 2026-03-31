@@ -141,6 +141,8 @@ export interface TodayLearningTasks {
     done: boolean;
     reviewItemsCompleted: number;
     dueReviewCount: number;
+    confidentOutputCountToday: number;
+    fullOutputCountToday: number;
   };
   outputTask: {
     done: boolean;
@@ -1111,6 +1113,8 @@ export async function getTodayLearningTasks(userId: string): Promise<TodayLearni
       done: reviewSummary.dueReviewCount === 0 || reviewItemsCompleted > 0,
       reviewItemsCompleted,
       dueReviewCount: reviewSummary.dueReviewCount,
+      confidentOutputCountToday: reviewSummary.confidentOutputCountToday,
+      fullOutputCountToday: reviewSummary.fullOutputCountToday,
     },
     outputTask: {
       done: phrasesSaved >= 1,

@@ -1,6 +1,9 @@
 import { invalidateAfterReviewMutation } from "@/lib/utils/cache-actions";
 
 export type ReviewResult = "again" | "hard" | "good";
+export type ReviewRecognitionState = "recognized" | "unknown";
+export type ReviewOutputConfidence = "high" | "low";
+export type ReviewFullOutputStatus = "completed" | "not_started";
 
 export interface DueReviewItemResponse {
   userPhraseId: string;
@@ -40,6 +43,8 @@ export interface ReviewSummaryResponse {
   reviewedTodayCount: number;
   reviewAccuracy: number | null;
   masteredPhraseCount: number;
+  confidentOutputCountToday: number;
+  fullOutputCountToday: number;
 }
 
 const toApiError = async (response: Response, fallback: string) => {
@@ -70,6 +75,9 @@ export async function submitPhraseReviewFromApi(payload: {
   userPhraseId: string;
   reviewResult: ReviewResult;
   source?: string;
+  recognitionState?: ReviewRecognitionState;
+  outputConfidence?: ReviewOutputConfidence;
+  fullOutputStatus?: ReviewFullOutputStatus;
 }) {
   const response = await fetch("/api/review/submit", {
     method: "POST",

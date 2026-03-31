@@ -41,7 +41,9 @@ const isSummaryValid = (summary: ReviewSummaryResponse) =>
   typeof summary?.dueReviewCount === "number" &&
   typeof summary?.reviewedTodayCount === "number" &&
   (summary.reviewAccuracy == null || typeof summary.reviewAccuracy === "number") &&
-  typeof summary?.masteredPhraseCount === "number";
+  typeof summary?.masteredPhraseCount === "number" &&
+  typeof summary?.confidentOutputCountToday === "number" &&
+  typeof summary?.fullOutputCountToday === "number";
 
 const isValidRecord = (record: ReviewPageCacheRecord, key: string) =>
   record.schemaVersion === CACHE_SCHEMA_VERSION &&

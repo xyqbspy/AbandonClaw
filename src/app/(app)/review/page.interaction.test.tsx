@@ -16,13 +16,16 @@ const setReviewPageCacheCalls: Array<{
     total: number;
     summary: {
       dueReviewCount: number;
-      reviewedTodayCount: number;
-      reviewAccuracy: number | null;
-      masteredPhraseCount: number;
-    };
+        reviewedTodayCount: number;
+        reviewAccuracy: number | null;
+        masteredPhraseCount: number;
+        confidentOutputCountToday: number;
+        fullOutputCountToday: number;
+      };
   };
   limit: number | undefined;
 }> = [];
+const submitPhraseReviewPayloads: Array<Record<string, unknown>> = [];
 let startScenePracticeRunCalls = 0;
 let recordScenePracticeAttemptCalls = 0;
 let markScenePracticeModeCompleteCalls = 0;
@@ -98,6 +101,8 @@ const mockedModules = {
           reviewedTodayCount: number;
           reviewAccuracy: number | null;
           masteredPhraseCount: number;
+          confidentOutputCountToday: number;
+          fullOutputCountToday: number;
         };
       },
       limit?: number,
@@ -121,17 +126,24 @@ const mockedModules = {
         reviewedTodayCount: 0,
         reviewAccuracy: null,
         masteredPhraseCount: 0,
+        confidentOutputCountToday: 0,
+        fullOutputCountToday: 0,
       };
     },
-    submitPhraseReviewFromApi: async () => ({
+    submitPhraseReviewFromApi: async (payload: Record<string, unknown>) => {
+      submitPhraseReviewPayloads.push(payload);
+      return {
       item: null,
       summary: {
         dueReviewCount: 0,
         reviewedTodayCount: 1,
         reviewAccuracy: 100,
         masteredPhraseCount: 0,
+        confidentOutputCountToday: 1,
+        fullOutputCountToday: 1,
       },
-    }),
+    };
+    },
   },
   "@/lib/utils/phrases-api": {
     getMyPhrasesFromApi: async () => ({ rows: [], total: 0, page: 1, limit: 100 }),
@@ -188,6 +200,7 @@ afterEach(() => {
   summaryRequestCount = 0;
   clearReviewPageCacheCalls = 0;
   setReviewPageCacheCalls.length = 0;
+  submitPhraseReviewPayloads.length = 0;
   startScenePracticeRunCalls = 0;
   recordScenePracticeAttemptCalls = 0;
   markScenePracticeModeCompleteCalls = 0;
@@ -331,7 +344,13 @@ test("ReviewPage 普通表达复习会按微回忆 -> 熟悉度 -> 改写 -> 输
     assert.deepEqual(latest?.payload.rows, []);
     assert.equal(latest?.payload.summary.reviewedTodayCount, 1);
     assert.equal(latest?.payload.summary.reviewAccuracy, 100);
+    assert.equal(latest?.payload.summary.confidentOutputCountToday, 1);
+    assert.equal(latest?.payload.summary.fullOutputCountToday, 1);
     assert.equal(latest?.limit, 20);
+    assert.equal(submitPhraseReviewPayloads.length, 1);
+    assert.equal(submitPhraseReviewPayloads[0]?.recognitionState, "recognized");
+    assert.equal(submitPhraseReviewPayloads[0]?.outputConfidence, "high");
+    assert.equal(submitPhraseReviewPayloads[0]?.fullOutputStatus, "completed");
   });
 });
 
@@ -360,7 +379,7 @@ test("ReviewPage 场景回补会进入阶段式复现并在完成后刷新列表
   await screen.findByRole("button", { name: "我准备好了，进入复现" });
   fireEvent.click(screen.getByRole("button", { name: "我准备好了，进入复现" }));
 
-  await screen.findByPlaceholderText("直接在这里补全这条表达或句子");
+  await screen.findByRole("button", { name: "检查这次复现" });
   fireEvent.change(screen.getByPlaceholderText("直接在这里补全这条表达或句子"), {
     target: { value: "call it a day" },
   });
@@ -407,7 +426,7 @@ test("ReviewPage 场景回补提交失败时不会误刷新列表", async () => 
 
   await screen.findByRole("button", { name: "我准备好了，进入复现" });
   fireEvent.click(screen.getByRole("button", { name: "我准备好了，进入复现" }));
-  await screen.findByPlaceholderText("直接在这里补全这条表达或句子");
+  await screen.findByRole("button", { name: "检查这次复现" });
   fireEvent.change(screen.getByPlaceholderText("直接在这里补全这条表达或句子"), {
     target: { value: "call it a day" },
   });

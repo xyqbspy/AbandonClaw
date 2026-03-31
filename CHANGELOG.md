@@ -2,6 +2,23 @@
 
 ## 2026-03-31
 
+### Review 递进式练习接入第一版正式后端信号
+- `review` 最终提交现在会把熟悉度、输出信心和完整输出状态一起带到后端，正式信号先挂到 `phrase_review_logs`，不再只剩 `again / hard / good` 这一层粗粒度结果。
+- 服务端 `review summary` 新增当天主动输出和完整输出数量的聚合摘要，`today` 页的回忆任务说明也开始消费这些稳定字段，而不是继续只看待复习数量。
+- 新增 `docs/review-practice-signals.md`，专门说明正式字段边界、聚合摘要、历史兼容策略和 `today` / dashboard 的消费规则。
+
+影响范围：
+- `review` 提交 API、服务端 review log 和 summary 聚合
+- `today` 页 review 任务说明
+- review 正式信号维护文档与 SQL 演进脚本
+
+验证情况：
+- `node --import tsx --import ./src/test/setup-dom.ts --test "src/app/(app)/review/page.interaction.test.tsx"`
+- `node --import tsx --test "src/features/today/components/today-page-selectors.test.ts"`
+- `node --import tsx --import ./src/test/setup-dom.ts --test "src/features/today/components/today-page-client.test.tsx"`
+- `pnpm exec tsc --noEmit`
+- `node_modules\\.bin\\openspec.CMD change validate formalize-review-practice-signals --strict --no-interactive`
+
 ### Review 页面递进式练习流增强
 - `review` 普通表达复习现在不再只是一轮“看参考 -> 打分”，而是改成 `微回忆 -> 熟悉度/输出信心 -> 变体改写 -> 完整输出 -> 结果判断` 的递进式训练流。
 - 第一阶段会先隐藏表达本体，让用户只根据语境和释义做微回忆；随后增加“眼熟 / 陌生”“能主动说 / 还需要提示”的判断，用来区分识别记忆和主动输出信心。

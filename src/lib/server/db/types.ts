@@ -273,6 +273,9 @@ export interface UserExpressionClusterMemberRow {
 }
 
 export type PhraseReviewResult = "again" | "hard" | "good";
+export type PhraseReviewRecognitionState = "recognized" | "unknown";
+export type PhraseReviewOutputConfidence = "high" | "low";
+export type PhraseReviewFullOutputStatus = "completed" | "not_started";
 
 export interface PhraseReviewLogRow {
   id: string;
@@ -280,6 +283,9 @@ export interface PhraseReviewLogRow {
   phrase_id: string;
   user_phrase_id: string;
   review_result: PhraseReviewResult;
+  recognition_state: PhraseReviewRecognitionState | null;
+  output_confidence: PhraseReviewOutputConfidence | null;
+  full_output_status: PhraseReviewFullOutputStatus | null;
   was_correct: boolean;
   reviewed_at: string;
   scheduled_next_review_at: string | null;

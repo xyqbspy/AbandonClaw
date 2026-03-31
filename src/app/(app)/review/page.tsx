@@ -85,6 +85,8 @@ type ReviewSummary = {
   reviewedTodayCount: number;
   reviewAccuracy: number | null;
   masteredPhraseCount: number;
+  confidentOutputCountToday: number;
+  fullOutputCountToday: number;
 };
 
 type SceneFeedbackState = {
@@ -298,6 +300,19 @@ export default function ReviewPage() {
         userPhraseId: currentPhraseItem.userPhraseId,
         reviewResult: result,
         source: "review_page",
+        recognitionState:
+          phraseRecognition === "recognized"
+            ? "recognized"
+            : phraseRecognition === "unknown"
+              ? "unknown"
+              : undefined,
+        outputConfidence:
+          phraseOutputConfidence === "high"
+            ? "high"
+            : phraseOutputConfidence === "low"
+              ? "low"
+              : undefined,
+        fullOutputStatus: phraseDraft.trim() ? "completed" : "not_started",
       });
       const nextItems = items.filter((item) => item.userPhraseId !== currentPhraseItem.userPhraseId);
       setItems(nextItems);

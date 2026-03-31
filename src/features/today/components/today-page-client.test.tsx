@@ -64,7 +64,13 @@ const createDashboardResponse = () => ({
       progressPercent: 0,
       completedSentenceCount: 0,
     },
-    reviewTask: { done: false, reviewItemsCompleted: 0, dueReviewCount: 2 },
+    reviewTask: {
+      done: false,
+      reviewItemsCompleted: 0,
+      dueReviewCount: 2,
+      confidentOutputCountToday: 0,
+      fullOutputCountToday: 0,
+    },
     outputTask: { done: false, phrasesSavedToday: 1 },
   },
 });

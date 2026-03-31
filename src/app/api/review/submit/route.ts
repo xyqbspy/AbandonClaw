@@ -4,6 +4,9 @@ import { toApiErrorResponse } from "@/lib/server/api-error";
 import { submitPhraseReview, getReviewSummary } from "@/lib/server/review/service";
 import {
   parseJsonBody,
+  parseOptionalReviewFullOutputStatus,
+  parseOptionalReviewOutputConfidence,
+  parseOptionalReviewRecognitionState,
   parseOptionalTrimmedString,
   parseRequiredTrimmedString,
   parseReviewResult,
@@ -13,6 +16,9 @@ interface SubmitReviewPayload extends Record<string, unknown> {
   userPhraseId?: unknown;
   reviewResult?: unknown;
   source?: unknown;
+  recognitionState?: unknown;
+  outputConfidence?: unknown;
+  fullOutputStatus?: unknown;
 }
 
 export async function POST(request: Request) {
@@ -23,6 +29,9 @@ export async function POST(request: Request) {
       userPhraseId: parseRequiredTrimmedString(payload.userPhraseId, "userPhraseId", 64),
       reviewResult: parseReviewResult(payload.reviewResult),
       source: parseOptionalTrimmedString(payload.source, "source", 80),
+      recognitionState: parseOptionalReviewRecognitionState(payload.recognitionState),
+      outputConfidence: parseOptionalReviewOutputConfidence(payload.outputConfidence),
+      fullOutputStatus: parseOptionalReviewFullOutputStatus(payload.fullOutputStatus),
     });
     const summary = await getReviewSummary(user.id);
     return NextResponse.json({ item, summary }, { status: 200 });

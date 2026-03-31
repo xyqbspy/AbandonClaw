@@ -44,7 +44,13 @@ const EMPTY_DASHBOARD: LearningDashboardResponse = {
       progressPercent: 0,
       completedSentenceCount: 0,
     },
-    reviewTask: { done: false, reviewItemsCompleted: 0, dueReviewCount: 0 },
+    reviewTask: {
+      done: false,
+      reviewItemsCompleted: 0,
+      dueReviewCount: 0,
+      confidentOutputCountToday: 0,
+      fullOutputCountToday: 0,
+    },
     outputTask: { done: false, phrasesSavedToday: 0 },
   },
 };

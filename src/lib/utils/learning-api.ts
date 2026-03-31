@@ -527,6 +527,8 @@ export interface LearningDashboardTasksResponse {
     done: boolean;
     reviewItemsCompleted: number;
     dueReviewCount: number;
+    confidentOutputCountToday: number;
+    fullOutputCountToday: number;
   };
   outputTask: {
     done: boolean;

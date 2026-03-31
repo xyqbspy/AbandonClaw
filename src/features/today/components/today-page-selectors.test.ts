@@ -54,7 +54,13 @@ const dashboard: LearningDashboardResponse = {
       progressPercent: 0,
       completedSentenceCount: 0,
     },
-    reviewTask: { done: false, reviewItemsCompleted: 2, dueReviewCount: 6 },
+    reviewTask: {
+      done: false,
+      reviewItemsCompleted: 2,
+      dueReviewCount: 6,
+      confidentOutputCountToday: 0,
+      fullOutputCountToday: 0,
+    },
     outputTask: { done: true, phrasesSavedToday: 4 },
   },
 };
@@ -382,7 +388,13 @@ test("buildTodayTasks 在回炉练习时不会把 output 和 review 重新锁住
         progressPercent: 0,
         completedSentenceCount: 0,
       },
-      reviewTask: { done: false, reviewItemsCompleted: 0, dueReviewCount: 3 },
+      reviewTask: {
+        done: false,
+        reviewItemsCompleted: 0,
+        dueReviewCount: 3,
+        confidentOutputCountToday: 0,
+        fullOutputCountToday: 0,
+      },
       outputTask: { done: false, phrasesSavedToday: 0 },
     },
   };
@@ -402,6 +414,35 @@ test("buildTodayTasks 在回炉练习时不会把 output 和 review 重新锁住
   assert.equal(tasks[0]?.status, "up_next");
   assert.equal(tasks[1]?.status, "up_next");
   assert.equal(tasks[2]?.status, "available");
+});
+
+test("buildTodayTasks 会把 review 正式信号摘要写进说明文案", () => {
+  const summaryDashboard: LearningDashboardResponse = {
+    ...dashboard,
+    todayTasks: {
+      ...dashboard.todayTasks,
+      reviewTask: {
+        done: true,
+        reviewItemsCompleted: 3,
+        dueReviewCount: 0,
+        confidentOutputCountToday: 2,
+        fullOutputCountToday: 1,
+      },
+    },
+  };
+
+  const tasks = buildTodayTasks({
+    dashboard: summaryDashboard,
+    continueLearning: null,
+    labels: {
+      taskSceneTitle: "先完成一个场景输入",
+      taskSceneDesc: "进入一个真实语境，先听懂、看懂，再开始训练。",
+      taskReviewTitle: "最后做一轮回忆",
+      taskOutputTitle: "带走 1 到 2 条表达",
+    },
+  });
+
+  assert.match(tasks[2]?.description ?? "", /其中 1 条进入完整输出/);
 });
 
 test("resolveContinueLearningState 会返回 continue learning 的来源", () => {

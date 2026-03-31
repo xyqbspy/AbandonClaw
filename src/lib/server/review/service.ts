@@ -1,5 +1,8 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import {
+  PhraseReviewFullOutputStatus,
+  PhraseReviewOutputConfidence,
+  PhraseReviewRecognitionState,
   PhraseReviewLogRow,
   PhraseReviewResult,
   PhraseRow,
@@ -42,6 +45,18 @@ export interface SubmitPhraseReviewInput {
   userPhraseId: string;
   reviewResult: PhraseReviewResult;
   source?: string;
+  recognitionState?: PhraseReviewRecognitionState;
+  outputConfidence?: PhraseReviewOutputConfidence;
+  fullOutputStatus?: PhraseReviewFullOutputStatus;
+}
+
+export interface ReviewSummary {
+  dueReviewCount: number;
+  reviewedTodayCount: number;
+  reviewAccuracy: number | null;
+  masteredPhraseCount: number;
+  confidentOutputCountToday: number;
+  fullOutputCountToday: number;
 }
 
 export interface DueScenePracticeReviewItem {
@@ -319,6 +334,15 @@ export async function getUserPhraseReviewBuckets(userId: string) {
   };
 }
 
+const isReviewSignalsQueryError = (error: { message: string; code?: string | null }) =>
+  error.code === "42703" ||
+  error.message.includes("recognition_state") ||
+  error.message.includes("output_confidence") ||
+  error.message.includes("full_output_status");
+
+const toReviewSchemaErrorMessage = (context: string, originalMessage: string) =>
+  `Review schema is not up to date (${context}): ${originalMessage}. Run supabase/sql/20260317_phase6_review_loop_mvp.sql and supabase/sql/20260331_phase20_review_practice_signals.sql after earlier review migrations.`;
+
 export async function submitPhraseReview(userId: string, input: SubmitPhraseReviewInput) {
   const admin = createSupabaseAdminClient();
   const { data: existing, error: existingError } = await admin
@@ -396,6 +420,9 @@ export async function submitPhraseReview(userId: string, input: SubmitPhraseRevi
     phrase_id: existing.phrase_id,
     user_phrase_id: existing.id,
     review_result: input.reviewResult,
+    recognition_state: input.recognitionState ?? null,
+    output_confidence: input.outputConfidence ?? null,
+    full_output_status: input.fullOutputStatus ?? null,
     was_correct: input.reviewResult !== "again",
     reviewed_at: now,
     scheduled_next_review_at: nextReviewAt,
@@ -420,13 +447,13 @@ export async function submitPhraseReview(userId: string, input: SubmitPhraseRevi
   );
 }
 
-export async function getReviewSummary(userId: string) {
+export async function getReviewSummary(userId: string): Promise<ReviewSummary> {
   const admin = createSupabaseAdminClient();
   const now = nowIso();
   const today = todayDate();
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
-  const [dueRes, todayStatsRes, accuracyRes, masteredRes] = await Promise.all([
+  const [dueRes, todayStatsRes, accuracyRes, masteredRes, todaySignalsRes] = await Promise.all([
     admin
       .from("user_phrases")
       .select("*", { count: "exact", head: true })
@@ -449,22 +476,45 @@ export async function getReviewSummary(userId: string) {
       .select("*", { count: "exact", head: true })
       .eq("user_id", userId)
       .eq("review_status", "mastered"),
+    admin
+      .from("phrase_review_logs")
+      .select("output_confidence,full_output_status")
+      .eq("user_id", userId)
+      .gte("reviewed_at", `${today}T00:00:00.000Z`)
+      .lt("reviewed_at", `${today}T23:59:59.999Z`),
   ]);
 
   if (dueRes.error) throw new Error(`Failed to count due review items: ${dueRes.error.message}`);
   if (todayStatsRes.error) throw new Error(`Failed to read today's review stats: ${todayStatsRes.error.message}`);
   if (accuracyRes.error) throw new Error(`Failed to read phrase_review_logs: ${accuracyRes.error.message}`);
   if (masteredRes.error) throw new Error(`Failed to count mastered phrases: ${masteredRes.error.message}`);
+  if (todaySignalsRes.error) {
+    if (isReviewSignalsQueryError(todaySignalsRes.error)) {
+      throw new Error(toReviewSchemaErrorMessage("read review practice signals", todaySignalsRes.error.message));
+    }
+    throw new Error(`Failed to read review practice signals: ${todaySignalsRes.error.message}`);
+  }
 
   const accuracyRows = (accuracyRes.data ?? []) as Array<Pick<PhraseReviewLogRow, "was_correct">>;
+  const signalRows = (todaySignalsRes.data ?? []) as Array<
+    Pick<PhraseReviewLogRow, "output_confidence" | "full_output_status">
+  >;
   const totalLogs = accuracyRows.length;
   const correctLogs = accuracyRows.filter((row) => row.was_correct).length;
   const reviewAccuracy = totalLogs === 0 ? null : Math.round((correctLogs / totalLogs) * 100);
+  const confidentOutputCountToday = signalRows.filter(
+    (row) => row.output_confidence === "high",
+  ).length;
+  const fullOutputCountToday = signalRows.filter(
+    (row) => row.full_output_status === "completed",
+  ).length;
 
   return {
     dueReviewCount: dueRes.count ?? 0,
     reviewedTodayCount: todayStatsRes.data?.review_items_completed ?? 0,
     reviewAccuracy,
     masteredPhraseCount: masteredRes.count ?? 0,
+    confidentOutputCountToday,
+    fullOutputCountToday,
   };
 }

@@ -175,12 +175,39 @@ export const parseOptionalStatusFilter = (
 };
 
 export type ReviewResult = "again" | "hard" | "good";
+export type ReviewRecognitionState = "recognized" | "unknown";
+export type ReviewOutputConfidence = "high" | "low";
+export type ReviewFullOutputStatus = "completed" | "not_started";
 
 export const parseReviewResult = (value: unknown): ReviewResult => {
   if (value === "again" || value === "hard" || value === "good") {
     return value;
   }
   throw new ValidationError("reviewResult must be one of again/hard/good.");
+};
+
+export const parseOptionalReviewRecognitionState = (
+  value: unknown,
+): ReviewRecognitionState | undefined => {
+  if (value == null) return undefined;
+  if (value === "recognized" || value === "unknown") return value;
+  throw new ValidationError("recognitionState must be one of recognized/unknown.");
+};
+
+export const parseOptionalReviewOutputConfidence = (
+  value: unknown,
+): ReviewOutputConfidence | undefined => {
+  if (value == null) return undefined;
+  if (value === "high" || value === "low") return value;
+  throw new ValidationError("outputConfidence must be one of high/low.");
+};
+
+export const parseOptionalReviewFullOutputStatus = (
+  value: unknown,
+): ReviewFullOutputStatus | undefined => {
+  if (value == null) return undefined;
+  if (value === "completed" || value === "not_started") return value;
+  throw new ValidationError("fullOutputStatus must be one of completed/not_started.");
 };
 
 export const parsePracticeMode = (value: unknown) => {

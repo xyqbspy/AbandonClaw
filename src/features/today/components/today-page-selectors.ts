@@ -353,11 +353,15 @@ export const buildTodayTasks = ({
     title: labels.taskReviewTitle,
     description: reviewDone
       ? dashboard.todayTasks.reviewTask.reviewItemsCompleted > 0
-        ? `今天已完成 ${dashboard.todayTasks.reviewTask.reviewItemsCompleted} 条回忆练习。`
+        ? dashboard.todayTasks.reviewTask.fullOutputCountToday > 0
+          ? `今天已完成 ${dashboard.todayTasks.reviewTask.reviewItemsCompleted} 条回忆练习，其中 ${dashboard.todayTasks.reviewTask.fullOutputCountToday} 条进入完整输出。`
+          : `今天已完成 ${dashboard.todayTasks.reviewTask.reviewItemsCompleted} 条回忆练习。`
         : "今天没有待复习内容。"
       : sceneReadyForDownstream
         ? dashboard.todayTasks.reviewTask.dueReviewCount > 0
-          ? `当前待回忆 ${dashboard.todayTasks.reviewTask.dueReviewCount} 条，做一轮把输入变成可提取能力。`
+          ? dashboard.todayTasks.reviewTask.confidentOutputCountToday > 0
+            ? `当前待回忆 ${dashboard.todayTasks.reviewTask.dueReviewCount} 条，今天已有 ${dashboard.todayTasks.reviewTask.confidentOutputCountToday} 条进入主动输出。`
+            : `当前待回忆 ${dashboard.todayTasks.reviewTask.dueReviewCount} 条，做一轮把输入变成可提取能力。`
           : "今天先做一轮短回忆，帮助刚学过的表达真正留下来。"
         : "先完成场景输入和表达沉淀，再进入回忆环节会更顺。",
     durationMinutes: 8,
