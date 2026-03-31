@@ -1,0 +1,52 @@
+# sentence-progression Specification
+
+## Purpose
+TBD - created by archiving change clarify-sentence-progression. Update Purpose after archive.
+## Requirements
+### Requirement: 句子推进链路必须区分场景步骤、题型完成与句子里程碑
+系统 MUST 将场景工作台当前步骤、练习内部题型完成度和句子掌握里程碑视为三层独立状态，不得使用单一字段同时表达三者。
+
+#### Scenario: 用户进入句子练习
+- **WHEN** 用户从场景页进入句子练习或开始当前场景的练习模块
+- **THEN** 系统必须把“进入练习阶段”记录为场景步骤推进
+- **AND** 该事件不得直接视为“当前句子已完成”或“当前场景已完成”
+
+### Requirement: 句子完成必须以句子里程碑达到 complete 为准
+系统 MUST 仅在当前句子的最高掌握里程碑达到 `complete` 时，才把该句子视为完成，不得把单次作答、单题正确或仅进入练习页直接判定为句子完成。
+
+#### Scenario: 用户第一次进入练习并完成部分题目
+- **WHEN** 用户已经开始某个句子的练习，并在一个或多个题型里拿到 `keyword` 或 `structure`
+- **THEN** 系统必须把这些结果视为句子里程碑升级
+- **AND** 只要最高里程碑尚未达到 `complete`，该句子仍不得被标记为已完成
+
+#### Scenario: 用户完整复现当前句子
+- **WHEN** 用户在当前句子的练习过程中把最高里程碑提升到 `complete`
+- **THEN** 系统必须把该句子标记为已完成
+- **AND** 用户可见的句子进度、练习反馈与后续入口必须同步反映这一结果
+
+### Requirement: 场景练习完成必须以当前练习模块全部必做题型完成为准
+系统 MUST 仅在当前场景的练习模块全部必做题型完成后，才把 `scene_practice` 视为完成。
+
+#### Scenario: 用户只完成前几个题型
+- **WHEN** 用户完成 `cloze` 或 `guided_recall` 等部分题型，但仍有未完成的后续题型
+- **THEN** 系统必须保持当前场景处于练习进行中
+- **AND** 不得提前把 `scene_practice` 标记为已完成
+
+#### Scenario: 用户完成本轮所有必做题型
+- **WHEN** 当前 practice set 的所有必做题型都达到完成条件
+- **THEN** 系统必须把 `scene_practice` 标记为已完成
+- **AND** 后续场景总结、复盘或变体入口必须以该完成结果为前提
+
+### Requirement: 场景 done 必须晚于场景练习完成
+系统 MUST 将 `done` 视为高于 `scene_practice` 的场景收束状态，只有在场景练习完成且当前产品定义的下游 unlock 条件满足后，才允许进入 `done`。
+
+#### Scenario: 练习已完成但下游未解锁
+- **WHEN** 用户已经完成当前场景练习，但变体或其他下游收束条件尚未满足
+- **THEN** 系统必须保持 `done` 未完成
+- **AND** 场景页仍应提示用户继续当前场景的下游动作，而不是直接视为整段学习已结束
+
+#### Scenario: 场景进入 done
+- **WHEN** 用户已经完成当前场景练习，且下游 unlock 条件满足
+- **THEN** 系统必须把当前场景标记为 `done`
+- **AND** `today`、场景浮层和继续学习入口必须对这一状态给出一致解释
+
