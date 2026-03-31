@@ -38,6 +38,22 @@ export async function getVisibleSceneBySlug(params: { slug: string; userId: stri
   return data ?? null;
 }
 
+export async function listVisibleScenesBySlugs(params: { userId: string; slugs: string[] }) {
+  const uniqueSlugs = Array.from(new Set(params.slugs.map((item) => item.trim()).filter(Boolean)));
+  if (uniqueSlugs.length === 0) return [] as Array<Pick<SceneRow, "slug" | "title">>;
+
+  const admin = createSupabaseAdminClient();
+  const { data, error } = await admin
+    .from("scenes")
+    .select("slug,title")
+    .in("slug", uniqueSlugs)
+    .or(`is_public.eq.true,created_by.eq.${params.userId}`);
+  if (error) {
+    throw new Error(`Failed to list visible scenes by slug: ${error.message}`);
+  }
+  return (data ?? []) as Array<Pick<SceneRow, "slug" | "title">>;
+}
+
 export async function getVisibleSceneById(params: { sceneId: string; userId: string }) {
   const admin = createSupabaseAdminClient();
   const { data, error } = await admin

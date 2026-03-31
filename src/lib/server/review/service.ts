@@ -11,6 +11,7 @@ import {
   UserPhraseRow,
 } from "@/lib/server/db/types";
 import { ValidationError } from "@/lib/server/errors";
+import { listVisibleScenesBySlugs } from "@/lib/server/scene/repository";
 
 const nowIso = () => new Date().toISOString();
 const todayDate = () => new Date().toISOString().slice(0, 10);
@@ -27,6 +28,7 @@ export interface DueReviewItem {
   translation: string | null;
   usageNote: string | null;
   sourceSceneSlug: string | null;
+  sourceSceneAvailable: boolean;
   sourceSentenceText: string | null;
   expressionClusterId: string | null;
   reviewStatus: UserPhraseReviewStatus;
@@ -112,6 +114,7 @@ async function loadClusterIdByUserPhraseId(userId: string, userPhraseIds: string
 const mapDueItem = (
   row: UserPhraseRow & { phrase: PhraseRow | null },
   expressionClusterId: string | null,
+  sourceSceneAvailable: boolean,
 ): DueReviewItem => ({
   userPhraseId: row.id,
   phraseId: row.phrase_id,
@@ -119,6 +122,7 @@ const mapDueItem = (
   translation: row.phrase?.translation ?? null,
   usageNote: row.phrase?.usage_note ?? null,
   sourceSceneSlug: row.source_scene_slug,
+  sourceSceneAvailable,
   sourceSentenceText: row.source_sentence_text,
   expressionClusterId,
   reviewStatus: row.review_status,
@@ -183,11 +187,22 @@ export async function getDueReviewItems(userId: string, params?: { limit?: numbe
   }
 
   const rows = (data ?? []) as Array<UserPhraseRow & { phrase: PhraseRow | null }>;
+  const visibleScenes = await listVisibleScenesBySlugs({
+    userId,
+    slugs: rows.map((row) => row.source_scene_slug ?? ""),
+  });
+  const visibleSceneSlugSet = new Set(visibleScenes.map((row) => row.slug));
   const clusterIdByPhraseId = await loadClusterIdByUserPhraseId(
     userId,
     rows.map((row) => row.id),
   );
-  return rows.map((row) => mapDueItem(row, clusterIdByPhraseId.get(row.id) ?? null));
+  return rows.map((row) =>
+    mapDueItem(
+      row,
+      clusterIdByPhraseId.get(row.id) ?? null,
+      row.source_scene_slug ? visibleSceneSlugSet.has(row.source_scene_slug) : false,
+    ),
+  );
 }
 
 export async function getDueScenePracticeReviewItems(
@@ -393,7 +408,16 @@ export async function submitPhraseReview(userId: string, input: SubmitPhraseRevi
   await addDailyReviewCompleted(userId);
 
   const clusterIdByPhraseId = await loadClusterIdByUserPhraseId(userId, [updated.id]);
-  return mapDueItem(updated, clusterIdByPhraseId.get(updated.id) ?? null);
+  const visibleScenes = await listVisibleScenesBySlugs({
+    userId,
+    slugs: [updated.source_scene_slug ?? ""],
+  });
+  const visibleSceneSlugSet = new Set(visibleScenes.map((row) => row.slug));
+  return mapDueItem(
+    updated,
+    clusterIdByPhraseId.get(updated.id) ?? null,
+    updated.source_scene_slug ? visibleSceneSlugSet.has(updated.source_scene_slug) : false,
+  );
 }
 
 export async function getReviewSummary(userId: string) {

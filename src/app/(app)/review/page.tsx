@@ -665,15 +665,22 @@ export default function ReviewPage() {
             </div>
           ) : currentPhraseItem?.sourceSceneSlug ? (
             <div className="flex flex-wrap gap-3">
-              <LoadingButton
-                type="button"
-                variant="outline"
-                loading={openingSceneHref === `/scene/${currentPhraseItem.sourceSceneSlug}`}
-                loadingText="进入场景中..."
-                onClick={() => openScene(`/scene/${currentPhraseItem.sourceSceneSlug}`)}
-              >
-                {zh.openSourceScene}
-              </LoadingButton>
+              {currentPhraseItem.sourceSceneAvailable ? (
+                <LoadingButton
+                  type="button"
+                  variant="outline"
+                  loading={openingSceneHref === `/scene/${currentPhraseItem.sourceSceneSlug}`}
+                  loadingText="进入场景中..."
+                  onClick={() => openScene(`/scene/${currentPhraseItem.sourceSceneSlug}`)}
+                >
+                  {zh.openSourceScene}
+                </LoadingButton>
+              ) : (
+                <div className="rounded-full border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-700">
+                  <p className="font-medium">{zh.sourceSceneUnavailable}</p>
+                  <p className="text-xs text-amber-600">{zh.sourceSceneUnavailableHint}</p>
+                </div>
+              )}
             </div>
           ) : null}
 

@@ -17,6 +17,7 @@ export const toDueItemFromSavedPhrase = (
     translation: row.translation,
     usageNote: row.usageNote,
     sourceSceneSlug: row.sourceSceneSlug,
+    sourceSceneAvailable: false,
     sourceSentenceText: row.sourceSentenceText,
     expressionClusterId: row.expressionClusterId,
     reviewStatus: row.reviewStatus,

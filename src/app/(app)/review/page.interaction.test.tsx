@@ -28,6 +28,39 @@ let recordScenePracticeAttemptCalls = 0;
 let markScenePracticeModeCompleteCalls = 0;
 let completeScenePracticeRunCalls = 0;
 let startScenePracticeRunError: Error | null = null;
+let currentDueRows: Array<{
+  userPhraseId: string;
+  phraseId: string;
+  text: string;
+  translation: string | null;
+  usageNote: string | null;
+  sourceSceneSlug: string | null;
+  sourceSceneAvailable: boolean;
+  sourceSentenceText: string | null;
+  expressionClusterId: string | null;
+  reviewStatus: "saved" | "reviewing" | "mastered" | "archived";
+  reviewCount: number;
+  correctCount: number;
+  incorrectCount: number;
+  nextReviewAt: string | null;
+}> = [
+  {
+    userPhraseId: "p1",
+    phraseId: "phrase-1",
+    text: "call it a day",
+    translation: "收工",
+    usageNote: null,
+    sourceSceneSlug: null,
+    sourceSceneAvailable: false,
+    sourceSentenceText: null,
+    expressionClusterId: null,
+    reviewStatus: "saved",
+    reviewCount: 0,
+    correctCount: 0,
+    incorrectCount: 0,
+    nextReviewAt: null,
+  },
+];
 let currentScenePracticeRows: Array<{
   sceneSlug: string;
   sceneTitle: string;
@@ -76,24 +109,8 @@ const mockedModules = {
     getDueReviewItemsFromApi: async () => {
       dueRequestCount += 1;
       return {
-        rows: [
-          {
-            userPhraseId: "p1",
-            phraseId: "phrase-1",
-            text: "call it a day",
-            translation: "收工",
-            usageNote: null,
-            sourceSceneSlug: null,
-            sourceSentenceText: null,
-            expressionClusterId: null,
-            reviewStatus: "saved",
-            reviewCount: 0,
-            correctCount: 0,
-            incorrectCount: 0,
-            nextReviewAt: null,
-          },
-        ],
-        total: 1,
+        rows: currentDueRows,
+        total: currentDueRows.length,
         scenePracticeRows: currentScenePracticeRows,
       };
     },
@@ -176,8 +193,81 @@ afterEach(() => {
   markScenePracticeModeCompleteCalls = 0;
   completeScenePracticeRunCalls = 0;
   startScenePracticeRunError = null;
+  currentDueRows = [
+    {
+      userPhraseId: "p1",
+      phraseId: "phrase-1",
+      text: "call it a day",
+      translation: "收工",
+      usageNote: null,
+      sourceSceneSlug: null,
+      sourceSceneAvailable: false,
+      sourceSentenceText: null,
+      expressionClusterId: null,
+      reviewStatus: "saved",
+      reviewCount: 0,
+      correctCount: 0,
+      incorrectCount: 0,
+      nextReviewAt: null,
+    },
+  ];
   currentScenePracticeRows = [];
   ReviewPageModule = null;
+});
+
+test("ReviewPage 普通表达有可访问来源场景时展示跳转入口", async () => {
+  currentDueRows = [
+    {
+      userPhraseId: "p-scene",
+      phraseId: "phrase-scene",
+      text: "call it a day",
+      translation: "收工",
+      usageNote: null,
+      sourceSceneSlug: "coffee-chat",
+      sourceSceneAvailable: true,
+      sourceSentenceText: "Let's call it a day.",
+      expressionClusterId: null,
+      reviewStatus: "saved",
+      reviewCount: 0,
+      correctCount: 0,
+      incorrectCount: 0,
+      nextReviewAt: null,
+    },
+  ];
+
+  const ReviewPage = getReviewPage();
+  render(<ReviewPage />);
+
+  await screen.findByRole("button", { name: "查看原场景" });
+  assert.equal(screen.queryByText("来源场景已不可用"), null);
+});
+
+test("ReviewPage 普通表达来源场景失效时只展示降级提示", async () => {
+  currentDueRows = [
+    {
+      userPhraseId: "p-missing-scene",
+      phraseId: "phrase-missing-scene",
+      text: "call it a day",
+      translation: "收工",
+      usageNote: null,
+      sourceSceneSlug: "missing-scene",
+      sourceSceneAvailable: false,
+      sourceSentenceText: "Let's call it a day.",
+      expressionClusterId: null,
+      reviewStatus: "saved",
+      reviewCount: 0,
+      correctCount: 0,
+      incorrectCount: 0,
+      nextReviewAt: null,
+    },
+  ];
+
+  const ReviewPage = getReviewPage();
+  render(<ReviewPage />);
+
+  await screen.findByText("来源场景已不可用");
+  assert.ok(screen.getByText("这条表达仍可继续复习，但原始场景当前已无法访问。"));
+  assert.equal(screen.queryByRole("button", { name: "查看原场景" }), null);
 });
 
 test("ReviewPage 会处理尾斜杠路径的下拉刷新并强制重新拉取数据", async () => {

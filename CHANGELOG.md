@@ -270,6 +270,22 @@
 - 仓库中已有部分文档存在编码异常；本次新增维护文档均使用 UTF-8 独立落地，后续以新文档为准持续维护
 ## 2026-03-31
 
+### Review 来源场景跳转降级与维护文档补齐
+- `review` 普通表达复习现在会明确区分“有历史来源场景”和“来源场景当前仍可访问”，只有当前用户还能访问该场景时才展示“查看原场景”入口。
+- 当一条待复习表达保留了历史 `sourceSceneSlug`，但原场景已经不可访问时，页面会降级为说明提示，不再把用户直接送到“场景不存在”。
+- 新增 `docs/review-source-mapping.md`，写清 `review` 普通表达复习与场景回补的后端来源、页面字段关系、原场景跳转规则和维护边界，并在 `docs/project-learning-guide.md` 增加入口。
+
+影响范围：
+- `review` 页普通表达卡片与原场景入口展示
+- `review` 服务端待复习表达查询
+- `review` 维护文档与项目学习讲解文档
+
+验证情况：
+- `node --import tsx --test "src/app/(app)/review/review-page-selectors.test.ts"`
+- `node --import tsx --import ./src/test/setup-dom.ts --test "src/app/(app)/review/page.interaction.test.tsx"`
+- `pnpm exec tsc --noEmit`
+- `node_modules\.bin\openspec.CMD change validate clarify-review-source-contract --strict --no-interactive`
+
 ### Scene / Today 服务端句子完成追踪收口
 - 场景学习服务端不再把“进入句子练习”近似当成“句子已完成”，而是把 practice run 进入、句子完成和整段练习完成拆成不同信号。
 - `today`、continue learning 和 scene 学习态现在统一消费新的句子完成语义，避免页面提示已经推进到整段练习，但服务端仍停留在“只是进过练习”的旧状态。

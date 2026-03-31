@@ -9,6 +9,7 @@ export interface DueReviewItemResponse {
   translation: string | null;
   usageNote: string | null;
   sourceSceneSlug: string | null;
+  sourceSceneAvailable: boolean;
   sourceSentenceText: string | null;
   expressionClusterId: string | null;
   reviewStatus: "saved" | "reviewing" | "mastered" | "archived";

@@ -81,6 +81,7 @@ test("toDueItemFromSavedPhrase 只转换可复习状态", () => {
   });
 
   assert.equal(reviewing?.text, "call it a day");
+  assert.equal(reviewing?.sourceSceneAvailable, false);
   assert.equal(archived, null);
 });
 
@@ -95,6 +96,7 @@ test("mergePrioritizedReviewItems 会优先插入 session 项并避免重复", (
         translation: "收工",
         usageNote: null,
         sourceSceneSlug: null,
+        sourceSceneAvailable: false,
         sourceSentenceText: null,
         expressionClusterId: null,
         reviewStatus: "saved",

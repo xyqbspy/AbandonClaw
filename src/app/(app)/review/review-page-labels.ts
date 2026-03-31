@@ -61,6 +61,8 @@ export type ReviewPageLabels = {
   correct: string;
   incorrect: string;
   openSourceScene: string;
+  sourceSceneUnavailable: string;
+  sourceSceneUnavailableHint: string;
   openScenePractice: string;
   practiceAgain: string;
   practiceModePrefix: string;
@@ -146,6 +148,8 @@ export const reviewPageLabels: ReviewPageLabels = {
   correct: "正确",
   incorrect: "错误",
   openSourceScene: "查看原场景",
+  sourceSceneUnavailable: "来源场景已不可用",
+  sourceSceneUnavailableHint: "这条表达仍可继续复习，但原始场景当前已无法访问。",
   openScenePractice: "回到场景继续练",
   practiceAgain: "继续复现这句",
   practiceModePrefix: "推荐练法",

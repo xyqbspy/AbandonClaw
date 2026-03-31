@@ -800,6 +800,10 @@
 - `src/lib/cache/learning-dashboard-cache.ts`
 - `src/lib/cache/review-page-cache.ts`
 
+`review` 页的来源契约、原场景跳转和降级规则，可配合阅读：
+
+- `docs/review-source-mapping.md`
+
 可总结成三句话：
 
 1. 列表页优先缓存命中，降低首屏等待
