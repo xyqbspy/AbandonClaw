@@ -254,7 +254,11 @@ test("useManualExpressionComposer 在有 assist 时会保存 base/similar/contra
     mode: "save_and_review",
   });
   assert.equal(batchPayloads.length, 3);
+  assert.equal((batchPayloads[0] as { items: Array<{ sourceNote?: string }> }).items[0]?.sourceNote, "manual-similar-ai");
   assert.equal((batchPayloads[0] as { items: Array<{ relationType?: string }> }).items[0]?.relationType, "similar");
+  assert.equal((batchPayloads[0] as { items: Array<{ expressionClusterId?: string }> }).items[0]?.expressionClusterId, "cluster-1");
+  assert.equal((batchPayloads[1] as { items: Array<{ sourceNote?: string }> }).items[0]?.sourceNote, "manual-contrast-ai");
   assert.equal((batchPayloads[1] as { items: Array<{ relationType?: string }> }).items[0]?.relationType, "contrast");
+  assert.equal((batchPayloads[1] as { items: Array<{ expressionClusterId?: string }> }).items[0]?.expressionClusterId, undefined);
   assert.equal((batchPayloads[2] as { enrich: { items: unknown[] } }).enrich.items.length, 2);
 });

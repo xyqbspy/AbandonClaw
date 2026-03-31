@@ -934,6 +934,7 @@
 4. `src/features/chunks/components/*`
 5. `src/features/chunks/expression-clusters/ui-logic.ts`
 6. `src/lib/server/expression-clusters/service.ts`
+7. `docs/chunks-data-mapping.md`
 
 ### 第四轮：读后端聚合
 

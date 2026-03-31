@@ -83,6 +83,7 @@ import {
   resolveClusterFilterExpressionLabel,
   resolveFocusExpressionId,
 } from "./chunks-page-logic";
+import { buildQuickAddRelatedPayload } from "./chunks-save-contract";
 import { useChunksRouteState } from "./use-chunks-route-state";
 import { useExpressionClusterActions } from "./use-expression-cluster-actions";
 import { useFocusAssist } from "./use-focus-assist";
@@ -395,6 +396,7 @@ export default function ChunksPage() {
   const [manualText, setManualText] = useState("");
   const [manualSentence, setManualSentence] = useState("");
   const [savingManual, setSavingManual] = useState(false);
+  const [savingManualMode, setSavingManualMode] = useState<"save" | "save_and_review" | null>(null);
   const [savingSentenceExpressionKey, setSavingSentenceExpressionKey] = useState<string | null>(
     null,
   );
@@ -1450,19 +1452,13 @@ export default function ChunksPage() {
 
     setSavingQuickAddRelated(true);
     try {
-      const response = await savePhraseFromApi({
-        text,
-        learningItemType: "expression",
-        sourceType: "manual",
-        sourceNote:
-          quickAddRelatedType === "similar"
-            ? "manual-similar-direct"
-            : "manual-contrast-direct",
-        sourceSentenceText: focusExpression.sourceSentenceText ?? undefined,
-        sourceChunkText: text,
-        relationSourceUserPhraseId: focusExpression.userPhraseId,
-        relationType: quickAddRelatedType,
-      });
+      const response = await savePhraseFromApi(
+        buildQuickAddRelatedPayload({
+          focusExpression,
+          text,
+          kind: quickAddRelatedType,
+        }),
+      );
       await enrichSimilarExpressionFromApi({
         userPhraseId: response.userPhrase.id,
         baseExpression: focusExpression.text,
@@ -1547,6 +1543,7 @@ export default function ChunksPage() {
     }
     if (savingManual) return;
 
+    setSavingManualMode(mode);
     setSavingManual(true);
     try {
       let reviewSessionExpressions: Array<{ userPhraseId: string; text: string }> = [];
@@ -1603,6 +1600,7 @@ export default function ChunksPage() {
       notifyChunksLoadFailed(error instanceof Error ? error.message : null);
     } finally {
       setSavingManual(false);
+      setSavingManualMode(null);
     }
   };
 
@@ -1610,6 +1608,7 @@ export default function ChunksPage() {
     manualItemType,
     manualExpressionAssist,
     savingManual,
+    savingManualMode,
     savingManualSentence,
     labels: {
       title: zh.manualAddTitle,
@@ -2279,14 +2278,15 @@ export default function ChunksPage() {
                 manualSheetState.footerGridClassName
               }`}
             >
-              <LoadingButton
-                type="button"
-                variant="ghost"
-                className={appleButtonStrongClassName}
-                loading={manualSheetState.isSaving}
-                loadingText={formatLoadingText(manualSheetState.primaryActionLabel)}
-                onClick={() => void handleSaveManualExpression("save")}
-              >
+                <LoadingButton
+                  type="button"
+                  variant="ghost"
+                  className={appleButtonStrongClassName}
+                  disabled={manualSheetState.isSaving}
+                  loading={manualSheetState.isPrimarySaving}
+                  loadingText={formatLoadingText(manualSheetState.primaryActionLabel)}
+                  onClick={() => void handleSaveManualExpression("save")}
+                >
                 {manualSheetState.primaryActionLabel}
               </LoadingButton>
               {manualSheetState.showSecondaryAction ? (
@@ -2294,7 +2294,8 @@ export default function ChunksPage() {
                   type="button"
                   variant="ghost"
                   className={appleButtonClassName}
-                  loading={manualSheetState.isSaving}
+                  disabled={manualSheetState.isSaving}
+                  loading={manualSheetState.isSecondarySaving}
                   loadingText={formatLoadingText(manualSheetState.secondaryActionLabel)}
                   onClick={() => void handleSaveManualExpression("save_and_review")}
                 >

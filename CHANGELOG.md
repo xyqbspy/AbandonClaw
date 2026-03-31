@@ -1,6 +1,22 @@
 # Changelog
 
 ## 2026-03-31
+### Chunks 页面保存链路与数据映射维护
+- 为 `chunks` 页面补齐了专门的数据映射维护文档，明确手动新建表达/句子、同类与对照表达生成、Quick Add、expression map、cluster 维护和 review 入口分别会调用哪些前端 API、触发哪些后端写入、产生哪些页面刷新与缓存失效副作用。
+- 把 `chunks` 页里重复分散的保存 payload 语义收口到统一 helper，稳定了 `sourceNote`、`relationType`、`relationSourceUserPhraseId` 与 `expressionClusterId` 的拼装规则，减少手动新建、focus assist、生成同类和快速关联之间各自漂移的风险。
+- 补强了相关回归测试，直接校验 `similar` 会进入 cluster、`contrast` 不会误并入 cluster，以及 generated similar / quick add 的固定来源语义，方便后续维护时快速发现链路断裂。
+- 修复手动新建 `chunk` 时两个底部动作按钮共用同一 loading 展示的问题；现在点击“保存到表达库”时，只会由当前按钮显示保存中，另一按钮保持禁用但不再误显示一起提交。
+
+影响范围：
+- `chunks` 页面新建、生成同类/对照表达、快速关联与表达簇维护链路
+- `phrases` / `expression clusters` 相关保存语义的前端契约
+- `chunks` 专项维护文档与项目学习指引
+
+验证情况：
+- `node --import tsx --test "src/app/(app)/chunks/chunks-save-contract.test.ts" "src/app/(app)/chunks/use-manual-expression-composer.test.tsx" "src/app/(app)/chunks/use-focus-assist.test.tsx" "src/app/(app)/chunks/use-generated-similar-sheet.test.tsx"`
+- `node_modules\\.bin\\openspec.CMD change validate clarify-chunks-data-contract --strict --no-interactive`
+
+## 2026-03-31
 ### Today 学习数据映射文档与展示边界梳理
 - 为 `today` 页面补齐了专项学习数据映射文档，明确继续学习卡片、今日任务、表达摘要与回忆入口分别依赖哪些后端聚合字段、前端回退规则和展示派生逻辑。
 - 收紧 `today` 页内部对学习态的消费边界：继续学习入口来源和有效步骤/进度的解析现在有统一 helper，减少页面和 selector 各自拼接语义导致的漂移。

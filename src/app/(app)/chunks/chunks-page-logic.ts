@@ -450,12 +450,14 @@ export const buildManualSheetState = ({
   manualItemType,
   manualExpressionAssist,
   savingManual,
+  savingManualMode,
   savingManualSentence,
   labels,
 }: {
   manualItemType: "expression" | "sentence";
   manualExpressionAssist: unknown | null;
   savingManual: boolean;
+  savingManualMode: "save" | "save_and_review" | null;
   savingManualSentence: boolean;
   labels: {
     title: string;
@@ -480,6 +482,9 @@ export const buildManualSheetState = ({
     description: labels.description,
     itemTypeLabel: labels.itemTypeLabel,
     isSaving,
+    isPrimarySaving:
+      manualItemType === "sentence" ? savingManualSentence : savingManual && savingManualMode === "save",
+    isSecondarySaving: manualItemType === "expression" && savingManual && savingManualMode === "save_and_review",
     footerGridClassName: manualItemType === "sentence" ? "grid-cols-1" : "grid-cols-2",
     primaryActionLabel: primaryIdleLabel,
     secondaryActionLabel: labels.saveAndReview,

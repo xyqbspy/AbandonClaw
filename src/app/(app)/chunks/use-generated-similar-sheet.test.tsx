@@ -118,6 +118,7 @@ test("useGeneratedSimilarSheet 会保存选中候选并加载 cluster", async ()
   const loaded: string[] = [];
   const filtered: string[] = [];
   const success: string[] = [];
+  const batchPayloads: Array<{ items: Array<Record<string, unknown>> }> = [];
   const { result } = renderHook(() =>
     useGeneratedSimilarSheet({
       expressionRows,
@@ -142,9 +143,12 @@ test("useGeneratedSimilarSheet 会保存选中候选并加载 cluster", async ()
           userPhrase: { id: "saved-1" },
           expressionClusterId: "cluster-1",
         }),
-        savePhrasesBatchFromApi: async () => ({
-          items: [{ created: true, phrase: { id: "phrase-2", normalized_text: "wrap it up", display_text: "wrap it up" }, userPhrase: { id: "saved-2" }, expressionClusterId: "cluster-1" }],
-        }),
+        savePhrasesBatchFromApi: async (payload) => {
+          batchPayloads.push(payload as { items: Array<Record<string, unknown>> });
+          return {
+            items: [{ created: true, phrase: { id: "phrase-2", normalized_text: "wrap it up", display_text: "wrap it up" }, userPhrase: { id: "saved-2" }, expressionClusterId: "cluster-1" }],
+          };
+        },
         enrichSimilarExpressionsBatchFromApi: async () => ({
           items: [{ userPhraseId: "saved-2", status: "done" as const }],
         }),
@@ -169,6 +173,9 @@ test("useGeneratedSimilarSheet 会保存选中候选并加载 cluster", async ()
   assert.deepEqual(loaded, ["cluster-1", "cluster-1"]);
   assert.deepEqual(filtered, ["cluster-1:call it a day"]);
   assert.deepEqual(success, ["saved"]);
+  assert.equal(batchPayloads[0]?.items[0]?.sourceNote, "similar-ai-mvp");
+  assert.equal(batchPayloads[0]?.items[0]?.relationType, "similar");
+  assert.equal(batchPayloads[0]?.items[0]?.expressionClusterId, "cluster-1");
   assert.equal(result.current.similarSheetOpen, false);
 });
 

@@ -152,9 +152,64 @@ test("useFocusAssist 会保存候选并执行后续回调", async () => {
 
   assert.deepEqual(result.current.savingFocusCandidateKeys, []);
   assert.deepEqual(result.current.completedFocusCandidateKeys, ["similar:wrap it up"]);
+  assert.equal(savedPayloads[0]?.sourceNote, "focus-similar-ai");
   assert.equal(savedPayloads[0]?.relationType, "similar");
   assert.equal(savedPayloads[0]?.expressionClusterId, "cluster-1");
   assert.deepEqual(callbackPayloads, [{ savedUserPhraseId: "saved-2", kind: "similar" }]);
+});
+
+test("useFocusAssist 保存 contrast 候选时不会继承 cluster", async () => {
+  const savedPayloads: Array<Parameters<FocusAssistDeps["savePhraseFromApi"]>[0]> = [];
+  const deps: FocusAssistDeps = {
+    generateManualExpressionAssistFromApi: async () => ({
+      version: "v1",
+      inputItem: {
+        text: "",
+        translation: "",
+        usageNote: "",
+        examples: [],
+        semanticFocus: "",
+        typicalScenario: "",
+      },
+      similarExpressions: [],
+      contrastExpressions: [],
+    }),
+    savePhraseFromApi: async (payload) => {
+      savedPayloads.push(payload);
+      return {
+        created: true,
+        phrase: { id: "phrase-3", normalized_text: "keep going", display_text: "keep going" },
+        userPhrase: { id: "saved-3" },
+        expressionClusterId: null,
+      };
+    },
+    enrichSimilarExpressionFromApi: async () => ({
+      userPhraseId: "saved-3",
+      status: "done",
+    }),
+  };
+
+  const { result } = renderHook(() =>
+    useFocusAssist({
+      expressionRows,
+      deps,
+    }),
+  );
+
+  await act(async () => {
+    await result.current.saveFocusCandidate(
+      expressionRows[0],
+      {
+        text: "keep going",
+        differenceLabel: "继续推进",
+      },
+      "contrast",
+    );
+  });
+
+  assert.equal(savedPayloads[0]?.sourceNote, "focus-contrast-ai");
+  assert.equal(savedPayloads[0]?.relationType, "contrast");
+  assert.equal(savedPayloads[0]?.expressionClusterId, undefined);
 });
 
 test("useFocusAssist 在失败时会回调错误并清理 loading key", async () => {

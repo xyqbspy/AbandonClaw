@@ -1,4 +1,4 @@
-import assert from "node:assert/strict";
+﻿import assert from "node:assert/strict";
 import test from "node:test";
 import {
   buildFocusDetailClosePayload,
@@ -562,6 +562,7 @@ test("buildManualSheetState 会稳定输出录入弹层标题和按钮状态", (
       manualItemType: "expression",
       manualExpressionAssist: { inputItem: { text: "call it a day" } },
       savingManual: false,
+      savingManualMode: null,
       savingManualSentence: false,
       labels: {
         title: "添加学习内容",
@@ -578,6 +579,8 @@ test("buildManualSheetState 会稳定输出录入弹层标题和按钮状态", (
       description: "desc",
       itemTypeLabel: "记录类型",
       isSaving: false,
+      isPrimarySaving: false,
+      isSecondarySaving: false,
       footerGridClassName: "grid-cols-2",
       primaryActionLabel: "保存勾选表达",
       secondaryActionLabel: "保存并加入复习",
@@ -590,6 +593,7 @@ test("buildManualSheetState 会稳定输出录入弹层标题和按钮状态", (
       manualItemType: "sentence",
       manualExpressionAssist: null,
       savingManual: false,
+      savingManualMode: null,
       savingManualSentence: true,
       labels: {
         title: "添加学习内容",
@@ -606,10 +610,43 @@ test("buildManualSheetState 会稳定输出录入弹层标题和按钮状态", (
       description: "desc",
       itemTypeLabel: "记录类型",
       isSaving: true,
+      isPrimarySaving: true,
+      isSecondarySaving: false,
       footerGridClassName: "grid-cols-1",
       primaryActionLabel: "保存句子",
       secondaryActionLabel: "保存并加入复习",
       showSecondaryAction: false,
+    },
+  );
+
+  assert.deepEqual(
+    buildManualSheetState({
+      manualItemType: "expression",
+      manualExpressionAssist: null,
+      savingManual: true,
+      savingManualMode: "save_and_review",
+      savingManualSentence: false,
+      labels: {
+        title: "title",
+        description: "desc",
+        itemTypeLabel: "type",
+        saveSentence: "save sentence",
+        saveSelectedExpressions: "save selected",
+        saveToLibrary: "save to library",
+        saveAndReview: "save and review",
+      },
+    }),
+    {
+      title: "title",
+      description: "desc",
+      itemTypeLabel: "type",
+      isSaving: true,
+      isPrimarySaving: false,
+      isSecondarySaving: true,
+      footerGridClassName: "grid-cols-2",
+      primaryActionLabel: "save to library",
+      secondaryActionLabel: "save and review",
+      showSecondaryAction: true,
     },
   );
 });

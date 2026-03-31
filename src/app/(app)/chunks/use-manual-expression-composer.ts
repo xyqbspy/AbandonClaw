@@ -10,6 +10,10 @@ import {
   savePhraseFromApi,
   UserPhraseItemResponse,
 } from "@/lib/utils/phrases-api";
+import {
+  buildManualAssistCandidatePayload,
+  buildManualBaseExpressionSavePayload,
+} from "./chunks-save-contract";
 
 type UseManualExpressionComposerDeps = {
   generateManualExpressionAssistFromApi: typeof generateManualExpressionAssistFromApi;
@@ -150,16 +154,13 @@ export const useManualExpressionComposer = ({
         let familyId: string | null = null;
 
         if (selectedBase) {
-          const baseResponse = await deps.savePhraseFromApi({
-            text: manualExpressionAssist.inputItem.text,
-            learningItemType: "expression",
-            translation: manualExpressionAssist.inputItem.translation || undefined,
-            usageNote: manualExpressionAssist.inputItem.usageNote || undefined,
-            expressionClusterId: selectedSimilar.length > 0 ? `create-cluster:${baseKey}` : undefined,
-            sourceType: "manual",
-            sourceSentenceText: manualExpressionAssist.inputItem.examples[0]?.en || undefined,
-            sourceChunkText: manualExpressionAssist.inputItem.text,
-          });
+          const baseResponse = await deps.savePhraseFromApi(
+            buildManualBaseExpressionSavePayload({
+              assist: manualExpressionAssist,
+              createClusterForSimilar: selectedSimilar.length > 0,
+              baseKey,
+            }),
+          );
           familyId = baseResponse.expressionClusterId;
           await deps.enrichSimilarExpressionFromApi({
             userPhraseId: baseResponse.userPhrase.id,
@@ -176,13 +177,13 @@ export const useManualExpressionComposer = ({
           let remainingSimilar = selectedSimilar;
           if (!familyId) {
             const seedCandidate = selectedSimilar[0];
-            const seedResponse = await deps.savePhraseFromApi({
-              text: seedCandidate.text,
-              sourceType: "manual",
-              sourceNote: "manual-similar-ai",
-              sourceSentenceText: manualExpressionAssist.inputItem.examples[0]?.en || undefined,
-              sourceChunkText: seedCandidate.text,
-            });
+            const seedResponse = await deps.savePhraseFromApi(
+              buildManualAssistCandidatePayload({
+                assist: manualExpressionAssist,
+                candidate: seedCandidate,
+                kind: "similar",
+              }),
+            );
             familyId = seedResponse.expressionClusterId;
             savedForEnrich.push({
               userPhraseId: seedResponse.userPhrase.id,
@@ -201,16 +202,15 @@ export const useManualExpressionComposer = ({
 
           if (remainingSimilar.length > 0) {
             const batchResult = await deps.savePhrasesBatchFromApi({
-              items: remainingSimilar.map((candidate) => ({
-                text: candidate.text,
-                expressionClusterId: familyId as string,
-                sourceType: "manual" as const,
-                sourceNote: "manual-similar-ai",
-                sourceSentenceText: manualExpressionAssist.inputItem.examples[0]?.en || undefined,
-                sourceChunkText: candidate.text,
-                relationSourceUserPhraseId: baseUserPhraseId ?? undefined,
-                relationType: baseUserPhraseId ? ("similar" as const) : undefined,
-              })),
+              items: remainingSimilar.map((candidate) =>
+                buildManualAssistCandidatePayload({
+                  assist: manualExpressionAssist,
+                  candidate,
+                  kind: "similar",
+                  expressionClusterId: familyId as string,
+                  relationSourceUserPhraseId: baseUserPhraseId ?? undefined,
+                }),
+              ),
             });
             savedForEnrich.push(
               ...batchResult.items.map((response, index) => ({
@@ -229,15 +229,14 @@ export const useManualExpressionComposer = ({
 
         if (selectedContrast.length > 0) {
           const batchResult = await deps.savePhrasesBatchFromApi({
-            items: selectedContrast.map((candidate) => ({
-              text: candidate.text,
-              sourceType: "manual" as const,
-              sourceNote: "manual-contrast-ai",
-              sourceSentenceText: manualExpressionAssist.inputItem.examples[0]?.en || undefined,
-              sourceChunkText: candidate.text,
-              relationSourceUserPhraseId: baseUserPhraseId ?? undefined,
-              relationType: baseUserPhraseId ? ("contrast" as const) : undefined,
-            })),
+            items: selectedContrast.map((candidate) =>
+              buildManualAssistCandidatePayload({
+                assist: manualExpressionAssist,
+                candidate,
+                kind: "contrast",
+                relationSourceUserPhraseId: baseUserPhraseId ?? undefined,
+              }),
+            ),
           });
           savedForEnrich.push(
             ...batchResult.items.map((response, index) => ({

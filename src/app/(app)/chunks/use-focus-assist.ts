@@ -9,6 +9,7 @@ import {
   SimilarExpressionCandidateResponse,
   UserPhraseItemResponse,
 } from "@/lib/utils/phrases-api";
+import { buildFocusAssistCandidatePayload } from "./chunks-save-contract";
 
 type UseFocusAssistDeps = {
   generateManualExpressionAssistFromApi: typeof generateManualExpressionAssistFromApi;
@@ -84,18 +85,13 @@ export const useFocusAssist = ({
 
       setSavingFocusCandidateKeys((current) => [...current, key]);
       try {
-        const response = await deps.savePhraseFromApi({
-          text: candidate.text,
-          learningItemType: "expression",
-          sourceType: "manual",
-          sourceNote: kind === "similar" ? "focus-similar-ai" : "focus-contrast-ai",
-          sourceSentenceText: focusItem.sourceSentenceText ?? undefined,
-          sourceChunkText: candidate.text,
-          expressionClusterId:
-            kind === "similar" ? focusItem.expressionClusterId ?? undefined : undefined,
-          relationSourceUserPhraseId: focusItem.userPhraseId,
-          relationType: kind,
-        });
+        const response = await deps.savePhraseFromApi(
+          buildFocusAssistCandidatePayload({
+            focusItem,
+            candidate,
+            kind,
+          }),
+        );
         await deps.enrichSimilarExpressionFromApi({
           userPhraseId: response.userPhrase.id,
           baseExpression: focusItem.text,

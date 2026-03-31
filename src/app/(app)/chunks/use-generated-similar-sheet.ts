@@ -13,6 +13,10 @@ import {
   SimilarExpressionCandidateResponse,
   UserPhraseItemResponse,
 } from "@/lib/utils/phrases-api";
+import {
+  buildGeneratedSimilarBasePayload,
+  buildGeneratedSimilarCandidatePayload,
+} from "./chunks-save-contract";
 
 type UseGeneratedSimilarSheetDeps = {
   getGeneratedSimilarCache: typeof getGeneratedSimilarCache;
@@ -126,33 +130,24 @@ export const useGeneratedSimilarSheet = ({
     }
     setSavingSelectedSimilar(true);
     try {
-      const baseSaveResult = await deps.savePhraseFromApi({
-        text: similarSeedExpression.text,
-        expressionClusterId:
-          similarSeedExpression.expressionClusterId ??
-          `create-cluster:${similarSeedExpression.userPhraseId}`,
-        sourceType: similarSeedExpression.sourceType,
-        sourceSceneSlug: similarSeedExpression.sourceSceneSlug ?? undefined,
-        sourceSentenceText: similarSeedExpression.sourceSentenceText ?? undefined,
-        sourceChunkText: similarSeedExpression.text,
-        translation: similarSeedExpression.translation ?? undefined,
-      });
+      const baseSaveResult = await deps.savePhraseFromApi(
+        buildGeneratedSimilarBasePayload({
+          seedExpression: similarSeedExpression,
+        }),
+      );
       const clusterId = baseSaveResult.expressionClusterId;
       if (!clusterId) {
         throw new Error("未能为主表达创建同类表达组。");
       }
 
       const batchResult = await deps.savePhrasesBatchFromApi({
-        items: selectedSimilarCandidates.map((candidate) => ({
-          text: candidate.text,
-          expressionClusterId: clusterId,
-          sourceType: "manual" as const,
-          sourceNote: "similar-ai-mvp",
-          sourceSentenceText: similarSeedExpression.sourceSentenceText ?? undefined,
-          sourceChunkText: candidate.text,
-          relationSourceUserPhraseId: similarSeedExpression.userPhraseId,
-          relationType: "similar" as const,
-        })),
+        items: selectedSimilarCandidates.map((candidate) =>
+          buildGeneratedSimilarCandidatePayload({
+            candidate,
+            seedExpression: similarSeedExpression,
+            clusterId,
+          }),
+        ),
       });
       const savedResponses = batchResult.items;
 
