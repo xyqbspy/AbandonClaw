@@ -28,14 +28,35 @@ export type ReviewPageLabels = {
   phraseStepTag: string;
   sceneStepTag: string;
   phraseScenarioLabel: string;
+  phraseRecallScenarioLabel: string;
   phraseReferenceLabel: string;
   phraseReferenceHint: string;
+  phraseMaskedExpression: string;
+  phraseMicroRecallTitle: string;
+  phraseMicroRecallBody: string;
+  phraseConfidenceLabel: string;
+  phraseRecognitionLabel: string;
+  phraseRecognitionKnown: string;
+  phraseRecognitionUnknown: string;
+  phraseOutputConfidenceLabel: string;
+  phraseOutputConfidenceHigh: string;
+  phraseOutputConfidenceLow: string;
+  phraseRewriteLabel: string;
+  phraseRewritePlaceholder: string;
+  phraseRewriteTodoTitle: string;
+  phraseRewriteTodoBody: string;
+  phraseRewritePromptLabel: string;
+  phraseOutputLabel: string;
+  phraseOutputPlaceholder: string;
   phraseDraftLabel: string;
   phraseDraftPlaceholder: string;
   phraseFeedbackLabel: string;
   phraseFeedbackTodoTitle: string;
   phraseFeedbackTodoBody: string;
   phraseRevealCta: string;
+  phraseConfidenceCta: string;
+  phraseRewriteCta: string;
+  phraseOutputCta: string;
   phrasePracticeCta: string;
   phraseScoringHint: string;
   phraseNextCta: string;
@@ -115,14 +136,35 @@ export const reviewPageLabels: ReviewPageLabels = {
   phraseStepTag: "STEP 1. 表达唤醒",
   sceneStepTag: "STEP 1. 场景回补",
   phraseScenarioLabel: "当前表达",
+  phraseRecallScenarioLabel: "当前语境",
   phraseReferenceLabel: "参考句",
   phraseReferenceHint: "想不起来时再展开参考句，尽量先自己回想。",
+  phraseMaskedExpression: "先别看表达本体，试着只根据语境和释义回想。",
+  phraseMicroRecallTitle: "先只看语境，不看表达本体",
+  phraseMicroRecallBody: "在脑中默说一遍你会怎么表达，确认想不起来时再展开参考。",
+  phraseConfidenceLabel: "STEP 2. 熟悉度与输出信心",
+  phraseRecognitionLabel: "这条表达你现在是“眼熟”还是“仍陌生”？",
+  phraseRecognitionKnown: "眼熟，能认出来",
+  phraseRecognitionUnknown: "还是陌生",
+  phraseOutputConfidenceLabel: "如果不看参考，你觉得自己能主动说出来吗？",
+  phraseOutputConfidenceHigh: "能主动说出来",
+  phraseOutputConfidenceLow: "还需要提示",
+  phraseRewriteLabel: "STEP 3. 变体改写",
+  phraseRewritePlaceholder: "根据改写提示，先写一个局部变体。这里先保留为本地草稿，后续再补正式评估。",
+  phraseRewriteTodoTitle: "TODO：变体改写评估待接入",
+  phraseRewriteTodoBody: "后续这里会补人称、时态、对象变化后的命中率和自然度反馈。",
+  phraseRewritePromptLabel: "本次改写方向",
+  phraseOutputLabel: "STEP 4. 场景完整输出",
+  phraseOutputPlaceholder: "不用填空，直接写出一整句或两整句。这里先保留为本地草稿，后续再补 chunks 命中率和自然度分析。",
   phraseDraftLabel: "STEP 2. 自己试着说一句",
   phraseDraftPlaceholder: "用这条表达写一句你自己的话。这里先保留为本地草稿，后续再补 AI 点评。",
   phraseFeedbackLabel: "STEP 3. 给这次复习一个判断",
   phraseFeedbackTodoTitle: "TODO：AI 反馈待接入",
   phraseFeedbackTodoBody: "后续这里会补自然度点评、替代表达建议和更细的输出反馈。",
   phraseRevealCta: "想好了，查看参考",
+  phraseConfidenceCta: "进入熟悉度判断",
+  phraseRewriteCta: "继续做变体改写",
+  phraseOutputCta: "继续进入完整输出",
   phrasePracticeCta: "继续进入输出练习",
   phraseScoringHint: "看完参考和自己的表达后，再判断这条表达你现在掌握到什么程度。",
   phraseNextCta: "继续下一项复习",

@@ -293,19 +293,33 @@ test("ReviewPage 会处理尾斜杠路径的下拉刷新并强制重新拉取数
   });
 });
 
-test("ReviewPage 普通表达复习会按 recall -> practice -> feedback 推进并写回缓存", async () => {
+test("ReviewPage 普通表达复习会按微回忆 -> 熟悉度 -> 改写 -> 输出 -> feedback 推进并写回缓存", async () => {
   const ReviewPage = getReviewPage();
   render(<ReviewPage />);
 
-  await screen.findByRole("button", { name: "想好了，查看参考" });
+  await screen.findByRole("button", { name: "进入熟悉度判断" });
 
-  fireEvent.click(screen.getByRole("button", { name: "想好了，查看参考" }));
-  await screen.findByRole("button", { name: "进入复习判断" });
-  assert.ok(screen.getByText("STEP 2. 输出练习"));
+  fireEvent.click(screen.getByRole("button", { name: "进入熟悉度判断" }));
+  await screen.findByRole("button", { name: "眼熟，能认出来" });
+  assert.ok(screen.getByText("STEP 2. 熟悉度判断"));
 
-  fireEvent.change(screen.getByPlaceholderText("用这条表达写一句你自己的话。这里先保留为本地草稿，后续再补 AI 点评。"), {
-    target: { value: "We should call it a day now." },
+  fireEvent.click(screen.getByRole("button", { name: "眼熟，能认出来" }));
+  fireEvent.click(screen.getByRole("button", { name: "能主动说出来" }));
+  fireEvent.click(screen.getByRole("button", { name: "继续做变体改写" }));
+
+  await screen.findByPlaceholderText("根据改写提示，先写一个局部变体。这里先保留为本地草稿，后续再补正式评估。");
+  fireEvent.change(screen.getByPlaceholderText("根据改写提示，先写一个局部变体。这里先保留为本地草稿，后续再补正式评估。"), {
+    target: { value: "Don't push yourself too hard today." },
   });
+  fireEvent.click(screen.getByRole("button", { name: "继续进入完整输出" }));
+
+  await screen.findByPlaceholderText("不用填空，直接写出一整句或两整句。这里先保留为本地草稿，后续再补 chunks 命中率和自然度分析。");
+  fireEvent.change(
+    screen.getByPlaceholderText("不用填空，直接写出一整句或两整句。这里先保留为本地草稿，后续再补 chunks 命中率和自然度分析。"),
+    {
+      target: { value: "We should call it a day now. Let's pick it up again tomorrow." },
+    },
+  );
   fireEvent.click(screen.getByRole("button", { name: "进入复习判断" }));
 
   await screen.findByRole("button", { name: "能用出来" });

@@ -1,7 +1,18 @@
 import { UserPhraseItemResponse } from "@/lib/utils/phrases-api";
 import { DueReviewItemResponse, DueScenePracticeReviewItemResponse } from "@/lib/utils/review-api";
 
-export type ReviewTaskStage = "recall" | "practice" | "feedback";
+export type ReviewTaskStage =
+  | "recall"
+  | "confidence"
+  | "rewrite"
+  | "practice"
+  | "feedback";
+
+export type PhraseRewritePrompt = {
+  id: "self" | "colleague" | "past";
+  title: string;
+  description: string;
+};
 
 export const buildFallbackExampleSentence = (expression: string) =>
   `I can use "${expression}" in a real sentence.`;
@@ -182,18 +193,48 @@ export const buildReviewTaskStageMeta = ({
 
   if (stage === "recall") {
     return {
-      stepTag: "STEP 1. 表达唤醒",
-      title: "先在脑中把这条表达提起来",
+      stepTag: "STEP 1. 微回忆",
+      title: "先只看语境，试着把表达主动提起来",
+    };
+  }
+  if (stage === "confidence") {
+    return {
+      stepTag: "STEP 2. 熟悉度判断",
+      title: "区分这条表达是眼熟，还是已经能主动说出来",
+    };
+  }
+  if (stage === "rewrite") {
+    return {
+      stepTag: "STEP 3. 变体改写",
+      title: "换一个对象、时态或视角，把表达重新组织一遍",
     };
   }
   if (stage === "practice") {
     return {
-      stepTag: "STEP 2. 输出练习",
-      title: "试着用自己的话造一句",
+      stepTag: "STEP 4. 完整输出",
+      title: "脱离填空，直接把整句或两句完整说出来",
     };
   }
   return {
-    stepTag: "STEP 3. 复习判断",
-    title: "给这次复习一个明确判断",
+    stepTag: "STEP 5. 复习判断",
+    title: "结合前面的表现，给这次复习一个明确判断",
   };
 };
+
+export const buildPhraseRewritePrompts = (): PhraseRewritePrompt[] => [
+  {
+    id: "self",
+    title: "改成对自己说",
+    description: "把它改成你安慰自己、提醒自己的说法。",
+  },
+  {
+    id: "colleague",
+    title: "改成对同事说",
+    description: "把它改成你对同事或朋友说的话。",
+  },
+  {
+    id: "past",
+    title: "改成昨天发生的事",
+    description: "把它改成描述昨天已经发生过的场景。",
+  },
+];

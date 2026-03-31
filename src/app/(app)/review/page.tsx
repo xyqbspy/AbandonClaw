@@ -60,10 +60,12 @@ import {
 } from "./review-page-notify";
 import {
   buildFallbackExampleSentence,
+  buildPhraseRewritePrompts,
   buildReviewProgressModel,
   buildReviewTaskStageMeta,
   buildScenePracticeReviewItemKey,
   mergePrioritizedReviewItems,
+  PhraseRewritePrompt,
   resolveReviewHints,
   resolveReviewSourceLabel,
   ReviewTaskStage,
@@ -90,6 +92,9 @@ type SceneFeedbackState = {
   completed: boolean;
 };
 
+type PhraseRecognitionState = "recognized" | "unknown" | null;
+type PhraseOutputConfidenceState = "high" | "low" | null;
+
 export default function ReviewPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -101,10 +106,17 @@ export default function ReviewPage() {
   const [openingSceneHref, setOpeningSceneHref] = useState<string | null>(null);
   const [taskStage, setTaskStage] = useState<ReviewTaskStage>("recall");
   const [showReference, setShowReference] = useState(false);
+  const [phraseRecognition, setPhraseRecognition] = useState<PhraseRecognitionState>(null);
+  const [phraseOutputConfidence, setPhraseOutputConfidence] =
+    useState<PhraseOutputConfidenceState>(null);
+  const [phraseRewritePromptId, setPhraseRewritePromptId] =
+    useState<PhraseRewritePrompt["id"]>("self");
+  const [phraseRewriteDraft, setPhraseRewriteDraft] = useState("");
   const [phraseDraft, setPhraseDraft] = useState("");
   const [scenePracticeAnswer, setScenePracticeAnswer] = useState("");
   const [sceneFeedback, setSceneFeedback] = useState<SceneFeedbackState | null>(null);
   const activeLoadTokenRef = useRef(0);
+  const phraseRewritePrompts = useMemo(() => buildPhraseRewritePrompts(), []);
 
   const loadData = useCallback(async (options?: { preferCache?: boolean }) => {
     const token = activeLoadTokenRef.current + 1;
@@ -216,6 +228,10 @@ export default function ReviewPage() {
   useEffect(() => {
     setTaskStage("recall");
     setShowReference(false);
+    setPhraseRecognition(null);
+    setPhraseOutputConfidence(null);
+    setPhraseRewritePromptId("self");
+    setPhraseRewriteDraft("");
     setPhraseDraft("");
     setScenePracticeAnswer("");
     setSceneFeedback(null);
@@ -261,6 +277,13 @@ export default function ReviewPage() {
   const currentPhraseExampleSentence = currentPhraseItem
     ? currentPhraseItem.sourceSentenceText?.trim() || buildFallbackExampleSentence(currentPhraseItem.text)
     : "";
+  const currentRewritePrompt =
+    phraseRewritePrompts.find((prompt) => prompt.id === phraseRewritePromptId) ??
+    phraseRewritePrompts[0];
+  const phraseCanContinueFromConfidence =
+    phraseRecognition != null && phraseOutputConfidence != null;
+  const phraseCanContinueFromRewrite = phraseRewriteDraft.trim().length > 0;
+  const phraseCanContinueFromPractice = phraseDraft.trim().length > 0;
 
   const refreshAfterScenePractice = useCallback(async () => {
     await clearAllReviewPageCache();
@@ -580,23 +603,36 @@ export default function ReviewPage() {
             ) : currentPhraseItem ? (
               <div className="mt-6 space-y-4">
                 <div className={`rounded-[20px] p-4 ${APPLE_PANEL}`}>
-                  <p className={APPLE_META_TEXT}>{zh.phraseScenarioLabel}</p>
-                  <p className="mt-2 text-2xl font-semibold text-slate-950">{currentPhraseItem.text}</p>
+                  <p className={APPLE_META_TEXT}>
+                    {taskStage === "recall" ? zh.phraseRecallScenarioLabel : zh.phraseScenarioLabel}
+                  </p>
+                  {taskStage === "recall" && !showReference ? (
+                    <p className="mt-2 text-lg font-semibold text-slate-950">
+                      {zh.phraseMaskedExpression}
+                    </p>
+                  ) : (
+                    <p className="mt-2 text-2xl font-semibold text-slate-950">{currentPhraseItem.text}</p>
+                  )}
                   <p className={`mt-2 text-sm ${APPLE_META_TEXT}`}>
                     {currentPhraseItem.translation ?? zh.noTranslation}
                   </p>
                 </div>
 
                 <div className="rounded-[20px] border-2 border-dashed border-slate-200 bg-slate-50 p-4">
-                  <p className="text-sm font-medium text-slate-700">{zh.activeRecallHint}</p>
+                  <p className="text-sm font-medium text-slate-700">
+                    {taskStage === "recall" ? zh.phraseMicroRecallTitle : zh.activeRecallHint}
+                  </p>
+                  <p className={`mt-2 text-sm ${APPLE_META_TEXT}`}>
+                    {taskStage === "recall" ? zh.phraseMicroRecallBody : zh.phraseReferenceHint}
+                  </p>
                   <Button
                     type="button"
                     variant="ghost"
                     className="mt-4 h-auto px-0 text-sm font-medium text-slate-600"
                     onClick={() => setShowReference((prev) => !prev)}
-                  >
-                    {showReference ? zh.hideReference : zh.showReference}
-                  </Button>
+                    >
+                      {showReference ? zh.hideReference : zh.showReference}
+                    </Button>
                   {showReference ? (
                     <div className="mt-3 rounded-[18px] bg-white p-4 shadow-sm">
                       <p className={APPLE_META_TEXT}>{zh.phraseReferenceLabel}</p>
@@ -605,17 +641,97 @@ export default function ReviewPage() {
                         <p className={`mt-2 ${APPLE_META_TEXT}`}>{currentPhraseItem.usageNote}</p>
                       ) : null}
                     </div>
-                  ) : (
-                    <p className={`mt-3 text-sm ${APPLE_META_TEXT}`}>{zh.phraseReferenceHint}</p>
-                  )}
+                  ) : null}
                 </div>
+
+                {taskStage === "confidence" ? (
+                  <div className="space-y-4">
+                    <div className={`rounded-[20px] p-4 ${APPLE_PANEL}`}>
+                      <p className={APPLE_META_TEXT}>{zh.phraseConfidenceLabel}</p>
+                      <p className="mt-3 text-sm font-medium text-slate-800">
+                        {zh.phraseRecognitionLabel}
+                      </p>
+                      <div className="mt-3 grid grid-cols-2 gap-2">
+                        <Button
+                          type="button"
+                          variant={phraseRecognition === "recognized" ? "default" : "outline"}
+                          onClick={() => setPhraseRecognition("recognized")}
+                        >
+                          {zh.phraseRecognitionKnown}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant={phraseRecognition === "unknown" ? "default" : "outline"}
+                          onClick={() => setPhraseRecognition("unknown")}
+                        >
+                          {zh.phraseRecognitionUnknown}
+                        </Button>
+                      </div>
+                      <p className="mt-5 text-sm font-medium text-slate-800">
+                        {zh.phraseOutputConfidenceLabel}
+                      </p>
+                      <div className="mt-3 grid grid-cols-2 gap-2">
+                        <Button
+                          type="button"
+                          variant={phraseOutputConfidence === "high" ? "default" : "outline"}
+                          onClick={() => setPhraseOutputConfidence("high")}
+                        >
+                          {zh.phraseOutputConfidenceHigh}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant={phraseOutputConfidence === "low" ? "default" : "outline"}
+                          onClick={() => setPhraseOutputConfidence("low")}
+                        >
+                          {zh.phraseOutputConfidenceLow}
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+
+                {taskStage === "rewrite" ? (
+                  <div className="space-y-4">
+                    <div className={`rounded-[20px] p-4 ${APPLE_PANEL}`}>
+                      <p className={APPLE_META_TEXT}>{zh.phraseRewriteLabel}</p>
+                      <p className="mt-3 text-sm font-medium text-slate-800">
+                        {zh.phraseRewritePromptLabel}
+                      </p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {phraseRewritePrompts.map((prompt) => (
+                          <Button
+                            key={prompt.id}
+                            type="button"
+                            variant={phraseRewritePromptId === prompt.id ? "default" : "outline"}
+                            onClick={() => setPhraseRewritePromptId(prompt.id)}
+                          >
+                            {prompt.title}
+                          </Button>
+                        ))}
+                      </div>
+                      <p className={`mt-3 text-sm ${APPLE_META_TEXT}`}>
+                        {currentRewritePrompt?.description}
+                      </p>
+                      <textarea
+                        className={`mt-3 min-h-24 w-full px-4 py-3 text-sm ${APPLE_INPUT_PANEL}`}
+                        placeholder={zh.phraseRewritePlaceholder}
+                        value={phraseRewriteDraft}
+                        onChange={(event) => setPhraseRewriteDraft(event.target.value)}
+                      />
+                    </div>
+                    <div className="rounded-[20px] border border-dashed border-slate-200 bg-slate-50 p-4">
+                      <p className="text-sm font-semibold text-slate-900">{zh.phraseRewriteTodoTitle}</p>
+                      <p className={`mt-2 text-sm ${APPLE_META_TEXT}`}>{zh.phraseRewriteTodoBody}</p>
+                    </div>
+                  </div>
+                ) : null}
 
                 {taskStage === "practice" ? (
                   <div className={`rounded-[20px] p-4 ${APPLE_PANEL}`}>
-                    <p className={APPLE_META_TEXT}>{zh.phraseDraftLabel}</p>
+                    <p className={APPLE_META_TEXT}>{zh.phraseOutputLabel}</p>
                     <textarea
                       className={`mt-3 min-h-28 w-full px-4 py-3 text-sm ${APPLE_INPUT_PANEL}`}
-                      placeholder={zh.phraseDraftPlaceholder}
+                      placeholder={zh.phraseOutputPlaceholder}
                       value={phraseDraft}
                       onChange={(event) => setPhraseDraft(event.target.value)}
                     />
@@ -627,6 +743,32 @@ export default function ReviewPage() {
                     <div className={`rounded-[20px] p-4 ${APPLE_PANEL}`}>
                       <p className={APPLE_META_TEXT}>{zh.phraseFeedbackLabel}</p>
                       <p className="mt-2 text-sm text-slate-700">{zh.phraseScoringHint}</p>
+                      <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                        {phraseRecognition ? (
+                          <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">
+                            {phraseRecognition === "recognized"
+                              ? zh.phraseRecognitionKnown
+                              : zh.phraseRecognitionUnknown}
+                          </span>
+                        ) : null}
+                        {phraseOutputConfidence ? (
+                          <span className="rounded-full bg-sky-50 px-3 py-1 text-sky-700">
+                            {phraseOutputConfidence === "high"
+                              ? zh.phraseOutputConfidenceHigh
+                              : zh.phraseOutputConfidenceLow}
+                          </span>
+                        ) : null}
+                        {phraseRewriteDraft.trim() ? (
+                          <span className="rounded-full bg-amber-50 px-3 py-1 text-amber-700">
+                            {currentRewritePrompt?.title}
+                          </span>
+                        ) : null}
+                        {phraseDraft.trim() ? (
+                          <span className="rounded-full bg-emerald-50 px-3 py-1 text-emerald-700">
+                            已完成完整输出草稿
+                          </span>
+                        ) : null}
+                      </div>
                       <p className={`mt-3 text-sm ${APPLE_META_TEXT}`}>
                         {zh.reviewStats} {currentPhraseItem.reviewCount}，{zh.correct}{" "}
                         {currentPhraseItem.correctCount}，{zh.incorrect} {currentPhraseItem.incorrectCount}
@@ -749,15 +891,34 @@ export default function ReviewPage() {
                   className="h-14 rounded-full text-base"
                   onClick={() => {
                     setShowReference(true);
-                    setTaskStage("practice");
+                    setTaskStage("confidence");
                   }}
                 >
-                  {zh.phraseRevealCta}
+                  {zh.phraseConfidenceCta}
+                </LoadingButton>
+              ) : taskStage === "confidence" ? (
+                <LoadingButton
+                  type="button"
+                  className="h-14 rounded-full text-base"
+                  disabled={!phraseCanContinueFromConfidence}
+                  onClick={() => setTaskStage("rewrite")}
+                >
+                  {zh.phraseRewriteCta}
+                </LoadingButton>
+              ) : taskStage === "rewrite" ? (
+                <LoadingButton
+                  type="button"
+                  className="h-14 rounded-full text-base"
+                  disabled={!phraseCanContinueFromRewrite}
+                  onClick={() => setTaskStage("practice")}
+                >
+                  {zh.phraseOutputCta}
                 </LoadingButton>
               ) : taskStage === "practice" ? (
                 <LoadingButton
                   type="button"
                   className="h-14 rounded-full text-base"
+                  disabled={!phraseCanContinueFromPractice}
                   onClick={() => setTaskStage("feedback")}
                 >
                   {zh.phraseFeedbackCta}

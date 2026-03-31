@@ -2,6 +2,23 @@
 
 ## 2026-03-31
 
+### Review 页面递进式练习流增强
+- `review` 普通表达复习现在不再只是一轮“看参考 -> 打分”，而是改成 `微回忆 -> 熟悉度/输出信心 -> 变体改写 -> 完整输出 -> 结果判断` 的递进式训练流。
+- 第一阶段会先隐藏表达本体，让用户只根据语境和释义做微回忆；随后增加“眼熟 / 陌生”“能主动说 / 还需要提示”的判断，用来区分识别记忆和主动输出信心。
+- 新增本地 TODO 版的变体改写和完整输出环节，先让用户练习把表达迁移到不同对象/时态，并尝试直接写出整句；正式后端仍沿用现有 `again / hard / good` 提交，不伪造新的学习完成信号。
+- 新增 `docs/review-progressive-practice.md`，补齐递进式复习阶段、TODO 边界和失败降级规则的维护说明，并与 `review` 来源文档相互关联。
+
+影响范围：
+- `review` 页普通表达复习阶段模型与底部 CTA
+- `review` 页交互测试与阶段 selector
+- `review` 专项维护文档
+
+验证情况：
+- `node --import tsx --test "src/app/(app)/review/review-page-selectors.test.ts"`
+- `node --import tsx --import ./src/test/setup-dom.ts --test "src/app/(app)/review/page.interaction.test.tsx"`
+- `pnpm exec tsc --noEmit`
+- `node_modules\\.bin\\openspec.CMD change validate review-progressive-practice --strict --no-interactive`
+
 ### Review 页面改造成阶段式沉浸复习流
 - 参考 `newApphtml/review.html` 重构了 `review` 页面，把原先并排堆叠的普通表达复习和场景回补，收口成单主舞台的三阶段流程：先回忆，再作答，最后给出反馈或进入下一题。
 - 新的复习页补上了顶部进度区、今日摘要卡、阶段标签、渐进式参考展开和底部固定 CTA，让普通表达与场景回补使用统一的交互节奏。

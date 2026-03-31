@@ -198,9 +198,13 @@ test("buildReviewProgressModel 会稳定计算进度百分比和正确率文本"
 });
 
 test("buildReviewTaskStageMeta 会为两类任务返回稳定阶段标题", () => {
+  assert.deepEqual(buildReviewTaskStageMeta({ taskKind: "phrase_review", stage: "rewrite" }), {
+    stepTag: "STEP 3. 变体改写",
+    title: "换一个对象、时态或视角，把表达重新组织一遍",
+  });
   assert.deepEqual(buildReviewTaskStageMeta({ taskKind: "phrase_review", stage: "practice" }), {
-    stepTag: "STEP 2. 输出练习",
-    title: "试着用自己的话造一句",
+    stepTag: "STEP 4. 完整输出",
+    title: "脱离填空，直接把整句或两句完整说出来",
   });
   assert.deepEqual(buildReviewTaskStageMeta({ taskKind: "scene_practice", stage: "feedback" }), {
     stepTag: "STEP 3. 反馈与下一步",
