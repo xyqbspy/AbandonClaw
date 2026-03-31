@@ -12,13 +12,14 @@ TBD - created by archiving change formalize-review-practice-signals. Update Purp
 - **AND** 不得在未定义正式边界的情况下直接把前端阶段状态写成长期学习字段
 
 ### Requirement: Review 正式信号必须与最终反馈并存
-系统 MUST 允许 `review` 递进式练习的新正式信号与现有最终反馈结果并存，而不是在没有迁移策略时直接替换 `again / hard / good`。
+系统 MUST 允许 `review` 递进式练习的新正式信号与现有最终反馈结果并存，而不是在没有迁移策略时直接替换 `again / hard / good`。这些正式信号 MUST 不只停留在记录或摘要层，还必须能按约定参与调度排序与节奏细调。
 
 #### Scenario: 系统记录一次包含递进式阶段的 review
 - **WHEN** 用户完成一次包含识别、输出信心或完整输出的复习流程
 - **THEN** 系统必须能同时保留本次最终反馈结果
 - **AND** 新的正式阶段信号必须作为补充维度存在
 - **AND** 调度层不得因为接入新信号而丢失现有最终反馈兼容性
+- **AND** 这些正式信号必须能够影响后续排序或节奏，而不是只写入日志后长期不被调度使用
 
 ### Requirement: Review 正式信号必须可被聚合为稳定摘要
 系统 MUST 提供可聚合的 `review` 正式信号摘要，以便 `today`、dashboard 或其他入口消费，而不需要页面直接解释原始事件流。
