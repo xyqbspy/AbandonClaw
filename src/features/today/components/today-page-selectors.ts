@@ -17,18 +17,18 @@ type ContinueMasteryStage = ContinueLearningItem["masteryStage"];
 const SCENE_STEP_LABELS: Record<NonNullable<ContinueCurrentStep>, string> = {
   listen: "听熟这段",
   focus_expression: "看重点表达",
-  practice_sentence: "练核心句",
-  scene_practice: "开始整段练习",
+  practice_sentence: "开始练习",
+  scene_practice: "开始练习",
   done: "本轮已完成",
 };
 
 const MASTERY_STAGE_LABELS: Record<ContinueMasteryStage, string> = {
   listening: "先听熟场景",
   focus: "抓住重点表达",
-  sentence_practice: "开始练核心句",
+  sentence_practice: "开始练习",
   scene_practice: "进入整段练习",
   variant_unlocked: "可以解锁变体",
-  mastered: "这一组已经熟练",
+  mastered: "这一组已经练熟",
 };
 
 const buildFallbackContinueLearning = (
@@ -185,7 +185,7 @@ export const getContinueLearningHelperText = (
   }
 
   if (continueLearning.repeatMode === "variants") {
-    return "基础链路已经走完，这一轮是回炉巩固，把核心表达迁移到变体里继续稳住。";
+    return "基础链路已经走完，这一轮是回炉巩固，把核心表达迁移到变体里继续练稳。";
   }
 
   const stepLabel = getContinueLearningStepLabel(continueLearning, sceneTask);

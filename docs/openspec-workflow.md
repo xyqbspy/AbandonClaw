@@ -11,7 +11,7 @@
 - 会影响多个页面之间的一致性
 - 会新增或修改维护规则
 
-如果只是非常小的局部文案、拼写或纯样式微调，且不会影响链路和规范，可以不单独建 change，但完成后仍然要更新 `CHANGELOG.md`。
+如果只是非常小的局部文案、拼写或纯样式微调，而且不影响链路和规范，可以不单独建 change，但完成后仍然要更新 `CHANGELOG.md`。
 
 ## 2. 日常命令
 
@@ -33,11 +33,21 @@ node_modules\.bin\openspec.CMD archive <change-name>
 
 - `today -> scene -> chunks -> review` 主闭环
 - 服务端学习状态
-- 跨页面按钮/交互一致性
+- 跨页面按钮、交互一致性
 - 缓存与预取
 - 测试基线
 
 就直接建 change。
+
+在这一步还要先做三个固定检查：
+
+- 先看完整功能链路，不按局部惯性直接改
+- 先判断这次改动会不会破坏功能连续性
+- 先判断测试影响和潜在未覆盖风险
+
+可以直接复用：
+
+- `docs/change-intake-template.md`
 
 ### 第二步：创建 change
 
@@ -45,7 +55,7 @@ node_modules\.bin\openspec.CMD archive <change-name>
 node_modules\.bin\openspec.CMD new change <change-name>
 ```
 
-建议名字直接用动词短语，例如：
+建议名称直接用动宾短语，例如：
 
 - `unify-detail-footer-actions`
 - `stabilize-scene-cache-refresh`
@@ -65,7 +75,7 @@ node_modules\.bin\openspec.CMD new change <change-name>
 - `proposal.md`: 为什么做、改什么、影响哪里
 - `design.md`: 当前链路、设计决策、风险
 - `tasks.md`: 实施步骤、验证步骤、changelog 更新
-- delta spec: 用 `## ADDED/MODIFIED/REMOVED/RENAMED Requirements`
+- delta spec: 使用 `## ADDED/MODIFIED/REMOVED/RENAMED Requirements`
 
 ## 4. 稳定 spec 和 change delta 的区别
 
@@ -75,7 +85,7 @@ node_modules\.bin\openspec.CMD new change <change-name>
 
 - `openspec/specs/*`
 
-格式用：
+格式：
 
 - `## Purpose`
 - `## Requirements`
@@ -92,14 +102,14 @@ node_modules\.bin\openspec.CMD new change <change-name>
 
 - `openspec/changes/<change-name>/specs/*`
 
-格式用：
+格式：
 
 - `## ADDED Requirements`
 - `## MODIFIED Requirements`
 - `## REMOVED Requirements`
 - `## RENAMED Requirements`
 
-适合写这次变更打算新增、修改或移除什么规则。
+适合写这次变更准备新增、修改或移除什么规则。
 
 ## 5. 归档前检查清单
 
@@ -110,7 +120,7 @@ node_modules\.bin\openspec.CMD new change <change-name>
 - 受影响测试已经执行，或明确记录未验证风险
 - `CHANGELOG.md` 已更新
 - 变更里的 delta spec 已经表达清楚本次规则变化
-- 稳定 spec 如果需要同步，也已经准备好
+- 如果稳定 spec 需要同步，也已经准备好
 
 推荐命令：
 
@@ -119,10 +129,14 @@ node_modules\.bin\openspec.CMD change validate <change-name> --strict --no-inter
 node_modules\.bin\openspec.CMD archive <change-name>
 ```
 
-## 6. 当前仓库的建议实践
+## 6. 当前仓库的实践约定
 
 - 小改动也要记 `CHANGELOG.md`
 - 非微小改动先建 change，再写代码
 - 如果一个改动横跨 `lesson` 和 `chunks`，默认当作跨页面一致性改动处理
 - 如果只是实现细节变化，但不涉及稳定规则，不要随意修改 `openspec/specs/*`
-- 如果 change 已经完成但暂时不 archive，也要确保它至少能通过 validate
+- 如果 change 已完成但暂时不 archive，也要保证它能通过 validate
+- 做之前先把上游入口、当前承接、下游回写和回退路径看完整
+- 做局部修复时，也要按完整链路验证是否会断在别处
+- 做完后必须判断已有测试是否需要更新、是否要补回归，以及是否有未覆盖风险
+- 如果是 detail 体系重构，优先参考 `openspec/changes/consolidate-detail-composition/implementation-intake-template.md`

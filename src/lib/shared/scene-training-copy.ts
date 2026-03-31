@@ -3,7 +3,7 @@ import { PracticeAssessmentLevel, PracticeMode } from "@/lib/types/learning-flow
 export const SCENE_TRAINING_STEP_TITLES = {
   listen: "听熟这段",
   focus_expression: "看 1 个重点表达",
-  practice_sentence: "练 1 句核心句",
+  practice_sentence: "进入练习",
   scene_practice: "开始练习",
   done: "解锁变体",
 } as const;

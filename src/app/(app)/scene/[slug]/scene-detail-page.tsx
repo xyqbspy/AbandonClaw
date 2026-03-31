@@ -66,7 +66,6 @@ import {
   notifyScenePhraseSaved,
   notifyScenePhraseSaveFailed,
   notifySceneSentencePracticed,
-  notifySceneSentenceStepHint,
   notifySceneSessionCompleted,
 } from "./scene-detail-notify";
 import {
@@ -607,7 +606,7 @@ function SceneTrainingCoachFloatingEntry({
 
                 <div className="mt-[var(--mobile-adapt-space-sheet)] border-t border-[var(--app-border-soft)] pt-[var(--mobile-adapt-space-xl)]">
                   <p className="text-[length:var(--mobile-adapt-overlay-meta)] leading-[1.4] text-[var(--app-scene-panel-muted)]">
-                    整段播放 {statsSummary.fullPlayCount} 次 · 重点表达 {statsSummary.openedExpressionCount} 个 · 核心句 {statsSummary.practicedSentenceCount} 句
+                    整段播放 {statsSummary.fullPlayCount} 次 · 重点表达 {statsSummary.openedExpressionCount} 个 · 已记录练习句数 {statsSummary.practicedSentenceCount} 句
                   </p>
                   <p className="mt-1 text-[length:var(--mobile-adapt-overlay-meta)] leading-[1.4] text-[var(--app-scene-panel-muted)]">
                     练习模块 {statsSummary.practiceModuleCompleted}/1 · 作答 {statsSummary.practiceAttemptCount} 次 · <span className="font-semibold text-foreground">{sceneDetailMessages.panelProgressLabel} {statsSummary.progressPercent}%</span>
@@ -663,7 +662,6 @@ export default function SceneDetailClientPage({
   const latestVariantStatusRef = useRef<"idle" | "generated" | "completed">("idle");
   const listenStepActionRef = useRef<() => unknown>(() => undefined);
   const focusExpressionStepActionRef = useRef<() => unknown>(() => undefined);
-  const practiceSentenceStepActionRef = useRef<() => unknown>(() => undefined);
   const practiceToolActionRef = useRef<() => unknown>(() => undefined);
   const variantToolActionRef = useRef<() => unknown>(() => undefined);
   const repeatPracticeActionRef = useRef<() => unknown>(() => undefined);
@@ -1014,10 +1012,6 @@ export default function SceneDetailClientPage({
     notifySceneFocusStepHint();
   }, []);
 
-  const handleTrainingPracticeSentenceStep = useCallback(() => {
-    notifySceneSentenceStepHint();
-  }, []);
-
   const currentStepAction = useMemo(() => {
     const currentStep = sceneTrainingState.currentStep;
     if (currentStep === "listen") {
@@ -1034,14 +1028,7 @@ export default function SceneDetailClientPage({
         disabled: false,
       };
     }
-    if (currentStep === "practice_sentence") {
-      return {
-        label: "去练核心句",
-        onClick: handleTrainingPracticeSentenceStep,
-        disabled: false,
-      };
-    }
-    if (currentStep === "scene_practice") {
+    if (currentStep === "practice_sentence" || currentStep === "scene_practice") {
       const practiceSetStatus = latestPracticeSet?.status ?? generatedState.practiceStatus;
       return {
         label:
@@ -1101,7 +1088,6 @@ export default function SceneDetailClientPage({
     handleRepeatVariants,
     handleTrainingFocusExpressionStep,
     handleTrainingListenStep,
-    handleTrainingPracticeSentenceStep,
     handleVariantToolClick,
     practiceLoading,
     sceneTrainingState.currentStep,
@@ -1129,7 +1115,6 @@ export default function SceneDetailClientPage({
   latestVariantStatusRef.current = latestVariantSet?.status ?? generatedState.variantStatus;
   listenStepActionRef.current = handleTrainingListenStep;
   focusExpressionStepActionRef.current = handleTrainingFocusExpressionStep;
-  practiceSentenceStepActionRef.current = handleTrainingPracticeSentenceStep;
   practiceToolActionRef.current = handlePracticeToolClick;
   variantToolActionRef.current = handleVariantToolClick;
   repeatPracticeActionRef.current = handleRepeatPractice;
@@ -1300,11 +1285,7 @@ export default function SceneDetailClientPage({
                 focusExpressionStepActionRef.current();
                 return;
               }
-              if (currentStep === "practice_sentence") {
-                practiceSentenceStepActionRef.current();
-                return;
-              }
-              if (currentStep === "scene_practice") {
+              if (currentStep === "practice_sentence" || currentStep === "scene_practice") {
                 if (latestPracticeStatusRef.current === "completed") {
                   repeatPracticeActionRef.current();
                   return;

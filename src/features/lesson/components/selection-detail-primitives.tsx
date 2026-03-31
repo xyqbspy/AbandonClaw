@@ -1,7 +1,7 @@
 "use client";
 
 import { ReactNode } from "react";
-import { Languages, Loader2, Volume2 } from "lucide-react";
+import { Languages, Loader2, RotateCcw, Volume2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DetailInfoBlock, DetailLoadingBlock } from "@/features/chunks/components/detail-info-blocks";
@@ -38,6 +38,21 @@ export const selectionSecondaryActionButtonClassName = cn(
 export const selectionIconButtonClassName = cn(
   APPLE_BUTTON_BASE,
   "inline-flex size-[var(--mobile-icon-button)] items-center justify-center rounded-full border-[var(--app-border-soft)] bg-[var(--app-surface-subtle)] px-0 text-[var(--app-foreground)] transition-all duration-150 active:scale-[0.96] active:opacity-80 hover:bg-[var(--app-surface-hover)]",
+);
+
+export const selectionFooterButtonClassName = cn(
+  APPLE_BUTTON_BASE,
+  "h-[var(--mobile-adapt-overlay-footer-button-height)] rounded-[var(--mobile-adapt-overlay-footer-button-radius)] text-[length:var(--mobile-font-sheet-body)] font-semibold transition-all duration-150 active:scale-[0.96] [@media(max-height:760px)]:h-[var(--mobile-control-height)] [@media(max-height:760px)]:text-[length:var(--mobile-font-body-sm)]",
+);
+
+export const selectionFooterSecondaryButtonClassName = cn(
+  selectionFooterButtonClassName,
+  "border border-[var(--app-border-soft)] bg-[var(--app-surface-subtle)] text-[var(--app-foreground)] shadow-none hover:bg-[var(--app-surface-hover)]",
+);
+
+export const selectionFooterPrimaryButtonClassName = cn(
+  selectionFooterButtonClassName,
+  "border-0 bg-[var(--app-chunks-sheet-primary-bg)] text-[var(--app-chunks-sheet-primary-text)] shadow-[var(--app-chunks-sheet-primary-shadow)] hover:bg-[var(--app-chunks-sheet-primary-hover)] disabled:bg-[#D0D7E2] disabled:text-white/80",
 );
 
 const detailBodyClassName = cn(
@@ -284,7 +299,7 @@ export function SelectionDetailActions({
     <div className="grid grid-cols-2 gap-3">
       <Button
         variant="ghost"
-        className="h-12 cursor-pointer rounded-[14px] border border-[#D9D9DE] bg-white text-[15px] font-bold text-[#1C1C1E] transition-all duration-150 active:scale-[0.96]"
+        className={cn(selectionFooterSecondaryButtonClassName, "cursor-pointer")}
         onClick={onSave}
         disabled={disabled}
       >
@@ -292,10 +307,11 @@ export function SelectionDetailActions({
       </Button>
       <Button
         variant="ghost"
-        className="h-12 cursor-pointer rounded-[14px] border-0 bg-[#007AFF] text-[15px] font-bold text-white transition-all duration-150 active:scale-[0.96] disabled:bg-[#D0D7E2] disabled:text-white/80"
+        className={cn(selectionFooterPrimaryButtonClassName, "cursor-pointer")}
         onClick={onReview}
         disabled={disabled}
       >
+        <RotateCcw className="size-4" />
         加入复习
       </Button>
     </div>

@@ -50,10 +50,6 @@ export const notifySceneFocusStepHint = () => {
   toast.message(sceneDetailMessages.focusStepHint);
 };
 
-export const notifySceneSentenceStepHint = () => {
-  toast.message(sceneDetailMessages.sentenceStepHint);
-};
-
 export const notifySceneLoadError = (message: string) => {
   toast.error(message);
 };
