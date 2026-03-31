@@ -27,6 +27,20 @@ const pendingActionHandles = new Map<
 
 const isClient = () => typeof window !== "undefined";
 
+const isWeakNetwork = () => {
+  if (!isClient()) return false;
+  const nav = navigator as Navigator & {
+    connection?: {
+      effectiveType?: string;
+      saveData?: boolean;
+    };
+  };
+  const connection = nav.connection;
+  if (!connection) return false;
+  if (connection.saveData) return true;
+  return connection.effectiveType === "slow-2g" || connection.effectiveType === "2g";
+};
+
 const getRequestIdleCallback = () =>
   (window as typeof window & { requestIdleCallback?: RequestIdleCallbackFn })
     .requestIdleCallback;
@@ -111,10 +125,11 @@ export const scheduleChunkAudioWarmup = (chunkTexts: string[], options?: { limit
 
 export const scheduleLessonAudioWarmup = (
   lesson: Lesson,
-  options?: { sentenceLimit?: number; chunkLimit?: number; key?: string },
+  options?: { sentenceLimit?: number; chunkLimit?: number; key?: string; includeSceneFull?: boolean },
 ) => {
   const sentenceLimit = options?.sentenceLimit ?? 2;
   const chunkLimit = options?.chunkLimit ?? 2;
+  const includeSceneFull = options?.includeSceneFull === true && !isWeakNetwork();
   const key =
     options?.key ??
     `lesson-audio:${lesson.id}:${lesson.slug}:s=${sentenceLimit}:c=${chunkLimit}`;
@@ -123,6 +138,7 @@ export const scheduleLessonAudioWarmup = (
     warmupLessonAudio(lesson, {
       sentenceLimit,
       chunkLimit,
+      includeSceneFull,
     });
   });
 };

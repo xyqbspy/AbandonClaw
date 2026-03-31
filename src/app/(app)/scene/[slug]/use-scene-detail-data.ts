@@ -155,9 +155,6 @@ export const useSceneDetailData = (
         setSceneLoading(false);
         setLoadErrorMessage(null);
       });
-      if (!syncCacheSnapshot.isExpired) {
-        return;
-      }
     }
 
     let cancelled = false;

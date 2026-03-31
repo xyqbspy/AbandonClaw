@@ -200,7 +200,6 @@ export default function ScenesPage() {
     const token = activeLoadTokenRef.current + 1;
     activeLoadTokenRef.current = token;
     let hasCacheFallback = false;
-    let cacheFresh = false;
     const preferCache = options?.preferCache ?? false;
     const forceNetwork = options?.forceNetwork ?? false;
     const keepVisibleContent = preferCache && visibleSceneCountRef.current > 0;
@@ -216,16 +215,12 @@ export default function ScenesPage() {
         const cache = await getSceneListCache();
         if (canApply() && cache.found && cache.record) {
           hasCacheFallback = true;
-          cacheFresh = !cache.isExpired;
           setAllScenes(cache.record.data);
           setListDataSource("cache");
           setLoading(false);
         }
       } catch {
         // Non-blocking.
-      }
-      if (cacheFresh) {
-        return;
       }
     }
 

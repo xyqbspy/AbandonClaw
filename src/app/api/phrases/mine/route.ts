@@ -36,7 +36,15 @@ export async function GET(request: Request) {
         .filter(Boolean)
         .slice(0, 120);
       const texts = await listUserSavedPhraseTextsByNormalized(user.id, normalizedTexts);
-      return NextResponse.json({ texts }, { status: 200 });
+      return NextResponse.json(
+        { texts },
+        {
+          status: 200,
+          headers: {
+            "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+          },
+        },
+      );
     }
 
     const query = searchParams.get("query")?.trim() ?? "";
@@ -87,7 +95,15 @@ export async function GET(request: Request) {
       expressionClusterId: expressionClusterId || undefined,
     });
 
-    return NextResponse.json(result, { status: 200 });
+    return NextResponse.json(
+      result,
+      {
+        status: 200,
+        headers: {
+          "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+        },
+      },
+    );
   } catch (error) {
     return toApiErrorResponse(error, "Failed to list user phrases.");
   }

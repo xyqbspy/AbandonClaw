@@ -48,7 +48,7 @@ test("resolveSceneCachePresentation 会区分无缓存、过期缓存和新鲜�
       shouldHydrateFromCache: true,
       nextDataSource: "cache",
       shouldStopLoading: true,
-      shouldFetchNetwork: false,
+      shouldFetchNetwork: true,
     },
   );
 });

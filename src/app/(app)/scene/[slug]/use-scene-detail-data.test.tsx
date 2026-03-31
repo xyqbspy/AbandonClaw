@@ -132,6 +132,62 @@ test("useSceneDetailData 会先接收缓存，再被网络结果覆盖", async (
   });
 });
 
+test("useSceneDetailData 命中新鲜同步缓存时仍会继续执行后台刷新", async () => {
+  const cacheLesson = createLesson("scene-cache", "scene-a");
+  const networkLesson = createLesson("scene-network", "scene-a");
+  let loadSceneDetailCalled = 0;
+
+  const deps: SceneDetailDataDeps = {
+    clearExpiredSceneCaches: async () => undefined,
+    getSceneCache: async () => ({ found: false, isExpired: false, record: null }),
+    getSceneCacheSnapshotSync: () => buildSceneCacheSnapshotResult("scene-a", cacheLesson, false),
+    getSceneDetailBySlugFromApi: async () => networkLesson,
+    setSceneCache: async () => undefined,
+    getScenesFromApi: async () => [],
+    listRecentSceneCacheKeys: async () => [],
+    scheduleScenePrefetch: () => undefined,
+    extractSlugFromSceneCacheKey: (key: string) => key,
+    getPrefetchDebugState: () => ({
+      pendingKeys: [],
+      inFlightKey: null,
+      recentPrefetchedKeys: [],
+    }),
+    loadSceneDetail: async ({ callbacks }: LoadSceneDetailArgs) => {
+      loadSceneDetailCalled += 1;
+      callbacks.onStart();
+      await Promise.resolve();
+      callbacks.onHydrateLesson(networkLesson, "network");
+      callbacks.onStopLoading();
+    },
+    getSceneSavedPhraseTextsCache: async () => ({ found: false, record: null, isExpired: false }),
+    setSceneSavedPhraseTextsCache: async () => undefined,
+    getSavedNormalizedPhraseTextsFromApi: async () => [],
+    collectLessonChunkTexts: () => [],
+    normalizePhraseText: (text: string) => text,
+    getSceneGeneratedState: () => ({
+      latestPracticeSet: null,
+      latestVariantSet: null,
+      practiceStatus: "idle",
+      variantStatus: "idle",
+    }),
+    syncSceneVariantsFromDb: async () => null,
+    saveVariantSet: () => undefined,
+  };
+
+  const { result } = renderHook(() => useSceneDetailData("scene-a", deps));
+
+  await waitFor(() => {
+    assert.equal(result.current.sceneDataSource, "cache");
+    assert.equal(result.current.baseLesson?.id, "scene-cache");
+  });
+
+  await waitFor(() => {
+    assert.equal(loadSceneDetailCalled, 1);
+    assert.equal(result.current.sceneDataSource, "network");
+    assert.equal(result.current.baseLesson?.id, "scene-network");
+  });
+});
+
 test("useSceneDetailData 会忽略旧 slug 的迟到回填", async () => {
   const lessons = {
     a: createLesson("scene-a", "scene-a"),
@@ -360,7 +416,7 @@ test("useSceneDetailData 在已收藏短语缓存未过期时不会继续请求�
   assert.equal(savedPhraseApiCalled, false);
 });
 
-test("useSceneDetailData 会同步复用本会话场景缓存做到首帧回填", () => {
+test("useSceneDetailData 会同步复用本会话场景缓存做到首帧回填", async () => {
   const cachedLesson = createLesson("scene-sync-cache", "scene-sync-cache");
   let loadSceneDetailCalled = false;
 
@@ -403,7 +459,9 @@ test("useSceneDetailData 会同步复用本会话场景缓存做到首帧回填"
   assert.equal(result.current.baseLesson?.id, "scene-sync-cache");
   assert.equal(result.current.sceneDataSource, "cache");
   assert.equal(result.current.sceneLoading, false);
-  assert.equal(loadSceneDetailCalled, false);
+  await waitFor(() => {
+    assert.equal(loadSceneDetailCalled, true);
+  });
 });
 
 test("useSceneDetailData 在同步缓存已过期时也会先展示旧内容，再等待网络回填", async () => {

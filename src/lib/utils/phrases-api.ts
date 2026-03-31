@@ -196,6 +196,7 @@ export async function getMyPhrasesFromApi(params?: {
   const suffix = search.toString();
   const response = await fetch(`/api/phrases/mine${suffix ? `?${suffix}` : ""}`, {
     method: "GET",
+    cache: "no-store",
   });
   if (!response.ok) {
     throw await toApiError(response, "\u52a0\u8f7d\u6536\u85cf\u77ed\u8bed\u5931\u8d25\u3002");

@@ -35,7 +35,7 @@ export const resolveSceneCachePresentation = ({
     shouldHydrateFromCache: true,
     nextDataSource: "cache" as const,
     shouldStopLoading: true,
-    shouldFetchNetwork: false,
+    shouldFetchNetwork: true,
   };
 };
 

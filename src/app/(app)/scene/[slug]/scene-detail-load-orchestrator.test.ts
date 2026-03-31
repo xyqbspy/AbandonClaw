@@ -18,9 +18,12 @@ const createLesson = (id: string, slug = id, title = id): Lesson => ({
   explanations: [],
 });
 
-test("loadSceneDetail 命中新鲜缓存时只回填缓存，不再请求网络", async () => {
-  const lesson = createLesson("scene-1", "scene-1", "Scene 1");
+test("loadSceneDetail 命中新鲜缓存时会先回填缓存，再继续请求网络", async () => {
+  const cacheLesson = createLesson("scene-cache", "scene-1", "Cached");
+  const networkLesson = createLesson("scene-network", "scene-1", "Fresh");
   const events: Array<unknown[]> = [];
+  const cacheWrites: Array<{ slug: string; lesson: Lesson }> = [];
+  const prefetchCalls: Array<{ slugs: string[]; currentSlug: string }> = [];
 
   await loadSceneDetail({
     sceneSlug: "scene-1",
@@ -36,25 +39,33 @@ test("loadSceneDetail 命中新鲜缓存时只回填缓存，不再请求网络"
       getSceneCache: async () => ({
         found: true,
         isExpired: false,
-        record: { data: lesson },
+        record: { data: cacheLesson },
       }),
-      getSceneDetailBySlugFromApi: async () => {
-        throw new Error("should not fetch network");
+      getSceneDetailBySlugFromApi: async () => networkLesson,
+      setSceneCache: async (slug, lesson) => {
+        cacheWrites.push({ slug, lesson });
       },
-      setSceneCache: async () => undefined,
-      getScenesFromApi: async () => [],
+      getScenesFromApi: async () => [{ slug: "scene-1" }, { slug: "scene-2" }],
       listRecentSceneCacheKeys: async () => [],
-      scheduleScenePrefetch: () => {
-        throw new Error("should not prefetch");
+      scheduleScenePrefetch: (slugs, options) => {
+        prefetchCalls.push({ slugs, currentSlug: options.currentSlug });
       },
       extractSlugFromSceneCacheKey: (key) => key,
     },
   });
 
+  await new Promise((resolve) => setImmediate(resolve));
+
   assert.deepEqual(events, [
     ["start"],
-    ["hydrate", "cache", lesson],
+    ["hydrate", "cache", cacheLesson],
     ["stop"],
+    ["hydrate", "network", networkLesson],
+    ["stop"],
+  ]);
+  assert.deepEqual(cacheWrites, [{ slug: "scene-1", lesson: networkLesson }]);
+  assert.deepEqual(prefetchCalls, [
+    { slugs: ["scene-2"], currentSlug: "scene-1" },
   ]);
 });
 

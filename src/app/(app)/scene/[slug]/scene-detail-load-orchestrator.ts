@@ -57,8 +57,6 @@ export const loadSceneDetail = async ({
   callbacks.onStart();
 
   let hasCacheFallback = false;
-  let cacheFresh = false;
-
   try {
     const cacheResult = await deps.getSceneCache(requestSlug);
     if (!callbacks.canApply()) return;
@@ -68,7 +66,6 @@ export const loadSceneDetail = async ({
         cacheExpired: cacheResult.isExpired,
       });
       hasCacheFallback = presentation.hasCacheFallback;
-      cacheFresh = presentation.cacheFresh;
       if (presentation.shouldHydrateFromCache) {
         callbacks.onHydrateLesson(cacheResult.record.data, presentation.nextDataSource);
       }
@@ -80,8 +77,6 @@ export const loadSceneDetail = async ({
     // Non-blocking: cache failures should not block network flow.
   }
 
-  if (cacheFresh) return;
-
   try {
     const lesson = await deps.getSceneDetailBySlugFromApi(sceneSlug);
     if (!callbacks.canApply()) return;
@@ -92,6 +87,7 @@ export const loadSceneDetail = async ({
       sentenceLimit: 2,
       chunkLimit: 2,
       key: `scene-detail-audio:${requestSlug}`,
+      includeSceneFull: true,
     });
 
     void deps.setSceneCache(requestSlug, lesson).catch(() => {

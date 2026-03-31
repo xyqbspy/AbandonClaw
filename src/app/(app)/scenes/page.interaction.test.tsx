@@ -17,6 +17,12 @@ let deleteSceneCalls = 0;
 let generatedSceneCalls = 0;
 let importSceneError: Error | null = null;
 let deleteSceneError: Error | null = null;
+let getScenesFromApiImpl = async (options?: { noStore?: boolean }) => {
+  getScenesCallOptions.push(options);
+  return sceneList;
+};
+let getSceneListCacheImpl = async () => ({ found: false, isExpired: false, record: null });
+let getSceneListCacheSnapshotSyncImpl = () => ({ found: false, isExpired: false, record: null });
 let detailPrefetchImpl = async (slug: string) => {
   detailPrefetchCalls.push(slug);
   return true;
@@ -98,10 +104,7 @@ const mockedModules = {
         : null,
   },
   "@/lib/utils/scenes-api": {
-    getScenesFromApi: async (options?: { noStore?: boolean }) => {
-      getScenesCallOptions.push(options);
-      return sceneList;
-    },
+    getScenesFromApi: async (options?: { noStore?: boolean }) => getScenesFromApiImpl(options),
     importSceneFromApi: async () => {
       importSceneCalls += 1;
       if (importSceneError) throw importSceneError;
@@ -115,8 +118,8 @@ const mockedModules = {
     clearSceneListCache: async () => {
       clearSceneListCacheCalls += 1;
     },
-    getSceneListCache: async () => ({ found: false, isExpired: false, record: null }),
-    getSceneListCacheSnapshotSync: () => ({ found: false, isExpired: false, record: null }),
+    getSceneListCache: async () => getSceneListCacheImpl(),
+    getSceneListCacheSnapshotSync: () => getSceneListCacheSnapshotSyncImpl(),
     setSceneListCache: async () => undefined,
   },
   "@/lib/cache/scene-prefetch": {
@@ -162,6 +165,12 @@ afterEach(() => {
   generatedSceneCalls = 0;
   importSceneError = null;
   deleteSceneError = null;
+  getScenesFromApiImpl = async (options?: { noStore?: boolean }) => {
+    getScenesCallOptions.push(options);
+    return sceneList;
+  };
+  getSceneListCacheImpl = async () => ({ found: false, isExpired: false, record: null });
+  getSceneListCacheSnapshotSyncImpl = () => ({ found: false, isExpired: false, record: null });
   detailPrefetchImpl = async (slug: string) => {
     detailPrefetchCalls.push(slug);
     return true;
@@ -226,6 +235,47 @@ test("ScenesPage 首屏会立即预热前两个场景详情", async () => {
   await waitFor(() => {
     assert.equal(detailPrefetchCalls.includes("coffee-chat"), true);
     assert.equal(detailPrefetchCalls.includes("imported-scene"), true);
+  });
+});
+
+test("ScenesPage 命中新鲜缓存后仍会继续走网络刷新", async () => {
+  let resolveNetwork: (() => void) | null = null;
+  getSceneListCacheImpl = async () => ({
+    found: true,
+    isExpired: false,
+    record: {
+      data: [
+        {
+          ...sceneList[0],
+          title: "Cached Coffee Chat",
+        },
+      ],
+    },
+  });
+  getScenesFromApiImpl = async (options?: { noStore?: boolean }) => {
+    getScenesCallOptions.push(options);
+    await new Promise<void>((resolve) => {
+      resolveNetwork = resolve;
+    });
+    return sceneList;
+  };
+
+  const ScenesPage = getScenesPage();
+  render(<ScenesPage />);
+
+  await screen.findByText("Cached Coffee Chat");
+
+  await waitFor(() => {
+    assert.equal(getScenesCallOptions.length >= 1, true);
+  });
+
+  if (!resolveNetwork) {
+    throw new Error("resolveNetwork was not initialized");
+  }
+  resolveNetwork();
+
+  await waitFor(() => {
+    screen.getByText("Coffee Chat");
   });
 });
 

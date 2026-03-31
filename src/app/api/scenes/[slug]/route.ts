@@ -17,7 +17,15 @@ export async function GET(
       throw new NotFoundError("Scene not found.");
     }
 
-    return NextResponse.json({ scene }, { status: 200 });
+    return NextResponse.json(
+      { scene },
+      {
+        status: 200,
+        headers: {
+          "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+        },
+      },
+    );
   } catch (error) {
     return toApiErrorResponse(error, "Failed to load scene.");
   }

@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-03-31
+
+### Scenes / Scene Detail / Audio 缓存刷新稳定性优化
+- 调整 `scenes` 列表与 `scene detail` 的缓存策略：命中新鲜本地缓存时，页面会先展示缓存结果，再继续执行后台网络刷新，不再因为 TTL 未过期就直接停止联网。
+- 统一 `/api/scenes/[slug]` 与 `/api/phrases/mine` 的 `Cache-Control: no-store` 语义，并让对应客户端请求显式使用 `cache: "no-store"`，减少浏览器默认缓存与前端自管缓存叠加造成的陈旧状态。
+- 为场景学习页补上整段场景循环音频预热，复用现有 TTS 持久缓存链路，并在弱网场景下自动跳过整段音频预热，降低首次整段播放等待。
+褰卞搷鑼冨洿锛?- `scenes` 列表与 `scene detail` 的刷新时机
+- 场景整段循环音频首播体验
+- 用户态列表/详情接口缓存语义
+楠岃瘉鎯呭喌锛?- 宸叉墽琛?`node --import tsx --test "src/lib/utils/audio-warmup.test.ts" "src/app/(app)/scene/[[]slug[]]/scene-detail-load-logic.test.ts" "src/app/(app)/scene/[[]slug[]]/scene-detail-load-orchestrator.test.ts"`
+- 宸叉墽琛?`node --import tsx --import ./src/test/setup-dom.ts --test "src/app/(app)/scenes/page.interaction.test.tsx" "src/app/(app)/scene/[[]slug[]]/use-scene-detail-data.test.tsx"`
+
 本文档用于记录仓库内每次实际改动，方便回看变更范围、验证情况和潜在风险。
 
 记录约定：

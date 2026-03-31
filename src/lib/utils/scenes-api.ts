@@ -45,7 +45,7 @@ export async function getScenesFromApi(options?: { noStore?: boolean }) {
   const task = (async () => {
     const response = await fetch(url, {
       method: "GET",
-      cache: noStore ? "no-store" : "default",
+      cache: "no-store",
     });
     if (!response.ok) {
       throw new Error(await extractError(response, "Failed to load scenes."));
@@ -74,6 +74,7 @@ export async function getSceneDetailBySlugFromApi(slug: string): Promise<Lesson>
   const task = (async () => {
     const response = await fetch(`/api/scenes/${encodeURIComponent(normalizedSlug)}`, {
       method: "GET",
+      cache: "no-store",
     });
     if (!response.ok) {
       throw new Error(await extractError(response, "Failed to load scene detail."));
