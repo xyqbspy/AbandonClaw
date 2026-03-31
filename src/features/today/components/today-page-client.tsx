@@ -10,7 +10,7 @@ import {
   buildTodayTasks,
   getContinueLearningCardState,
   getRecommendedScenes,
-  resolveContinueLearning,
+  resolveTodayLearningSnapshot,
 } from "@/features/today/components/today-page-selectors";
 import { TodayRecommendedScenesSection } from "@/features/today/components/today-recommended-scenes-section";
 import { TodayReviewSummaryCard } from "@/features/today/components/today-review-summary-card";
@@ -222,10 +222,15 @@ export function TodayPageClient({ displayName }: { displayName: string }) {
     });
   }, [dashboardDataSource, phraseDataSource, recentPhrases.length, sceneDataSource, sceneList.length]);
 
-  const continueLearning = useMemo(
-    () => resolveContinueLearning(dashboard, sceneList),
+  const todayLearningSnapshot = useMemo(
+    () =>
+      resolveTodayLearningSnapshot({
+        dashboard,
+        sceneList,
+      }),
     [dashboard, sceneList],
   );
+  const continueLearning = todayLearningSnapshot.continueLearning;
 
   const dailyTasks = useMemo(
     () =>
@@ -262,7 +267,7 @@ export function TodayPageClient({ displayName }: { displayName: string }) {
     [continueCardState.stepLabel],
   );
   const progressPercent = Math.round(
-    dashboard.todayTasks.sceneTask.progressPercent || continueLearning?.progressPercent || 0,
+    todayLearningSnapshot.effectiveProgressPercent,
   );
 
   const expressionSummary = useMemo(() => {
@@ -320,9 +325,9 @@ export function TodayPageClient({ displayName }: { displayName: string }) {
     if (!continueLearning) return;
     warmupContinueLearningScene({
       sceneSlug: continueLearning.sceneSlug,
-      currentStep: dashboard.todayTasks.sceneTask.currentStep ?? continueLearning.currentStep,
+      currentStep: todayLearningSnapshot.effectiveCurrentStep,
     });
-  }, [continueLearning, dashboard.todayTasks.sceneTask.currentStep]);
+  }, [continueLearning, todayLearningSnapshot.effectiveCurrentStep]);
 
   return (
     <div className="mx-auto max-w-[500px] space-y-[var(--mobile-space-lg)] text-foreground">

@@ -15,6 +15,16 @@ export type ResolvedContinueLearningItem = ContinueLearningItem & {
   isRepeat?: boolean;
 };
 
+export type ContinueLearningSource = "dashboard" | "local-repeat" | "scene-list-fallback";
+
+export type TodayLearningSnapshot = {
+  continueLearning: ResolvedContinueLearningItem | null;
+  continueLearningSource: ContinueLearningSource | null;
+  effectiveCurrentStep: LearningDashboardResponse["todayTasks"]["sceneTask"]["currentStep"];
+  effectiveMasteryStage: LearningDashboardResponse["todayTasks"]["sceneTask"]["masteryStage"];
+  effectiveProgressPercent: number;
+};
+
 const buildFallbackContinueLearning = (
   sceneList: SceneListItemResponse[],
 ): ResolvedContinueLearningItem | null => {
@@ -124,13 +134,59 @@ const buildRepeatContinueCandidate = (
   };
 };
 
+export const resolveContinueLearningState = (
+  dashboard: LearningDashboardResponse,
+  sceneList: SceneListItemResponse[],
+): {
+  continueLearning: ResolvedContinueLearningItem | null;
+  source: ContinueLearningSource | null;
+} => {
+  const fromDashboard = dashboard.continueLearning as ResolvedContinueLearningItem | null;
+  if (fromDashboard) {
+    return {
+      continueLearning: fromDashboard,
+      source: "dashboard",
+    };
+  }
+
+  const repeatCandidate = buildRepeatContinueCandidate(sceneList);
+  if (repeatCandidate) {
+    return {
+      continueLearning: repeatCandidate,
+      source: "local-repeat",
+    };
+  }
+
+  const fallback = buildFallbackContinueLearning(sceneList);
+  return {
+    continueLearning: fallback,
+    source: fallback ? "scene-list-fallback" : null,
+  };
+};
+
 export const resolveContinueLearning = (
   dashboard: LearningDashboardResponse,
   sceneList: SceneListItemResponse[],
-): ResolvedContinueLearningItem | null =>
-  (dashboard.continueLearning as ResolvedContinueLearningItem | null) ??
-  buildRepeatContinueCandidate(sceneList) ??
-  buildFallbackContinueLearning(sceneList);
+): ResolvedContinueLearningItem | null => resolveContinueLearningState(dashboard, sceneList).continueLearning;
+
+export const resolveTodayLearningSnapshot = ({
+  dashboard,
+  sceneList,
+}: {
+  dashboard: LearningDashboardResponse;
+  sceneList: SceneListItemResponse[];
+}): TodayLearningSnapshot => {
+  const { continueLearning, source } = resolveContinueLearningState(dashboard, sceneList);
+  const sceneTask = dashboard.todayTasks.sceneTask;
+
+  return {
+    continueLearning,
+    continueLearningSource: source,
+    effectiveCurrentStep: sceneTask.currentStep ?? continueLearning?.currentStep ?? null,
+    effectiveMasteryStage: sceneTask.masteryStage ?? continueLearning?.masteryStage ?? null,
+    effectiveProgressPercent: sceneTask.progressPercent ?? continueLearning?.progressPercent ?? 0,
+  };
+};
 
 const resolveStepLabelFromSceneTask = (
   sceneTask: LearningDashboardResponse["todayTasks"]["sceneTask"],

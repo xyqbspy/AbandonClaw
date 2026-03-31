@@ -1,6 +1,20 @@
 # Changelog
 
 ## 2026-03-31
+### Today 学习数据映射文档与展示边界梳理
+- 为 `today` 页面补齐了专项学习数据映射文档，明确继续学习卡片、今日任务、表达摘要与回忆入口分别依赖哪些后端聚合字段、前端回退规则和展示派生逻辑。
+- 收紧 `today` 页内部对学习态的消费边界：继续学习入口来源和有效步骤/进度的解析现在有统一 helper，减少页面和 selector 各自拼接语义导致的漂移。
+- 同步补充 `today` selectors 回归测试，并把这份文档挂入项目学习指南，方便后续维护时快速定位数据来源与影响范围。
+影响范围：
+- `today` 页面继续学习卡片、任务链路与进度解释的维护基线
+- learning dashboard 聚合结果在前端的消费边界
+- 项目学习/维护文档入口
+
+验证情况：
+- `node --import tsx --test "src/features/today/components/today-page-selectors.test.ts"`
+- `node --import tsx --import ./src/test/setup-dom.ts --test "src/features/today/components/today-page-client.test.tsx"`
+- `node_modules\\.bin\\openspec.CMD change validate clarify-today-learning-mapping --strict --no-interactive`
+
 
 ### Scene / Today 句子练习链路解释收口
 - 把 `today` 和 `scene` 对练习阶段的解释统一成同一套口径：进入句子练习、继续整段练习、本轮已完成不再混成同一个“开始练习”状态。

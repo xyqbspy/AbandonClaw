@@ -13,6 +13,8 @@ import {
   getContinueLearningStepLabel,
   getRecommendedScenes,
   resolveContinueLearning,
+  resolveContinueLearningState,
+  resolveTodayLearningSnapshot,
 } from "./today-page-selectors";
 
 const createLocalStorageMock = () => {
@@ -121,7 +123,7 @@ afterEach(() => {
   window.localStorage.clear();
 });
 
-test("resolveContinueLearning 会优先使用 dashboard continue，否则回退到首个场景", () => {
+test("resolveContinueLearning 优先使用 dashboard continue，否则回退到首个场景", () => {
   const fallback = resolveContinueLearning(dashboard, scenes);
   assert.equal(fallback?.sceneSlug, "coffee-chat");
   assert.equal(fallback?.savedPhraseCount, 0);
@@ -150,7 +152,7 @@ test("resolveContinueLearning 会优先使用 dashboard continue，否则回退�
   assert.equal(direct?.sceneSlug, "direct-scene");
 });
 
-test("today continue helper 会把句子练习和整段练习区分开", () => {
+test("today continue helper 会区分句子练习与整段练习", () => {
   const sentencePractice = resolveContinueLearning(
     {
       ...dashboard,
@@ -200,7 +202,7 @@ test("today continue helper 会把句子练习和整段练习区分开", () => {
   assert.match(getContinueLearningHelperText(scenePractice), /把这一轮题型完整做完/);
 });
 
-test("today continue helper 会优先读取 today sceneTask 里的训练状态", () => {
+test("today continue helper 会优先读取 sceneTask 的训练状态", () => {
   const continueLearning = resolveContinueLearning(dashboard, scenes);
   const taskScene = {
     done: false,
@@ -215,7 +217,7 @@ test("today continue helper 会优先读取 today sceneTask 里的训练状态",
   assert.match(getContinueLearningHelperText(continueLearning, taskScene), /35%/);
 });
 
-test("continue learning card 在等待数据时不会回退成开始新场景", () => {
+test("continue learning card 等待数据时不会回退成开始新场景", () => {
   const cardState = getContinueLearningCardState({
     continueLearning: null,
     sceneTask: dashboard.todayTasks.sceneTask,
@@ -400,6 +402,92 @@ test("buildTodayTasks 在回炉练习时不会把 output 和 review 重新锁住
   assert.equal(tasks[0]?.status, "up_next");
   assert.equal(tasks[1]?.status, "up_next");
   assert.equal(tasks[2]?.status, "available");
+});
+
+test("resolveContinueLearningState 会返回 continue learning 的来源", () => {
+  const dashboardSource = resolveContinueLearningState(
+    {
+      ...dashboard,
+      continueLearning: {
+        sceneSlug: "direct-scene",
+        title: "Direct Scene",
+        subtitle: "From dashboard",
+        progressPercent: 60,
+        masteryStage: "focus",
+        masteryPercent: 35,
+        currentStep: "focus_expression",
+        lastViewedAt: "2026-03-21T00:00:00.000Z",
+        lastSentenceIndex: 3,
+        estimatedMinutes: 11,
+        savedPhraseCount: 6,
+        completedSentenceCount: 0,
+      },
+    },
+    scenes,
+  );
+  assert.equal(dashboardSource.source, "dashboard");
+
+  savePracticeSet({
+    id: "repeat-practice-1",
+    sourceSceneId: "scene-3",
+    sourceSceneTitle: "Wrap Up",
+    sourceType: "original",
+    exercises: [],
+    status: "generated",
+    createdAt: "2026-03-25T08:00:00.000Z",
+  });
+
+  const repeatSource = resolveContinueLearningState(
+    {
+      ...dashboard,
+      continueLearning: null,
+    },
+    scenes,
+  );
+  assert.equal(repeatSource.source, "local-repeat");
+
+  window.localStorage.clear();
+  const fallbackSource = resolveContinueLearningState(dashboard, scenes);
+  assert.equal(fallbackSource.source, "scene-list-fallback");
+});
+
+test("resolveTodayLearningSnapshot 会优先使用 sceneTask 的步骤和进度", () => {
+  const snapshot = resolveTodayLearningSnapshot({
+    dashboard: {
+      ...dashboard,
+      continueLearning: {
+        sceneSlug: "direct-scene",
+        title: "Direct Scene",
+        subtitle: "From dashboard",
+        progressPercent: 60,
+        masteryStage: "focus",
+        masteryPercent: 35,
+        currentStep: "focus_expression",
+        lastViewedAt: "2026-03-21T00:00:00.000Z",
+        lastSentenceIndex: 3,
+        estimatedMinutes: 11,
+        savedPhraseCount: 6,
+        completedSentenceCount: 0,
+      },
+      todayTasks: {
+        ...dashboard.todayTasks,
+        sceneTask: {
+          done: false,
+          continueSceneSlug: "direct-scene",
+          currentStep: "scene_practice",
+          masteryStage: "scene_practice",
+          progressPercent: 80,
+          completedSentenceCount: 1,
+        },
+      },
+    },
+    sceneList: scenes,
+  });
+
+  assert.equal(snapshot.continueLearningSource, "dashboard");
+  assert.equal(snapshot.effectiveCurrentStep, "scene_practice");
+  assert.equal(snapshot.effectiveMasteryStage, "scene_practice");
+  assert.equal(snapshot.effectiveProgressPercent, 80);
 });
 
 test("getRecommendedScenes 会按顺序截取推荐场景", () => {

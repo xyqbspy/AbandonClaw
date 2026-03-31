@@ -914,6 +914,7 @@
 3. `src/app/(app)/today/page.tsx`
 4. `src/features/today/components/today-page-client.tsx`
 5. `src/features/today/components/today-page-selectors.ts`
+6. `docs/today-learning-mapping.md`
 
 ### 第二轮：读主线 `scene`
 
