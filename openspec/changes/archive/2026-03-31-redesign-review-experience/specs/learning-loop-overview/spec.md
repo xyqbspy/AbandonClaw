@@ -1,4 +1,4 @@
-## MODIFIED Requirements
+## ADDED Requirements
 
 ### Requirement: Review 必须承担学习回顾与再练入口职责
 系统 MUST 允许 `review` 页面同时承担普通表达复习和来自场景练习的继续回补、参考展开、再作答与下一题推进职责；当复习体验需要新的前端阶段式工作台或后续增强能力时，必须用稳定的数据契约和清晰的 TODO 占位来维护学习链路一致性。

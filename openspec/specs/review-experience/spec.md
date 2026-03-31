@@ -1,0 +1,31 @@
+# review-experience Specification
+
+## Purpose
+TBD - created by archiving change redesign-review-experience. Update Purpose after archive.
+## Requirements
+### Requirement: Review 页面必须提供阶段式复习工作台
+系统 MUST 把 `review` 页面组织成统一的阶段式复习工作台，而不是把普通表达复习、场景回补和辅助信息简单平铺在同一页中。
+
+#### Scenario: 用户进入复习页
+- **WHEN** 用户打开 `review`
+- **THEN** 页面必须展示清晰的当前任务、进度信息和下一步动作
+- **AND** 普通表达复习与场景回补必须使用统一的视觉层级和交互节奏
+- **AND** 页面必须允许按阶段逐步展开参考、作答、反馈与下一题推进
+
+### Requirement: Review 页面必须允许 TODO 占位而不伪造学习完成信号
+系统 MUST 允许复习页先按新的前端主流程落地，再逐步补齐增强能力；当后端尚未提供正式支持时，前端必须使用清晰的 TODO 占位，而不能伪造成正式学习完成、统计或持久反馈。
+
+#### Scenario: 某个复习交互暂时缺少后端支持
+- **WHEN** 页面需要展示 AI 点评、增强反馈或更细粒度推荐，但后端尚未提供正式能力
+- **THEN** 前端必须明确区分“正式已接通能力”和“待接入 TODO”
+- **AND** 本地占位交互不得写成正式 review 完成或学习进度
+- **AND** 后续若补后端，必须同步更新数据契约、测试和规范
+
+### Requirement: Review 舞台模型必须统一映射普通复习与场景回补
+系统 MUST 通过稳定的 selector / 页面模型，把普通 due review 与场景回补翻译成统一的前端舞台模型，避免页面层直接散落多套条件判断。
+
+#### Scenario: 页面渲染当前复习任务
+- **WHEN** 当前任务来自普通表达 due review 或场景练习回补
+- **THEN** 页面都必须能得到统一的阶段标题、来源说明、提示、参考区、作答区和主 CTA 配置
+- **AND** 这些配置必须由稳定映射逻辑产出，而不是在组件树中重复拼接
+
