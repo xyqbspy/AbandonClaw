@@ -337,3 +337,21 @@
   - `src/app/(app)/scenes/page.interaction.test.tsx`
   - `src/features/lesson/components/selection-detail-panel.tsx`
   - `src/features/lesson/components/selection-detail-sheet.tsx`
+# Changelog
+
+## 2026-03-31
+
+### Review 调度开始消费正式训练信号
+- `review` 的 due 列表现在不再只按 `next_review_at` 平铺排序；最近一次复习里表现出“低输出信心”“还没完成完整输出”或“仍停留在识别层”的表达，会被更稳定地前置出来，优先回看。
+- 提交 `again / hard / good` 后，下一次复习时间不再固定映射成旧的 1/3/7 天，而是会结合正式训练信号做细调：高信心且完成完整输出的条目会拉得更远，仍缺主动输出能力的条目会更快回到队列。
+- `review` 页面补上了调度提示文案，能直接解释“为什么这条会优先出现”；同时新增 `docs/review-scheduling-signals.md`，把排序规则、节奏规则和历史空值兼容边界正式写清楚。
+影响范围：
+- `review` due 列表服务端排序与 `next_review_at` 更新策略
+- `review` 页面调度提示展示
+- review 调度专项维护文档与项目学习导览
+
+验证情况：
+- `node --import tsx --test "src/lib/server/review/service.logic.test.ts" "src/app/(app)/review/review-page-selectors.test.ts"`
+- `node --import tsx --import ./src/test/setup-dom.ts --test "src/app/(app)/review/page.interaction.test.tsx"`
+- `pnpm exec tsc --noEmit`
+- `node_modules\\.bin\\openspec.CMD change validate adapt-review-scheduling-signals --strict --no-interactive`

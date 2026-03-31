@@ -36,6 +36,10 @@ export const toDueItemFromSavedPhrase = (
     correctCount: row.correctCount,
     incorrectCount: row.incorrectCount,
     nextReviewAt: row.nextReviewAt,
+    recognitionState: null,
+    outputConfidence: null,
+    fullOutputStatus: null,
+    schedulingFocus: null,
   };
 };
 
@@ -238,3 +242,18 @@ export const buildPhraseRewritePrompts = (): PhraseRewritePrompt[] => [
     description: "把它改成描述昨天已经发生过的场景。",
   },
 ];
+
+export const getReviewSchedulingReason = (
+  item: Pick<DueReviewItemResponse, "schedulingFocus">,
+) => {
+  if (item.schedulingFocus === "low_output_confidence") {
+    return "这条会优先出现，因为你上次还缺少主动输出信心。";
+  }
+  if (item.schedulingFocus === "missing_full_output") {
+    return "这条会优先出现，因为你还没完成过完整输出。";
+  }
+  if (item.schedulingFocus === "recognition_only") {
+    return "这条会优先出现，因为它还停留在识别层。";
+  }
+  return null;
+};

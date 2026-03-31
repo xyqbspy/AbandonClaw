@@ -46,6 +46,10 @@ let currentDueRows: Array<{
   correctCount: number;
   incorrectCount: number;
   nextReviewAt: string | null;
+  recognitionState: "recognized" | "unknown" | null;
+  outputConfidence: "high" | "low" | null;
+  fullOutputStatus: "completed" | "not_started" | null;
+  schedulingFocus: "low_output_confidence" | "missing_full_output" | "recognition_only" | null;
 }> = [
   {
     userPhraseId: "p1",
@@ -62,6 +66,10 @@ let currentDueRows: Array<{
     correctCount: 0,
     incorrectCount: 0,
     nextReviewAt: null,
+    recognitionState: null,
+    outputConfidence: null,
+    fullOutputStatus: null,
+    schedulingFocus: null,
   },
 ];
 let currentScenePracticeRows: Array<{
@@ -222,6 +230,10 @@ afterEach(() => {
       correctCount: 0,
       incorrectCount: 0,
       nextReviewAt: null,
+      recognitionState: null,
+      outputConfidence: null,
+      fullOutputStatus: null,
+      schedulingFocus: null,
     },
   ];
   currentScenePracticeRows = [];
@@ -245,6 +257,10 @@ test("ReviewPage 普通表达有可访问来源场景时展示跳转入口", asy
       correctCount: 0,
       incorrectCount: 0,
       nextReviewAt: null,
+      recognitionState: null,
+      outputConfidence: null,
+      fullOutputStatus: null,
+      schedulingFocus: null,
     },
   ];
 
@@ -272,6 +288,10 @@ test("ReviewPage 普通表达来源场景失效时只展示降级提示", async 
       correctCount: 0,
       incorrectCount: 0,
       nextReviewAt: null,
+      recognitionState: null,
+      outputConfidence: null,
+      fullOutputStatus: null,
+      schedulingFocus: null,
     },
   ];
 
@@ -352,6 +372,37 @@ test("ReviewPage 普通表达复习会按微回忆 -> 熟悉度 -> 改写 -> 输
     assert.equal(submitPhraseReviewPayloads[0]?.outputConfidence, "high");
     assert.equal(submitPhraseReviewPayloads[0]?.fullOutputStatus, "completed");
   });
+});
+
+test("ReviewPage 会展示正式信号带来的调度提示", async () => {
+  currentDueRows = [
+    {
+      userPhraseId: "p-priority",
+      phraseId: "phrase-priority",
+      text: "call it a day",
+      translation: "收工",
+      usageNote: null,
+      sourceSceneSlug: null,
+      sourceSceneAvailable: false,
+      sourceSentenceText: null,
+      expressionClusterId: null,
+      reviewStatus: "reviewing",
+      reviewCount: 2,
+      correctCount: 1,
+      incorrectCount: 1,
+      nextReviewAt: "2026-03-31T08:00:00.000Z",
+      recognitionState: "recognized",
+      outputConfidence: "low",
+      fullOutputStatus: "not_started",
+      schedulingFocus: "low_output_confidence",
+    },
+  ];
+
+  const ReviewPage = getReviewPage();
+  render(<ReviewPage />);
+
+  await screen.findByText("调度提示");
+  assert.ok(screen.getByText("这条会优先出现，因为你上次还缺少主动输出信心。"));
 });
 
 test("ReviewPage 场景回补会进入阶段式复现并在完成后刷新列表", async () => {

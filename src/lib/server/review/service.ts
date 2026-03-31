@@ -18,11 +18,28 @@ import { listVisibleScenesBySlugs } from "@/lib/server/scene/repository";
 
 const nowIso = () => new Date().toISOString();
 const todayDate = () => new Date().toISOString().slice(0, 10);
+const addHours = (hours: number) => {
+  const timestamp = Date.now() + hours * 60 * 60 * 1000;
+  return new Date(timestamp).toISOString();
+};
 
 const addDays = (days: number) => {
   const timestamp = Date.now() + days * 24 * 60 * 60 * 1000;
   return new Date(timestamp).toISOString();
 };
+
+export type ReviewSchedulingFocus =
+  | "low_output_confidence"
+  | "missing_full_output"
+  | "recognition_only"
+  | null;
+
+export interface ReviewLatestSignals {
+  recognitionState: PhraseReviewRecognitionState | null;
+  outputConfidence: PhraseReviewOutputConfidence | null;
+  fullOutputStatus: PhraseReviewFullOutputStatus | null;
+  schedulingFocus: ReviewSchedulingFocus;
+}
 
 export interface DueReviewItem {
   userPhraseId: string;
@@ -39,6 +56,10 @@ export interface DueReviewItem {
   correctCount: number;
   incorrectCount: number;
   nextReviewAt: string | null;
+  recognitionState: PhraseReviewRecognitionState | null;
+  outputConfidence: PhraseReviewOutputConfidence | null;
+  fullOutputStatus: PhraseReviewFullOutputStatus | null;
+  schedulingFocus: ReviewSchedulingFocus;
 }
 
 export interface SubmitPhraseReviewInput {
@@ -130,6 +151,7 @@ const mapDueItem = (
   row: UserPhraseRow & { phrase: PhraseRow | null },
   expressionClusterId: string | null,
   sourceSceneAvailable: boolean,
+  latestSignals?: ReviewLatestSignals,
 ): DueReviewItem => ({
   userPhraseId: row.id,
   phraseId: row.phrase_id,
@@ -145,6 +167,10 @@ const mapDueItem = (
   correctCount: row.correct_count,
   incorrectCount: row.incorrect_count,
   nextReviewAt: row.next_review_at,
+  recognitionState: latestSignals?.recognitionState ?? null,
+  outputConfidence: latestSignals?.outputConfidence ?? null,
+  fullOutputStatus: latestSignals?.fullOutputStatus ?? null,
+  schedulingFocus: latestSignals?.schedulingFocus ?? null,
 });
 
 const isReviewableStatus = (status: UserPhraseReviewStatus) =>
@@ -185,6 +211,7 @@ async function addDailyReviewCompleted(userId: string) {
 export async function getDueReviewItems(userId: string, params?: { limit?: number }) {
   const admin = createSupabaseAdminClient();
   const limit = Math.min(100, Math.max(1, Math.floor(params?.limit ?? 20)));
+  const fetchLimit = Math.min(400, Math.max(limit * 4, limit));
   const now = nowIso();
 
   const { data, error } = await admin
@@ -195,7 +222,7 @@ export async function getDueReviewItems(userId: string, params?: { limit?: numbe
     .or(`next_review_at.is.null,next_review_at.lte.${now}`)
     .order("next_review_at", { ascending: true, nullsFirst: true })
     .order("saved_at", { ascending: true })
-    .limit(limit);
+    .limit(fetchLimit);
 
   if (error) {
     throw new Error(`Failed to load due review items: ${error.message}`);
@@ -211,13 +238,144 @@ export async function getDueReviewItems(userId: string, params?: { limit?: numbe
     userId,
     rows.map((row) => row.id),
   );
-  return rows.map((row) =>
+  const latestSignalsByPhraseId = await loadLatestReviewSignalsByUserPhraseId(
+    userId,
+    rows.map((row) => row.id),
+  );
+  const mapped = rows.map((row) =>
     mapDueItem(
       row,
       clusterIdByPhraseId.get(row.id) ?? null,
       row.source_scene_slug ? visibleSceneSlugSet.has(row.source_scene_slug) : false,
+      latestSignalsByPhraseId.get(row.id),
     ),
   );
+
+  mapped.sort((left, right) => {
+    const urgencyDelta =
+      getReviewSchedulingUrgencyRank(left.schedulingFocus) -
+      getReviewSchedulingUrgencyRank(right.schedulingFocus);
+    if (urgencyDelta !== 0) return urgencyDelta;
+    const leftNext = left.nextReviewAt ?? "";
+    const rightNext = right.nextReviewAt ?? "";
+    const nextDelta = leftNext.localeCompare(rightNext);
+    if (nextDelta !== 0) return nextDelta;
+    return left.userPhraseId.localeCompare(right.userPhraseId);
+  });
+
+  return mapped.slice(0, limit);
+}
+
+export const resolveReviewSchedulingFocus = ({
+  recognitionState,
+  outputConfidence,
+  fullOutputStatus,
+}: {
+  recognitionState: PhraseReviewRecognitionState | null;
+  outputConfidence: PhraseReviewOutputConfidence | null;
+  fullOutputStatus: PhraseReviewFullOutputStatus | null;
+}): ReviewSchedulingFocus => {
+  if (outputConfidence === "low") return "low_output_confidence";
+  if (fullOutputStatus === "not_started") return "missing_full_output";
+  if (recognitionState === "unknown") return "recognition_only";
+  return null;
+};
+
+export const getReviewSchedulingUrgencyRank = (focus: ReviewSchedulingFocus) => {
+  if (focus === "low_output_confidence") return 0;
+  if (focus === "missing_full_output") return 1;
+  if (focus === "recognition_only") return 2;
+  return 3;
+};
+
+export const resolveNextReviewAt = ({
+  reviewResult,
+  recognitionState,
+  outputConfidence,
+  fullOutputStatus,
+  reachesMastered,
+}: {
+  reviewResult: PhraseReviewResult;
+  recognitionState: PhraseReviewRecognitionState | null;
+  outputConfidence: PhraseReviewOutputConfidence | null;
+  fullOutputStatus: PhraseReviewFullOutputStatus | null;
+  reachesMastered: boolean;
+}) => {
+  if (reviewResult === "again") {
+    if (
+      outputConfidence === "low" ||
+      recognitionState === "unknown" ||
+      fullOutputStatus === "not_started"
+    ) {
+      return addHours(12);
+    }
+    return addDays(1);
+  }
+
+  if (reviewResult === "hard") {
+    if (outputConfidence === "low" || fullOutputStatus === "not_started") {
+      return addDays(2);
+    }
+    return addDays(3);
+  }
+
+  if (reachesMastered) return null;
+  if (
+    recognitionState === "recognized" &&
+    outputConfidence === "high" &&
+    fullOutputStatus === "completed"
+  ) {
+    return addDays(10);
+  }
+  if (outputConfidence === "low" || recognitionState === "unknown") {
+    return addDays(4);
+  }
+  if (fullOutputStatus === "not_started") {
+    return addDays(5);
+  }
+  return addDays(7);
+};
+
+async function loadLatestReviewSignalsByUserPhraseId(userId: string, userPhraseIds: string[]) {
+  const uniqueIds = Array.from(new Set(userPhraseIds.map((item) => item.trim()).filter(Boolean)));
+  if (uniqueIds.length === 0) return new Map<string, ReviewLatestSignals>();
+
+  const admin = createSupabaseAdminClient();
+  const { data, error } = await admin
+    .from("phrase_review_logs")
+    .select("user_phrase_id, recognition_state, output_confidence, full_output_status, reviewed_at")
+    .eq("user_id", userId)
+    .in("user_phrase_id", uniqueIds)
+    .order("reviewed_at", { ascending: false });
+
+  if (error) {
+    if (isReviewSignalsQueryError(error)) {
+      throw new Error(toReviewSchemaErrorMessage("load latest review signals", error.message));
+    }
+    throw new Error(`Failed to load latest review signals: ${error.message}`);
+  }
+
+  const result = new Map<string, ReviewLatestSignals>();
+  for (const row of (data ?? []) as Array<{
+    user_phrase_id: string;
+    recognition_state: PhraseReviewRecognitionState | null;
+    output_confidence: PhraseReviewOutputConfidence | null;
+    full_output_status: PhraseReviewFullOutputStatus | null;
+  }>) {
+    if (result.has(row.user_phrase_id)) continue;
+    result.set(row.user_phrase_id, {
+      recognitionState: row.recognition_state,
+      outputConfidence: row.output_confidence,
+      fullOutputStatus: row.full_output_status,
+      schedulingFocus: resolveReviewSchedulingFocus({
+        recognitionState: row.recognition_state,
+        outputConfidence: row.output_confidence,
+        fullOutputStatus: row.full_output_status,
+      }),
+    });
+  }
+
+  return result;
 }
 
 export async function getDueScenePracticeReviewItems(
@@ -367,30 +525,36 @@ export async function submitPhraseReview(userId: string, input: SubmitPhraseRevi
     (existing.correct_count ?? 0) + (input.reviewResult === "again" ? 0 : 1);
   const nextIncorrectCount =
     (existing.incorrect_count ?? 0) + (input.reviewResult === "again" ? 1 : 0);
+  const reachesMastered = input.reviewResult === "good" && nextCorrectCount >= 3;
+  const latestSignals: ReviewLatestSignals = {
+    recognitionState: input.recognitionState ?? null,
+    outputConfidence: input.outputConfidence ?? null,
+    fullOutputStatus: input.fullOutputStatus ?? null,
+    schedulingFocus: resolveReviewSchedulingFocus({
+      recognitionState: input.recognitionState ?? null,
+      outputConfidence: input.outputConfidence ?? null,
+      fullOutputStatus: input.fullOutputStatus ?? null,
+    }),
+  };
 
   let nextReviewAt: string | null = null;
   let reviewStatus: UserPhraseReviewStatus = "reviewing";
   let masteredAt: string | null = existing.mastered_at ?? null;
 
-  if (input.reviewResult === "again") {
-    nextReviewAt = addDays(1);
-    reviewStatus = "reviewing";
-    masteredAt = null;
-  } else if (input.reviewResult === "hard") {
-    nextReviewAt = addDays(3);
-    reviewStatus = "reviewing";
-    masteredAt = null;
+  if (reachesMastered) {
+    reviewStatus = "mastered";
+    nextReviewAt = null;
+    masteredAt = now;
   } else {
-    const reachesMastered = nextCorrectCount >= 3;
-    if (reachesMastered) {
-      reviewStatus = "mastered";
-      nextReviewAt = null;
-      masteredAt = now;
-    } else {
-      reviewStatus = "reviewing";
-      nextReviewAt = addDays(7);
-      masteredAt = null;
-    }
+    reviewStatus = "reviewing";
+    nextReviewAt = resolveNextReviewAt({
+      reviewResult: input.reviewResult,
+      recognitionState: latestSignals.recognitionState,
+      outputConfidence: latestSignals.outputConfidence,
+      fullOutputStatus: latestSignals.fullOutputStatus,
+      reachesMastered,
+    });
+    masteredAt = null;
   }
 
   const updatePayload = {
@@ -444,6 +608,7 @@ export async function submitPhraseReview(userId: string, input: SubmitPhraseRevi
     updated,
     clusterIdByPhraseId.get(updated.id) ?? null,
     updated.source_scene_slug ? visibleSceneSlugSet.has(updated.source_scene_slug) : false,
+    latestSignals,
   );
 }
 

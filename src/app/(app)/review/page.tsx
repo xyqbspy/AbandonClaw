@@ -64,6 +64,7 @@ import {
   buildReviewProgressModel,
   buildReviewTaskStageMeta,
   buildScenePracticeReviewItemKey,
+  getReviewSchedulingReason,
   mergePrioritizedReviewItems,
   PhraseRewritePrompt,
   resolveReviewHints,
@@ -282,6 +283,9 @@ export default function ReviewPage() {
   const currentRewritePrompt =
     phraseRewritePrompts.find((prompt) => prompt.id === phraseRewritePromptId) ??
     phraseRewritePrompts[0];
+  const currentPhraseSchedulingReason = currentPhraseItem
+    ? getReviewSchedulingReason(currentPhraseItem)
+    : null;
   const phraseCanContinueFromConfidence =
     phraseRecognition != null && phraseOutputConfidence != null;
   const phraseCanContinueFromRewrite = phraseRewriteDraft.trim().length > 0;
@@ -617,6 +621,14 @@ export default function ReviewPage() {
               </div>
             ) : currentPhraseItem ? (
               <div className="mt-6 space-y-4">
+                {currentPhraseSchedulingReason ? (
+                  <div className="rounded-[18px] border border-amber-200 bg-amber-50/80 p-4">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-700">
+                      调度提示
+                    </p>
+                    <p className="mt-2 text-sm text-amber-800">{currentPhraseSchedulingReason}</p>
+                  </div>
+                ) : null}
                 <div className={`rounded-[20px] p-4 ${APPLE_PANEL}`}>
                   <p className={APPLE_META_TEXT}>
                     {taskStage === "recall" ? zh.phraseRecallScenarioLabel : zh.phraseScenarioLabel}

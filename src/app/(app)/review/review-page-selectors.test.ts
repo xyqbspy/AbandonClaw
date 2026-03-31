@@ -4,6 +4,7 @@ import {
   buildFallbackExampleSentence,
   buildReviewProgressModel,
   buildReviewTaskStageMeta,
+  getReviewSchedulingReason,
   mergePrioritizedReviewItems,
   resolveReviewHints,
   resolveReviewSourceLabel,
@@ -104,6 +105,10 @@ test("mergePrioritizedReviewItems 会优先插入 session 项并避免重复", (
         correctCount: 0,
         incorrectCount: 0,
         nextReviewAt: null,
+        recognitionState: null,
+        outputConfidence: null,
+        fullOutputStatus: null,
+        schedulingFocus: null,
       },
     ],
     phraseRows: [
@@ -217,4 +222,20 @@ test("buildFallbackExampleSentence 会生成稳定的回退参考句", () => {
     buildFallbackExampleSentence("call it a day"),
     'I can use "call it a day" in a real sentence.',
   );
+});
+
+test("getReviewSchedulingReason 会返回稳定的调度解释", () => {
+  assert.equal(
+    getReviewSchedulingReason({ schedulingFocus: "low_output_confidence" }),
+    "这条会优先出现，因为你上次还缺少主动输出信心。",
+  );
+  assert.equal(
+    getReviewSchedulingReason({ schedulingFocus: "missing_full_output" }),
+    "这条会优先出现，因为你还没完成过完整输出。",
+  );
+  assert.equal(
+    getReviewSchedulingReason({ schedulingFocus: "recognition_only" }),
+    "这条会优先出现，因为它还停留在识别层。",
+  );
+  assert.equal(getReviewSchedulingReason({ schedulingFocus: null }), null);
 });

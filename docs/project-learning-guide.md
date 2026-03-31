@@ -803,6 +803,8 @@
 `review` 页的来源契约、原场景跳转和降级规则，可配合阅读：
 
 - `docs/review-source-mapping.md`
+- `docs/review-practice-signals.md`
+- `docs/review-scheduling-signals.md`
 
 可总结成三句话：
 

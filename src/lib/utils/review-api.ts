@@ -4,6 +4,11 @@ export type ReviewResult = "again" | "hard" | "good";
 export type ReviewRecognitionState = "recognized" | "unknown";
 export type ReviewOutputConfidence = "high" | "low";
 export type ReviewFullOutputStatus = "completed" | "not_started";
+export type ReviewSchedulingFocus =
+  | "low_output_confidence"
+  | "missing_full_output"
+  | "recognition_only"
+  | null;
 
 export interface DueReviewItemResponse {
   userPhraseId: string;
@@ -20,6 +25,10 @@ export interface DueReviewItemResponse {
   correctCount: number;
   incorrectCount: number;
   nextReviewAt: string | null;
+  recognitionState: ReviewRecognitionState | null;
+  outputConfidence: ReviewOutputConfidence | null;
+  fullOutputStatus: ReviewFullOutputStatus | null;
+  schedulingFocus: ReviewSchedulingFocus;
 }
 
 export interface DueScenePracticeReviewItemResponse {
