@@ -1,6 +1,8 @@
 import { UserPhraseItemResponse } from "@/lib/utils/phrases-api";
 import { DueReviewItemResponse, DueScenePracticeReviewItemResponse } from "@/lib/utils/review-api";
 
+export type ReviewTaskStage = "recall" | "practice" | "feedback";
+
 export const buildFallbackExampleSentence = (expression: string) =>
   `I can use "${expression}" in a real sentence.`;
 
@@ -121,3 +123,76 @@ export const buildScenePracticeReviewItemKey = (
 export const buildScenePracticeReviewKeySet = (
   items: Array<Pick<DueScenePracticeReviewItemResponse, "sceneSlug" | "sentenceId" | "exerciseId">>,
 ) => new Set(items.map((item) => buildScenePracticeReviewItemKey(item)));
+
+export const buildReviewProgressModel = ({
+  summary,
+  scenePracticeCount,
+}: {
+  summary: {
+    dueReviewCount: number;
+    reviewedTodayCount: number;
+    reviewAccuracy: number | null;
+    masteredPhraseCount: number;
+  } | null;
+  scenePracticeCount: number;
+}) => {
+  const reviewedTodayCount = summary?.reviewedTodayCount ?? 0;
+  const dueReviewCount = summary?.dueReviewCount ?? 0;
+  const totalCount = reviewedTodayCount + dueReviewCount + scenePracticeCount;
+  const completedCount = reviewedTodayCount;
+  const progressPercent =
+    totalCount <= 0 ? 0 : Math.max(0, Math.min(100, Math.round((completedCount / totalCount) * 100)));
+
+  return {
+    reviewedTodayCount,
+    dueReviewCount,
+    totalCount,
+    completedCount,
+    progressPercent,
+    accuracyText: summary?.reviewAccuracy == null ? "—" : `${summary.reviewAccuracy}%`,
+  };
+};
+
+export const buildReviewTaskStageMeta = ({
+  taskKind,
+  stage,
+}: {
+  taskKind: "scene_practice" | "phrase_review";
+  stage: ReviewTaskStage;
+}) => {
+  if (taskKind === "scene_practice") {
+    if (stage === "recall") {
+      return {
+        stepTag: "STEP 1. 场景回补",
+        title: "先回忆这句该怎么接",
+      };
+    }
+    if (stage === "practice") {
+      return {
+        stepTag: "STEP 2. 当场再练一次",
+        title: "把这句重新说出来",
+      };
+    }
+    return {
+      stepTag: "STEP 3. 反馈与下一步",
+      title: "根据结果决定继续回场景还是进入下一题",
+    };
+  }
+
+  if (stage === "recall") {
+    return {
+      stepTag: "STEP 1. 表达唤醒",
+      title: "先在脑中把这条表达提起来",
+    };
+  }
+  if (stage === "practice") {
+    return {
+      stepTag: "STEP 2. 输出练习",
+      title: "试着用自己的话造一句",
+    };
+  }
+  return {
+    stepTag: "STEP 3. 复习判断",
+    title: "给这次复习一个明确判断",
+  };
+};

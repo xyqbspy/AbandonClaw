@@ -1,5 +1,3 @@
-import { PRACTICE_ASSESSMENT_FEEDBACK } from "@/lib/shared/scene-training-copy";
-
 export type ReviewPageLabels = {
   loadFailed: string;
   submitFailed: string;
@@ -7,39 +5,63 @@ export type ReviewPageLabels = {
   eyebrow: string;
   title: string;
   desc: string;
+  streakSummary: string;
+  progressLabel: string;
   dueNow: string;
   doneToday: string;
   accuracy: string;
   statusJoiner: string;
-  trainingGuidePrefix: string;
-  trainingGuideSuffix: string;
+  queueLoading: string;
+  queueEmpty: string;
+  noTranslation: string;
+  dash: string;
+  sourcePrefix: string;
+  fromExpressionLibrary: string;
+  fromExpressionMap: string;
+  fromTodayTask: string;
+  fromSelected: string;
+  defaultHint: string;
+  sessionHint: string;
+  manualSessionHint: string;
   trainingHintSubtle: string;
-  expressionLabel: string;
-  exampleLabel: string;
+  manualTrainingHintSubtle: string;
+  phraseStepTag: string;
+  sceneStepTag: string;
+  phraseScenarioLabel: string;
+  phraseReferenceLabel: string;
+  phraseReferenceHint: string;
+  phraseDraftLabel: string;
+  phraseDraftPlaceholder: string;
+  phraseFeedbackLabel: string;
+  phraseFeedbackTodoTitle: string;
+  phraseFeedbackTodoBody: string;
+  phraseRevealCta: string;
+  phrasePracticeCta: string;
+  phraseScoringHint: string;
+  phraseNextCta: string;
+  phraseFeedbackCta: string;
+  sceneScenarioLabel: string;
+  scenePromptLabel: string;
+  sceneExpectedLabel: string;
+  sceneHintLabel: string;
+  sceneRecallCta: string;
+  scenePracticeLabel: string;
+  sceneFeedbackLabel: string;
+  sceneTodoTitle: string;
+  sceneTodoBody: string;
+  sceneNextCta: string;
+  sceneRetryCta: string;
   showReference: string;
   hideReference: string;
   activeRecallHint: string;
   againLabel: string;
   hardLabel: string;
   goodLabel: string;
-  queueLoading: string;
-  queueEmpty: string;
-  noTranslation: string;
-  sourceSentence: string;
   reviewStats: string;
   correct: string;
   incorrect: string;
-  dash: string;
-  sessionHint: string;
-  manualSessionHint: string;
-  manualTrainingHintSubtle: string;
-  fromExpressionLibrary: string;
-  fromExpressionMap: string;
-  fromTodayTask: string;
-  fromSelected: string;
-  sourcePrefix: string;
-  defaultHint: string;
   openSourceScene: string;
+  openScenePractice: string;
   practiceAgain: string;
   practiceModePrefix: string;
   practicePromptPrefix: string;
@@ -63,61 +85,85 @@ export type ReviewPageLabels = {
 
 export const reviewPageLabels: ReviewPageLabels = {
   loadFailed: "加载复习数据失败。",
-  submitFailed: "提交复习失败。",
-  submitOk: "已记录复习结果。",
-  eyebrow: "复习",
-  title: "巩固已保存表达",
-  desc: "把已保存表达跑进真实复习闭环，持续形成可输出能力。",
-  dueNow: "当前待复习",
-  doneToday: "今日已复习",
-  accuracy: "复习正确率",
+  submitFailed: "提交复习结果失败。",
+  submitOk: "已记录这次复习结果。",
+  eyebrow: "Review",
+  title: "沉浸式复习",
+  desc: "把今天需要回顾的表达和场景句子重新拉回到真实语境里，先唤醒，再输出，最后给出明确判断。",
+  streakSummary: "连续 12 天复习",
+  progressLabel: "今日进度",
+  dueNow: "待处理",
+  doneToday: "已完成",
+  accuracy: "正确率",
   statusJoiner: "·",
-  trainingGuidePrefix: "先在心里说一句，再判断你现在的",
-  trainingGuideSuffix: "熟悉程度",
-  trainingHintSubtle: "别急着看参考句，先自己试一下",
-  expressionLabel: "表达",
-  exampleLabel: "参考句",
-  showReference: "想不起来？看参考句",
-  hideReference: "收起参考句",
-  activeRecallHint: "在心里说一遍，或用你自己的话试着改写一句",
-  againLabel: "不会",
-  hardLabel: "有点难",
-  goodLabel: "会用了",
-  queueLoading: "复习队列加载中...",
-  queueEmpty: "当前没有到期待复习项，稍后再来巩固。",
+  queueLoading: "正在准备今天的复习队列...",
+  queueEmpty: "当前没有待复习内容，稍后再来巩固也可以。",
   noTranslation: "暂无翻译",
-  sourceSentence: "来源句子：",
-  reviewStats: "复习次数",
+  dash: "—",
+  sourcePrefix: "来源",
+  fromExpressionLibrary: "表达库",
+  fromExpressionMap: "表达地图",
+  fromTodayTask: "今日任务",
+  fromSelected: "手动选择",
+  defaultHint: "先别急着看参考，尽量先在脑中把表达和场景提起来。",
+  sessionHint: "这是你刚刚点进来的表达，适合趁热快速复习一轮。",
+  manualSessionHint: "这是你刚刚保存的表达，先趁记忆还热自己说一遍。",
+  trainingHintSubtle: "先回忆，再看参考，最后再判断自己现在掌握到什么程度。",
+  manualTrainingHintSubtle: "先别看参考句，试着先说一遍自己的版本。",
+  phraseStepTag: "STEP 1. 表达唤醒",
+  sceneStepTag: "STEP 1. 场景回补",
+  phraseScenarioLabel: "当前表达",
+  phraseReferenceLabel: "参考句",
+  phraseReferenceHint: "想不起来时再展开参考句，尽量先自己回想。",
+  phraseDraftLabel: "STEP 2. 自己试着说一句",
+  phraseDraftPlaceholder: "用这条表达写一句你自己的话。这里先保留为本地草稿，后续再补 AI 点评。",
+  phraseFeedbackLabel: "STEP 3. 给这次复习一个判断",
+  phraseFeedbackTodoTitle: "TODO：AI 反馈待接入",
+  phraseFeedbackTodoBody: "后续这里会补自然度点评、替代表达建议和更细的输出反馈。",
+  phraseRevealCta: "想好了，查看参考",
+  phrasePracticeCta: "继续进入输出练习",
+  phraseScoringHint: "看完参考和自己的表达后，再判断这条表达你现在掌握到什么程度。",
+  phraseNextCta: "继续下一项复习",
+  phraseFeedbackCta: "进入复习判断",
+  sceneScenarioLabel: "当前场景任务",
+  scenePromptLabel: "本次提示",
+  sceneExpectedLabel: "参考目标",
+  sceneHintLabel: "补充提醒",
+  sceneRecallCta: "我准备好了，进入复现",
+  scenePracticeLabel: "STEP 2. 当场再练一次",
+  sceneFeedbackLabel: "STEP 3. 结果反馈",
+  sceneTodoTitle: "TODO：场景复现反馈增强",
+  sceneTodoBody: "后续这里会补更强的 AI 点评、错因归纳和下一题推荐策略。",
+  sceneNextCta: "进入下一项复习",
+  sceneRetryCta: "继续回到场景练习",
+  showReference: "展开参考",
+  hideReference: "收起参考",
+  activeRecallHint: "先在脑中说一遍，再决定是否展开参考。",
+  againLabel: "没想起来",
+  hardLabel: "有点卡",
+  goodLabel: "能用出来",
+  reviewStats: "累计复习",
   correct: "正确",
   incorrect: "错误",
-  dash: "—",
-  sessionHint: "正在复习你刚选中的表达。",
-  manualSessionHint: "刚记下这个表达，现在试着自己用一下。",
-  manualTrainingHintSubtle: "这是你刚收藏的表达，先别看参考句，试着说一句",
-  fromExpressionLibrary: "来自表达库",
-  fromExpressionMap: "来自表达地图",
-  fromTodayTask: "来自今日任务",
-  fromSelected: "来自你的选中表达",
-  sourcePrefix: "来源",
-  defaultHint: "正在进行当前到期表达复习。",
   openSourceScene: "查看原场景",
-  practiceAgain: "当场再练一次",
-  practiceModePrefix: "当前练法",
-  practicePromptPrefix: "这次提示",
-  practiceHintPrefix: "补充提醒",
-  practiceInputPlaceholder: "直接在这里复现这句或补全表达",
+  openScenePractice: "回到场景继续练",
+  practiceAgain: "继续复现这句",
+  practiceModePrefix: "推荐练法",
+  practicePromptPrefix: "本次提示",
+  practiceHintPrefix: "提醒",
+  practiceInputPlaceholder: "直接在这里补全这条表达或句子",
   practiceGuidedRecallPlaceholder: "根据提示，把后半句补出来",
   practiceSentenceRecallPlaceholder: "试着完整复现这一句",
-  practiceFullDictationPlaceholder: "根据提示，整段默写你记得的内容",
+  practiceFullDictationPlaceholder: "根据提示，把你记得的整段内容写下来",
   practiceCheck: "检查这次复现",
   practiceReset: "清空",
-  practiceKeywordFeedback: "这次已经抓到关键表达了，继续把句子骨架补完整。",
+  practiceKeywordFeedback: "这次已经抓到关键词了，继续把句子骨架补完整。",
   practiceStructureFeedback: "这次骨架已经对上了，再把细节补齐就能过。",
-  practiceCompleteFeedback: "这次已经完整复现，说明复习接住了。",
-  practiceIncorrectFeedback: "这次还不稳，先看原场景，再回来试一次。",
+  practiceCompleteFeedback: "这次已经完整复现，可以进入下一题。",
+  practiceIncorrectFeedback: "这次还不稳，先看提示或回到场景再试一次。",
   practiceMissingAnswer: "先输入这次的复现内容。",
   practiceMissingExpectedAnswer: "这条复习项缺少参考目标，暂时无法直接练习。",
   practiceInlineCompleted: "这句已经接住了，已从待复习里移除。",
-  practiceInlineRecorded: "已记录这次复习结果。",
-  practiceInlineFailed: "提交场景复习失败。",
+  practiceInlineRecorded: "已记录这次回补结果。",
+  practiceInlineFailed: "提交场景回补失败。",
 };

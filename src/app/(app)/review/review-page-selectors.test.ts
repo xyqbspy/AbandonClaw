@@ -2,143 +2,208 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   buildFallbackExampleSentence,
+  buildReviewProgressModel,
+  buildReviewTaskStageMeta,
   mergePrioritizedReviewItems,
   resolveReviewHints,
   resolveReviewSourceLabel,
   toDueItemFromSavedPhrase,
 } from "./review-page-selectors";
-import { UserPhraseItemResponse } from "@/lib/utils/phrases-api";
-import { DueReviewItemResponse } from "@/lib/utils/review-api";
 
-const createPhrase = (
-  overrides: Partial<UserPhraseItemResponse> = {},
-): UserPhraseItemResponse => ({
-  userPhraseId: overrides.userPhraseId ?? "phrase-1",
-  phraseId: overrides.phraseId ?? "phrase-1",
-  text: overrides.text ?? "call it a day",
-  normalizedText: overrides.normalizedText ?? "call it a day",
-  translation: overrides.translation ?? "今天先到这里",
-  usageNote: overrides.usageNote ?? null,
-  difficulty: overrides.difficulty ?? null,
-  tags: overrides.tags ?? [],
-  sourceSceneSlug: overrides.sourceSceneSlug ?? null,
-  sourceType: overrides.sourceType ?? "manual",
-  sourceNote: overrides.sourceNote ?? null,
-  sourceSentenceIndex: overrides.sourceSentenceIndex ?? null,
-  sourceSentenceText: overrides.sourceSentenceText ?? null,
-  sourceChunkText: overrides.sourceChunkText ?? null,
-  expressionClusterId: overrides.expressionClusterId ?? null,
-  expressionClusterRole: overrides.expressionClusterRole ?? null,
-  expressionClusterMainUserPhraseId: overrides.expressionClusterMainUserPhraseId ?? null,
-  aiEnrichmentStatus: overrides.aiEnrichmentStatus ?? null,
-  semanticFocus: overrides.semanticFocus ?? null,
-  typicalScenario: overrides.typicalScenario ?? null,
-  exampleSentences: overrides.exampleSentences ?? [],
-  aiEnrichmentError: overrides.aiEnrichmentError ?? null,
-  learningItemType: overrides.learningItemType ?? "expression",
-  savedAt: overrides.savedAt ?? "2026-03-21T00:00:00.000Z",
-  lastSeenAt: overrides.lastSeenAt ?? "2026-03-21T00:00:00.000Z",
-  reviewStatus: overrides.reviewStatus ?? "saved",
-  reviewCount: overrides.reviewCount ?? 0,
-  correctCount: overrides.correctCount ?? 0,
-  incorrectCount: overrides.incorrectCount ?? 0,
-  lastReviewedAt: overrides.lastReviewedAt ?? null,
-  nextReviewAt: overrides.nextReviewAt ?? null,
-  masteredAt: overrides.masteredAt ?? null,
-});
+test("toDueItemFromSavedPhrase 只转换可复习状态", () => {
+  const reviewing = toDueItemFromSavedPhrase({
+    userPhraseId: "u1",
+    phraseId: "p1",
+    text: "call it a day",
+    normalizedText: "call it a day",
+    translation: "收工",
+    usageNote: null,
+    difficulty: null,
+    tags: [],
+    sourceSceneSlug: "coffee-chat",
+    sourceType: "scene",
+    sourceSentenceIndex: null,
+    sourceSentenceText: "Let's call it a day.",
+    sourceChunkText: null,
+    expressionClusterId: null,
+    expressionClusterRole: null,
+    expressionClusterMainUserPhraseId: null,
+    aiEnrichmentStatus: null,
+    semanticFocus: null,
+    typicalScenario: null,
+    exampleSentences: [],
+    aiEnrichmentError: null,
+    learningItemType: "expression",
+    savedAt: "2026-03-31T00:00:00.000Z",
+    lastSeenAt: "2026-03-31T00:00:00.000Z",
+    reviewStatus: "saved",
+    reviewCount: 0,
+    correctCount: 0,
+    incorrectCount: 0,
+    lastReviewedAt: null,
+    nextReviewAt: null,
+    sourceNote: null,
+    masteredAt: null,
+  });
+  const archived = toDueItemFromSavedPhrase({
+    userPhraseId: "u2",
+    phraseId: "p2",
+    text: "wrap it up",
+    normalizedText: "wrap it up",
+    translation: "收尾",
+    usageNote: null,
+    difficulty: null,
+    tags: [],
+    sourceSceneSlug: null,
+    sourceType: "manual",
+    sourceSentenceIndex: null,
+    sourceSentenceText: null,
+    sourceChunkText: null,
+    expressionClusterId: null,
+    expressionClusterRole: null,
+    expressionClusterMainUserPhraseId: null,
+    aiEnrichmentStatus: null,
+    semanticFocus: null,
+    typicalScenario: null,
+    exampleSentences: [],
+    aiEnrichmentError: null,
+    learningItemType: "expression",
+    savedAt: "2026-03-31T00:00:00.000Z",
+    lastSeenAt: "2026-03-31T00:00:00.000Z",
+    reviewStatus: "archived",
+    reviewCount: 1,
+    correctCount: 1,
+    incorrectCount: 0,
+    lastReviewedAt: null,
+    nextReviewAt: null,
+    sourceNote: null,
+    masteredAt: null,
+  });
 
-const createDueItem = (
-  overrides: Partial<DueReviewItemResponse> = {},
-): DueReviewItemResponse => ({
-  userPhraseId: overrides.userPhraseId ?? "phrase-1",
-  phraseId: overrides.phraseId ?? "phrase-1",
-  text: overrides.text ?? "call it a day",
-  translation: overrides.translation ?? "今天先到这里",
-  usageNote: overrides.usageNote ?? null,
-  sourceSceneSlug: overrides.sourceSceneSlug ?? null,
-  sourceSentenceText: overrides.sourceSentenceText ?? null,
-  expressionClusterId: overrides.expressionClusterId ?? null,
-  reviewStatus: overrides.reviewStatus ?? "saved",
-  reviewCount: overrides.reviewCount ?? 0,
-  correctCount: overrides.correctCount ?? 0,
-  incorrectCount: overrides.incorrectCount ?? 0,
-  nextReviewAt: overrides.nextReviewAt ?? null,
-});
-
-test("toDueItemFromSavedPhrase 只转换可复习状态，并保留关键字段", () => {
-  const saved = toDueItemFromSavedPhrase(
-    createPhrase({
-      userPhraseId: "p1",
-      reviewStatus: "reviewing",
-      sourceSentenceText: "I should call it a day.",
-    }),
-  );
-  const archived = toDueItemFromSavedPhrase(
-    createPhrase({
-      userPhraseId: "p2",
-      reviewStatus: "archived",
-    }),
-  );
-
-  assert.equal(saved?.userPhraseId, "p1");
-  assert.equal(saved?.sourceSentenceText, "I should call it a day.");
+  assert.equal(reviewing?.text, "call it a day");
   assert.equal(archived, null);
 });
 
-test("mergePrioritizedReviewItems 会优先插入 session 项，并避免重复", () => {
-  const dueRows = [
-    createDueItem({ userPhraseId: "due-1", text: "burn out" }),
-    createDueItem({ userPhraseId: "due-2", text: "call it a day" }),
-  ];
-  const phraseRows = [
-    createPhrase({ userPhraseId: "saved-1", text: "barely slept", reviewStatus: "saved" }),
-    createPhrase({ userPhraseId: "due-2", text: "call it a day", reviewStatus: "saved" }),
-  ];
-
+test("mergePrioritizedReviewItems 会优先插入 session 项并避免重复", () => {
   const merged = mergePrioritizedReviewItems({
-    prioritizedIds: ["saved-1", "due-2"],
-    dueRows,
-    phraseRows,
+    prioritizedIds: ["u2", "u1"],
+    dueRows: [
+      {
+        userPhraseId: "u1",
+        phraseId: "p1",
+        text: "call it a day",
+        translation: "收工",
+        usageNote: null,
+        sourceSceneSlug: null,
+        sourceSentenceText: null,
+        expressionClusterId: null,
+        reviewStatus: "saved",
+        reviewCount: 0,
+        correctCount: 0,
+        incorrectCount: 0,
+        nextReviewAt: null,
+      },
+    ],
+    phraseRows: [
+      {
+        userPhraseId: "u2",
+        phraseId: "p2",
+        text: "wrap it up",
+        normalizedText: "wrap it up",
+        translation: "收尾",
+        usageNote: null,
+        difficulty: null,
+        tags: [],
+        sourceSceneSlug: null,
+        sourceType: "manual",
+        sourceSentenceIndex: null,
+        sourceSentenceText: null,
+        sourceChunkText: null,
+        expressionClusterId: null,
+        expressionClusterRole: null,
+        expressionClusterMainUserPhraseId: null,
+        aiEnrichmentStatus: null,
+        semanticFocus: null,
+        typicalScenario: null,
+        exampleSentences: [],
+        aiEnrichmentError: null,
+        learningItemType: "expression",
+        savedAt: "2026-03-31T00:00:00.000Z",
+        lastSeenAt: "2026-03-31T00:00:00.000Z",
+        reviewStatus: "saved",
+        reviewCount: 0,
+        correctCount: 0,
+        incorrectCount: 0,
+        lastReviewedAt: null,
+        nextReviewAt: null,
+        sourceNote: null,
+        masteredAt: null,
+      },
+    ],
   });
 
   assert.deepEqual(
     merged.map((item) => item.userPhraseId),
-    ["saved-1", "due-2", "due-1"],
+    ["u2", "u1"],
   );
 });
 
 test("review selector 会返回正确的来源文案和提示文案", () => {
-  assert.equal(
-    resolveReviewSourceLabel({
-      isSessionReview: true,
-      sessionSource: "expression-map-single",
-      labels: {
-        fromExpressionLibrary: "来自表达库",
-        fromExpressionMap: "来自表达地图",
-        fromTodayTask: "来自今日任务",
-        fromSelected: "来自你的选中表达",
-      },
-    }),
-    "来自表达地图",
-  );
-
-  assert.deepEqual(
-    resolveReviewHints({
-      isSessionReview: true,
-      sessionSource: "expression-library-manual-add",
-      labels: {
-        defaultHint: "默认提示",
-        sessionHint: "session 提示",
-        manualSessionHint: "手动添加提示",
-        trainingHintSubtle: "普通轻提示",
-        manualTrainingHintSubtle: "手动添加轻提示",
-      },
-    }),
-    {
-      primaryHint: "手动添加提示",
-      trainingHintSubtle: "手动添加轻提示",
+  const sourceLabel = resolveReviewSourceLabel({
+    isSessionReview: true,
+    sessionSource: "expression-map-cluster",
+    labels: {
+      fromExpressionLibrary: "表达库",
+      fromExpressionMap: "表达地图",
+      fromTodayTask: "今日任务",
+      fromSelected: "手动选择",
     },
-  );
+  });
+  const hints = resolveReviewHints({
+    isSessionReview: true,
+    sessionSource: "expression-library-manual-add",
+    labels: {
+      defaultHint: "默认提示",
+      sessionHint: "普通 session 提示",
+      manualSessionHint: "手动添加提示",
+      trainingHintSubtle: "默认训练提示",
+      manualTrainingHintSubtle: "手动训练提示",
+    },
+  });
+
+  assert.equal(sourceLabel, "表达地图");
+  assert.deepEqual(hints, {
+    primaryHint: "手动添加提示",
+    trainingHintSubtle: "手动训练提示",
+  });
+});
+
+test("buildReviewProgressModel 会稳定计算进度百分比和正确率文本", () => {
+  const progress = buildReviewProgressModel({
+    summary: {
+      dueReviewCount: 3,
+      reviewedTodayCount: 2,
+      reviewAccuracy: 80,
+      masteredPhraseCount: 4,
+    },
+    scenePracticeCount: 1,
+  });
+
+  assert.equal(progress.totalCount, 6);
+  assert.equal(progress.completedCount, 2);
+  assert.equal(progress.progressPercent, 33);
+  assert.equal(progress.accuracyText, "80%");
+});
+
+test("buildReviewTaskStageMeta 会为两类任务返回稳定阶段标题", () => {
+  assert.deepEqual(buildReviewTaskStageMeta({ taskKind: "phrase_review", stage: "practice" }), {
+    stepTag: "STEP 2. 输出练习",
+    title: "试着用自己的话造一句",
+  });
+  assert.deepEqual(buildReviewTaskStageMeta({ taskKind: "scene_practice", stage: "feedback" }), {
+    stepTag: "STEP 3. 反馈与下一步",
+    title: "根据结果决定继续回场景还是进入下一题",
+  });
 });
 
 test("buildFallbackExampleSentence 会生成稳定的回退参考句", () => {

@@ -81,7 +81,7 @@ const mockedModules = {
             userPhraseId: "p1",
             phraseId: "phrase-1",
             text: "call it a day",
-            translation: "结束工作",
+            translation: "收工",
             usageNote: null,
             sourceSceneSlug: null,
             sourceSentenceText: null,
@@ -203,7 +203,35 @@ test("ReviewPage 会处理尾斜杠路径的下拉刷新并强制重新拉取数
   });
 });
 
-test("ReviewPage 场景内联练习提交成功后会清缓存并重新拉取数据", async () => {
+test("ReviewPage 普通表达复习会按 recall -> practice -> feedback 推进并写回缓存", async () => {
+  const ReviewPage = getReviewPage();
+  render(<ReviewPage />);
+
+  await screen.findByRole("button", { name: "想好了，查看参考" });
+
+  fireEvent.click(screen.getByRole("button", { name: "想好了，查看参考" }));
+  await screen.findByRole("button", { name: "进入复习判断" });
+  assert.ok(screen.getByText("STEP 2. 输出练习"));
+
+  fireEvent.change(screen.getByPlaceholderText("用这条表达写一句你自己的话。这里先保留为本地草稿，后续再补 AI 点评。"), {
+    target: { value: "We should call it a day now." },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "进入复习判断" }));
+
+  await screen.findByRole("button", { name: "能用出来" });
+  fireEvent.click(screen.getByRole("button", { name: "能用出来" }));
+
+  await waitFor(() => {
+    assert.equal(setReviewPageCacheCalls.length, 2);
+    const latest = setReviewPageCacheCalls.at(-1);
+    assert.deepEqual(latest?.payload.rows, []);
+    assert.equal(latest?.payload.summary.reviewedTodayCount, 1);
+    assert.equal(latest?.payload.summary.reviewAccuracy, 100);
+    assert.equal(latest?.limit, 20);
+  });
+});
+
+test("ReviewPage 场景回补会进入阶段式复现并在完成后刷新列表", async () => {
   currentScenePracticeRows = [
     {
       sceneSlug: "coffee-chat",
@@ -225,12 +253,19 @@ test("ReviewPage 场景内联练习提交成功后会清缓存并重新拉取数
   const ReviewPage = getReviewPage();
   render(<ReviewPage />);
 
-  await screen.findByText("场景练习待复习");
+  await screen.findByRole("button", { name: "我准备好了，进入复现" });
+  fireEvent.click(screen.getByRole("button", { name: "我准备好了，进入复现" }));
 
-  fireEvent.change(screen.getByPlaceholderText("直接在这里复现这句或补全表达"), {
+  await screen.findByPlaceholderText("直接在这里补全这条表达或句子");
+  fireEvent.change(screen.getByPlaceholderText("直接在这里补全这条表达或句子"), {
     target: { value: "call it a day" },
   });
   fireEvent.click(screen.getByRole("button", { name: "检查这次复现" }));
+
+  await screen.findByRole("button", { name: "进入下一项复习" });
+  assert.ok(screen.getByText("STEP 3. 反馈与下一步"));
+
+  fireEvent.click(screen.getByRole("button", { name: "进入下一项复习" }));
 
   await waitFor(() => {
     assert.equal(startScenePracticeRunCalls, 1);
@@ -243,30 +278,7 @@ test("ReviewPage 场景内联练习提交成功后会清缓存并重新拉取数
   });
 });
 
-test("ReviewPage 普通复习提交后会把最新列表和 summary 回写到缓存", async () => {
-  const ReviewPage = getReviewPage();
-  render(<ReviewPage />);
-
-  await waitFor(() => {
-    assert.equal(dueRequestCount, 1);
-    assert.equal(summaryRequestCount, 1);
-  });
-
-  setReviewPageCacheCalls.length = 0;
-
-  fireEvent.click(screen.getByRole("button", { name: "会用了" }));
-
-  await waitFor(() => {
-    assert.equal(setReviewPageCacheCalls.length, 1);
-    assert.deepEqual(setReviewPageCacheCalls[0]?.payload.rows, []);
-    assert.equal(setReviewPageCacheCalls[0]?.payload.total, 0);
-    assert.equal(setReviewPageCacheCalls[0]?.payload.summary.reviewedTodayCount, 1);
-    assert.equal(setReviewPageCacheCalls[0]?.payload.summary.reviewAccuracy, 100);
-    assert.equal(setReviewPageCacheCalls[0]?.limit, 20);
-  });
-});
-
-test("ReviewPage 场景内联练习提交失败时不会误清缓存或重新拉取数据", async () => {
+test("ReviewPage 场景回补提交失败时不会误刷新列表", async () => {
   startScenePracticeRunError = new Error("start failed");
   currentScenePracticeRows = [
     {
@@ -289,14 +301,16 @@ test("ReviewPage 场景内联练习提交失败时不会误清缓存或重新拉
   const ReviewPage = getReviewPage();
   render(<ReviewPage />);
 
-  await screen.findByText("场景练习待复习");
+  await screen.findByRole("button", { name: "我准备好了，进入复现" });
+  fireEvent.click(screen.getByRole("button", { name: "我准备好了，进入复现" }));
+  await screen.findByPlaceholderText("直接在这里补全这条表达或句子");
+  fireEvent.change(screen.getByPlaceholderText("直接在这里补全这条表达或句子"), {
+    target: { value: "call it a day" },
+  });
   clearReviewPageCacheCalls = 0;
   dueRequestCount = 1;
   summaryRequestCount = 1;
 
-  fireEvent.change(screen.getByPlaceholderText("直接在这里复现这句或补全表达"), {
-    target: { value: "call it a day" },
-  });
   fireEvent.click(screen.getByRole("button", { name: "检查这次复现" }));
 
   await waitFor(() => {

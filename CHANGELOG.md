@@ -1,6 +1,25 @@
 # Changelog
 
 ## 2026-03-31
+
+### Review 页面改造成阶段式沉浸复习流
+- 参考 `newApphtml/review.html` 重构了 `review` 页面，把原先并排堆叠的普通表达复习和场景回补，收口成单主舞台的三阶段流程：先回忆，再作答，最后给出反馈或进入下一题。
+- 新的复习页补上了顶部进度区、今日摘要卡、阶段标签、渐进式参考展开和底部固定 CTA，让普通表达与场景回补使用统一的交互节奏。
+- 普通表达复习现在会按 `recall -> practice -> feedback` 推进，并保留本地草稿与明确的 TODO 占位，用来承接后续 AI 反馈能力；场景回补则继续复用现有 `learning-api` 正式记录复现结果与完成信号。
+- 同步重写了 `review-page-selectors`、交互测试与 change spec delta，确保来源说明、进度模型、阶段标题、缓存刷新和下一题推进都由稳定映射逻辑驱动。
+
+影响范围：
+- `review` 页面 UI、阶段交互和底部 CTA
+- 普通表达复习与场景回补在前端的统一编排逻辑
+- `review` 页缓存刷新、交互回归测试与 OpenSpec 变更说明
+
+验证情况：
+- `node --import tsx --test "src/app/(app)/review/review-page-selectors.test.ts"`
+- `node --import tsx --import ./src/test/setup-dom.ts --test "src/app/(app)/review/page.interaction.test.tsx"`
+- `pnpm exec tsc --noEmit`
+- `node_modules\\.bin\\openspec.CMD change validate redesign-review-experience --strict --no-interactive`
+
+## 2026-03-31
 ### Chunks 页面保存链路与数据映射维护
 - 为 `chunks` 页面补齐了专门的数据映射维护文档，明确手动新建表达/句子、同类与对照表达生成、Quick Add、expression map、cluster 维护和 review 入口分别会调用哪些前端 API、触发哪些后端写入、产生哪些页面刷新与缓存失效副作用。
 - 把 `chunks` 页里重复分散的保存 payload 语义收口到统一 helper，稳定了 `sourceNote`、`relationType`、`relationSourceUserPhraseId` 与 `expressionClusterId` 的拼装规则，减少手动新建、focus assist、生成同类和快速关联之间各自漂移的风险。
