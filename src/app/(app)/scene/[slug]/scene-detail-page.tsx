@@ -927,22 +927,8 @@ export default function SceneDetailClientPage({
   );
 
   const handleSentenceCompleted = useCallback(() => {
-    if (!baseLesson) return;
-    const shouldNotifyMilestone = (trainingState?.session?.practicedSentenceCount ?? 0) < 1;
     notifySceneSentencePracticed();
-    void recordSceneTrainingEventFromApi(baseLesson.slug, {
-      event: "practice_sentence",
-    })
-      .then((nextState) => {
-        handleLearningStateChange(nextState);
-        if (shouldNotifyMilestone && (nextState.session?.practicedSentenceCount ?? 0) >= 1) {
-          notifySceneMilestone("practice_sentence", baseLesson.title);
-        }
-      })
-      .catch(() => {
-        // Non-blocking.
-      });
-  }, [baseLesson, handleLearningStateChange, trainingState?.session?.practicedSentenceCount]);
+  }, []);
 
   const savePhraseForScene = useCallback(
     async (payload: SavePhrasePayload) => {
@@ -1014,6 +1000,7 @@ export default function SceneDetailClientPage({
 
   const currentStepAction = useMemo(() => {
     const currentStep = sceneTrainingState.currentStep;
+    const rawSessionStep = trainingState?.session?.currentStep;
     if (currentStep === "listen") {
       return {
         label: "开始听整段",
@@ -1028,9 +1015,9 @@ export default function SceneDetailClientPage({
         disabled: false,
       };
     }
-    if (currentStep === "practice_sentence" || currentStep === "scene_practice") {
+    if (rawSessionStep === "practice_sentence" || currentStep === "scene_practice") {
       const practiceSetStatus = latestPracticeSet?.status ?? generatedState.practiceStatus;
-      const isSentenceEntryStep = currentStep === "practice_sentence";
+      const isSentenceEntryStep = rawSessionStep === "practice_sentence";
       return {
         label:
           practiceSetStatus === "completed"
@@ -1098,6 +1085,7 @@ export default function SceneDetailClientPage({
     handleVariantToolClick,
     practiceLoading,
     sceneTrainingState.currentStep,
+    trainingState?.session?.currentStep,
     variantUnlocked,
     variantsLoading,
   ]);
@@ -1416,6 +1404,15 @@ export default function SceneDetailClientPage({
           onPracticeRunStart={(payload) => {
             void startScenePracticeRunFromApi(baseLesson.slug, payload)
               .then((result) => {
+                if (
+                  (trainingState?.session?.practicedSentenceCount ?? 0) < 1 &&
+                  (result.learningState?.session?.practicedSentenceCount ?? 0) >= 1
+                ) {
+                  notifySceneMilestone("practice_sentence", baseLesson.title);
+                }
+                if (result.learningState) {
+                  handleLearningStateChange(result.learningState);
+                }
                 setPracticeSnapshot((current) => {
                   const next = {
                     run: result.run,
@@ -1441,6 +1438,9 @@ export default function SceneDetailClientPage({
             if (!payload.practiceSetId) return;
             void recordScenePracticeAttemptFromApi(baseLesson.slug, payload)
               .then((result) => {
+                if (result.learningState) {
+                  handleLearningStateChange(result.learningState);
+                }
                 setPracticeSnapshot((current) => {
                   const next = {
                     run: result.run,

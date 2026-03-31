@@ -35,6 +35,7 @@ export interface SceneLearningProgressResponse {
     masteryPercent: number;
     focusedExpressionCount: number;
     practicedSentenceCount: number;
+    completedSentenceCount: number;
     scenePracticeCount: number;
     variantUnlockedAt: string | null;
     lastSentenceIndex: number | null;
@@ -62,6 +63,7 @@ export interface SceneLearningProgressResponse {
     fullPlayCount: number;
     openedExpressionCount: number;
     practicedSentenceCount: number;
+    completedSentenceCount: number;
     scenePracticeCompleted: boolean;
     isDone: boolean;
     startedAt: string;
@@ -97,6 +99,7 @@ export interface ScenePracticeRunResponse {
     createdAt: string;
     updatedAt: string;
   };
+  learningState?: SceneLearningProgressResponse | null;
 }
 
 export interface ScenePracticeAttemptResponse extends ScenePracticeRunResponse {
@@ -230,6 +233,7 @@ export async function recordSceneTrainingEventFromApi(
       | "full_play"
       | "open_expression"
       | "practice_sentence"
+      | "sentence_completed"
       | "scene_practice_complete";
     selectedBlockId?: string;
   },
@@ -492,6 +496,7 @@ export interface LearningDashboardContinueResponse {
   lastSentenceIndex: number | null;
   estimatedMinutes: number | null;
   savedPhraseCount: number;
+  completedSentenceCount: number;
   repeatMode?: "practice" | "variants" | null;
   isRepeat?: boolean;
 }
@@ -516,6 +521,7 @@ export interface LearningDashboardTasksResponse {
       | "mastered"
       | null;
     progressPercent: number;
+    completedSentenceCount: number;
   };
   reviewTask: {
     done: boolean;

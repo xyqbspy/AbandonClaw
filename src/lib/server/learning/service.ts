@@ -46,7 +46,7 @@ const MASTERY_STAGE_PERCENT: Record<SceneMasteryStage, number> = {
 };
 
 const toLearningSchemaErrorMessage = (context: string, originalMessage: string) =>
-  `Learning schema is not up to date (${context}): ${originalMessage}. Run supabase/sql/20260324_phase16_scene_training_station_mvp.sql after earlier learning migrations.`;
+  `Learning schema is not up to date (${context}): ${originalMessage}. Run supabase/sql/20260324_phase16_scene_training_station_mvp.sql and supabase/sql/20260331_phase19_sentence_completion_tracking.sql after earlier learning migrations.`;
 
 const throwLearningQueryError = (
   context: string,
@@ -72,6 +72,7 @@ export interface SceneProgressView {
   masteryPercent: number;
   focusedExpressionCount: number;
   practicedSentenceCount: number;
+  completedSentenceCount: number;
   scenePracticeCount: number;
   variantUnlockedAt: string | null;
   lastSentenceIndex: number | null;
@@ -95,6 +96,7 @@ export interface SceneSessionView {
   fullPlayCount: number;
   openedExpressionCount: number;
   practicedSentenceCount: number;
+  completedSentenceCount: number;
   scenePracticeCompleted: boolean;
   isDone: boolean;
   startedAt: string;
@@ -121,6 +123,7 @@ export interface ContinueLearningItem {
   lastSentenceIndex: number | null;
   estimatedMinutes: number | null;
   savedPhraseCount: number;
+  completedSentenceCount: number;
   repeatMode?: "practice" | "variants" | null;
   isRepeat?: boolean;
 }
@@ -132,6 +135,7 @@ export interface TodayLearningTasks {
     currentStep: SceneTrainingStep | null;
     masteryStage: SceneMasteryStage | null;
     progressPercent: number;
+    completedSentenceCount: number;
   };
   reviewTask: {
     done: boolean;
@@ -157,6 +161,7 @@ export type SceneTrainingEvent =
   | "full_play"
   | "open_expression"
   | "practice_sentence"
+  | "sentence_completed"
   | "scene_practice_complete";
 
 const chooseHigherTrainingStep = (
@@ -184,6 +189,7 @@ const toProgressView = (row: UserSceneProgressRow): SceneProgressView => ({
   masteryPercent: Number(row.mastery_percent ?? 0),
   focusedExpressionCount: row.focused_expression_count ?? 0,
   practicedSentenceCount: row.practiced_sentence_count ?? 0,
+  completedSentenceCount: row.completed_sentence_count ?? 0,
   scenePracticeCount: row.scene_practice_count ?? 0,
   variantUnlockedAt: row.variant_unlocked_at,
   lastSentenceIndex: row.last_sentence_index,
@@ -207,6 +213,7 @@ const toSessionView = (row: UserSceneSessionRow): SceneSessionView => ({
   fullPlayCount: row.full_play_count,
   openedExpressionCount: row.opened_expression_count,
   practicedSentenceCount: row.practiced_sentence_count,
+  completedSentenceCount: row.completed_sentence_count ?? 0,
   scenePracticeCompleted: row.scene_practice_completed,
   isDone: row.is_done,
   startedAt: row.started_at,
@@ -252,6 +259,32 @@ async function getLatestSessionByUserAndScene(userId: string, sceneId: string) {
     throwLearningQueryError("read user_scene_sessions", error);
   }
   return data ?? null;
+}
+
+async function countCompletedSentencesByUserAndScene(userId: string, sceneId: string) {
+  const admin = createSupabaseAdminClient();
+  const { data, error } = await admin
+    .from("user_scene_practice_attempts")
+    .select("sentence_id,exercise_id,assessment_level")
+    .eq("user_id", userId)
+    .eq("scene_id", sceneId)
+    .eq("assessment_level", "complete")
+    .returns<
+      Array<{
+        sentence_id: string | null;
+        exercise_id: string;
+        assessment_level: "complete";
+      }>
+    >();
+
+  if (error) {
+    throwLearningQueryError("read completed sentence attempts", error);
+  }
+
+  const completedSentenceKeys = new Set(
+    (data ?? []).map((row) => row.sentence_id ?? row.exercise_id),
+  );
+  return completedSentenceKeys.size;
 }
 
 async function upsertDailyStats(params: {
@@ -321,6 +354,7 @@ async function upsertProgress(
     saved_phrase_count: existing?.saved_phrase_count ?? 0,
     focused_expression_count: existing?.focused_expression_count ?? 0,
     practiced_sentence_count: existing?.practiced_sentence_count ?? 0,
+    completed_sentence_count: existing?.completed_sentence_count ?? 0,
     scene_practice_count: existing?.scene_practice_count ?? 0,
     ...patch,
   };
@@ -358,6 +392,7 @@ async function upsertSession(
     full_play_count: current?.full_play_count ?? 0,
     opened_expression_count: current?.opened_expression_count ?? 0,
     practiced_sentence_count: current?.practiced_sentence_count ?? 0,
+    completed_sentence_count: current?.completed_sentence_count ?? 0,
     scene_practice_completed: current?.scene_practice_completed ?? false,
     is_done: current?.is_done ?? false,
     started_at: current?.started_at ?? timestamp,
@@ -399,6 +434,7 @@ async function ensureActiveSceneSession(userId: string, sceneId: string) {
     full_play_count: 0,
     opened_expression_count: 0,
     practiced_sentence_count: 0,
+    completed_sentence_count: 0,
     scene_practice_completed: false,
     is_done: false,
     started_at: nowIso(),
@@ -407,13 +443,16 @@ async function ensureActiveSceneSession(userId: string, sceneId: string) {
   });
 }
 
-const evaluateSessionDone = (session: Pick<
+export const evaluateSceneSessionDone = (session: Pick<
   UserSceneSessionRow,
-  "full_play_count" | "opened_expression_count" | "practiced_sentence_count" | "scene_practice_completed"
+  | "full_play_count"
+  | "opened_expression_count"
+  | "completed_sentence_count"
+  | "scene_practice_completed"
 >) =>
   session.full_play_count >= 1 &&
   session.opened_expression_count >= 1 &&
-  session.practiced_sentence_count >= 1 &&
+  session.completed_sentence_count >= 1 &&
   Boolean(session.scene_practice_completed);
 
 function buildTrainingStagePatch(
@@ -452,6 +491,7 @@ const toContinueItem = (
   lastSentenceIndex: progress.last_sentence_index,
   estimatedMinutes: parseEstimatedMinutesFromSceneJson(scene as SceneRow),
   savedPhraseCount: progress.saved_phrase_count ?? 0,
+  completedSentenceCount: session?.completed_sentence_count ?? progress.completed_sentence_count ?? 0,
   repeatMode: null,
   isRepeat: false,
 });
@@ -534,6 +574,7 @@ const toRepeatPracticeContinueItem = (params: {
   lastSentenceIndex: params.progress?.last_sentence_index ?? null,
   estimatedMinutes: parseEstimatedMinutesFromSceneJson(params.scene as SceneRow),
   savedPhraseCount: params.progress?.saved_phrase_count ?? 0,
+  completedSentenceCount: params.progress?.completed_sentence_count ?? 0,
   repeatMode: "practice",
   isRepeat: true,
 });
@@ -556,6 +597,7 @@ const toRepeatVariantContinueItem = (params: {
   lastSentenceIndex: params.progress?.last_sentence_index ?? null,
   estimatedMinutes: parseEstimatedMinutesFromSceneJson(params.scene as SceneRow),
   savedPhraseCount: params.progress?.saved_phrase_count ?? 0,
+  completedSentenceCount: params.progress?.completed_sentence_count ?? 0,
   repeatMode: "variants",
   isRepeat: true,
 });
@@ -587,6 +629,29 @@ export async function startSceneLearning(userId: string, sceneSlug: string) {
     ...buildTrainingStagePatch(current, current?.mastery_stage ?? "listening"),
   });
   const session = await ensureActiveSceneSession(userId, scene.id);
+  const completedSentenceCount = await countCompletedSentencesByUserAndScene(userId, scene.id);
+
+  const hydratedProgress =
+    completedSentenceCount > (row.completed_sentence_count ?? 0)
+      ? await upsertProgress(userId, scene.id, {
+          completed_sentence_count: completedSentenceCount,
+        }).then((result) => result.row)
+      : row;
+  const hydratedSession =
+    completedSentenceCount > (session.completed_sentence_count ?? 0)
+      ? await upsertSession(
+          userId,
+          scene.id,
+          {
+            completed_sentence_count: completedSentenceCount,
+            current_step:
+              completedSentenceCount >= 1 && session.current_step === "practice_sentence"
+                ? "scene_practice"
+                : session.current_step,
+          },
+          session,
+        )
+      : session;
 
   if (!existing || !existing.started_at) {
     await upsertDailyStats({ userId, scenesStartedDelta: 1 });
@@ -594,8 +659,8 @@ export async function startSceneLearning(userId: string, sceneSlug: string) {
 
   return {
     scene,
-    progress: toProgressView(row),
-    session: toSessionView(session),
+    progress: toProgressView(hydratedProgress),
+    session: toSessionView(hydratedSession),
   };
 }
 
@@ -726,6 +791,19 @@ export async function recordSceneTrainingEvent(
     };
   }
 
+  if (input.event === "sentence_completed") {
+    sessionPatch = {
+      ...sessionPatch,
+      completed_sentence_count: (activeSession.completed_sentence_count ?? 0) + 1,
+      current_step: chooseHigherTrainingStep(activeSession.current_step, "scene_practice"),
+    };
+    progressPatch = {
+      ...progressPatch,
+      completed_sentence_count: (currentProgress?.completed_sentence_count ?? 0) + 1,
+      ...buildTrainingStagePatch(currentProgress, "sentence_practice"),
+    };
+  }
+
   if (input.event === "scene_practice_complete") {
     sessionPatch = {
       ...sessionPatch,
@@ -744,7 +822,28 @@ export async function recordSceneTrainingEvent(
     ...sessionPatch,
   } as UserSceneSessionRow;
 
-  const sessionDone = evaluateSessionDone(nextSessionDraft);
+  if (input.event === "scene_practice_complete" && (nextSessionDraft.completed_sentence_count ?? 0) < 1) {
+    const completedSentenceCount = await countCompletedSentencesByUserAndScene(userId, scene.id);
+    if (completedSentenceCount > 0) {
+      nextSessionDraft.completed_sentence_count = completedSentenceCount;
+      sessionPatch = {
+        ...sessionPatch,
+        completed_sentence_count: Math.max(
+          sessionPatch.completed_sentence_count ?? 0,
+          completedSentenceCount,
+        ),
+      };
+      progressPatch = {
+        ...progressPatch,
+        completed_sentence_count: Math.max(
+          currentProgress?.completed_sentence_count ?? 0,
+          completedSentenceCount,
+        ),
+      };
+    }
+  }
+
+  const sessionDone = evaluateSceneSessionDone(nextSessionDraft);
   if (sessionDone) {
     sessionPatch = {
       ...sessionPatch,
@@ -876,7 +975,28 @@ export async function getContinueLearningScene(userId: string) {
   if (!targetRow) return null;
 
   const latestSession = await getLatestSessionByUserAndScene(userId, targetRow.scene_id);
-  return toContinueItem(targetRow.scenes, targetRow, latestSession);
+  const completedSentenceCount = await countCompletedSentencesByUserAndScene(userId, targetRow.scene_id);
+  const resolvedSession = latestSession
+    ? ({
+        ...latestSession,
+        completed_sentence_count: Math.max(
+          latestSession.completed_sentence_count ?? 0,
+          completedSentenceCount,
+        ),
+        current_step:
+          completedSentenceCount >= 1 && latestSession.current_step === "practice_sentence"
+            ? "scene_practice"
+            : latestSession.current_step,
+      } satisfies UserSceneSessionRow)
+    : null;
+  const resolvedProgress = {
+    ...targetRow,
+    completed_sentence_count: Math.max(
+      targetRow.completed_sentence_count ?? 0,
+      completedSentenceCount,
+    ),
+  } satisfies UserSceneProgressRow;
+  return toContinueItem(targetRow.scenes, resolvedProgress, resolvedSession);
 }
 
 async function getRepeatPracticeContinueScene(userId: string) {
@@ -985,6 +1105,7 @@ export async function getTodayLearningTasks(userId: string): Promise<TodayLearni
       currentStep: continueScene?.currentStep ?? null,
       masteryStage: continueScene?.masteryStage ?? null,
       progressPercent: continueScene?.progressPercent ?? 0,
+      completedSentenceCount: continueScene?.completedSentenceCount ?? 0,
     },
     reviewTask: {
       done: reviewSummary.dueReviewCount === 0 || reviewItemsCompleted > 0,

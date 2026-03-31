@@ -219,3 +219,22 @@
 
 备注：
 - 仓库中已有部分文档存在编码异常；本次新增维护文档均使用 UTF-8 独立落地，后续以新文档为准持续维护
+## 2026-03-31
+
+### Scene / Today 服务端句子完成追踪收口
+- 场景学习服务端不再把“进入句子练习”近似当成“句子已完成”，而是把 practice run 进入、句子完成和整段练习完成拆成不同信号。
+- `today`、continue learning 和 scene 学习态现在统一消费新的句子完成语义，避免页面提示已经推进到整段练习，但服务端仍停留在“只是进过练习”的旧状态。
+- 为历史练习记录补上保守兼容：如果旧会话没有显式句子完成计数，会优先从已有 practice attempt 中回填，不会把仅有 `practice_sentence` 的旧记录误升格为句子完成。
+
+影响范围：
+- scene practice run / attempt 服务端记录
+- `today` / continue learning / scene detail 学习状态消费
+- Supabase 学习状态表新增 `completed_sentence_count`
+
+验证情况：
+- `node --import tsx --import ./src/test/setup-dom.ts --test "src/lib/server/learning/service.logic.test.ts" "src/features/today/components/today-page-selectors.test.ts" "src/features/today/components/today-page-client.test.tsx" "src/app/(app)/scene/[[]slug[]]/scene-detail-selectors.test.ts" "src/app/(app)/scene/[[]slug[]]/use-scene-learning-sync.test.tsx" "src/app/(app)/scene/[[]slug[]]/page.regression.test.tsx"`
+- 额外执行 `pnpm exec tsc --noEmit`；发现仓库里仍有与本次改动无关的既有类型问题，未在本次变更中处理：
+  - `src/app/(app)/review/page.interaction.test.tsx`
+  - `src/app/(app)/scenes/page.interaction.test.tsx`
+  - `src/features/lesson/components/selection-detail-panel.tsx`
+  - `src/features/lesson/components/selection-detail-sheet.tsx`

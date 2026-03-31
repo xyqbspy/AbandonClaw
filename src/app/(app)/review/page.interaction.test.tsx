@@ -56,7 +56,19 @@ const mockedModules = {
       clearReviewPageCacheCalls += 1;
     },
     getReviewPageCache: async () => ({ found: false, record: null, isExpired: false }),
-    setReviewPageCache: async (payload, limit) => {
+    setReviewPageCache: async (
+      payload: {
+        rows: Array<{ userPhraseId: string }>;
+        total: number;
+        summary: {
+          dueReviewCount: number;
+          reviewedTodayCount: number;
+          reviewAccuracy: number | null;
+          masteredPhraseCount: number;
+        };
+      },
+      limit?: number,
+    ) => {
       setReviewPageCacheCalls.push({ payload, limit });
     },
   },

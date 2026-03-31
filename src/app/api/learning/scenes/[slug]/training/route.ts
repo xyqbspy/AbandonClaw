@@ -21,12 +21,13 @@ const parseTrainingEvent = (value: unknown): SceneTrainingEvent => {
     value === "full_play" ||
     value === "open_expression" ||
     value === "practice_sentence" ||
+    value === "sentence_completed" ||
     value === "scene_practice_complete"
   ) {
     return value;
   }
   throw new ValidationError(
-    "event must be one of full_play/open_expression/practice_sentence/scene_practice_complete.",
+    "event must be one of full_play/open_expression/practice_sentence/sentence_completed/scene_practice_complete.",
   );
 };
 

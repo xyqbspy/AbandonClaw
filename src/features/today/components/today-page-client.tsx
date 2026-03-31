@@ -42,6 +42,7 @@ const EMPTY_DASHBOARD: LearningDashboardResponse = {
       currentStep: null,
       masteryStage: null,
       progressPercent: 0,
+      completedSentenceCount: 0,
     },
     reviewTask: { done: false, reviewItemsCompleted: 0, dueReviewCount: 0 },
     outputTask: { done: false, phrasesSavedToday: 0 },

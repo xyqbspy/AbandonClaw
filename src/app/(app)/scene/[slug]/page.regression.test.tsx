@@ -92,6 +92,7 @@ const buildLearningState = (overrides?: {
     masteryPercent: 20,
     focusedExpressionCount: 0,
     practicedSentenceCount: 0,
+    completedSentenceCount: 0,
     scenePracticeCount: 0,
     variantUnlockedAt: null,
     lastSentenceIndex: null,
@@ -115,6 +116,7 @@ const buildLearningState = (overrides?: {
     fullPlayCount: 0,
     openedExpressionCount: 0,
     practicedSentenceCount: 0,
+    completedSentenceCount: 0,
     scenePracticeCompleted: false,
     isDone: false,
     startedAt: "2026-03-22T00:00:00.000Z",
@@ -281,14 +283,60 @@ const mockedModules = {
       ScenePracticeView: ({
         onDelete,
         onSentenceCompleted,
+        onPracticeAttempt,
+        onPracticeRunStart,
       }: {
         onDelete: () => void;
         onSentenceCompleted?: () => void;
+        onPracticeAttempt?: (payload: {
+          practiceSetId: string;
+          mode: "cloze";
+          sourceType: "original";
+          exerciseId: string;
+          sentenceId?: string | null;
+          userAnswer: string;
+          assessmentLevel: "complete";
+          isCorrect: boolean;
+        }) => void;
+        onPracticeRunStart?: (payload: {
+          practiceSetId: string;
+          mode: "cloze";
+          sourceType: "original";
+        }) => void;
       }) => (
         <div>
           <div>practice-view</div>
           <button type="button" onClick={onDelete}>
             delete-practice
+          </button>
+          <button
+            type="button"
+            onClick={() =>
+              onPracticeRunStart?.({
+                practiceSetId: "practice-1",
+                mode: "cloze",
+                sourceType: "original",
+              })
+            }
+          >
+            start-practice-run
+          </button>
+          <button
+            type="button"
+            onClick={() =>
+              onPracticeAttempt?.({
+                practiceSetId: "practice-1",
+                mode: "cloze",
+                sourceType: "original",
+                exerciseId: "exercise-1",
+                sentenceId: "sentence-1",
+                userAnswer: "answer",
+                assessmentLevel: "complete",
+                isCorrect: true,
+              })
+            }
+          >
+            complete-practice-attempt
           </button>
           <button type="button" onClick={() => onSentenceCompleted?.()}>
             practice-sentence
@@ -368,11 +416,104 @@ const mockedModules = {
   },
   "@/lib/utils/learning-api": {
     completeSceneLearningFromApi: async () => currentLearningState,
+    completeScenePracticeRunFromApi: async () => ({ run: null }),
     completeSceneVariantRunFromApi: async () => ({ run: null }),
     getScenePracticeSnapshotFromApi: async () => currentPracticeSnapshot,
     getSceneVariantRunSnapshotFromApi: async () => currentVariantRunSnapshot,
+    markScenePracticeModeCompleteFromApi: async () => ({ run: null }),
     pauseSceneLearningFromApi: async () => currentLearningState,
+    recordScenePracticeAttemptFromApi: async (
+      _slug: string,
+      payload: {
+        sentenceId?: string | null;
+      },
+    ) => {
+      currentLearningState = buildLearningState({
+        progress: {
+          masteryStage: "sentence_practice",
+          masteryPercent: 60,
+          practicedSentenceCount: 1,
+          completedSentenceCount: 1,
+        },
+        session: {
+          fullPlayCount: currentLearningState.session?.fullPlayCount ?? 1,
+          openedExpressionCount: currentLearningState.session?.openedExpressionCount ?? 1,
+          practicedSentenceCount: currentLearningState.session?.practicedSentenceCount ?? 1,
+          completedSentenceCount: 1,
+          currentStep: "scene_practice",
+        },
+      });
+      return {
+        run: {
+          id: "practice-run-1",
+          sceneId: "scene-1",
+          sessionId: "session-1",
+          practiceSetId: "practice-1",
+          sourceType: "original" as const,
+          sourceVariantId: null,
+          status: "in_progress" as const,
+          currentMode: "cloze" as const,
+          completedModes: [],
+          startedAt: "2026-03-22T00:00:00.000Z",
+          completedAt: null,
+          lastActiveAt: "2026-03-22T00:00:00.000Z",
+          createdAt: "2026-03-22T00:00:00.000Z",
+          updatedAt: "2026-03-22T00:00:00.000Z",
+        },
+        attempt: {
+          id: "attempt-1",
+          runId: "practice-run-1",
+          sceneId: "scene-1",
+          sessionId: "session-1",
+          practiceSetId: "practice-1",
+          mode: "cloze" as const,
+          exerciseId: "exercise-1",
+          sentenceId: payload.sentenceId ?? "sentence-1",
+          userAnswer: "answer",
+          assessmentLevel: "complete" as const,
+          isCorrect: true,
+          attemptIndex: 1,
+          metadata: null,
+          createdAt: "2026-03-22T00:00:00.000Z",
+        },
+        learningState: currentLearningState,
+      };
+    },
     startSceneLearningFromApi: async () => currentLearningState,
+    startScenePracticeRunFromApi: async () => {
+      currentLearningState = buildLearningState({
+        progress: {
+          masteryStage: "sentence_practice",
+          masteryPercent: 60,
+          practicedSentenceCount: 1,
+        },
+        session: {
+          fullPlayCount: currentLearningState.session?.fullPlayCount ?? 0,
+          openedExpressionCount: currentLearningState.session?.openedExpressionCount ?? 0,
+          practicedSentenceCount: 1,
+          currentStep: "practice_sentence",
+        },
+      });
+      return {
+        run: {
+          id: "practice-run-1",
+          sceneId: "scene-1",
+          sessionId: "session-1",
+          practiceSetId: "practice-1",
+          sourceType: "original" as const,
+          sourceVariantId: null,
+          status: "in_progress" as const,
+          currentMode: "cloze" as const,
+          completedModes: [],
+          startedAt: "2026-03-22T00:00:00.000Z",
+          completedAt: null,
+          lastActiveAt: "2026-03-22T00:00:00.000Z",
+          createdAt: "2026-03-22T00:00:00.000Z",
+          updatedAt: "2026-03-22T00:00:00.000Z",
+        },
+        learningState: currentLearningState,
+      };
+    },
     startSceneVariantRunFromApi: async () => ({ run: null }),
     updateSceneLearningProgressFromApi: async () => currentLearningState,
     recordSceneVariantViewFromApi: async () => ({ run: null }),
@@ -411,11 +552,13 @@ const mockedModules = {
             masteryStage: "sentence_practice",
             masteryPercent: 60,
             practicedSentenceCount: 1,
+            completedSentenceCount: currentLearningState.progress?.completedSentenceCount ?? 0,
           },
           session: {
             fullPlayCount: currentLearningState.session?.fullPlayCount ?? 0,
             openedExpressionCount: currentLearningState.session?.openedExpressionCount ?? 0,
             practicedSentenceCount: 1,
+            completedSentenceCount: currentLearningState.session?.completedSentenceCount ?? 0,
             currentStep: "practice_sentence",
           },
         });
@@ -830,6 +973,43 @@ test("SceneDetailPage 到开始练习步骤后，会在训练浮层里给出直�
   await waitFor(() => {
     assert.equal(routerPushCalls.at(-1), "/scene/test-scene?view=practice");
   });
+});
+
+test("SceneDetailPage 在 practice run 与句子完成后，会用 practice API 回写服务端语义而不是复用旧 training event", async () => {
+  currentSearchParams = new URLSearchParams("view=practice");
+  currentGeneratedState = {
+    latestPracticeSet: practiceSet,
+    latestVariantSet: null,
+    practiceStatus: "generated",
+    variantStatus: "idle",
+  };
+  currentLearningState = buildLearningState({
+    progress: {
+      masteryStage: "focus",
+      masteryPercent: 35,
+      focusedExpressionCount: 1,
+    },
+    session: {
+      currentStep: "focus_expression",
+      fullPlayCount: 1,
+      openedExpressionCount: 1,
+    },
+  });
+
+  const SceneDetailPage = getSceneDetailPage();
+  render(<SceneDetailPage initialLesson={baseLesson} />);
+
+  await screen.findByText("practice-view");
+  fireEvent.click(screen.getByRole("button", { name: "start-practice-run" }));
+  fireEvent.click(screen.getByRole("button", { name: "complete-practice-attempt" }));
+  fireEvent.click(screen.getByRole("button", { name: "practice-sentence" }));
+
+  await waitFor(() => {
+    assert.equal(currentLearningState.session?.currentStep, "scene_practice");
+    assert.equal(currentLearningState.session?.practicedSentenceCount, 1);
+    assert.equal(currentLearningState.session?.completedSentenceCount, 1);
+  });
+  assert.equal(trainingEventCalls.some((call) => call.payload.event === "practice_sentence"), false);
 });
 
 test("SceneDetailPage 当前步骤已推进到开始练习时，浮层CTA会跟随到练习页而不是停留在已并入练习的旧步骤", async () => {

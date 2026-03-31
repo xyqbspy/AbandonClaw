@@ -92,6 +92,7 @@ export function SelectionDetailSheet({
       : currentSentence.text
     : null;
   const translationText = blockTranslation || currentSentence?.translation || null;
+  const resolvedBlockSpeakText = blockSpeakText || "";
 
   return (
     <DetailSheetShell
@@ -150,11 +151,11 @@ export function SelectionDetailSheet({
             <section className="space-y-2">
               <div className={selectionSectionTitleClassName}>{sentenceSectionLabel}</div>
               <SelectionSentenceCard
-                sentenceText={sentenceText}
-                translationText={translationText}
+                sentenceText={sentenceText ?? null}
+                translationText={translationText ?? null}
                 speakingText={speakingText}
                 loadingText={loadingText}
-                blockSpeakText={blockSpeakText}
+                blockSpeakText={resolvedBlockSpeakText}
                 showTranslation={showSentenceTranslation}
                 onToggleTranslation={() => setShowSentenceTranslation((prev) => !prev)}
                 onPronounceBlock={onPronounceBlock}

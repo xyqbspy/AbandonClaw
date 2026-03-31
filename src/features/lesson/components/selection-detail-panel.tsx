@@ -80,6 +80,7 @@ export function SelectionDetailPanel({
       : currentSentence.text
     : null;
   const translationText = blockTranslation || currentSentence?.translation || null;
+  const resolvedBlockSpeakText = blockSpeakText || "";
 
   return (
     <div className="sticky top-20 hidden rounded-[28px] bg-[rgba(242,242,247,0.96)] p-[var(--mobile-space-sheet)] shadow-[0_24px_60px_rgba(15,23,42,0.14)] backdrop-blur-[24px] lg:block">
@@ -98,11 +99,11 @@ export function SelectionDetailPanel({
             </div>
           ) : (
             <SelectionSentenceCard
-              sentenceText={sentenceText}
-              translationText={translationText}
+              sentenceText={sentenceText ?? null}
+              translationText={translationText ?? null}
               speakingText={speakingText}
               loadingText={loadingText}
-              blockSpeakText={blockSpeakText}
+              blockSpeakText={resolvedBlockSpeakText}
               showTranslation={showSentenceTranslation}
               onToggleTranslation={() => setShowSentenceTranslation((prev) => !prev)}
               onPronounceBlock={onPronounceBlock}

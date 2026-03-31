@@ -31,6 +31,7 @@ const buildFallbackContinueLearning = (
     lastSentenceIndex: null,
     estimatedMinutes: sceneList[0].estimatedMinutes,
     savedPhraseCount: 0,
+    completedSentenceCount: 0,
     repeatMode: null,
     isRepeat: false,
   };
@@ -65,6 +66,7 @@ const buildRepeatContinueCandidate = (
           lastSentenceIndex: null,
           estimatedMinutes: scene.estimatedMinutes,
           savedPhraseCount: 0,
+          completedSentenceCount: 0,
           repeatMode: "variants",
           isRepeat: true,
           repeatStartedAt: latestVariantSet.createdAt,
@@ -85,6 +87,7 @@ const buildRepeatContinueCandidate = (
           lastSentenceIndex: null,
           estimatedMinutes: scene.estimatedMinutes,
           savedPhraseCount: 0,
+          completedSentenceCount: 0,
           repeatMode: "practice",
           isRepeat: true,
           repeatStartedAt: latestPracticeSet.createdAt,
@@ -115,6 +118,7 @@ const buildRepeatContinueCandidate = (
     lastSentenceIndex: latestCandidate.lastSentenceIndex,
     estimatedMinutes: latestCandidate.estimatedMinutes,
     savedPhraseCount: latestCandidate.savedPhraseCount,
+    completedSentenceCount: latestCandidate.completedSentenceCount,
     repeatMode: latestCandidate.repeatMode,
     isRepeat: latestCandidate.isRepeat,
   };

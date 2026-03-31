@@ -7,7 +7,7 @@ import {
 } from "@/lib/server/db/types";
 import { getSceneRecordBySlug } from "@/lib/server/scene/service";
 import { NotFoundError } from "@/lib/server/errors";
-import { startSceneLearning } from "./service";
+import { recordSceneTrainingEvent, startSceneLearning } from "./service";
 
 const nowIso = () => new Date().toISOString();
 
@@ -46,6 +46,61 @@ export interface ScenePracticeRunView {
   updatedAt: string;
 }
 
+interface SceneLearningSnapshot {
+  progress: {
+    id: string;
+    sceneId: string;
+    status: "not_started" | "in_progress" | "completed" | "paused";
+    progressPercent: number;
+    masteryStage:
+      | "listening"
+      | "focus"
+      | "sentence_practice"
+      | "scene_practice"
+      | "variant_unlocked"
+      | "mastered";
+    masteryPercent: number;
+    focusedExpressionCount: number;
+    practicedSentenceCount: number;
+    completedSentenceCount: number;
+    scenePracticeCount: number;
+    variantUnlockedAt: string | null;
+    lastSentenceIndex: number | null;
+    lastVariantIndex: number | null;
+    startedAt: string | null;
+    lastViewedAt: string | null;
+    completedAt: string | null;
+    lastPracticedAt: string | null;
+    totalStudySeconds: number;
+    todayStudySeconds: number;
+    savedPhraseCount: number;
+    createdAt: string;
+    updatedAt: string;
+  };
+  session: {
+    id: string;
+    sceneId: string;
+    currentStep:
+      | "listen"
+      | "focus_expression"
+      | "practice_sentence"
+      | "scene_practice"
+      | "done";
+    selectedBlockId: string | null;
+    fullPlayCount: number;
+    openedExpressionCount: number;
+    practicedSentenceCount: number;
+    completedSentenceCount: number;
+    scenePracticeCompleted: boolean;
+    isDone: boolean;
+    startedAt: string;
+    endedAt: string | null;
+    lastActiveAt: string;
+    createdAt: string;
+    updatedAt: string;
+  } | null;
+}
+
 export interface ScenePracticeAttemptView {
   id: string;
   runId: string;
@@ -73,6 +128,11 @@ export interface ScenePracticeSnapshotResponse {
     latestAssessmentLevel: ScenePracticeAssessmentLevel | null;
   };
 }
+
+type SentenceCompletionKeyInput = {
+  sentenceId?: string | null;
+  exerciseId: string;
+};
 
 export interface RepeatPracticeContinueView {
   sceneId: string;
@@ -165,6 +225,33 @@ async function getLatestRunBySet(userId: string, sceneId: string, practiceSetId?
     throwPracticeQueryError("read latest user_scene_practice_runs", error);
   }
   return data ?? null;
+}
+
+async function hasCompletedSentenceAttempt(
+  userId: string,
+  sceneId: string,
+  input: SentenceCompletionKeyInput,
+) {
+  const admin = createSupabaseAdminClient();
+  let query = admin
+    .from("user_scene_practice_attempts")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("scene_id", sceneId)
+    .eq("assessment_level", "complete")
+    .limit(1);
+
+  if (input.sentenceId) {
+    query = query.eq("sentence_id", input.sentenceId);
+  } else {
+    query = query.is("sentence_id", null).eq("exercise_id", input.exerciseId);
+  }
+
+  const { data, error } = await query.maybeSingle<{ id: string }>();
+  if (error) {
+    throwPracticeQueryError("read completed sentence attempt", error);
+  }
+  return Boolean(data?.id);
 }
 
 export async function getLatestRepeatPracticeRun(
@@ -335,6 +422,12 @@ export async function startScenePracticeRun(
 ) {
   const scene = await resolveVisibleSceneBySlug(userId, sceneSlug);
   const learningState = await startSceneLearning(userId, sceneSlug);
+  const nextLearningState =
+    (learningState.session?.practicedSentenceCount ?? 0) >= 1
+      ? learningState
+      : await recordSceneTrainingEvent(userId, sceneSlug, {
+          event: "practice_sentence",
+        });
   const existingRun = await getLatestActiveRunBySet(userId, scene.id, input.practiceSetId);
 
   const row = await upsertPracticeRun({
@@ -355,6 +448,7 @@ export async function startScenePracticeRun(
 
   return {
     run: toRunView(row),
+    learningState: nextLearningState as SceneLearningSnapshot,
   };
 }
 
@@ -374,6 +468,11 @@ export async function recordScenePracticeAttempt(
     metadata?: Record<string, unknown>;
   },
 ) {
+  const scene = await resolveVisibleSceneBySlug(userId, sceneSlug);
+  const alreadyCompletedSentence = await hasCompletedSentenceAttempt(userId, scene.id, {
+    sentenceId: input.sentenceId,
+    exerciseId: input.exerciseId,
+  });
   const startResult = await startScenePracticeRun(userId, sceneSlug, {
     practiceSetId: input.practiceSetId,
     mode: input.mode,
@@ -414,9 +513,17 @@ export async function recordScenePracticeAttempt(
     last_active_at: nowIso(),
   });
 
+  const learningState =
+    input.assessmentLevel === "complete" && !alreadyCompletedSentence
+      ? await recordSceneTrainingEvent(userId, sceneSlug, {
+          event: "sentence_completed",
+        })
+      : startResult.learningState;
+
   return {
     run: toRunView(updatedRun),
     attempt: toAttemptView(attemptRow),
+    learningState: learningState as SceneLearningSnapshot,
   };
 }
 

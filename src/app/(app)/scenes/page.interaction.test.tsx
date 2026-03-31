@@ -3,9 +3,20 @@ import { createRequire } from "node:module";
 import test, { afterEach } from "node:test";
 import React from "react";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import type { SceneListCacheRecord } from "@/lib/cache/scene-list-cache";
+import type { SceneListItemResponse } from "@/lib/utils/scenes-api";
 
 const localRequire = createRequire(import.meta.url);
 const nodeModule = localRequire("node:module") as typeof import("node:module");
+const buildSceneListCacheRecord = (data: SceneListItemResponse[]): SceneListCacheRecord => ({
+  schemaVersion: "scene-list-cache-v1",
+  key: "scene-list:default",
+  type: "scene_list",
+  data,
+  cachedAt: 1,
+  lastAccessedAt: 1,
+  expiresAt: Number.MAX_SAFE_INTEGER,
+});
 
 const routerPushCalls: string[] = [];
 const routerPrefetchCalls: string[] = [];
@@ -17,18 +28,28 @@ let deleteSceneCalls = 0;
 let generatedSceneCalls = 0;
 let importSceneError: Error | null = null;
 let deleteSceneError: Error | null = null;
-let getScenesFromApiImpl = async (options?: { noStore?: boolean }) => {
+let getScenesFromApiImpl: (options?: { noStore?: boolean }) => Promise<SceneListItemResponse[]> = async (
+  options?: { noStore?: boolean },
+) => {
   getScenesCallOptions.push(options);
   return sceneList;
 };
-let getSceneListCacheImpl = async () => ({ found: false, isExpired: false, record: null });
-let getSceneListCacheSnapshotSyncImpl = () => ({ found: false, isExpired: false, record: null });
+let getSceneListCacheImpl: () => Promise<{
+  found: boolean;
+  isExpired: boolean;
+  record: SceneListCacheRecord | null;
+}> = async () => ({ found: false, isExpired: false, record: null });
+let getSceneListCacheSnapshotSyncImpl: () => {
+  found: boolean;
+  isExpired: boolean;
+  record: SceneListCacheRecord | null;
+} = () => ({ found: false, isExpired: false, record: null });
 let detailPrefetchImpl = async (slug: string) => {
   detailPrefetchCalls.push(slug);
   return true;
 };
 
-const sceneList = [
+const sceneList: SceneListItemResponse[] = [
   {
     id: "scene-1",
     slug: "coffee-chat",
@@ -41,7 +62,9 @@ const sceneList = [
     learningStatus: "not_started" as const,
     progressPercent: 0,
     sourceType: "builtin" as const,
+    createdAt: "2026-03-31T00:00:00.000Z",
     variantLinks: [],
+    lastViewedAt: null,
   },
   {
     id: "scene-2",
@@ -55,7 +78,9 @@ const sceneList = [
     learningStatus: "paused" as const,
     progressPercent: 40,
     sourceType: "imported" as const,
+    createdAt: "2026-03-31T00:00:00.000Z",
     variantLinks: [],
+    lastViewedAt: "2026-03-31T08:00:00.000Z",
   },
 ];
 
@@ -243,14 +268,12 @@ test("ScenesPage 命中新鲜缓存后仍会继续走网络刷新", async () => 
   getSceneListCacheImpl = async () => ({
     found: true,
     isExpired: false,
-    record: {
-      data: [
-        {
-          ...sceneList[0],
-          title: "Cached Coffee Chat",
-        },
-      ],
-    },
+    record: buildSceneListCacheRecord([
+      {
+        ...sceneList[0],
+        title: "Cached Coffee Chat",
+      },
+    ]),
   });
   getScenesFromApiImpl = async (options?: { noStore?: boolean }) => {
     getScenesCallOptions.push(options);
@@ -272,7 +295,8 @@ test("ScenesPage 命中新鲜缓存后仍会继续走网络刷新", async () => 
   if (!resolveNetwork) {
     throw new Error("resolveNetwork was not initialized");
   }
-  resolveNetwork();
+  const finishNetwork: () => void = resolveNetwork;
+  finishNetwork();
 
   await waitFor(() => {
     screen.getByText("Coffee Chat");

@@ -103,6 +103,7 @@ export interface UserSceneProgressRow {
   saved_phrase_count: number;
   focused_expression_count: number;
   practiced_sentence_count: number;
+  completed_sentence_count: number;
   scene_practice_count: number;
   created_at: string;
   updated_at: string;
@@ -117,6 +118,7 @@ export interface UserSceneSessionRow {
   full_play_count: number;
   opened_expression_count: number;
   practiced_sentence_count: number;
+  completed_sentence_count: number;
   scene_practice_completed: boolean;
   is_done: boolean;
   started_at: string;
