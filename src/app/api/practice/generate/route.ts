@@ -22,6 +22,12 @@ import { buildExerciseSpecsFromScene } from "@/lib/server/exercises/spec-builder
 const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value));
 
+const PRACTICE_MAX_SECTIONS = 12;
+const PRACTICE_MAX_BLOCKS = 80;
+const PRACTICE_MAX_SENTENCES = 400;
+const PRACTICE_MAX_CHUNKS = 1200;
+const PRACTICE_MAX_TEXT_LENGTH = 40000;
+
 const sanitizeExerciseCount = (value: unknown) => {
   if (typeof value !== "number" || Number.isNaN(value)) return 6;
   return clamp(Math.round(value), 3, 12);
@@ -100,6 +106,58 @@ const parseWithDiagnostics = (rawText: string) => {
   };
 };
 
+const measureScenePayload = (scene: PracticeGenerateRequest["scene"]) => {
+  let blockCount = 0;
+  let sentenceCount = 0;
+  let chunkCount = 0;
+  let textLength = 0;
+
+  textLength += scene.title.length;
+  textLength += scene.subtitle?.length ?? 0;
+  textLength += scene.description?.length ?? 0;
+
+  for (const section of scene.sections) {
+    textLength += section.title?.length ?? 0;
+    textLength += section.summary?.length ?? 0;
+    blockCount += section.blocks.length;
+
+    for (const block of section.blocks) {
+      textLength += block.translation?.length ?? 0;
+      textLength += block.tts?.length ?? 0;
+      sentenceCount += block.sentences.length;
+
+      for (const sentence of block.sentences) {
+        textLength += sentence.text.length;
+        textLength += sentence.translation?.length ?? 0;
+        textLength += sentence.tts?.length ?? 0;
+        chunkCount += sentence.chunks.length;
+
+        for (const chunk of sentence.chunks) {
+          textLength += chunk.text.length;
+          textLength += chunk.translation?.length ?? 0;
+          textLength += chunk.grammarLabel?.length ?? 0;
+          textLength += chunk.meaningInSentence?.length ?? 0;
+          textLength += chunk.usageNote?.length ?? 0;
+          textLength += chunk.pronunciation?.length ?? 0;
+          textLength += (chunk.notes ?? []).reduce((sum, item) => sum + item.length, 0);
+          textLength += (chunk.examples ?? []).reduce(
+            (sum, item) => sum + item.en.length + item.zh.length,
+            0,
+          );
+        }
+      }
+    }
+  }
+
+  return {
+    sections: scene.sections.length,
+    blocks: blockCount,
+    sentences: sentenceCount,
+    chunks: chunkCount,
+    textLength,
+  };
+};
+
 const toValidPayload = (
   payload: Partial<PracticeGenerateRequest>,
 ):
@@ -107,6 +165,23 @@ const toValidPayload = (
   | { ok: false; error: string } => {
   if (!isValidParsedScene(payload.scene)) {
     return { ok: false, error: "Invalid payload.scene structure." };
+  }
+
+  const metrics = measureScenePayload(payload.scene);
+  if (metrics.sections > PRACTICE_MAX_SECTIONS) {
+    return { ok: false, error: `scene sections exceed limit ${PRACTICE_MAX_SECTIONS}.` };
+  }
+  if (metrics.blocks > PRACTICE_MAX_BLOCKS) {
+    return { ok: false, error: `scene blocks exceed limit ${PRACTICE_MAX_BLOCKS}.` };
+  }
+  if (metrics.sentences > PRACTICE_MAX_SENTENCES) {
+    return { ok: false, error: `scene sentences exceed limit ${PRACTICE_MAX_SENTENCES}.` };
+  }
+  if (metrics.chunks > PRACTICE_MAX_CHUNKS) {
+    return { ok: false, error: `scene chunks exceed limit ${PRACTICE_MAX_CHUNKS}.` };
+  }
+  if (metrics.textLength > PRACTICE_MAX_TEXT_LENGTH) {
+    return { ok: false, error: `scene text exceeds limit ${PRACTICE_MAX_TEXT_LENGTH}.` };
   }
 
   return {

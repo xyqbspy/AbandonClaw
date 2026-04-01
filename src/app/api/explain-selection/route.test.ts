@@ -32,6 +32,7 @@ test("explain selection handler 会透传合法 payload", async () => {
     createJsonRequest({
       selectedText: "running on empty",
       sourceSentence: "I am running on empty.",
+      sourceChunks: ["running on empty", "worn out"],
       lessonId: "lesson-1",
       lessonTitle: "Lesson 1",
       lessonDifficulty: "easy",
@@ -52,8 +53,33 @@ test("explain selection handler 会透传合法 payload", async () => {
   assert.deepEqual(receivedPayload, {
     selectedText: "running on empty",
     sourceSentence: "I am running on empty.",
+    sourceTranslation: undefined,
+    sourceChunks: ["running on empty", "worn out"],
     lessonId: "lesson-1",
     lessonTitle: "Lesson 1",
     lessonDifficulty: "easy",
+  });
+});
+
+test("explain selection handler 会拒绝超长输入", async () => {
+  const response = await handleExplainSelectionPost(
+    createJsonRequest({
+      selectedText: "x".repeat(241),
+      sourceSentence: "I am running on empty.",
+      lessonId: "lesson-1",
+      lessonTitle: "Lesson 1",
+      lessonDifficulty: "easy",
+    }),
+    {
+      requireCurrentProfile: async () => ({ user: { id: "user-1" }, profile: {} } as never),
+      explainSelection: async () => ({}) as never,
+    },
+  );
+
+  assert.equal(response.status, 400);
+  assert.deepEqual(await response.json(), {
+    error: "selectedText must be <= 240 characters.",
+    code: "VALIDATION_ERROR",
+    details: null,
   });
 });

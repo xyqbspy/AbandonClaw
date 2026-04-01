@@ -38,6 +38,41 @@ export const parseJsonBody = async <T extends Record<string, unknown>>(
   return payload as T;
 };
 
+export const parseRequiredObjectArray = (
+  value: unknown,
+  field: string,
+  options?: {
+    minItems?: number;
+    maxItems?: number;
+  },
+) => {
+  if (!Array.isArray(value)) {
+    throw new ValidationError(`${field} must be an array.`);
+  }
+
+  const minItems = options?.minItems ?? 1;
+  const maxItems = options?.maxItems;
+
+  if (value.length < minItems) {
+    throw new ValidationError(`${field} must contain at least ${minItems} item(s).`);
+  }
+
+  if (maxItems && value.length > maxItems) {
+    throw new ValidationError(`${field} must contain at most ${maxItems} item(s).`);
+  }
+
+  const objects = value.filter(
+    (item): item is Record<string, unknown> =>
+      Boolean(item) && typeof item === "object" && !Array.isArray(item),
+  );
+
+  if (objects.length !== value.length) {
+    throw new ValidationError(`${field} must contain only objects.`);
+  }
+
+  return objects;
+};
+
 export const parseOptionalTrimmedString = (
   value: unknown,
   field: string,

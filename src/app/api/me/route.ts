@@ -1,30 +1,24 @@
 import { NextResponse } from "next/server";
 import {
   getCurrentProfileForUser,
-  getCurrentSession,
   getCurrentUser,
 } from "@/lib/server/auth";
 import { toApiErrorResponse } from "@/lib/server/api-error";
 
 interface MeRouteDependencies {
-  getCurrentSession: typeof getCurrentSession;
   getCurrentUser: typeof getCurrentUser;
   getCurrentProfileForUser: typeof getCurrentProfileForUser;
 }
 
 const defaultDependencies: MeRouteDependencies = {
-  getCurrentSession,
   getCurrentUser,
   getCurrentProfileForUser,
 };
 
 export async function handleMeGet(dependencies: MeRouteDependencies = defaultDependencies) {
   try {
-    const [session, user] = await Promise.all([
-      dependencies.getCurrentSession(),
-      dependencies.getCurrentUser(),
-    ]);
-    if (!session || !user) {
+    const user = await dependencies.getCurrentUser();
+    if (!user) {
       return NextResponse.json({ user: null, profile: null }, { status: 200 });
     }
 

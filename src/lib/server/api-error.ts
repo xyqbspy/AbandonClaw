@@ -24,8 +24,26 @@ export const toApiErrorResponse = (
 
   if (error instanceof Error) {
     const status = mapLegacyMessageToStatus(error.message);
-    return NextResponse.json({ error: error.message }, { status });
+    if (status !== 500) {
+      return NextResponse.json({ error: error.message }, { status });
+    }
+
+    return NextResponse.json(
+      {
+        error: fallbackMessage,
+        code: "INTERNAL_ERROR",
+        details: null,
+      },
+      { status: 500 },
+    );
   }
 
-  return NextResponse.json({ error: fallbackMessage }, { status: 500 });
+  return NextResponse.json(
+    {
+      error: fallbackMessage,
+      code: "INTERNAL_ERROR",
+      details: null,
+    },
+    { status: 500 },
+  );
 };

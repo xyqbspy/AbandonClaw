@@ -71,7 +71,7 @@ test("practice generate handler 在模型结果不合法时会回退到本地 ex
           version: "v1",
           exercises: [{ id: "bad-1", type: "unknown", prompt: "p", answer: { text: "a" } }],
         }),
-      buildExerciseSpecsFromScene: ((scene, count) => {
+      buildExerciseSpecsFromScene: ((scene: unknown, count: unknown) => {
         fallbackArgs = [scene, count];
         return [{ id: "fallback-1", type: "typing", prompt: "p", answer: { text: "a" } }] as never;
       }) as never,
@@ -84,4 +84,30 @@ test("practice generate handler 在模型结果不合法时会回退到本地 ex
     exercises: [{ id: "fallback-1", type: "typing", prompt: "p", answer: { text: "a" } }],
   });
   assert.deepEqual(fallbackArgs, [sampleScene, 4]);
+});
+
+test("practice generate handler 会拒绝超大 scene", async () => {
+  const hugeScene = {
+    ...sampleScene,
+    sections: Array.from({ length: 13 }, (_, index) => ({
+      id: `sec-${index + 1}`,
+      blocks: sampleScene.sections[0].blocks,
+    })),
+  };
+
+  const response = await handlePracticeGeneratePost(
+    createJsonRequest({ scene: hugeScene, exerciseCount: 4 }),
+    {
+      requireCurrentProfile: async () => ({ user: { id: "user-1" }, profile: {} } as never),
+      callGlmChatCompletion: async () => "",
+      buildExerciseSpecsFromScene: () => [] as never,
+    },
+  );
+
+  assert.equal(response.status, 400);
+  assert.deepEqual(await response.json(), {
+    error: "scene sections exceed limit 12.",
+    code: "VALIDATION_ERROR",
+    details: null,
+  });
 });
