@@ -34,6 +34,7 @@
 - `src/lib/utils/audio-warmup.ts`
 - `src/lib/utils/resource-actions.ts`
 - `src/hooks/use-tts-playback-state.ts`
+- `src/hooks/use-tts-playback-controller.ts`
 
 ### 页面触发入口
 
@@ -210,7 +211,7 @@ chunk 音频重生成前也会主动清：
 - `subscribeTtsPlaybackState()`
 - `getTtsPlaybackState()`
 
-`useTtsPlaybackState()` 只是一个薄订阅 hook。
+`useTtsPlaybackState()` 只是一个薄订阅 hook。页面侧现在统一通过 `useTtsPlaybackController()` 消费这套状态，把“再次点按停止、loop 清理、错误兜底和常见 active/loading 判断”收敛在公共层，而不是让 `lesson`、`scene detail`、`chunks` 各自维护一套近似状态机。
 
 状态字段能表达：
 
@@ -219,7 +220,34 @@ chunk 音频重生成前也会主动清：
 - 当前文本、句子 ID、chunkKey、sceneSlug
 - 是否处于 loop 模式
 
-### 6.2 实际播放策略
+### 6.2 页面公共编排层
+
+`src/hooks/use-tts-playback-controller.ts` 当前负责：
+
+- 统一 chunk / sentence / scene loop 的播放切换语义
+- 统一“再次点按当前目标则停止”的行为
+- 统一 loop 状态的前置清理与收尾恢复
+- 统一向页面暴露 `speakingText`、`loadingText` 和常见状态判断 helper
+
+页面目前的接入点：
+
+- `src/features/lesson/components/lesson-reader.tsx`
+- `src/app/(app)/scene/[slug]/use-scene-detail-playback.ts`
+- `src/app/(app)/chunks/page.tsx`
+
+页面仍保留自身职责：
+
+- 组装 sentence / chunk / scene loop 的业务 payload
+- 触发页面特有的预热、埋点和 UI 副作用
+- 决定错误提示文案
+
+这样做的边界是：
+
+- `tts-api.ts` 继续负责底层生成、播放和全局状态
+- `use-tts-playback-controller.ts` 负责页面常见编排
+- 页面组件只保留本页业务语义，不再手写完整播放状态机
+
+### 6.3 实际播放策略
 
 #### sentence / chunk
 

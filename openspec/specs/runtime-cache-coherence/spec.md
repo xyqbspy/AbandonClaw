@@ -31,7 +31,7 @@ TBD - created by archiving change stabilize-runtime-caching. Update Purpose afte
 - **AND** 不得出现同类接口一部分依赖自定义缓存、一部分依赖浏览器默认缓存的隐式分裂
 
 ### Requirement: 场景循环音频应纳入既有预热链路
-系统 MUST 在现有音频缓存与预热体系内支持整段场景循环音频的受控预热，降低用户首次触发场景循环播放时的等待。该预热体系 MUST 具备稳定的去重规则，避免同一 lesson 在多个入口被重复调度为等价预热任务。
+系统 MUST 在现有音频缓存与预热体系内支持整段场景循环音频的受控预热，降低用户首次触发场景循环播放时的等待。该预热体系 MUST 具备稳定的去重规则，避免同一 lesson 在多个入口被重复调度为等价预热任务。当前端引入统一播放编排层时，该公共层 MUST 继续复用既有 lesson 级与局部预热 key 规则，不得因页面重构而派生新的等价 key 语义。
 
 #### Scenario: 用户准备进入或刚进入场景学习
 - **WHEN** 系统在允许的入口与空闲时机为某个场景执行音频预热
@@ -48,6 +48,11 @@ TBD - created by archiving change stabilize-runtime-caching. Update Purpose afte
 - **WHEN** 用户打开某个 chunk 或句子的局部详情，系统只需要为当前局部上下文做细粒度预热
 - **THEN** 系统 MAY 保留独立于 lesson 级预热的更细粒度 key
 - **AND** 不得因为全局 lesson 级去重而吞掉这类局部交互预热
+
+#### Scenario: 页面迁移到统一播放编排层
+- **WHEN** `lesson`、`scene detail`、`chunks` 等页面改为通过公共播放编排层触发播放和相关预热
+- **THEN** 公共播放编排层必须继续复用既有 `buildChunkAudioKey`、lesson 级预热 key 和局部预热 key 约定
+- **AND** 不得为语义等价的播放或预热任务生成另一套重复 key
 
 ### Requirement: 浏览器端 TTS 缓存必须受控增长
 系统 MUST 把浏览器端 TTS 缓存视为受控资源，而不是无限增长的临时堆积。对于内存 URL 缓存、Blob URL 缓存和 Cache Storage 持久缓存，系统 MUST 定义明确的增长上限与自动裁剪策略；当缓存超过上限时，系统 MUST 优先清理最旧或最低优先级条目，并保持主播放链路不被阻塞。

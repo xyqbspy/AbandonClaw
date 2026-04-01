@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { useTtsPlaybackState } from "@/hooks/use-tts-playback-state";
+import { useTtsPlaybackController } from "@/hooks/use-tts-playback-controller";
 import { getChunkLayerFromLesson } from "@/lib/data/mock-lessons";
 import { buildChunkAudioKey } from "@/lib/shared/tts";
 import { getLessonSentences } from "@/lib/shared/lesson-content";
@@ -8,12 +8,6 @@ import { Lesson, LessonSentence, SelectionChunkLayer } from "@/lib/types";
 import { VariantSet } from "@/lib/types/learning-flow";
 import { trackChunksFromApi } from "@/lib/utils/chunks-api";
 import { getSentenceSpeakText } from "@/lib/utils/audio-warmup";
-import {
-  playChunkAudio,
-  playSentenceAudio,
-  setTtsLooping,
-  stopTtsPlayback,
-} from "@/lib/utils/tts-api";
 import { scheduleChunkAudioWarmup, scheduleLessonAudioWarmup } from "@/lib/utils/resource-actions";
 
 import { findChunkContext } from "./scene-detail-logic";
@@ -41,13 +35,12 @@ export function useSceneDetailPlayback({
   const [variantChunkRelatedChunks, setVariantChunkRelatedChunks] = useState<string[]>([]);
   const [variantChunkHoveredKey, setVariantChunkHoveredKey] = useState<string | null>(null);
   const [trackedChunkKeys, setTrackedChunkKeys] = useState<Record<string, true>>({});
-  const playbackState = useTtsPlaybackState();
-  const effectiveSpeakingText = playbackState.text ?? null;
+  const playbackController = useTtsPlaybackController();
+  const { playbackState, speakingText: effectiveSpeakingText, stop } = playbackController;
 
   const stopGeneratedAudio = useCallback(() => {
-    stopTtsPlayback();
-    setTtsLooping(false);
-  }, []);
+    stop();
+  }, [stop]);
 
   useEffect(
     () => () => {
@@ -127,72 +120,42 @@ export function useSceneDetailPlayback({
       const sentence = variantChunkSentence;
       const selectedChunkText = variantChunkDetail?.text?.trim();
       if (selectedChunkText && clean.toLowerCase() === selectedChunkText.toLowerCase()) {
-        if (playbackState.kind === "chunk" && playbackState.chunkKey === buildChunkAudioKey(clean)) {
-          stopGeneratedAudio();
-          return;
-        }
-        void (async () => {
-          stopTtsPlayback();
-          setTtsLooping(false);
-          try {
-            await playChunkAudio({
-              chunkText: clean,
-              chunkKey: buildChunkAudioKey(clean),
-            });
-          } catch (error) {
+        void playbackController.toggleChunkPlayback({
+          chunkText: clean,
+          chunkKey: buildChunkAudioKey(clean),
+          onError: (error) => {
             toast.error(error instanceof Error ? error.message : "播放失败，请稍后重试");
-          }
-        })();
+          },
+        });
         return;
       }
 
       if (sentence && clean === sentence.text.trim()) {
-        if (
-          playbackState.kind === "sentence" &&
-          playbackState.sentenceId === sentence.id &&
-          (playbackState.mode ?? "normal") === "normal"
-        ) {
-          stopGeneratedAudio();
-          return;
-        }
-        void (async () => {
-          stopTtsPlayback();
-          setTtsLooping(false);
-          try {
-            await playSentenceAudio({
-              sceneSlug: (baseLesson?.slug ?? sceneSlug).trim() || "scene",
-              sentenceId: sentence.id,
-              text: clean,
-              mode: "normal",
-              speaker: sentence.speaker,
-            });
-          } catch (error) {
+        void playbackController.toggleSentencePlayback({
+          sceneSlug: (baseLesson?.slug ?? sceneSlug).trim() || "scene",
+          sentenceId: sentence.id,
+          text: clean,
+          mode: "normal",
+          speaker: sentence.speaker,
+          onError: (error) => {
             toast.error(error instanceof Error ? error.message : "播放失败，请稍后重试");
-          }
-        })();
+          },
+        });
         return;
       }
 
-      void (async () => {
-        stopTtsPlayback();
-        setTtsLooping(false);
-        try {
-          await playChunkAudio({
-            chunkText: clean,
-            chunkKey: buildChunkAudioKey(clean),
-          });
-        } catch (error) {
+      void playbackController.toggleChunkPlayback({
+        chunkText: clean,
+        chunkKey: buildChunkAudioKey(clean),
+        onError: (error) => {
           toast.error(error instanceof Error ? error.message : "播放失败，请稍后重试");
-        }
-      })();
+        },
+      });
     },
     [
       baseLesson,
       effectiveSpeakingText,
-      playbackState.chunkKey,
-      playbackState.kind,
-      playbackState.mode,
-      playbackState.sentenceId,
+      playbackController,
       sceneSlug,
       stopGeneratedAudio,
       variantChunkDetail,
@@ -204,26 +167,15 @@ export function useSceneDetailPlayback({
     (text: string) => {
       const clean = text.trim();
       if (!clean) return;
-      if (effectiveSpeakingText === clean) {
-        stopGeneratedAudio();
-        return;
-      }
-      void (async () => {
-        stopTtsPlayback();
-        setTtsLooping(true);
-        try {
-          await playChunkAudio({
-            chunkText: clean,
-            chunkKey: buildChunkAudioKey(clean),
-          });
-        } catch (error) {
+      void playbackController.playChunkWithLoopState({
+        chunkText: clean,
+        chunkKey: buildChunkAudioKey(clean),
+        onError: (error) => {
           toast.error(error instanceof Error ? error.message : "播放失败，请稍后重试");
-        } finally {
-          setTtsLooping(false);
-        }
-      })();
+        },
+      });
     },
-    [effectiveSpeakingText, stopGeneratedAudio],
+    [playbackController],
   );
 
   const openChunkDetail = useCallback(

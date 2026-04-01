@@ -210,7 +210,7 @@ test("useSceneDetailPlayback 会打开 chunk detail 并支持重置", async () =
 test("useSceneDetailPlayback 会按当前上下文播放 chunk 和 sentence", async () => {
   const useSceneDetailPlayback = getUseSceneDetailPlayback();
 
-  const { result } = renderHook(() =>
+  const { result, rerender } = renderHook(() =>
     useSceneDetailPlayback({
       sceneSlug: "scene-1",
       viewMode: "scene",
@@ -255,6 +255,44 @@ test("useSceneDetailPlayback 会按当前上下文播放 chunk 和 sentence", as
   });
   assert.deepEqual(loopCalls.slice(-2), [true, false]);
   assert.ok(stopCalls.length >= 2);
+});
+
+test("useSceneDetailPlayback 会在再次点按当前 chunk 时停止播放", async () => {
+  const useSceneDetailPlayback = getUseSceneDetailPlayback();
+
+  const { result, rerender } = renderHook(() =>
+    useSceneDetailPlayback({
+      sceneSlug: "scene-1",
+      viewMode: "scene",
+      baseLesson: lesson,
+      activeVariantLesson: null,
+      latestVariantSet: variantSet,
+    }),
+  );
+
+  act(() => {
+    result.current.handleOpenVariantChunk("call it a day");
+  });
+
+  await waitFor(() => {
+    assert.equal(result.current.variantChunkDetail?.text, "call it a day");
+  });
+
+  playbackState = {
+    text: "call it a day",
+    kind: "chunk",
+    chunkKey: "call-it-a-day",
+    sentenceId: null,
+    mode: "normal",
+  };
+  rerender();
+
+  await act(async () => {
+    result.current.handlePronounce("call it a day");
+  });
+
+  assert.equal(playChunkCalls.length, 0);
+  assert.ok(stopCalls.length >= 1);
 });
 
 test("useSceneDetailPlayback 会在有本轮相关短语时默认选中第一个 chunk", async () => {

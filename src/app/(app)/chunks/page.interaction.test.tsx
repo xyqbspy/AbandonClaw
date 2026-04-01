@@ -218,6 +218,7 @@ const mockedModules = {
   "@/lib/utils/tts-api": {
     playChunkAudio: async () => undefined,
     regenerateChunkAudioBatch: async () => undefined,
+    setTtsLooping: () => undefined,
     stopTtsPlayback: () => undefined,
   },
   "@/lib/utils/resource-actions": {

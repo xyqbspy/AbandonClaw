@@ -5,13 +5,11 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Search } from "lucide-react";
 import { clearAllPhraseListCache } from "@/lib/cache/phrase-list-cache";
 import { getChunksExpressionMapCache, setChunksExpressionMapCache } from "@/lib/cache/chunks-runtime-cache";
-import { useTtsPlaybackState } from "@/hooks/use-tts-playback-state";
+import { useTtsPlaybackController } from "@/hooks/use-tts-playback-controller";
 import { normalizePhraseText } from "@/lib/shared/phrases";
 import { buildChunkAudioKey } from "@/lib/shared/tts";
 import {
-  playChunkAudio,
   regenerateChunkAudioBatch,
-  stopTtsPlayback,
 } from "@/lib/utils/tts-api";
 import { scheduleChunkAudioWarmup } from "@/lib/utils/resource-actions";
 import { generateExpressionMapFromApi } from "@/lib/utils/expression-map-api";
@@ -361,8 +359,8 @@ const extractExpressionsFromSentenceItem = (item: UserPhraseItemResponse) => {
 
 export default function ChunksPage() {
   const router = useRouter();
-  const ttsPlaybackState = useTtsPlaybackState();
-  const [playingText, setPlayingText] = useState<string | null>(null);
+  const playbackController = useTtsPlaybackController();
+  const { speakingText, loadingText, stop } = playbackController;
   const searchParams = useSearchParams();
   const {
     query,
@@ -426,9 +424,9 @@ export default function ChunksPage() {
 
   useEffect(
     () => () => {
-      stopTtsPlayback();
+      stop();
     },
-    [],
+    [stop],
   );
 
   useEffect(() => {
@@ -981,8 +979,7 @@ export default function ChunksPage() {
     nextMainUserPhraseId: string | null;
     nextFocusUserPhraseId: string | null;
   }, refreshedRows: UserPhraseItemResponse[]) => {
-    stopTtsPlayback();
-    setPlayingText(null);
+    stop();
 
     const nextState = resolveDeleteFocusDetailSuccessState({
       result,
@@ -1232,24 +1229,12 @@ export default function ChunksPage() {
   const handlePronounceSentence = (sentence: string | null | undefined) => {
     const text = (sentence ?? "").trim();
     if (!text) return;
-    const isLoadingCurrentText =
-      ttsPlaybackState.status === "loading" && ttsPlaybackState.text?.trim() === text;
-    if (playingText === text || isLoadingCurrentText) {
-      stopTtsPlayback();
-      setPlayingText(null);
-      return;
-    }
-    void (async () => {
-      stopTtsPlayback();
-      setPlayingText(text);
-      try {
-        await playChunkAudio({ chunkText: text });
-      } catch (error) {
+    void playbackController.toggleChunkPlayback({
+      chunkText: text,
+      onError: (error) => {
         notifyChunksSpeechUnsupported(error instanceof Error ? error.message : null);
-      } finally {
-        setPlayingText((prev) => (prev === text ? null : prev));
-      }
-    })();
+      },
+    });
   };
 
   useEffect(() => {
@@ -1693,8 +1678,8 @@ export default function ChunksPage() {
     canShowFindRelations: focusDetailViewModel.canShowFindRelations,
     focusExpression,
     savingFocusCandidateKey: savingFocusCandidateKeys[0] ?? null,
-    playingText,
-    ttsPlaybackText: ttsPlaybackState.text,
+    playingText: speakingText,
+    ttsPlaybackText: speakingText,
     detailSpeakText: focusDetailViewModel.detailSpeakText,
   });
   const focusDetailSheetPresentation = buildChunksFocusDetailSheetPresentation({
@@ -1743,13 +1728,8 @@ export default function ChunksPage() {
           focusDetail.text,
           {
             onSpeak: handlePronounceSentence,
-            isSpeakingText: (text) =>
-              Boolean(text) &&
-              (playingText === text.trim() || ttsPlaybackState.text === text.trim()),
-            isLoadingText: (text) =>
-              Boolean(text) &&
-              ttsPlaybackState.status === "loading" &&
-              ttsPlaybackState.text === text.trim(),
+            isSpeakingText: (text) => Boolean(text) && speakingText === text.trim(),
+            isLoadingText: (text) => Boolean(text) && loadingText === text.trim(),
           },
         ) ?? null)
       : null,
@@ -2090,9 +2070,9 @@ export default function ChunksPage() {
             generatingSimilarForId={generatingSimilarForId}
             mapOpeningForId={mapOpeningForId}
             openingSourceSceneSlug={openingSourceSceneSlug}
-            playingText={playingText}
-          ttsPlaybackText={ttsPlaybackState.text}
-          ttsLoadingText={ttsPlaybackState.status === "loading" ? ttsPlaybackState.text : null}
+            playingText={speakingText}
+          ttsPlaybackText={speakingText}
+          ttsLoadingText={loadingText}
           appleButtonClassName={appleButtonClassName}
           appleSurfaceClassName={APPLE_SURFACE}
           labels={{
@@ -2248,13 +2228,8 @@ export default function ChunksPage() {
                             manualExpressionAssist.inputItem.text,
                             {
                               onSpeak: handlePronounceSentence,
-                              isSpeakingText: (text) =>
-                                Boolean(text) &&
-                                (playingText === text.trim() || ttsPlaybackState.text === text.trim()),
-                              isLoadingText: (text) =>
-                                Boolean(text) &&
-                                ttsPlaybackState.status === "loading" &&
-                                ttsPlaybackState.text === text.trim(),
+                              isSpeakingText: (text) => Boolean(text) && speakingText === text.trim(),
+                              isLoadingText: (text) => Boolean(text) && loadingText === text.trim(),
                             },
                           )}
                         </div>

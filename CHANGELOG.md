@@ -507,3 +507,29 @@
 - 重写了 `openspec/changes/add-chunks-expression-deletion/proposal.md` 与 `specs/chunks-data-contract/spec.md`，把这条 change 的提案与 delta spec 一并恢复成可读 UTF-8，并与当前实现保持一致。
 - 新增了仓库级“编码与乱码处理硬规则”，明确禁止用裸 `Get-Content` 的终端显示结果判断中文文件是否乱码；中文文件必须显式按 UTF-8 读取并在判定前复读验证。
 - 升级 `scripts/check-mojibake.ts`，把扫描范围扩展到 `docs/`、`openspec/` 和根目录规则文档，同时排除归档目录与示例噪声，避免把历史脏数据或说明性文案误报成当前问题。
+
+### TTS 播放编排层公共化
+- 新增 `src/hooks/use-tts-playback-controller.ts`，把 chunk / sentence / scene loop 的播放切换、再次点按停止、loop 状态清理、错误兜底和常见激活态判断收敛成统一公共层。
+- `lesson-reader`、`scene detail` 和 `chunks` 页面现在都改为通过这层公共控制器触发 TTS 播放，页面只保留业务 payload、预热、副作用和提示文案，不再各自维护近似的播放状态机。
+- 补充了公共播放控制器测试，并新增 `scene detail` 的“再次点按当前 chunk 会停止播放”回归，文档 `docs/audio-tts-pipeline.md` 也同步记录了新的职责边界与接入点。
+
+影响范围：
+- `src/hooks/use-tts-playback-controller.ts`
+- `src/features/lesson/components/lesson-reader.tsx`
+- `src/app/(app)/scene/[slug]/use-scene-detail-playback.ts`
+- `src/app/(app)/chunks/page.tsx`
+- `src/hooks/use-tts-playback-controller.test.tsx`
+- `src/app/(app)/scene/[slug]/use-scene-detail-playback.test.tsx`
+- `docs/audio-tts-pipeline.md`
+- `openspec/changes/consolidate-audio-playback/tasks.md`
+
+验证情况：
+- `node --import tsx --import ./src/test/setup-dom.ts --test "src/hooks/use-tts-playback-controller.test.tsx" "src/app/(app)/scene/[[]slug[]]/use-scene-detail-playback.test.tsx" "src/app/(app)/chunks/page.interaction.test.tsx" "src/features/lesson/components/lesson-reader.interaction.test.tsx"`
+- `node --import tsx scripts/check-mojibake.ts`
+- 额外执行 `pnpm exec tsc --noEmit --pretty false`；仓库中仍存在与本次改动无关的既有类型问题，未在本次变更中处理：
+  - `middleware.ts`
+  - `src/app/(app)/chunks/use-expression-cluster-actions.ts`
+  - `src/app/(auth)/login/page.tsx`
+  - `src/app/(auth)/signup/page.tsx`
+  - `src/lib/server/phrases/service.ts`
+  - `src/lib/shared/auth-redirect.ts`
