@@ -29,11 +29,11 @@ export function LoopActionButton({
   activeLabel = "停止循环",
   loadingLabel = "加载中...",
   variant = "ghost",
-  size = "sm",
+  size = "icon-sm",
   className,
   iconClassName,
   ariaLabel,
-  iconOnly = false,
+  iconOnly = true,
   icon = "play",
 }: LoopActionButtonProps) {
   const resolvedLabel = loading ? loadingLabel : active ? activeLabel : label;
@@ -45,7 +45,12 @@ export function LoopActionButton({
       type="button"
       size={size}
       variant={variant}
-      className={cn("shrink-0", active && "text-primary", className)}
+      className={cn(
+        "shrink-0",
+        active && "text-primary",
+        iconOnly && (size === "sm" || size === "default") && "aspect-square px-0",
+        className,
+      )}
       onClick={onClick}
       aria-label={resolvedAriaLabel}
     >

@@ -58,6 +58,20 @@ export function SentenceBlock({
 }) {
   const [translationOpen, setTranslationOpen] = useState(false);
   const translationText = sentence.translation.trim() || "该句翻译暂未提供。";
+  const audioButton = (
+    <TtsActionButton
+      active={speaking}
+      loading={loading}
+      variant="ghost"
+      size="icon-sm"
+      className={`mt-0.5 ${APPLE_META_TEXT} hover:text-foreground`}
+      ariaLabel={speaking ? "停止朗读" : "朗读"}
+      onClick={(event) => {
+        event.stopPropagation();
+        onPronounce?.(getSentenceSpeakText(sentence));
+      }}
+    />
+  );
 
   return (
     <div
@@ -75,33 +89,6 @@ export function SentenceBlock({
         if (mobileTapEnabled) onSentenceTap?.(sentence.id);
       }}
     >
-      <div className={`mb-[var(--mobile-adapt-space-2xs)] flex items-center justify-end gap-[var(--mobile-adapt-space-md)] text-[length:var(--mobile-adapt-font-meta)] ${APPLE_META_TEXT}`}>
-        <div className={`flex items-center gap-[var(--mobile-adapt-space-md)] text-[length:var(--mobile-adapt-font-meta)] ${APPLE_META_TEXT}`}>
-          <button
-            type="button"
-            className="inline-flex cursor-pointer items-center gap-1 transition-colors hover:text-foreground"
-            onClick={(event) => {
-              event.stopPropagation();
-              setTranslationOpen((prev) => !prev);
-            }}
-          >
-            <Languages className="size-3.5" />
-            {translationOpen ? "收起" : "翻译"}
-          </button>
-          <TtsActionButton
-            active={speaking}
-            loading={loading}
-            variant="ghost"
-            size="sm"
-            className={`h-auto px-0 ${APPLE_META_TEXT} hover:text-foreground`}
-            onClick={(event) => {
-              event.stopPropagation();
-              onPronounce?.(getSentenceSpeakText(sentence));
-            }}
-          />
-        </div>
-      </div>
-
       {showSpeaker && sentence.speaker ? (
         <div className="flex items-start gap-[var(--mobile-adapt-space-sm)]">
           <Badge
@@ -113,31 +100,51 @@ export function SentenceBlock({
           >
             {speakerLabel(sentence.speaker)}
           </Badge>
+          <div className="flex min-w-0 flex-1 items-start gap-[var(--mobile-adapt-space-sm)]">
+            <p
+              data-sentence-id={sentence.id}
+              data-sentence-text={sentence.text}
+              data-sentence-translation={sentence.translation}
+              className={cn(
+                `min-w-0 flex-1 cursor-text text-[length:var(--mobile-adapt-font-body)] leading-relaxed ${APPLE_BODY_TEXT} sm:text-lg`,
+                mobileTapEnabled && "selection:bg-primary/20",
+              )}
+            >
+              {sentence.text}
+            </p>
+            {audioButton}
+          </div>
+        </div>
+      ) : (
+        <div className="flex items-start gap-[var(--mobile-adapt-space-sm)]">
           <p
             data-sentence-id={sentence.id}
             data-sentence-text={sentence.text}
             data-sentence-translation={sentence.translation}
             className={cn(
-              `cursor-text text-[length:var(--mobile-adapt-font-body)] leading-relaxed ${APPLE_BODY_TEXT} sm:text-lg`,
+              `min-w-0 flex-1 cursor-text text-[length:var(--mobile-adapt-font-body)] leading-relaxed ${APPLE_BODY_TEXT} sm:text-lg`,
               mobileTapEnabled && "selection:bg-primary/20",
             )}
           >
             {sentence.text}
           </p>
+          {audioButton}
         </div>
-      ) : (
-        <p
-          data-sentence-id={sentence.id}
-          data-sentence-text={sentence.text}
-          data-sentence-translation={sentence.translation}
-          className={cn(
-            `cursor-text text-[length:var(--mobile-adapt-font-body)] leading-relaxed ${APPLE_BODY_TEXT} sm:text-lg`,
-            mobileTapEnabled && "selection:bg-primary/20",
-          )}
-        >
-          {sentence.text}
-        </p>
       )}
+
+      <div className={`mt-[var(--mobile-adapt-space-2xs)] flex items-center gap-[var(--mobile-adapt-space-md)] text-[length:var(--mobile-adapt-font-meta)] ${APPLE_META_TEXT}`}>
+        <button
+          type="button"
+          className="inline-flex cursor-pointer items-center gap-1 transition-colors hover:text-foreground"
+          onClick={(event) => {
+            event.stopPropagation();
+            setTranslationOpen((prev) => !prev);
+          }}
+        >
+          <Languages className="size-3.5" />
+          {translationOpen ? "收起" : "翻译"}
+        </button>
+      </div>
 
       <div
         className={cn(

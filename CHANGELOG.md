@@ -533,3 +533,23 @@
   - `src/app/(auth)/signup/page.tsx`
   - `src/lib/server/phrases/service.ts`
   - `src/lib/shared/auth-redirect.ts`
+
+### 音频按钮与句子翻译入口统一
+- `TtsActionButton` 与 `LoopActionButton` 现在默认统一为纯 icon 展示，正文不再直接显示“朗读 / 播放 / 循环播放”，状态语义继续保留在 `aria-label`。
+- 句子详情卡片、面板和 sheet 现在直接展示中文翻译，不再额外保留“翻译/收起”按钮；主播放按钮统一放到句子右侧，并与下方其它播放入口保持一致位置语言。
+- `lesson-reader` 里的对话块、移动端分组和桌面段落阅读也去掉了额外翻译按钮，改为直接展示中文；只有句子正文层继续保留句子下方的翻译按钮。
+
+影响范围：
+- `src/components/audio/tts-action-button.tsx`
+- `src/components/audio/loop-action-button.tsx`
+- `src/features/lesson/components/sentence-block.tsx`
+- `src/features/lesson/components/selection-detail-primitives.tsx`
+- `src/features/lesson/components/selection-detail-panel.tsx`
+- `src/features/lesson/components/selection-detail-sheet.tsx`
+- `src/features/lesson/components/lesson-reader.tsx`
+- `docs/audio-tts-pipeline.md`
+- `openspec/changes/unify-audio-icon-buttons/tasks.md`
+
+验证情况：
+- `node --import tsx --import ./src/test/setup-dom.ts --test "src/features/lesson/components/sentence-block.interaction.test.tsx" "src/features/lesson/components/selection-detail-panel.interaction.test.tsx" "src/features/lesson/components/selection-detail-sheet.interaction.test.tsx" "src/features/lesson/components/lesson-reader.interaction.test.tsx"`
+- `node --import tsx --import ./src/test/setup-dom.ts --test "src/features/lesson/components/selection-toolbar.interaction.test.tsx" "src/app/(app)/chunks/chunks-list-view.interaction.test.tsx" "src/features/chunks/components/example-sentence-cards.test.tsx" "src/features/chunks/components/focus-detail-content.interaction.test.tsx"`

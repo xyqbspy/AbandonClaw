@@ -44,7 +44,7 @@ test("SentenceBlock 会处理句子点击、翻译切换和朗读", () => {
   assert.ok(screen.getByText("我不想把自己耗尽。"));
 
   fireEvent.click(screen.getByRole("button", { name: "收起" }));
-  fireEvent.click(screen.getAllByRole("button")[1]);
+  fireEvent.click(screen.getByRole("button", { name: "朗读" }));
   fireEvent.click(screen.getByText("I don't want to burn out."));
 
   assert.deepEqual(pronouncedTexts, ["I don't want to burn out."]);

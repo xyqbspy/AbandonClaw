@@ -11,7 +11,6 @@ import {
 } from "react";
 import {
   ArrowLeft,
-  Languages,
 } from "lucide-react";
 import { toast } from "sonner";
 import { appCopy } from "@/lib/constants/copy";
@@ -70,8 +69,6 @@ const speakerLabel = (speaker?: string) => normalizeSpeaker(speaker);
 const TOOLBAR_WIDTH = 256;
 const appleButtonLgClassName = `${APPLE_BUTTON_BASE} ${APPLE_BUTTON_TEXT_LG}`;
 const hasSpeakerTag = (speaker?: string) => /^[A-Z]$/.test((speaker ?? "").trim().toUpperCase());
-const dialogueTextButtonClassName =
-  "inline-flex cursor-pointer items-center gap-1 text-[length:var(--mobile-font-meta)] leading-none text-[#8e9aaf] transition-colors hover:text-[#2c3e50] active:opacity-70";
 
 export function LessonReader({
   lesson,
@@ -152,10 +149,6 @@ export function LessonReader({
   const sentenceLoopRef = useRef<string | null>(null);
   const trackedEncounterKeysRef = useRef<Set<string>>(new Set());
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [dialogueBlockTranslationOpenMap, setDialogueBlockTranslationOpenMap] =
-    useState<Record<string, boolean>>({});
-  const [mobileGroupTranslationOpenMap, setMobileGroupTranslationOpenMap] =
-    useState<Record<string, boolean>>({});
   const [mobileActiveGroup, setMobileActiveGroup] =
     useState<MobileSentenceGroup | null>(null);
   const [localSavedPhraseTexts, setLocalSavedPhraseTexts] = useState<Set<string>>(new Set());
@@ -559,13 +552,6 @@ export function LessonReader({
     [dispatchAction, isMobile, isTrainingMode, openDetailForSentence, setSheetOpen],
   );
 
-  const toggleDialogueBlockTranslation = useCallback((blockId: string) => {
-    setDialogueBlockTranslationOpenMap((prev) => ({
-      ...prev,
-      [blockId]: !prev[blockId],
-    }));
-  }, []);
-
   const handleMobileGroupTap = useCallback(
     (group: MobileSentenceGroup) => {
       const anchorSentenceId = group.sentenceIds[0];
@@ -950,7 +936,6 @@ export function LessonReader({
     (block: LessonBlock) => {
       const speaker = block.speaker ?? "A";
       const primarySpeaker = isPrimarySpeaker(speaker);
-      const translationOpen = Boolean(dialogueBlockTranslationOpenMap[block.id]);
       const blockTranslation =
         block.translation?.trim() ||
         block.sentences
@@ -1019,31 +1004,13 @@ export function LessonReader({
             </article>
 
             <div className="flex items-center gap-[var(--mobile-space-lg)] px-[var(--mobile-space-xs)]">
-              <button
-                type="button"
-                aria-label="翻译"
-                className={cn(dialogueTextButtonClassName, translationOpen && "text-[#4a90e2]")}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  toggleDialogueBlockTranslation(block.id);
-                }}
-              >
-                <Languages className="size-3.5" />
-                {translationOpen ? "收起" : "翻译"}
-              </button>
               <TtsActionButton
                 active={isBlockSpeaking}
                 loading={isBlockLoading}
-                label="朗读"
-                activeLabel="停止"
-                loadingLabel="加载中..."
-                ariaLabel="朗读"
                 variant="ghost"
-                size="sm"
-                className={cn(
-                  "h-auto px-0 text-[length:var(--mobile-font-meta)] leading-none text-[#8e9aaf] hover:text-[#2c3e50]",
-                  isBlockSpeaking && "text-[#4a90e2] hover:text-[#4a90e2]",
-                )}
+                size="icon-sm"
+                ariaLabel={isBlockSpeaking ? "停止朗读" : "朗读"}
+                className={cn("text-[#8e9aaf] hover:text-[#2c3e50]", isBlockSpeaking && "text-[#4a90e2] hover:text-[#4a90e2]")}
                 iconClassName="size-3.5"
                 onClick={(event) => {
                   event.stopPropagation();
@@ -1052,11 +1019,9 @@ export function LessonReader({
               />
             </div>
 
-            {translationOpen ? (
-              <p className="px-[var(--mobile-space-xs)] text-[length:var(--mobile-font-body-sm)] leading-[1.55] text-[#8e9aaf]">
-                {blockTranslation || "该段翻译暂未提供。"}
-              </p>
-            ) : null}
+            <p className="px-[var(--mobile-space-xs)] text-[length:var(--mobile-font-body-sm)] leading-[1.55] text-[#8e9aaf]">
+              {blockTranslation || "该段翻译暂未提供。"}
+            </p>
           </div>
         </div>
       );
@@ -1068,8 +1033,6 @@ export function LessonReader({
       playbackState.kind,
       playbackState.status,
       playbackState.sentenceId,
-      toggleDialogueBlockTranslation,
-      dialogueBlockTranslationOpenMap,
     ],
   );
 
@@ -1336,7 +1299,6 @@ export function LessonReader({
                     const groupTranslation = group.map((sentence) => sentence.translation).join(" ");
                     const groupPlaying = effectiveSpeakingText === groupText;
                     const groupSelected = group.some((sentence) => sentence.id === state.activeSentenceId);
-                    const translationOpen = Boolean(mobileGroupTranslationOpenMap[groupKey]);
                     const groupRelatedChunks = Array.from(new Set(group.flatMap((sentence) => sentence.chunks)));
                     const groupContext: MobileSentenceGroup = {
                       key: groupKey,
@@ -1373,32 +1335,14 @@ export function LessonReader({
                                 groupSelected && "text-primary",
                               )}
                             >
-                              <button
-                                type="button"
-                                className={cn(
-                                  "inline-flex cursor-pointer items-center gap-1 text-[length:var(--mobile-font-caption)] leading-none transition-colors active:opacity-70",
-                                  groupSelected
-                                    ? "text-primary/80 hover:text-primary/95"
-                                    : `${APPLE_META_TEXT} hover:text-foreground`,
-                                )}
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  setMobileGroupTranslationOpenMap((prev) => ({
-                                    ...prev,
-                                    [groupKey]: !prev[groupKey],
-                                  }));
-                                }}
-                              >
-                                <Languages className="size-3" />
-                                {translationOpen ? "收起" : "翻译"}
-                              </button>
                               <TtsActionButton
                                 active={groupPlaying}
                                 loading={isChunkLoading(groupText)}
                                 variant="ghost"
-                                size="sm"
+                                size="icon-sm"
+                                ariaLabel={groupPlaying ? "停止朗读" : "朗读"}
                                 className={cn(
-                                  "h-auto px-0 text-[length:var(--mobile-font-caption)] leading-none",
+                                  "text-[length:var(--mobile-font-caption)] leading-none",
                                   groupSelected
                                     ? "text-primary/80 hover:text-primary/95"
                                     : `${APPLE_META_TEXT} hover:text-foreground`,
@@ -1411,16 +1355,9 @@ export function LessonReader({
                               />
                             </div>
 
-                            <div
-                              className={cn(
-                                "grid overflow-hidden transition-all duration-200",
-                                translationOpen ? "mb-[var(--mobile-space-md)] grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
-                              )}
-                            >
-                              <p className={`min-h-0 rounded-[var(--app-radius-panel)] px-[var(--mobile-space-md)] py-[var(--mobile-space-sm)] text-[length:var(--mobile-font-body-sm)] leading-[1.55] ${APPLE_META_TEXT} ${APPLE_PANEL}`}>
-                                {groupTranslation}
-                              </p>
-                            </div>
+                            <p className={`mb-[var(--mobile-space-md)] rounded-[var(--app-radius-panel)] px-[var(--mobile-space-md)] py-[var(--mobile-space-sm)] text-[length:var(--mobile-font-body-sm)] leading-[1.55] ${APPLE_META_TEXT} ${APPLE_PANEL}`}>
+                              {groupTranslation || "该段翻译暂未提供。"}
+                            </p>
                           </div>
 
                           <div className="space-y-[var(--mobile-space-sm)]">
@@ -1485,15 +1422,6 @@ export function LessonReader({
                       </div>
 
                       <div className={`mt-1 flex items-center gap-[var(--mobile-space-sm)] text-[length:var(--mobile-font-caption)] ${APPLE_META_TEXT}`}>
-                        <button
-                          type="button"
-                          className="inline-flex cursor-pointer items-center gap-1 transition-colors hover:text-foreground"
-                          onClick={() => toggleDialogueBlockTranslation(block.id)}
-                        >
-                          <Languages className="size-3.5" />
-                          翻译
-                        </button>
-                        <span className="opacity-40">·</span>
                         <TtsActionButton
                           loading={isChunkLoading(
                             block.tts?.trim() ||
@@ -1503,8 +1431,9 @@ export function LessonReader({
                                 .join(" "),
                           )}
                           variant="ghost"
-                          size="sm"
-                          className="h-auto px-0 text-inherit hover:text-foreground"
+                          size="icon-sm"
+                          ariaLabel="朗读"
+                          className="text-inherit hover:text-foreground"
                           onClick={() => handlePronounce(
                             block.tts?.trim() ||
                               block.sentences
@@ -1515,16 +1444,14 @@ export function LessonReader({
                         />
                       </div>
 
-                      {dialogueBlockTranslationOpenMap[block.id] ? (
-                        <p className={`mt-2 leading-6 ${APPLE_META_TEXT}`}>
-                          {block.translation?.trim() ||
-                            block.sentences
-                              .map((sentence) => sentence.translation?.trim())
-                              .filter(Boolean)
-                              .join(" ") ||
-                            "该段翻译暂未提供。"}
-                        </p>
-                      ) : null}
+                      <p className={`mt-2 leading-6 ${APPLE_META_TEXT}`}>
+                        {block.translation?.trim() ||
+                          block.sentences
+                            .map((sentence) => sentence.translation?.trim())
+                            .filter(Boolean)
+                            .join(" ") ||
+                          "该段翻译暂未提供。"}
+                      </p>
                     </article>
                   </div>
                 ))}

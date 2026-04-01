@@ -29,10 +29,10 @@ export function TtsActionButton({
   loadingLabel = "加载中...",
   ariaLabel,
   variant = "ghost",
-  size = "sm",
+  size = "icon-sm",
   className,
   iconClassName,
-  iconOnly = false,
+  iconOnly = true,
 }: TtsActionButtonProps) {
   const resolvedLabel = loading ? loadingLabel : active ? activeLabel : label;
 
@@ -41,7 +41,11 @@ export function TtsActionButton({
       type="button"
       size={size}
       variant={variant}
-      className={cn("shrink-0", className)}
+      className={cn(
+        "shrink-0",
+        iconOnly && (size === "sm" || size === "default") && "aspect-square px-0",
+        className,
+      )}
       onClick={onClick}
       aria-label={ariaLabel ?? resolvedLabel}
     >

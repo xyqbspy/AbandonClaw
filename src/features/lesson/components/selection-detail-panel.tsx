@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { LessonBlock, LessonSentence, SelectionChunkLayer } from "@/lib/types";
@@ -53,7 +52,6 @@ export function SelectionDetailPanel({
   showSpeaker?: boolean;
   sentenceSectionLabel?: string;
 }) {
-  const [showSentenceTranslation, setShowSentenceTranslation] = useState(false);
   const blockText = currentBlock?.sentences.map((sentence) => sentence.text).join(" ");
   const blockTranslation =
     currentBlock?.translation?.trim() ||
@@ -104,8 +102,6 @@ export function SelectionDetailPanel({
               speakingText={speakingText}
               loadingText={loadingText}
               blockSpeakText={resolvedBlockSpeakText}
-              showTranslation={showSentenceTranslation}
-              onToggleTranslation={() => setShowSentenceTranslation((prev) => !prev)}
               onPronounceBlock={onPronounceBlock}
               emptyText="先选择一句内容，查看整句理解。"
             />

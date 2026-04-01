@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { DetailSheetShell } from "@/components/shared/detail-sheet-shell";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
@@ -64,7 +64,6 @@ export function SelectionDetailSheet({
   sentenceSectionLabel?: string;
   showRelatedChunkAudio?: boolean;
 }) {
-  const [showSentenceTranslation, setShowSentenceTranslation] = useState(false);
   const blockText = currentBlock?.sentences.map((sentence) => sentence.text).join(" ");
   const blockTranslation =
     currentBlock?.translation?.trim() ||
@@ -156,8 +155,6 @@ export function SelectionDetailSheet({
                 speakingText={speakingText}
                 loadingText={loadingText}
                 blockSpeakText={resolvedBlockSpeakText}
-                showTranslation={showSentenceTranslation}
-                onToggleTranslation={() => setShowSentenceTranslation((prev) => !prev)}
                 onPronounceBlock={onPronounceBlock}
                 emptyText="先选择一句内容，查看整句理解。"
               />

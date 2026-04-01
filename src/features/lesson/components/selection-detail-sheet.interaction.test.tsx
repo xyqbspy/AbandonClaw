@@ -94,8 +94,7 @@ test("SelectionDetailSheet 会处理 block 朗读和相关短语交互", () => {
   );
 
   view.getByText("当前句子");
-  fireEvent.click(view.getByRole("button", { name: "翻译" }));
-  assert.ok(view.getByRole("button", { name: "收起" }));
+  assert.ok(view.getByText("我不想把自己耗尽。今天先到这里吧。"));
   const sentenceSection = view.getByText("当前句子").closest("section");
   assert.ok(sentenceSection);
   fireEvent.click(within(sentenceSection).getByRole("button", { name: "朗读" }));
@@ -110,6 +109,7 @@ test("SelectionDetailSheet 会处理 block 朗读和相关短语交互", () => {
   assert.deepEqual(blockSpeakCalls, ["I don't want to burn out. Let's call it a day."]);
   assert.deepEqual(hoveredChunks, ["call it a day", "call it a day", null, null]);
   assert.deepEqual(selectedChunks, ["call it a day"]);
+  assert.equal(view.queryByRole("button", { name: "翻译" }), null);
 });
 
 test("SelectionDetailSheet 会限制例句数量，并处理例句朗读", () => {

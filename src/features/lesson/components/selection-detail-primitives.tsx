@@ -1,7 +1,7 @@
 "use client";
 
 import { ReactNode } from "react";
-import { Languages, Loader2, RotateCcw, Volume2 } from "lucide-react";
+import { Loader2, RotateCcw, Volume2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DetailInfoBlock, DetailLoadingBlock } from "@/features/chunks/components/detail-info-blocks";
@@ -136,8 +136,6 @@ export function SelectionSentenceCard({
   speakingText,
   loadingText,
   blockSpeakText,
-  showTranslation,
-  onToggleTranslation,
   onPronounceBlock,
   emptyText,
 }: {
@@ -146,8 +144,6 @@ export function SelectionSentenceCard({
   speakingText: string | null;
   loadingText?: string | null;
   blockSpeakText: string;
-  showTranslation: boolean;
-  onToggleTranslation: () => void;
   onPronounceBlock: () => void;
   emptyText: string;
 }) {
@@ -155,22 +151,14 @@ export function SelectionSentenceCard({
     <div className={cn(selectionCardClassName, "p-[var(--mobile-space-sheet)]")}>
       {sentenceText ? (
         <>
-          <p className="text-[length:clamp(1rem,4.4vw,1.125rem)] font-medium leading-[var(--mobile-adapt-overlay-body-line-height)] text-[var(--app-foreground)]">
-            {sentenceText}
-          </p>
-          <div className="mt-[var(--mobile-space-xl)] flex gap-[var(--mobile-space-sm)]">
+          <div className="flex items-start gap-[var(--mobile-space-sm)]">
+            <p className="min-w-0 flex-1 text-[length:clamp(1rem,4.4vw,1.125rem)] font-medium leading-[var(--mobile-adapt-overlay-body-line-height)] text-[var(--app-foreground)]">
+              {sentenceText}
+            </p>
             <button
               type="button"
-              className={selectionSecondaryActionButtonClassName}
-              onClick={onToggleTranslation}
-            >
-              <Languages className="size-4" />
-              {showTranslation ? "收起" : "翻译"}
-            </button>
-            <button
-              type="button"
-              aria-label="朗读"
-              className={cn(selectionSecondaryActionButtonClassName, "size-[var(--mobile-control-height)] px-0")}
+              aria-label={speakingText === blockSpeakText ? "停止朗读" : "朗读"}
+              className={selectionIconButtonClassName}
               onClick={onPronounceBlock}
             >
               <SelectionAudioIcon
@@ -179,11 +167,9 @@ export function SelectionSentenceCard({
               />
             </button>
           </div>
-          {showTranslation ? (
-            <p className="mt-[var(--mobile-space-xl)] text-[length:var(--mobile-font-body)] leading-[var(--mobile-adapt-overlay-body-line-height)] text-[var(--app-chunks-sheet-body)]">
-              {translationText || "该句翻译待补充。"}
-            </p>
-          ) : null}
+          <p className="mt-[var(--mobile-space-xl)] text-[length:var(--mobile-font-body)] leading-[var(--mobile-adapt-overlay-body-line-height)] text-[var(--app-chunks-sheet-body)]">
+            {translationText || "该句翻译待补充。"}
+          </p>
         </>
       ) : (
         <p className="text-[length:var(--mobile-font-body)] leading-[var(--mobile-adapt-overlay-body-line-height)] text-[var(--app-foreground-muted)]">

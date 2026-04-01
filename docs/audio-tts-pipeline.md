@@ -235,6 +235,14 @@ chunk 音频重生成前也会主动清：
 - `src/app/(app)/scene/[slug]/use-scene-detail-playback.ts`
 - `src/app/(app)/chunks/page.tsx`
 
+当前前端展示约定也同步收口成统一规则：
+
+- 播放按钮默认只显示 icon，不再在按钮正文里直接渲染“朗读 / 播放 / 循环播放”文字
+- 状态语义继续保留在 `aria-label`
+- 句子正文层可以保留句子下方的翻译按钮
+- 一旦进入句子详情面板或 sheet，中文翻译直接展示，不再额外点开“翻译”
+- 句子详情里的主播放按钮固定放在句子右侧，与下方其他播放入口保持一致位置语言
+
 页面仍保留自身职责：
 
 - 组装 sentence / chunk / scene loop 的业务 payload
