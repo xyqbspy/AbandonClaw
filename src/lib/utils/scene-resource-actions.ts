@@ -95,7 +95,6 @@ export const warmupContinueLearningScene = (params: {
       scheduleLessonAudioWarmup(lesson, {
         sentenceLimit: 2,
         chunkLimit: 2,
-        key: `continue-scene-audio:${lesson.id}`,
       });
 
       const generatedState = getSceneGeneratedState(lesson.id);

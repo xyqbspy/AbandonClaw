@@ -86,7 +86,6 @@ export const loadSceneDetail = async ({
     scheduleLessonAudioWarmup(lesson, {
       sentenceLimit: 2,
       chunkLimit: 2,
-      key: `scene-detail-audio:${requestSlug}`,
       includeSceneFull: true,
     });
 

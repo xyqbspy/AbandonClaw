@@ -49,6 +49,8 @@ const getCancelIdleCallback = () =>
   (window as typeof window & { cancelIdleCallback?: CancelIdleCallbackFn })
     .cancelIdleCallback;
 
+const normalizeWarmupChunkText = (text: string) => text.trim().toLowerCase();
+
 export const scheduleIdleAction = (
   key: string,
   action: () => void,
@@ -107,12 +109,22 @@ export const cancelScheduledIdleAction = (key: string) => {
   return true;
 };
 
-const buildChunkAudioWarmupKey = (chunkTexts: string[], limit: number) =>
+export const buildChunkAudioWarmupKey = (chunkTexts: string[], limit: number) =>
   `chunk-audio:${chunkTexts
     .slice(0, limit)
-    .map((text) => text.trim().toLowerCase())
+    .map(normalizeWarmupChunkText)
     .filter(Boolean)
     .join("|")}`;
+
+export const buildLessonAudioWarmupKey = (
+  lesson: Pick<Lesson, "id" | "slug">,
+  options?: { sentenceLimit?: number; chunkLimit?: number; includeSceneFull?: boolean },
+) => {
+  const sentenceLimit = options?.sentenceLimit ?? 2;
+  const chunkLimit = options?.chunkLimit ?? 2;
+  const includeSceneFull = options?.includeSceneFull === true;
+  return `lesson-audio:${lesson.id}:${lesson.slug}:s=${sentenceLimit}:c=${chunkLimit}:full=${includeSceneFull ? 1 : 0}`;
+};
 
 export const scheduleChunkAudioWarmup = (chunkTexts: string[], options?: { limit?: number }) => {
   const limit = options?.limit ?? 2;
@@ -132,7 +144,11 @@ export const scheduleLessonAudioWarmup = (
   const includeSceneFull = options?.includeSceneFull === true && !isWeakNetwork();
   const key =
     options?.key ??
-    `lesson-audio:${lesson.id}:${lesson.slug}:s=${sentenceLimit}:c=${chunkLimit}`;
+    buildLessonAudioWarmupKey(lesson, {
+      sentenceLimit,
+      chunkLimit,
+      includeSceneFull,
+    });
 
   return scheduleIdleAction(key, () => {
     warmupLessonAudio(lesson, {

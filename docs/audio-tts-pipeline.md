@@ -1,0 +1,454 @@
+# 音频生成、缓存与预热链路说明
+
+## 1. 这份文档解决什么问题
+
+项目里的音频能力并不是单一接口，而是一整条链路：
+
+1. 服务端按文本或场景内容生成 TTS
+2. 生成结果上传到 Supabase Storage，并按需返回签名 URL
+3. 浏览器端对 URL、音频 Blob 和播放状态做多层缓存
+4. 页面在 `today`、`scene`、`chunks` 等入口按空闲时机做预热
+5. 用户真正点击播放时，再决定复用缓存、走网络还是退回浏览器 `speechSynthesis`
+
+这份文档的目标是让维护者能快速回答下面几个问题：
+
+- 某段音频到底是谁生成的
+- 为何同一段文本第二次播放几乎不走网络
+- 预热发生在什么时机，哪里会重复调度
+- 清缓存、重生成、弱网兜底分别在哪一层做
+
+## 2. 关键文件
+
+### 服务端生成与存储
+
+- `src/lib/shared/tts.ts`
+- `src/lib/server/tts/service.ts`
+- `src/lib/server/tts/storage.ts`
+- `src/lib/server/tts/repo.ts`
+- `src/app/api/tts/route.ts`
+- `src/app/api/tts/regenerate/route.ts`
+
+### 客户端缓存、预热与播放
+
+- `src/lib/utils/tts-api.ts`
+- `src/lib/utils/audio-warmup.ts`
+- `src/lib/utils/resource-actions.ts`
+- `src/hooks/use-tts-playback-state.ts`
+
+### 页面触发入口
+
+- `src/app/(app)/scene/[slug]/scene-detail-load-orchestrator.ts`
+- `src/app/(app)/scene/[slug]/use-scene-detail-playback.ts`
+- `src/lib/cache/scene-prefetch.ts`
+- `src/lib/utils/scene-resource-actions.ts`
+- `src/features/today/components/today-page-client.tsx`
+- `src/app/(app)/chunks/page.tsx`
+- `src/components/admin/tts-browser-cache-panel.tsx`
+
+## 3. 音频 key 与资源组织
+
+统一 key 逻辑在 `src/lib/shared/tts.ts`：
+
+- chunk 音频：`buildChunkAudioKey(chunkText)`
+  - 以清洗后的文本为主，兜底是 hash
+  - 存储路径形如 `chunks/<chunkKey>.mp3`
+- sentence 音频：`buildSentenceAudioKey({ sentenceId, text, speaker, mode })`
+  - 会把 `sentenceId`、speaker、快慢速和文本一起算进指纹
+  - 存储路径形如 `scenes/<slug>/sentences/<sentenceAudioKey>.mp3`
+- scene full 音频：`buildSceneFullAudioKey(segments, sceneType)`
+  - 先做 speaker 合并，再对整段内容算 hash
+  - 存储路径形如 `scenes/<slug>/<sceneFullKey>.mp3`
+
+这意味着：
+
+- chunk 音频天然跨页面复用，只要文本归一化后相同，就会共用一个 key
+- sentence 音频更稳定，避免同一句文本因为 speaker 或速度不同而混用
+- scene full 音频依赖整段内容与场景类型，任何句子或 speaker 变化都会换 key
+
+## 4. 服务端生成链路
+
+### 4.1 单次运行时生成
+
+用户端请求进入：
+
+- `POST /api/tts` -> `src/app/api/tts/route.ts`
+- 先 `requireCurrentProfile()`
+- 再把 payload 交给 `generateTtsAudio()`
+
+`generateTtsAudio()` 在 `src/lib/server/tts/service.ts` 中按下面顺序工作：
+
+1. 校验 `kind/mode/text/segments` 等输入
+2. 解析目标资源路径
+3. 先查服务端进程内签名 URL 缓存
+4. 再尝试用 `getTtsStorageSignedUrlIfExists()` 判断 Storage 中是否已有现成文件
+5. 若已有文件：直接返回签名 URL，`source = "storage-hit"`
+6. 若没有文件：
+   - 用 `msedge-tts` 合成 Buffer
+   - 尝试写一份到本地 `public/audio/...`
+   - 再上传到 Supabase Storage
+   - 上传成功：返回签名 URL，`source = "fresh-upload"`
+   - 上传失败：退回 `data:audio/mpeg;base64,...`，`source = "inline-fallback"`
+
+注意：
+
+- 运行时真正依赖的是 Supabase Storage，不是本地 `public/audio`
+- 本地文件写入更像兼容兜底或本地开发副产物
+- 服务端签名 URL 缓存是进程内 `Map`，TTL 约 59 分钟
+
+### 4.2 批量预热生成
+
+场景导入后或服务端主动预热走：
+
+- `warmLessonTtsAudio()` in `src/lib/server/tts/storage.ts`
+
+它会批量生成三类资源：
+
+- sentence 音频
+- chunk 音频
+- scene full 音频
+
+特点：
+
+- 先看 Storage 里是否已有文件，没有才生成
+- 默认并发数 `3`
+- 直接上传到 Storage，不走浏览器端缓存
+- 不负责页面播放，只负责“把文件提前备好”
+
+当前服务端主动触发点里，最关键的是导入场景后：
+
+- `src/lib/server/scene/service.ts`
+  - 导入成功后会调用 `warmLessonTtsAudio(lesson, { includeSceneFull: true, concurrency: 3 })`
+
+## 5. 客户端缓存链路
+
+客户端核心都在 `src/lib/utils/tts-api.ts`。
+
+### 5.1 当前实际有三层缓存
+
+#### 第一层：内存 URL 缓存
+
+- `ttsUrlCache: Map<string, { url, expiresAt }>`
+- TTL 45 分钟
+- 用来避免同页会话里重复请求 `/api/tts`
+- 默认上限：180 条，超限后按最旧条目优先裁剪
+
+#### 第二层：浏览器 Cache Storage
+
+- cache name: `tts-audio-v2`
+- 存的不是 JSON，而是音频 Blob
+- key 形式：
+  - `chunk:<chunkKey>`
+  - `sentence:<sceneSlug>:<sentenceAudioKey>`
+  - `scene:<sceneSlug>:<sceneFullKey>`
+- 默认上限：
+  - 最多 120 条
+  - 总大小最多 24 MB
+- 新条目写入后若超限，会按最旧缓存优先裁剪，但不会直接清空全部缓存
+
+命中后会把 Blob 变成 `blob:` URL，再塞回内存缓存。
+
+#### 第三层：预加载状态集合
+
+- `preloadedAudioUrls: Set<string>`
+- 作用是避免对同一个 URL 反复创建新的 `Audio().load()`
+- 默认上限：180 条
+
+#### 第四层：Blob URL 复用表
+
+- `persistentAudioObjectUrls: Map<cacheKey, blobUrl>`
+- 作用是复用 Cache Storage 命中后创建出的 `blob:` URL，避免同一个条目反复 `createObjectURL`
+- 默认上限：120 条，超限后会优先释放较旧的 object URL
+
+### 5.2 请求顺序
+
+`requestTtsUrl()` 的顺序是：
+
+1. 先读浏览器持久缓存 `readPersistentAudioUrl()`
+2. 再读内存 URL 缓存 `getCachedTtsUrl()`
+3. 再看是否已有同 key 的 in-flight 请求
+4. 最后才 `fetch("/api/tts")`
+
+首次从 `/api/tts` 拿到 URL 后，还会异步做两件事：
+
+- `preloadAudioUrl(url)` 预加载
+- `persistAudioToBrowserCache(cacheKey, data.url)` 把远端音频抓下来落到 Cache Storage
+
+所以一次成功播放后，后续通常会变成：
+
+- 先命中浏览器 Blob 缓存
+- 不再依赖短期签名 URL 是否过期
+
+### 5.3 缓存清理
+
+目前提供了显式清理能力：
+
+- 定向清理：`clearBrowserTtsCacheEntries(cacheKeys)`
+- 全量清理：`clearAllBrowserTtsCache()`
+- 管理界面：`src/components/admin/tts-browser-cache-panel.tsx`
+
+chunk 音频重生成前也会主动清：
+
+- `regenerateChunkAudioBatch()`
+  - 先 `stopTtsPlayback()`
+  - 清掉对应 chunk 的浏览器缓存
+  - 再调 `/api/tts/regenerate`
+  - 最后立即重新 `prefetchChunkAudio()`
+
+新增的自动治理规则：
+
+- 每次新音频成功持久化到浏览器 Cache Storage 后，都会检查条目数与总大小是否超限
+- 若超限，系统会按最旧条目优先裁剪
+- 裁剪失败只记日志，不阻塞当前音频请求、预取或播放
+
+## 6. 客户端播放链路
+
+### 6.1 播放状态
+
+全局播放状态也集中在 `tts-api.ts`：
+
+- `playbackState`
+- `subscribeTtsPlaybackState()`
+- `getTtsPlaybackState()`
+
+`useTtsPlaybackState()` 只是一个薄订阅 hook。
+
+状态字段能表达：
+
+- 当前在播 sentence / chunk / scene 哪一种
+- 是 `loading` 还是 `playing`
+- 当前文本、句子 ID、chunkKey、sceneSlug
+- 是否处于 loop 模式
+
+### 6.2 实际播放策略
+
+#### sentence / chunk
+
+- `playSentenceAudio()`
+- `playChunkAudio()`
+
+流程是：
+
+1. 先把状态置为 `loading`
+2. 走 `ensure*Audio()` 拿 URL
+3. URL 拿到后切成 `playing`
+4. 用单例 `playbackAudio` 播放
+5. 若音频失败，退回浏览器 `speechSynthesis`
+6. 若 `speechSynthesis` 也失败，则抛中文错误
+
+#### scene full loop
+
+- `playSceneLoopAudio()`
+
+流程类似，但有几个明显差异：
+
+- 强制 `isLooping = true`
+- 直接让 `HTMLAudioElement.loop = true`
+- 当前没有 `speechSynthesis` 兜底
+- 更依赖完整 scene full 音频成功生成
+
+### 6.3 停止播放
+
+- `stopTtsPlayback()`
+
+它会：
+
+- 终止当前 `Audio`
+- 清掉 `onended/onerror`
+- 取消 `speechSynthesis`
+- 重置全局播放状态
+
+这也是重生成和页面切换前常见的收口点。
+
+## 7. 预热与预加载触发点
+
+### 7.1 scene 详情页加载完成
+
+`src/app/(app)/scene/[slug]/scene-detail-load-orchestrator.ts`
+
+- 网络 lesson 回来后，调 `scheduleLessonAudioWarmup()`
+- 默认预热：
+  - 前 2 句 sentence
+  - 第一批 chunk
+  - `includeSceneFull: true`
+
+### 7.2 scene 详情页内部播放交互
+
+`src/app/(app)/scene/[slug]/use-scene-detail-playback.ts`
+
+- 页面挂载后 120ms，再调一次 `scheduleLessonAudioWarmup()`
+- 打开 variant chunk 详情时：
+  - 预热该句 sentence
+  - 预热当前 chunk
+
+### 7.3 scene 预取
+
+`src/lib/cache/scene-prefetch.ts`
+
+- 预取相关场景详情成功后，会顺手预热该场景的 1 句 sentence + 2 个 chunk
+- 不包含 scene full
+
+### 7.4 today 继续学习卡片
+
+`src/features/today/components/today-page-client.tsx`
+`src/lib/utils/scene-resource-actions.ts`
+
+- `warmupContinueLearningScene()` 会在 idle 时拉取 lesson
+- 然后调 `scheduleLessonAudioWarmup()`
+- 主要用于继续学习前的轻量热身
+
+### 7.5 chunks 页
+
+`src/app/(app)/chunks/page.tsx`
+
+- 列表加载后 120ms，对前 6 条表达做 chunk 预热
+- 每条最多预热：
+  - 表达文本本身
+  - 第一条例句或来源句
+
+此外，详情里点击“重新生成音频”会：
+
+- 收集当前表达详情可读文本
+- 调 `regenerateChunkAudioBatch()`
+- 清浏览器缓存并重新预取
+
+### 7.6 弱网控制
+
+`src/lib/utils/resource-actions.ts`
+
+- `scheduleLessonAudioWarmup()` 在 `includeSceneFull = true` 时，会先判断弱网
+- 如果 `navigator.connection.saveData = true` 或 `effectiveType` 是 `2g/slow-2g`
+- 就不会预热 scene full 音频
+
+这条规则目前只作用于“整段场景预热”，不会阻止 sentence/chunk 轻量预热。
+
+### 7.7 lesson / chunk 预热 key 统一规则
+
+`src/lib/utils/resource-actions.ts` 现在提供了共享 key builder：
+
+- `buildLessonAudioWarmupKey()`
+- `buildChunkAudioWarmupKey()`
+
+当前策略是：
+
+- lesson 级等价预热默认共用同一 key
+- 只有确实需要保留局部交互粒度时，才显式传自定义 key
+
+这意味着：
+
+- `scene detail` 首次进入
+- `scene detail playback` 的页面级预热
+- `scene prefetch`
+- `today continue learning`
+
+这些 lesson 级轻量预热现在会按统一 key 去重，不再因为入口不同就各自重复热一次。
+
+## 8. 当前链路的实际优点
+
+- 服务端和客户端都做了“先命中已有资源，再生成”的收口，不会每次都重新合成
+- chunk / sentence / scene full 三类 key 分层比较清晰，复用边界明确
+- 浏览器端把远端音频转存到 Cache Storage 后，能绕过签名 URL 时效问题
+- 现在浏览器端缓存已经有明确上限，不再只靠 admin 手动清理
+- 页面侧大多用 idle 调度做预热，避免主交互一上来就抢资源
+- sentence / chunk 播放失败时有 `speechSynthesis` 兜底，用户不至于完全没声音
+- 管理端已经具备浏览器 TTS 缓存查看与清理面板，排障成本可控
+
+## 9. 当前最值得关注的优化点
+
+下面这些是“建议优先级”，不是已经落地的改动。
+
+### 高优先级
+
+#### 1. scene full 播放缺少降级兜底
+
+现状：
+
+- sentence / chunk 可以回退到 `speechSynthesis`
+- `playSceneLoopAudio()` 没有同等级 fallback
+
+风险：
+
+- scene full 一旦远端失败，用户直接失去整段循环播放能力
+
+建议：
+
+- 至少在失败时给出更明确的 UI 提示
+- 若产品允许，可考虑退化为“逐句串播”而不是直接失败
+
+#### 2. `regenerateChunkTtsAudioBatch()` 现在是串行
+
+现状：
+
+- 管理端批量重生成上限已经限制为 12
+- 但服务端仍是一条一条顺序删、顺序生、顺序传
+
+风险：
+
+- 批量重生成会被单文件 RTT 线性拉长
+
+建议：
+
+- 用和 `warmLessonTtsAudio()` 类似的有界并发
+- 并发数控制在 2~4 即可，不需要太激进
+
+### 中优先级
+
+#### 3. 继续观察预热触发点是否还有非等价重复
+
+现状：
+
+- scene 详情加载后会热一次
+- scene 播放 hook 里又会热一次
+- scene prefetch、today continue、chunks 也会各自热
+
+目前 lesson 级等价预热已经统一 key，但仍可能存在“lesson 级预热”和“局部交互预热”叠加命中的情况。
+
+建议：
+
+- 统一 lesson 音频预热 key 的命名策略
+- 区分“页面首次进入预热”和“交互局部预热”
+
+#### 4. 服务端“本地 public 写盘”职责偏模糊
+
+现状：
+
+- 运行时生成时会尝试写 `public/audio/...`
+- 但真正长期复用的是 Storage 签名 URL
+- 服务端批量预热并不会同步写本地文件
+
+这说明本地写盘不是主缓存层，只是附带兼容。
+
+建议：
+
+- 明确它是开发兜底还是生产兼容
+- 如果线上已经完全依赖 Storage，可以考虑把这层职责缩小，减少维护心智负担
+
+### 低优先级
+
+#### 5. Storage “是否存在”判断仍依赖创建签名 URL
+
+现状：
+
+- `getTtsStorageSignedUrlIfExists()` 本质是尝试创建 signed URL，再根据报错判断是否存在
+
+建议：
+
+- 如果未来这条链路压力变大，可以评估改成更直接的对象元信息查询
+- 当前规模下先不一定需要动
+
+## 10. 维护建议
+
+以后只要动下面任何一类改动，建议同步回看这份文档：
+
+- 音频 key 规则变化
+- `/api/tts` 或 `/api/tts/regenerate` 的输入/权限变化
+- scene/chunks/today 的预热策略变化
+- 浏览器 Cache Storage 结构变化
+- 播放状态与 fallback 逻辑变化
+
+最低回归建议：
+
+- `node --import tsx --test "src/lib/utils/tts-api.test.ts" "src/lib/utils/audio-warmup.test.ts" "src/app/api/tts/regenerate/route.test.ts"`
+
+如果改到场景预取或 scene 详情加载，再加：
+
+- `node --import tsx --test "src/app/(app)/scene/[slug]/scene-detail-load-orchestrator.test.ts" "src/lib/cache/scene-prefetch.test.ts"`

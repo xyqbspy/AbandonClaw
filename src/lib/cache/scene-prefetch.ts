@@ -161,7 +161,6 @@ export async function prefetchSceneDetail(slug: string, options?: PrefetchOption
       scheduleLessonAudioWarmup(scene, {
         sentenceLimit: 1,
         chunkLimit: 2,
-        key: `scene-prefetch-audio:${normalized}`,
       });
       recentPrefetchedAt.set(normalized, Date.now());
       debugLog("prefetched", normalized);

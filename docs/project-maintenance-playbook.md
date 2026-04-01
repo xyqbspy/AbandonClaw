@@ -51,6 +51,7 @@
 - `src/lib/server/phrases`: 表达保存、补全、关系
 - `src/lib/server/review`: 复习数据与提交
 - `src/lib/server/expression-clusters`: 表达聚类与主表达组织
+- `src/lib/server/tts` + `src/lib/utils/tts-api`: 音频生成、缓存、预热与播放链路
 - `src/lib/cache`: 前端缓存、回填与预取
 - `supabase/sql`: 数据库演进脚本
 
@@ -100,6 +101,21 @@
 - 焦点详情与更多动作是否还能闭环
 - cluster 相关操作是否破坏详情态或缓存态
 - 手动录入、AI 补全、加入复习之间的链路是否断裂
+
+### 音频 / TTS
+
+音频不是单点能力，而是跨服务端生成、Storage、浏览器缓存、预热调度和页面播放的一整条链路。
+
+优先参考：
+
+- `docs/audio-tts-pipeline.md`
+
+维护时重点关注：
+
+- audio key 是否仍稳定，是否会误打破 chunk / sentence / scene full 复用
+- 预热触发点是否重复或过重
+- 缓存清理、重生成与播放 fallback 是否仍然闭环
+- 弱网下 scene full 预热是否仍然被正确抑制
 
 ### `review`
 

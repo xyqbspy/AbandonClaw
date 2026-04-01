@@ -3,6 +3,7 @@ import test, { afterEach, beforeEach } from "node:test";
 
 import {
   __resetTtsTestState,
+  __setTtsCacheLimitsForTests,
   clearBrowserTtsCacheEntries,
   ensureChunkAudio,
   ensureSentenceAudio,
@@ -118,6 +119,44 @@ test("ensureChunkAudio 命中前端内存缓存后不会重复请求", async () 
   assert.equal(firstUrl, "https://cdn.test/chunk-1.mp3");
   assert.equal(secondUrl, "https://cdn.test/chunk-1.mp3");
   assert.equal(requestCount, 1);
+});
+
+test("ensureChunkAudio 在内存 URL 缓存超限后会逐出较旧条目", async () => {
+  let requestCount = 0;
+
+  __setTtsCacheLimitsForTests({
+    urlEntries: 1,
+    preloadedUrls: 1,
+    persistentObjectUrls: 1,
+    browserEntries: 0,
+    browserBytes: 0,
+  });
+
+  globalThis.fetch = (async () => {
+    requestCount += 1;
+    return new Response(JSON.stringify({ url: `https://cdn.test/chunk-${requestCount}.mp3` }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }) as typeof fetch;
+
+  const firstUrl = await ensureChunkAudio({
+    chunkText: "hang in there",
+    chunkKey: "hang-in-there",
+  });
+  const secondUrl = await ensureChunkAudio({
+    chunkText: "call it a day",
+    chunkKey: "call-it-a-day",
+  });
+  const reloadedFirstUrl = await ensureChunkAudio({
+    chunkText: "hang in there",
+    chunkKey: "hang-in-there",
+  });
+
+  assert.equal(firstUrl, "https://cdn.test/chunk-1.mp3");
+  assert.equal(secondUrl, "https://cdn.test/chunk-2.mp3");
+  assert.equal(reloadedFirstUrl, "https://cdn.test/chunk-3.mp3");
+  assert.equal(requestCount, 3);
 });
 
 test("ensureChunkAudio 首次成功后会优先命中浏览器本地缓存", async () => {
@@ -268,6 +307,100 @@ test("浏览器 TTS 缓存 helper 可以列出大小并定向清理", async () =
   assert.equal(clearResult.removedCount, 1);
   assert.equal(clearResult.removedBytes, 4);
   assert.deepEqual(nextEntries.map((entry) => entry.cacheKey), ["sentence:scene-a:s-1"]);
+});
+
+test("浏览器 TTS 缓存在超限后会保留最新写入的音频", async () => {
+  let apiRequestCount = 0;
+  let sourceAudioFetchCount = 0;
+  let objectUrlCount = 0;
+  const cacheBuckets = new Map<string, Map<string, Response>>();
+  globalThis.window = globalThis as typeof globalThis & Window;
+
+  globalThis.Audio = class {
+    preload = "auto";
+    src = "";
+    load() {}
+  } as typeof Audio;
+
+  globalThis.caches = {
+    open: async (name: string) => {
+      let bucket = cacheBuckets.get(name);
+      if (!bucket) {
+        bucket = new Map<string, Response>();
+        cacheBuckets.set(name, bucket);
+      }
+      return {
+        match: async (request: RequestInfo | URL) => {
+          const key = getRequestUrl(request);
+          return bucket?.get(key)?.clone() ?? undefined;
+        },
+        put: async (request: RequestInfo | URL, response: Response) => {
+          const key = getRequestUrl(request);
+          bucket?.set(key, response.clone());
+        },
+        delete: async (request: RequestInfo | URL) => {
+          const key = getRequestUrl(request);
+          return bucket?.delete(key) ?? false;
+        },
+        keys: async () =>
+          Array.from(bucket?.keys() ?? []).map((key) => new Request(key)),
+      } as unknown as Cache;
+    },
+    delete: async (name: string) => cacheBuckets.delete(name),
+    has: async (name: string) => cacheBuckets.has(name),
+    keys: async () => Array.from(cacheBuckets.keys()),
+    match: async () => undefined,
+  } as CacheStorage;
+
+  globalThis.URL.createObjectURL = ((blob: Blob) => {
+    objectUrlCount += 1;
+    return `blob:tts-${objectUrlCount}-${blob.size}`;
+  }) as typeof URL.createObjectURL;
+  globalThis.URL.revokeObjectURL = (() => {}) as typeof URL.revokeObjectURL;
+
+  __setTtsCacheLimitsForTests({
+    browserEntries: 1,
+    browserBytes: 1024 * 1024,
+  });
+
+  globalThis.fetch = (async (input: RequestInfo | URL) => {
+    if (typeof input === "string" && input === "/api/tts") {
+      apiRequestCount += 1;
+      return new Response(
+        JSON.stringify({ url: `https://cdn.test/audio-${apiRequestCount}.mp3` }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    }
+    sourceAudioFetchCount += 1;
+    return new Response(new Blob([`audio-data-${sourceAudioFetchCount}`], { type: "audio/mpeg" }), {
+      status: 200,
+      headers: { "Content-Type": "audio/mpeg" },
+    });
+  }) as typeof fetch;
+
+  await ensureChunkAudio({
+    chunkText: "hang in there",
+    chunkKey: "hang-in-there",
+  });
+  await ensureChunkAudio({
+    chunkText: "call it a day",
+    chunkKey: "call-it-a-day",
+  });
+
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const bucketSize = cacheBuckets.get("tts-audio-v2")?.size ?? 0;
+    if (bucketSize === 1) break;
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+
+  const entries = await listBrowserTtsCacheEntries();
+
+  assert.equal(apiRequestCount, 2);
+  assert.equal(sourceAudioFetchCount, 2);
+  assert.deepEqual(entries.map((entry) => entry.cacheKey), ["chunk:call-it-a-day"]);
 });
 
 test("playChunkAudio 会复用同一个播放音频实例", async () => {

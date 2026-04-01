@@ -1,6 +1,36 @@
 # Changelog
 
 ## 2026-04-01
+### 音频链路维护文档补充
+- 新增 `docs/audio-tts-pipeline.md`，整理当前 TTS 生成、Storage 复用、浏览器缓存、预热调度、播放 fallback 和重生成链路。
+- 在 `docs/project-maintenance-playbook.md` 中补挂音频 / TTS 维护入口，后续维护者可以直接定位这套链路的关键文件与回归点。
+
+影响范围：
+- 音频生成、缓存、预热与播放维护文档
+
+验证情况：
+- 已人工对照 `src/lib/server/tts/*`、`src/lib/utils/tts-api.ts`、`src/lib/utils/audio-warmup.ts` 与 scene/chunks/today 调用入口整理文档
+
+### TTS 浏览器缓存治理与预热去重收口
+- 为 `tts-api.ts` 增加浏览器端 TTS 缓存治理：内存 URL 缓存、预加载 URL 集合、Blob URL 复用表和 Cache Storage 现在都有明确上限，并在超限后按最旧条目优先裁剪。
+- lesson 级音频预热 key 收口到共享 builder，`scene detail`、`scene prefetch`、`today continue learning` 等等价入口不再因为各自拼 key 而重复调度。
+- 补充 `resource-actions.test.ts` 以及 `tts-api.test.ts` 的缓存逐出回归，锁住“超限后保留最新写入”和“同 key 预热去重”两类行为。
+- 更新 `docs/audio-tts-pipeline.md`，同步新的缓存上限、自动裁剪和预热 key 规则。
+
+影响范围：
+- `src/lib/utils/tts-api.ts`
+- `src/lib/utils/resource-actions.ts`
+- `src/lib/utils/scene-resource-actions.ts`
+- `src/lib/cache/scene-prefetch.ts`
+- `src/app/(app)/scene/[slug]/scene-detail-load-orchestrator.ts`
+- `src/app/(app)/scene/[slug]/use-scene-detail-playback.ts`
+- `docs/audio-tts-pipeline.md`
+
+验证情况：
+- `node --import tsx --test "src/lib/utils/tts-api.test.ts" "src/lib/utils/audio-warmup.test.ts" "src/lib/utils/resource-actions.test.ts"`
+- `node --import tsx --test "src/lib/cache/scene-prefetch.test.ts" "src/lib/utils/scene-resource-actions.test.ts"`
+- `node --import tsx --test "src/app/(app)/scene/[[]slug[]]/scene-detail-load-orchestrator.test.ts"`
+
 ### 提交信息规范补充
 - 在仓库规则中新增 Git 提交信息约束：提交前缀继续沿用 `feat:`、`fix:`、`test:` 等 Conventional Commits 形式，但冒号后的摘要必须使用中文，不再接受英文摘要提交。
 

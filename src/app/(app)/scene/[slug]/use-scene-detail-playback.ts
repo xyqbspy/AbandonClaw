@@ -64,7 +64,6 @@ export function useSceneDetailPlayback({
       scheduleLessonAudioWarmup(warmupLesson, {
         sentenceLimit: 2,
         chunkLimit: 2,
-        key: `scene-playback:${warmupLesson.id}:${viewMode}`,
         includeSceneFull: true,
       });
     }, 120);

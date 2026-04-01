@@ -51,6 +51,14 @@ type TtsUrlCacheEntry = {
   expiresAt: number;
 };
 
+type TtsCacheLimits = {
+  urlEntries: number;
+  preloadedUrls: number;
+  persistentObjectUrls: number;
+  browserEntries: number;
+  browserBytes: number;
+};
+
 export type TtsPlaybackState = {
   kind: "sentence" | "chunk" | "scene" | null;
   status?: "idle" | "loading" | "playing";
@@ -68,6 +76,7 @@ export type BrowserTtsCacheEntry = {
   kind: "sentence" | "chunk" | "scene" | "unknown";
   size: number;
   contentType: string | null;
+  cachedAt: number | null;
 };
 
 let currentAudio: HTMLAudioElement | null = null;
@@ -86,6 +95,14 @@ const preloadedAudioUrls = new Set<string>();
 const persistentAudioObjectUrls = new Map<string, string>();
 const ttsUrlCacheTtlMs = 45 * 60 * 1000;
 const browserTtsCacheName = "tts-audio-v2";
+const defaultTtsCacheLimits: TtsCacheLimits = {
+  urlEntries: 180,
+  preloadedUrls: 180,
+  persistentObjectUrls: 120,
+  browserEntries: 120,
+  browserBytes: 24 * 1024 * 1024,
+};
+let ttsCacheLimits: TtsCacheLimits = { ...defaultTtsCacheLimits };
 
 const emitPlaybackState = () => {
   for (const listener of playbackListeners) {
@@ -142,6 +159,58 @@ const extractError = async (response: Response, fallback: string) => {
   return fallback;
 };
 
+const touchMapEntry = <K, V>(map: Map<K, V>, key: K, value: V) => {
+  if (map.has(key)) {
+    map.delete(key);
+  }
+  map.set(key, value);
+};
+
+const touchSetEntry = <T>(set: Set<T>, value: T) => {
+  if (set.has(value)) {
+    set.delete(value);
+  }
+  set.add(value);
+};
+
+const pruneOldestMapEntries = <K, V>(
+  map: Map<K, V>,
+  maxEntries: number,
+  options?: {
+    protectedKeys?: K[];
+    onDelete?: (key: K, value: V) => void;
+  },
+) => {
+  if (maxEntries < 1) return;
+  const protectedKeys = new Set(options?.protectedKeys ?? []);
+  for (const [key, value] of map) {
+    if (map.size <= maxEntries) break;
+    if (protectedKeys.has(key)) continue;
+    map.delete(key);
+    options?.onDelete?.(key, value);
+  }
+};
+
+const pruneOldestSetEntries = <T>(
+  set: Set<T>,
+  maxEntries: number,
+  options?: { protectedValues?: T[] },
+) => {
+  if (maxEntries < 1) return;
+  const protectedValues = new Set(options?.protectedValues ?? []);
+  for (const value of set) {
+    if (set.size <= maxEntries) break;
+    if (protectedValues.has(value)) continue;
+    set.delete(value);
+  }
+};
+
+const revokeAudioObjectUrl = (objectUrl: string) => {
+  if (typeof URL !== "undefined" && typeof URL.revokeObjectURL === "function") {
+    URL.revokeObjectURL(objectUrl);
+  }
+};
+
 const getCachedTtsUrl = (cacheKey: string) => {
   const entry = ttsUrlCache.get(cacheKey);
   if (!entry) return null;
@@ -149,13 +218,18 @@ const getCachedTtsUrl = (cacheKey: string) => {
     ttsUrlCache.delete(cacheKey);
     return null;
   }
+  touchMapEntry(ttsUrlCache, cacheKey, entry);
   return entry.url;
 };
 
 const cacheTtsUrl = (cacheKey: string, url: string) => {
-  ttsUrlCache.set(cacheKey, {
+  const entry = {
     url,
     expiresAt: Date.now() + ttsUrlCacheTtlMs,
+  };
+  touchMapEntry(ttsUrlCache, cacheKey, entry);
+  pruneOldestMapEntries(ttsUrlCache, ttsCacheLimits.urlEntries, {
+    protectedKeys: [cacheKey],
   });
   return url;
 };
@@ -178,12 +252,24 @@ const resolveBrowserTtsCacheKind = (cacheKey: string): BrowserTtsCacheEntry["kin
   return "unknown";
 };
 
+const rememberPersistentAudioObjectUrl = (cacheKey: string, objectUrl: string) => {
+  const existingObjectUrl = persistentAudioObjectUrls.get(cacheKey);
+  if (existingObjectUrl && existingObjectUrl !== objectUrl) {
+    revokeAudioObjectUrl(existingObjectUrl);
+  }
+  touchMapEntry(persistentAudioObjectUrls, cacheKey, objectUrl);
+  pruneOldestMapEntries(persistentAudioObjectUrls, ttsCacheLimits.persistentObjectUrls, {
+    protectedKeys: [cacheKey],
+    onDelete: (_evictedCacheKey, evictedObjectUrl) => {
+      revokeAudioObjectUrl(evictedObjectUrl);
+    },
+  });
+};
+
 const revokePersistentAudioObjectUrl = (cacheKey: string) => {
   const objectUrl = persistentAudioObjectUrls.get(cacheKey);
   if (!objectUrl) return;
-  if (typeof URL !== "undefined" && typeof URL.revokeObjectURL === "function") {
-    URL.revokeObjectURL(objectUrl);
-  }
+  revokeAudioObjectUrl(objectUrl);
   persistentAudioObjectUrls.delete(cacheKey);
 };
 
@@ -198,6 +284,7 @@ const clearTtsCachesByKeys = (cacheKeys: string[]) => {
 const readPersistentAudioUrl = async (cacheKey: string) => {
   const inMemoryUrl = persistentAudioObjectUrls.get(cacheKey);
   if (inMemoryUrl) {
+    rememberPersistentAudioObjectUrl(cacheKey, inMemoryUrl);
     return inMemoryUrl;
   }
   if (!canUseBrowserAudioCache()) return null;
@@ -209,7 +296,7 @@ const readPersistentAudioUrl = async (cacheKey: string) => {
 
   const blob = await response.blob();
   const objectUrl = URL.createObjectURL(blob);
-  persistentAudioObjectUrls.set(cacheKey, objectUrl);
+  rememberPersistentAudioObjectUrl(cacheKey, objectUrl);
   return objectUrl;
 };
 
@@ -225,7 +312,7 @@ const persistAudioToBrowserCache = async (cacheKey: string, sourceUrl: string) =
     if (existingUrl) return existingUrl;
     const blob = await existing.blob();
     const objectUrl = URL.createObjectURL(blob);
-    persistentAudioObjectUrls.set(cacheKey, objectUrl);
+    rememberPersistentAudioObjectUrl(cacheKey, objectUrl);
     return objectUrl;
   }
 
@@ -239,11 +326,12 @@ const persistAudioToBrowserCache = async (cacheKey: string, sourceUrl: string) =
     new Response(blob, {
       headers: {
         "Content-Type": blob.type || "audio/mpeg",
+        "X-TTS-Cached-At": String(Date.now()),
       },
     }),
   );
   const objectUrl = URL.createObjectURL(blob);
-  persistentAudioObjectUrls.set(cacheKey, objectUrl);
+  rememberPersistentAudioObjectUrl(cacheKey, objectUrl);
   return objectUrl;
 };
 
@@ -266,6 +354,7 @@ export const listBrowserTtsCacheEntries = async (): Promise<BrowserTtsCacheEntry
         kind: resolveBrowserTtsCacheKind(cacheKey),
         size: blob.size,
         contentType: response.headers.get("Content-Type"),
+        cachedAt: Number(response.headers.get("X-TTS-Cached-At") || "") || null,
       } satisfies BrowserTtsCacheEntry;
     }),
   );
@@ -273,6 +362,44 @@ export const listBrowserTtsCacheEntries = async (): Promise<BrowserTtsCacheEntry
   return entries
     .filter((entry): entry is BrowserTtsCacheEntry => Boolean(entry))
     .sort((a, b) => b.size - a.size || a.cacheKey.localeCompare(b.cacheKey));
+};
+
+const pruneBrowserTtsCacheIfNeeded = async (protectedCacheKeys: string[]) => {
+  const cache = await getBrowserAudioCache();
+  if (!cache) return;
+
+  const entries = await listBrowserTtsCacheEntries();
+  let entryCount = entries.length;
+  let totalBytes = entries.reduce((sum, entry) => sum + entry.size, 0);
+  if (
+    entryCount <= ttsCacheLimits.browserEntries &&
+    totalBytes <= ttsCacheLimits.browserBytes
+  ) {
+    return;
+  }
+
+  const protectedKeys = new Set(protectedCacheKeys);
+  const toDelete: string[] = [];
+  const oldestFirst = [...entries].sort(
+    (a, b) => (a.cachedAt ?? 0) - (b.cachedAt ?? 0) || a.cacheKey.localeCompare(b.cacheKey),
+  );
+
+  for (const entry of oldestFirst) {
+    if (
+      entryCount <= ttsCacheLimits.browserEntries &&
+      totalBytes <= ttsCacheLimits.browserBytes
+    ) {
+      break;
+    }
+    if (protectedKeys.has(entry.cacheKey)) continue;
+    toDelete.push(entry.cacheKey);
+    entryCount -= 1;
+    totalBytes -= entry.size;
+  }
+
+  if (toDelete.length > 0) {
+    await clearBrowserTtsCacheEntries(toDelete);
+  }
 };
 
 export const getBrowserTtsCacheSummary = async () => {
@@ -374,8 +501,14 @@ export const clearAllBrowserTtsCache = async () => {
 
 const preloadAudioUrl = (url: string) => {
   if (typeof window === "undefined" || typeof Audio === "undefined") return;
-  if (preloadedAudioUrls.has(url)) return;
-  preloadedAudioUrls.add(url);
+  if (preloadedAudioUrls.has(url)) {
+    touchSetEntry(preloadedAudioUrls, url);
+    return;
+  }
+  touchSetEntry(preloadedAudioUrls, url);
+  pruneOldestSetEntries(preloadedAudioUrls, ttsCacheLimits.preloadedUrls, {
+    protectedValues: [url],
+  });
   const audio = new Audio();
   audio.preload = "auto";
   audio.src = url;
@@ -434,12 +567,17 @@ const requestTtsUrl = async (
     const url = cacheTtsUrl(cacheKey, data.url);
     preloadAudioUrl(url);
     void persistAudioToBrowserCache(cacheKey, data.url)
-      .then((persistentUrl) => {
+      .then(async (persistentUrl) => {
         if (!persistentUrl) return;
         cacheTtsUrl(cacheKey, persistentUrl);
         preloadAudioUrl(persistentUrl);
+        await pruneBrowserTtsCacheIfNeeded([cacheKey]);
       })
-      .catch(() => {
+      .catch((error) => {
+        console.warn("[tts-cache] browser cache persistence/prune skipped", {
+          cacheKey,
+          error: error instanceof Error ? error.message : String(error),
+        });
         // Non-blocking persistence.
       });
     return url;
@@ -815,6 +953,7 @@ export const ensureChunkTtsFromApi = ensureChunkAudio;
 
 export const __resetTtsTestState = async (options?: { preservePersistentCache?: boolean }) => {
   stopTtsPlayback();
+  ttsCacheLimits = { ...defaultTtsCacheLimits };
   ttsUrlCache.clear();
   pendingTtsUrlRequests.clear();
   preloadedAudioUrls.clear();
@@ -825,4 +964,11 @@ export const __resetTtsTestState = async (options?: { preservePersistentCache?: 
   if (!options?.preservePersistentCache && typeof caches !== "undefined") {
     await caches.delete(browserTtsCacheName);
   }
+};
+
+export const __setTtsCacheLimitsForTests = (overrides: Partial<TtsCacheLimits>) => {
+  ttsCacheLimits = {
+    ...ttsCacheLimits,
+    ...overrides,
+  };
 };
