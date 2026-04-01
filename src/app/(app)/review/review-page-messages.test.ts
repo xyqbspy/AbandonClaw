@@ -12,15 +12,15 @@ import {
 
 test("review page messages 会复用统一的题型与评估文案", () => {
   assert.deepEqual(reviewModeLabelMap, {
-    cloze: "填空练习",
-    guided_recall: "半句复现",
+    cloze: "填空复现",
+    guided_recall: "提示回忆",
     sentence_recall: "整句复现",
-    full_dictation: "默写全文",
+    full_dictation: "整段默写",
   });
   assert.deepEqual(assessmentLabelMap, {
     incorrect: "还不稳",
-    keyword: "关键词命中",
-    structure: "骨架已对上",
+    keyword: "抓到关键词",
+    structure: "骨架对上了",
   });
 });
 
@@ -56,5 +56,5 @@ test("review mode accent class 会按题型返回稳定样式", () => {
   assert.equal(getReviewModeAccentClassName("guided_recall"), "bg-sky-50 text-sky-700");
   assert.equal(getReviewModeAccentClassName("sentence_recall"), "bg-amber-50 text-amber-700");
   assert.equal(getReviewModeAccentClassName("full_dictation"), "bg-emerald-50 text-emerald-700");
-  assert.equal(getReviewModeAccentClassName("cloze"), "bg-muted text-muted-foreground");
+  assert.equal(getReviewModeAccentClassName("cloze"), "bg-slate-100 text-slate-700");
 });

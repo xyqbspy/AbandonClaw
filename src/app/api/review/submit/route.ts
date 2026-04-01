@@ -1,41 +1,5 @@
-import { NextResponse } from "next/server";
-import { requireCurrentProfile } from "@/lib/server/auth";
-import { toApiErrorResponse } from "@/lib/server/api-error";
-import { submitPhraseReview, getReviewSummary } from "@/lib/server/review/service";
-import {
-  parseJsonBody,
-  parseOptionalReviewFullOutputStatus,
-  parseOptionalReviewOutputConfidence,
-  parseOptionalReviewRecognitionState,
-  parseOptionalTrimmedString,
-  parseRequiredTrimmedString,
-  parseReviewResult,
-} from "@/lib/server/validation";
-
-interface SubmitReviewPayload extends Record<string, unknown> {
-  userPhraseId?: unknown;
-  reviewResult?: unknown;
-  source?: unknown;
-  recognitionState?: unknown;
-  outputConfidence?: unknown;
-  fullOutputStatus?: unknown;
-}
+import { handleReviewSubmitPost } from "../handlers";
 
 export async function POST(request: Request) {
-  try {
-    const { user } = await requireCurrentProfile();
-    const payload = await parseJsonBody<SubmitReviewPayload>(request);
-    const item = await submitPhraseReview(user.id, {
-      userPhraseId: parseRequiredTrimmedString(payload.userPhraseId, "userPhraseId", 64),
-      reviewResult: parseReviewResult(payload.reviewResult),
-      source: parseOptionalTrimmedString(payload.source, "source", 80),
-      recognitionState: parseOptionalReviewRecognitionState(payload.recognitionState),
-      outputConfidence: parseOptionalReviewOutputConfidence(payload.outputConfidence),
-      fullOutputStatus: parseOptionalReviewFullOutputStatus(payload.fullOutputStatus),
-    });
-    const summary = await getReviewSummary(user.id);
-    return NextResponse.json({ item, summary }, { status: 200 });
-  } catch (error) {
-    return toApiErrorResponse(error, "Failed to submit review.");
-  }
+  return handleReviewSubmitPost(request);
 }

@@ -27,11 +27,42 @@ const isProtectedApiPath = (pathname: string) =>
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
   );
 
-export async function middleware(request: NextRequest) {
+const resolveSafeRedirectTarget = (redirectTarget: string | null | undefined) => {
+  if (!redirectTarget) return "/scenes";
+  if (!redirectTarget.startsWith("/") || redirectTarget.startsWith("//")) {
+    return "/scenes";
+  }
+  return redirectTarget;
+};
+
+interface MiddlewareDependencies {
+  createServerClient: typeof createServerClient;
+  getSupabaseUrl: typeof getSupabaseUrl;
+  getSupabaseAnonKey: typeof getSupabaseAnonKey;
+  isAdminEmail: typeof isAdminEmail;
+  next: (request: NextRequest) => NextResponse;
+  redirect: (url: URL) => NextResponse;
+  json: (body: unknown, init: { status: number }) => NextResponse;
+}
+
+const defaultDependencies: MiddlewareDependencies = {
+  createServerClient,
+  getSupabaseUrl,
+  getSupabaseAnonKey,
+  isAdminEmail,
+  next: (request) => NextResponse.next({ request }),
+  redirect: (url) => NextResponse.redirect(url),
+  json: (body, init) => NextResponse.json(body, init),
+};
+
+export async function handleMiddleware(
+  request: NextRequest,
+  dependencies: MiddlewareDependencies = defaultDependencies,
+) {
   const { pathname, search } = request.nextUrl;
 
   if (pathname.startsWith("/api/") && !isProtectedApiPath(pathname)) {
-    return NextResponse.next({ request });
+    return dependencies.next(request);
   }
 
   if (
@@ -39,14 +70,15 @@ export async function middleware(request: NextRequest) {
     !AUTH_PAGE_PATHS.has(pathname) &&
     !isProtectedApiPath(pathname)
   ) {
-    return NextResponse.next({ request });
+    return dependencies.next(request);
   }
 
-  const response = NextResponse.next({
-    request,
-  });
+  const response = dependencies.next(request);
 
-  const supabase = createServerClient(getSupabaseUrl(), getSupabaseAnonKey(), {
+  const supabase = dependencies.createServerClient(
+    dependencies.getSupabaseUrl(),
+    dependencies.getSupabaseAnonKey(),
+    {
     cookies: {
       getAll() {
         return request.cookies.getAll();
@@ -58,7 +90,8 @@ export async function middleware(request: NextRequest) {
         });
       },
     },
-  });
+    },
+  );
 
   const {
     data: { user },
@@ -72,23 +105,27 @@ export async function middleware(request: NextRequest) {
 
   if (user && AUTH_PAGE_PATHS.has(pathname)) {
     const redirectTarget = request.nextUrl.searchParams.get("redirect");
-    const safeTarget = redirectTarget?.startsWith("/") ? redirectTarget : "/scenes";
-    return NextResponse.redirect(new URL(safeTarget, request.url));
+    const safeTarget = resolveSafeRedirectTarget(redirectTarget);
+    return dependencies.redirect(new URL(safeTarget, request.url));
   }
 
   if (
     user &&
     (pathname === "/admin" || pathname.startsWith("/admin/")) &&
-    !isAdminEmail(user.email)
+    !dependencies.isAdminEmail(user.email)
   ) {
-    return NextResponse.redirect(new URL("/", request.url));
+    return dependencies.redirect(new URL("/", request.url));
   }
 
   if (!user && isProtectedApiPath(pathname)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return dependencies.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   return response;
+}
+
+export async function middleware(request: NextRequest) {
+  return handleMiddleware(request);
 }
 
 export const config = {

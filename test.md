@@ -248,6 +248,24 @@ pnpm run test:all
 pnpm run build
 ```
 
+## 13. 关键入口测试基线
+
+涉及 `middleware`、`review`、`learning` 关键入口时，至少补齐下面这组最小回归：
+
+```bash
+node --import tsx --test middleware.test.ts
+node --import tsx --test src/app/api/review/handlers.test.ts
+node --import tsx --test src/app/api/learning/handlers.test.ts
+node --import tsx --test "src/app/(app)/review/review-page-messages.test.ts"
+pnpm run test:unit
+```
+
+说明：
+- `middleware.test.ts` 负责覆盖未登录访问、登录页 redirect 回跳、危险 redirect 拦截与 admin 访问限制。
+- `src/app/api/review/handlers.test.ts` 负责覆盖 `due / submit` 的参数校验、service 透传与错误响应。
+- `src/app/api/learning/handlers.test.ts` 负责覆盖 `continue / progress / start / pause` 的入口级行为。
+- 这批改动不涉及页面交互语义时，可以不额外跑 `test:interaction`，但要在变更记录里明确写出原因。
+
 如果只改了纯逻辑层，可以先跑定向文件：
 
 ```bash

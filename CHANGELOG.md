@@ -1,5 +1,26 @@
 # Changelog
 
+## 2026-04-01
+
+### 测试基线补强与关键入口回归补齐
+- 修复了 `review-page-messages` 单元测试的失效预期，恢复默认单元测试命令全绿。
+- 为 `middleware` 新增了认证、登录回跳、危险 redirect 拦截和 admin 访问限制测试，并收紧登录页 `redirect` 参数的安全校验，避免 `//host` 形式的协议相对跳转被当作站内地址放行。
+- 为 `review due / submit` 与 `learning continue / progress / scene start / pause` 新增入口级 handler 测试，覆盖参数校验、service 透传和错误响应。
+- 补充了 `test.md` 中针对关键入口测试的最小回归命令，方便后续维护直接复用。
+
+影响范围：
+- `middleware.ts` 认证与重定向规则
+- `review` 与 `learning` 高优 API handler 的自动化测试基线
+- 单元测试默认回归链路与测试维护说明
+
+验证情况：
+- `node --import tsx --test "src/app/(app)/review/review-page-messages.test.ts"`
+- `node --import tsx --test middleware.test.ts`
+- `node --import tsx --test src/app/api/review/handlers.test.ts`
+- `node --import tsx --test src/app/api/learning/handlers.test.ts`
+- `pnpm run test:unit`
+- 本次未执行 `test:interaction`，因为没有改动页面交互组件或 DOM 行为。
+
 ## 2026-03-31
 
 ### Review 递进式练习接入第一版正式后端信号
