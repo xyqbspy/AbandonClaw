@@ -10,6 +10,12 @@ Keep APIs small, behavior explicit, and naming clear. Avoid cleverness unless it
 
 Use UTF-8 for reading and writing consistently (especially in PowerShell's `Set-Content -Encoding UTF8`).
 
+### Git 提交信息规则
+
+- 提交信息必须使用中文摘要，不要写英文 `feat: xxx`、`fix: xxx`、`test: xxx`。
+- 提交前缀仍使用 Conventional Commits 风格，但摘要内容必须为中文，例如：`feat: 补齐表达删除回退逻辑`、`fix: 修正详情弹框关闭条件`、`test: 补充接口越权分支测试`。
+- 若一次提交同时包含多类改动，优先按主要目的选择前缀；不要为了凑规则拆出低价值提交。
+
 ### 编码与乱码处理硬规则
 
 - 不要用裸 `Get-Content` 的终端显示结果来判断中文文件是否乱码；PowerShell 控制台输出可能乱码，但文件本身仍是正常 UTF-8。
