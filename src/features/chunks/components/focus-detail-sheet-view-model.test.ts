@@ -1,4 +1,4 @@
-import assert from "node:assert/strict";
+﻿import assert from "node:assert/strict";
 import test from "node:test";
 import {
   buildFocusDetailConfirmState,
@@ -12,6 +12,7 @@ const labels = {
   prev: "prev",
   next: "next",
   detailMoreActions: "more",
+  detailDeleteExpression: "delete",
   detailOpenAsMain: "set main",
   moveIntoCluster: "move",
   detachClusterMember: "detach",
@@ -24,6 +25,8 @@ const labels = {
   detailOpenAsMainConfirmDesc: "set main desc",
   detachClusterMemberConfirmTitle: "detach title",
   detachClusterMemberConfirmDesc: "detach desc",
+  detailDeleteExpressionConfirmTitle: "delete title",
+  detailDeleteExpressionConfirmDesc: "delete desc",
   detailCandidateBadge: "candidate",
   noTranslation: "no translation",
   detailLoading: "loading",
@@ -101,13 +104,21 @@ test("buildFocusDetailConfirmState 会根据 action 切换确认弹层文案", (
     text: "burn yourself out",
     translation: "透支自己",
   });
+
+  assert.deepEqual(buildFocusDetailConfirmState(labels, "delete-expression", detail), {
+    open: true,
+    title: "delete title",
+    description: "delete desc",
+    text: "burn yourself out",
+    translation: "透支自己",
+  });
 });
 
 test("buildFocusDetailConfirmState 在缺少 saved item 时会关闭确认弹层", () => {
   assert.deepEqual(buildFocusDetailConfirmState(labels, null, null), {
     open: false,
-    title: "detach title",
-    description: "detach desc",
+    title: "delete title",
+    description: "delete desc",
     text: "",
     translation: null,
   });

@@ -8,6 +8,7 @@ export type FocusDetailSheetLabels = {
   detailManualAddRelated?: string;
   detailRegenerateAudio?: string;
   detailRetryEnrichment?: string;
+  detailDeleteExpression?: string;
   detailOpenAsMain: string;
   moveIntoCluster: string;
   detachClusterMember: string;
@@ -21,6 +22,8 @@ export type FocusDetailSheetLabels = {
   detailOpenAsMainConfirmDesc: string;
   detachClusterMemberConfirmTitle: string;
   detachClusterMemberConfirmDesc: string;
+  detailDeleteExpressionConfirmTitle?: string;
+  detailDeleteExpressionConfirmDesc?: string;
   detailCandidateBadge: string;
   noTranslation: string;
   detailLoading: string;
@@ -53,6 +56,7 @@ type FocusDetailLabelSource = {
   detailManualAddRelated?: string;
   detailRegenerateAudio?: string;
   detailRetryEnrichment?: string;
+  detailDeleteExpression?: string;
   detailOpenAsMain: string;
   moveIntoCluster: string;
   detachClusterMember: string;
@@ -66,6 +70,8 @@ type FocusDetailLabelSource = {
   detailOpenAsMainConfirmDesc: string;
   detachClusterMemberConfirmTitle: string;
   detachClusterMemberConfirmDesc: string;
+  detailDeleteExpressionConfirmTitle?: string;
+  detailDeleteExpressionConfirmDesc?: string;
   detailCandidateBadge: string;
   noTranslation: string;
   detailLoading: string;
@@ -100,6 +106,7 @@ export const buildFocusDetailLabels = (
   detailManualAddRelated: source.detailManualAddRelated,
   detailRegenerateAudio: source.detailRegenerateAudio,
   detailRetryEnrichment: source.detailRetryEnrichment,
+  detailDeleteExpression: source.detailDeleteExpression,
   detailOpenAsMain: source.detailOpenAsMain,
   moveIntoCluster: source.moveIntoCluster,
   detachClusterMember: source.detachClusterMember,
@@ -113,6 +120,8 @@ export const buildFocusDetailLabels = (
   detailOpenAsMainConfirmDesc: source.detailOpenAsMainConfirmDesc,
   detachClusterMemberConfirmTitle: source.detachClusterMemberConfirmTitle,
   detachClusterMemberConfirmDesc: source.detachClusterMemberConfirmDesc,
+  detailDeleteExpressionConfirmTitle: source.detailDeleteExpressionConfirmTitle,
+  detailDeleteExpressionConfirmDesc: source.detailDeleteExpressionConfirmDesc,
   detailCandidateBadge: source.detailCandidateBadge,
   noTranslation: source.noTranslation,
   detailLoading: source.detailLoading,

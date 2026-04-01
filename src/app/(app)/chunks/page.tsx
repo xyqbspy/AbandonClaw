@@ -80,6 +80,7 @@ import {
   buildMoveIntoClusterSheetState,
   buildClusterFilterChange,
   buildChunksSummary,
+  resolveDeleteFocusDetailSuccessState,
   resolveClusterFilterExpressionLabel,
   resolveFocusExpressionId,
 } from "./chunks-page-logic";
@@ -336,7 +337,10 @@ type FocusDetailState = {
   assistItem: ManualExpressionAssistResponse["inputItem"] | null;
 };
 
-type FocusDetailConfirmAction = "set-cluster-main" | "set-standalone-main";
+type FocusDetailConfirmAction =
+  | "set-cluster-main"
+  | "set-standalone-main"
+  | "delete-expression";
 
 const extractExpressionsFromSentenceItem = (item: UserPhraseItemResponse) => {
   const raw = (item.sourceChunkText ?? "").trim();
@@ -969,13 +973,54 @@ export default function ChunksPage() {
   const canSetStandaloneMain = Boolean(
     focusDetail?.savedItem?.expressionClusterId && focusDetailClusterMemberCount > 1,
   );
+  const canDeleteCurrentExpression = Boolean(focusDetail?.savedItem);
+  const handleDeleteFocusDetailSuccess = useCallback((result: {
+    deletedUserPhraseId: string;
+    deletedClusterId: string | null;
+    clusterDeleted: boolean;
+    nextMainUserPhraseId: string | null;
+    nextFocusUserPhraseId: string | null;
+  }, refreshedRows: UserPhraseItemResponse[]) => {
+    stopTtsPlayback();
+    setPlayingText(null);
+
+    const nextState = resolveDeleteFocusDetailSuccessState({
+      result,
+      refreshedRows,
+      focusExpression,
+    });
+
+    if (nextState.action === "open" && nextState.nextExpression) {
+      setFocusRelationTab("similar");
+      void openFocusDetail({
+        text: nextState.nextExpression.text,
+        kind: "current",
+        chainMode: "reset",
+      });
+      return;
+    }
+
+    setFocusDetailOpen(false);
+    const closeState = buildFocusDetailClosePayload();
+    setFocusDetailActionsOpen(closeState.actionsOpen);
+    setFocusDetailTrail(closeState.trail);
+    setFocusDetailTab(closeState.tab);
+  }, [
+    focusExpression,
+    openFocusDetail,
+    setFocusDetailOpen,
+    setFocusDetailTab,
+    setFocusDetailTrail,
+  ]);
   const {
     detachingClusterMember,
     moveIntoClusterOpen,
     setMoveIntoClusterOpen,
     movingIntoCluster,
     ensuringMoveTargetCluster,
+    deletingCurrentExpression,
     detachFocusDetailFromCluster,
+    deleteFocusDetailExpression,
     setFocusDetailAsClusterMain,
     handleMoveSelectedIntoCurrentCluster,
     openMoveIntoCurrentCluster,
@@ -1003,6 +1048,9 @@ export default function ChunksPage() {
     onClearDetailConfirm: () => {
       setDetailConfirmAction(null);
     },
+    onDeleteFocusDetailSuccess: (result, refreshedRows) => {
+      handleDeleteFocusDetailSuccess(result, refreshedRows);
+    },
     onSuccess: (message) => {
       notifyChunksActionSucceeded(message);
     },
@@ -1015,6 +1063,7 @@ export default function ChunksPage() {
       moveIntoClusterSelectOne: zh.moveIntoClusterSelectOne,
       moveIntoClusterSuccess: zh.moveIntoClusterSuccess,
       moveIntoClusterPartialFailed: zh.moveIntoClusterPartialFailed,
+      deleteExpressionSuccess: "已删除当前表达",
     },
   });
   // Focus 详情打开与链路切换
@@ -1684,6 +1733,8 @@ export default function ChunksPage() {
     detailActionsOpen: focusDetailActionsOpen,
     detailConfirmAction,
     ...focusDetailSheetPresentation,
+    canDeleteCurrentExpression,
+    deletingCurrentExpression,
     savingFocusCandidateKeys,
     completedFocusCandidateKeys,
     exampleCards: focusDetail
@@ -1749,6 +1800,11 @@ export default function ChunksPage() {
       setFocusDetailActionsOpen(false);
       setDetailConfirmAction("set-standalone-main");
     },
+    onRequestDeleteCurrentExpression: () => {
+      if (!focusDetail?.savedItem) return;
+      setFocusDetailActionsOpen(false);
+      setDetailConfirmAction("delete-expression");
+    },
     onPrimaryAction: () => {
       if (!focusDetail?.savedItem) return;
       startReviewFromCard(focusDetail.savedItem as UserPhraseItemResponse);
@@ -1797,6 +1853,10 @@ export default function ChunksPage() {
     onConfirm: () => {
       if (detailConfirmAction === "set-cluster-main") {
         void setFocusDetailAsClusterMain();
+        return;
+      }
+      if (detailConfirmAction === "delete-expression") {
+        void deleteFocusDetailExpression();
         return;
       }
       void detachFocusDetailFromCluster();

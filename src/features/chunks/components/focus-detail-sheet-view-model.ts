@@ -1,6 +1,9 @@
-import { FocusDetailSheetLabels } from "./focus-detail-labels";
+﻿import { FocusDetailSheetLabels } from "./focus-detail-labels";
 
-type FocusDetailConfirmAction = "set-cluster-main" | "set-standalone-main";
+type FocusDetailConfirmAction =
+  | "set-cluster-main"
+  | "set-standalone-main"
+  | "delete-expression";
 
 type FocusDetailState = {
   savedItem: {
@@ -49,11 +52,16 @@ export function buildFocusDetailConfirmState(
     title:
       detailConfirmAction === "set-cluster-main"
         ? labels.detailOpenAsMainConfirmTitle
-        : labels.detachClusterMemberConfirmTitle,
+        : detailConfirmAction === "set-standalone-main"
+          ? labels.detachClusterMemberConfirmTitle
+          : labels.detailDeleteExpressionConfirmTitle ?? "删除当前表达？",
     description:
       detailConfirmAction === "set-cluster-main"
         ? labels.detailOpenAsMainConfirmDesc
-        : labels.detachClusterMemberConfirmDesc,
+        : detailConfirmAction === "set-standalone-main"
+          ? labels.detachClusterMemberConfirmDesc
+          : labels.detailDeleteExpressionConfirmDesc ??
+            "这会从你的表达库中移除当前表达，删除后无法恢复。",
     text: detail?.savedItem?.text ?? "",
     translation: detail?.savedItem?.translation ?? null,
   };

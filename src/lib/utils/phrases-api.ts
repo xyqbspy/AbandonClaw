@@ -70,6 +70,14 @@ export interface UserPhraseRelationItemResponse {
   item: UserPhraseItemResponse;
 }
 
+export interface DeleteUserPhraseResponse {
+  deletedUserPhraseId: string;
+  deletedClusterId: string | null;
+  clusterDeleted: boolean;
+  nextMainUserPhraseId: string | null;
+  nextFocusUserPhraseId: string | null;
+}
+
 export async function savePhraseFromApi(payload: {
   text?: string;
   learningItemType?: "expression" | "sentence";
@@ -343,6 +351,17 @@ export async function getPhraseSummaryFromApi() {
     throw await toApiError(response, "\u52a0\u8f7d\u77ed\u8bed\u7edf\u8ba1\u5931\u8d25\u3002");
   }
   return (await response.json()) as PhraseSummaryResponse;
+}
+
+export async function deleteUserPhraseFromApi(userPhraseId: string) {
+  const response = await fetch(`/api/phrases/${encodeURIComponent(userPhraseId)}`, {
+    method: "DELETE",
+  });
+  if (!response.ok) {
+    throw await toApiError(response, "删除表达失败。");
+  }
+  invalidateAfterPhraseMutation();
+  return (await response.json()) as DeleteUserPhraseResponse;
 }
 
 export async function getSavedNormalizedPhraseTextsFromApi(texts: string[]) {

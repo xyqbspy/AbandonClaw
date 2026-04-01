@@ -1,6 +1,21 @@
 # Changelog
 
 ## 2026-04-01
+### 接口边界与高成本请求收口
+- `/api/tts/regenerate` 现在只允许管理员触发，并会拒绝空批量或超出上限的重生成请求，避免普通用户滥用高成本音频重建能力。
+- `explain-selection` 与 `practice/generate` 现在会在入口提前拒绝超长文本和超大场景载荷，减少异常请求直接放大成模型成本和长耗时。
+- `/api/me` 读取当前用户资料时改为复用单次身份识别结果，减少同一请求内可避免的重复认证查询。
+- 未知服务端错误现在会统一收敛为通用失败响应，不再把内部错误文本直接暴露给客户端。
+影响范围：
+- `/api/tts/regenerate`
+- `/api/explain-selection`
+- `/api/practice/generate`
+- `/api/me`
+- 通用 API 错误收敛与参数校验
+
+验证情况：
+- `node --import tsx --test src/lib/server/validation.test.ts src/lib/server/api-error.test.ts src/app/api/me/route.test.ts src/app/api/explain-selection/route.test.ts src/app/api/practice/generate/route.test.ts src/app/api/tts/regenerate/route.test.ts`
+- `pnpm exec tsc --noEmit` 仍存在仓库内既有类型错误：`middleware.ts`、`src/app/(auth)/login/page.tsx`、`src/app/(auth)/signup/page.tsx`、`src/lib/shared/auth-redirect.ts`
 
 ### 登录重定向与高成本接口安全边界收紧
 - 统一了 `login`、`signup` 和 `middleware` 的站内重定向校验规则，危险的 `//host` 与跨站地址不再被当作有效回跳目标。
@@ -159,13 +174,23 @@
 - 调整 `scenes` 列表与 `scene detail` 的缓存策略：命中新鲜本地缓存时，页面会先展示缓存结果，再继续执行后台网络刷新，不再因为 TTL 未过期就直接停止联网。
 - 统一 `/api/scenes/[slug]` 与 `/api/phrases/mine` 的 `Cache-Control: no-store` 语义，并让对应客户端请求显式使用 `cache: "no-store"`，减少浏览器默认缓存与前端自管缓存叠加造成的陈旧状态。
 - 为场景学习页补上整段场景循环音频预热，复用现有 TTS 持久缓存链路，并在弱网场景下自动跳过整段音频预热，降低首次整段播放等待。
-褰卞搷鑼冨洿锛?- `scenes` 列表与 `scene detail` 的刷新时机
+- 影响范围：`scenes` 列表与 `scene detail` 的刷新时机
 - 场景整段循环音频首播体验
 - 用户态列表/详情接口缓存语义
-楠岃瘉鎯呭喌锛?- 宸叉墽琛?`node --import tsx --test "src/lib/utils/audio-warmup.test.ts" "src/app/(app)/scene/[[]slug[]]/scene-detail-load-logic.test.ts" "src/app/(app)/scene/[[]slug[]]/scene-detail-load-orchestrator.test.ts"`
-- 宸叉墽琛?`node --import tsx --import ./src/test/setup-dom.ts --test "src/app/(app)/scenes/page.interaction.test.tsx" "src/app/(app)/scene/[[]slug[]]/use-scene-detail-data.test.tsx"`
+- 验证情况：已执行 `node --import tsx --test "src/lib/utils/audio-warmup.test.ts" "src/app/(app)/scene/[[]slug[]]/scene-detail-load-logic.test.ts" "src/app/(app)/scene/[[]slug[]]/scene-detail-load-orchestrator.test.ts"`
+- 已执行 `node --import tsx --import ./src/test/setup-dom.ts --test "src/app/(app)/scenes/page.interaction.test.tsx" "src/app/(app)/scene/[[]slug[]]/use-scene-detail-data.test.tsx"`
 
 本文档用于记录仓库内每次实际改动，方便回看变更范围、验证情况和潜在风险。
+
+## 2026-04-01
+
+### 中文编码治理补充收尾
+- 清理 `src/lib/server/phrases/service.ts` 中残留的中文默认文案乱码，避免表达说明回退文案继续产出脏文本。
+- 修复 `CHANGELOG.md` 历史条目中的两处乱码标题，统一“影响范围 / 验证情况”的可读性。
+- 补写归档变更 `stabilize-test-baseline` 的 `project-maintenance` spec，清除历史归档文档中的中文乱码残留。
+- 扩大后的 `pnpm run text:check-mojibake` 继续作为提交前 UTF-8 自检入口，当前仓库无高置信度乱码告警。
+- 影响范围：中文默认文案、历史变更记录、归档 OpenSpec 文档可读性
+- 验证情况：已执行 `node --import tsx scripts/check-mojibake.ts`
 
 记录约定：
 - 每次实际改动后都要追加一条记录
@@ -409,3 +434,37 @@
 - `node --import tsx --import ./src/test/setup-dom.ts --test "src/app/(app)/review/page.interaction.test.tsx"`
 - `pnpm exec tsc --noEmit`
 - `node_modules\\.bin\\openspec.CMD change validate adapt-review-scheduling-signals --strict --no-interactive`
+
+## 2026-04-01
+
+### Chunks 删除表达后端补位测试与详情回退文档补强
+- 修复了 `focus-detail-sheet-view-model` 及其单测中的 UTF-8 乱码，恢复删除确认与补全文案的可读性。
+- 为删除表达链路新增后端纯逻辑测试，明确“删主表达会补位新主表达、删空簇会返回 `clusterDeleted = true`”两条规则，避免后端补位语义只散落在 service 分支里。
+- 补齐 `DELETE /api/phrases/[userPhraseId]` handler 的成功、校验失败、未登录和未知异常测试，确保删除接口返回契约和错误收口稳定。
+- 在 `add-chunks-expression-deletion` 的设计文档中追加了“删主表达补位、删空簇关闭详情”的明确说明，降低前后端各自猜测回退行为的风险。
+
+影响范围：
+- `src/features/chunks/components/focus-detail-sheet-view-model.ts`
+- `src/features/chunks/components/focus-detail-sheet-view-model.test.ts`
+- `src/lib/server/phrases/service.ts`
+- `src/lib/server/phrases/logic.ts`
+- `src/lib/server/phrases/logic.test.ts`
+- `src/app/api/phrases/handlers.test.ts`
+- `openspec/changes/add-chunks-expression-deletion/design.md`
+- `openspec/changes/add-chunks-expression-deletion/tasks.md`
+
+验证情况：
+- 计划执行 `node --import tsx --test src/lib/server/phrases/logic.test.ts src/app/api/phrases/handlers.test.ts src/features/chunks/components/focus-detail-sheet-view-model.test.ts`
+- 若仓库内仍存在与本次无关的既有问题，会在结果里单独注明。
+补充验证：
+- 已补上 `chunks` 页面删除成功回退逻辑测试，覆盖“删空簇关闭详情”和“删主表达切到后端补位主表达”。
+- 已执行 `node --import tsx --test "src/app/(app)/chunks/chunks-page-logic.test.ts" "src/app/api/phrases/handlers.test.ts" "src/lib/server/phrases/logic.test.ts" "src/features/chunks/components/focus-detail-sheet-view-model.test.ts"`
+
+补充维护：
+- 修复了 `openspec/changes/add-chunks-expression-deletion/tasks.md` 的 UTF-8 乱码，恢复实现任务清单可读性。
+- 修复了 `src/app/(app)/chunks/use-expression-cluster-actions.test.tsx` 的乱码中文，并补充删除成功回调 hook 测试，明确校验删除返回值与刷新后列表会透传给页面回退层。
+- 重写了 `openspec/changes/add-chunks-expression-deletion/design.md`，恢复删除契约设计文档的 UTF-8 可读性，并对齐当前已经落地的补位、关详情与回退测试规则。
+- 修正了 `chunks` 页面删除成功回调的接线，确保页面层真实消费后端返回的 `clusterDeleted / nextFocusUserPhraseId / nextMainUserPhraseId`，而不是在接线处丢失这些回退信息。
+- 重写了 `openspec/changes/add-chunks-expression-deletion/proposal.md` 与 `specs/chunks-data-contract/spec.md`，把这条 change 的提案与 delta spec 一并恢复成可读 UTF-8，并与当前实现保持一致。
+- 新增了仓库级“编码与乱码处理硬规则”，明确禁止用裸 `Get-Content` 的终端显示结果判断中文文件是否乱码；中文文件必须显式按 UTF-8 读取并在判定前复读验证。
+- 升级 `scripts/check-mojibake.ts`，把扫描范围扩展到 `docs/`、`openspec/` 和根目录规则文档，同时排除归档目录与示例噪声，避免把历史脏数据或说明性文案误报成当前问题。

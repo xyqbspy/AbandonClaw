@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+﻿import { useCallback, useState } from "react";
 
 import { MoveIntoClusterCandidate } from "@/features/chunks/components/types";
 import {
@@ -7,13 +7,18 @@ import {
   moveExpressionClusterMemberFromApi,
   setExpressionClusterMainFromApi,
 } from "@/lib/utils/expression-clusters-api";
-import { UserPhraseItemResponse } from "@/lib/utils/phrases-api";
+import {
+  deleteUserPhraseFromApi,
+  DeleteUserPhraseResponse,
+  UserPhraseItemResponse,
+} from "@/lib/utils/phrases-api";
 
 type UseExpressionClusterActionsDeps = {
   detachExpressionClusterMemberFromApi: typeof detachExpressionClusterMemberFromApi;
   ensureExpressionClusterForPhraseFromApi: typeof ensureExpressionClusterForPhraseFromApi;
   moveExpressionClusterMemberFromApi: typeof moveExpressionClusterMemberFromApi;
   setExpressionClusterMainFromApi: typeof setExpressionClusterMainFromApi;
+  deleteUserPhraseFromApi?: typeof deleteUserPhraseFromApi;
 };
 
 const defaultDeps: UseExpressionClusterActionsDeps = {
@@ -21,6 +26,7 @@ const defaultDeps: UseExpressionClusterActionsDeps = {
   ensureExpressionClusterForPhraseFromApi,
   moveExpressionClusterMemberFromApi,
   setExpressionClusterMainFromApi,
+  deleteUserPhraseFromApi,
 };
 
 export const useExpressionClusterActions = ({
@@ -37,6 +43,7 @@ export const useExpressionClusterActions = ({
   onCloseFocusDetail,
   onCloseFocusActions,
   onClearDetailConfirm,
+  onDeleteFocusDetailSuccess,
   onSuccess,
   onError,
   labels,
@@ -46,7 +53,7 @@ export const useExpressionClusterActions = ({
   focusDetailSavedItem: UserPhraseItemResponse | null;
   moveIntoClusterCandidates: MoveIntoClusterCandidate[];
   selectedMoveIntoClusterMap: Record<string, boolean>;
-  loadPhrases: () => Promise<void>;
+  loadPhrases: () => Promise<UserPhraseItemResponse[] | void>;
   onInvalidateSavedRelations: (userPhraseIds: string[]) => void;
   onAssignFocusMainExpression: (item: UserPhraseItemResponse) => void;
   onResetMoveSelection: () => void;
@@ -55,6 +62,10 @@ export const useExpressionClusterActions = ({
   onCloseFocusDetail: () => void;
   onCloseFocusActions: () => void;
   onClearDetailConfirm: () => void;
+  onDeleteFocusDetailSuccess?: (
+    result: DeleteUserPhraseResponse,
+    refreshedRows: UserPhraseItemResponse[],
+  ) => void;
   onSuccess?: (message: string) => void;
   onError?: (message: string) => void;
   labels: {
@@ -63,6 +74,7 @@ export const useExpressionClusterActions = ({
     moveIntoClusterSelectOne: string;
     moveIntoClusterSuccess: string;
     moveIntoClusterPartialFailed: string;
+    deleteExpressionSuccess?: string;
   };
   deps?: UseExpressionClusterActionsDeps;
 }) => {
@@ -70,6 +82,7 @@ export const useExpressionClusterActions = ({
   const [moveIntoClusterOpen, setMoveIntoClusterOpen] = useState(false);
   const [movingIntoCluster, setMovingIntoCluster] = useState(false);
   const [ensuringMoveTargetCluster, setEnsuringMoveTargetCluster] = useState(false);
+  const [deletingCurrentExpression, setDeletingCurrentExpression] = useState(false);
 
   const detachFocusDetailFromCluster = useCallback(async () => {
     const savedItem = focusDetailSavedItem;
@@ -138,6 +151,47 @@ export const useExpressionClusterActions = ({
     onError,
   ]);
 
+  const deleteFocusDetailExpression = useCallback(async () => {
+    const savedItem = focusDetailSavedItem;
+    if (!savedItem) return;
+
+    setDeletingCurrentExpression(true);
+    try {
+      const deletePhrase = deps.deleteUserPhraseFromApi ?? defaultDeps.deleteUserPhraseFromApi;
+      const result = await deletePhrase(savedItem.userPhraseId);
+      const nextRows = await loadPhrases();
+      const refreshedRows = Array.isArray(nextRows) ? nextRows : [];
+      onInvalidateSavedRelations(
+        [
+          savedItem.userPhraseId,
+          focusExpression?.userPhraseId ?? "",
+          result.nextMainUserPhraseId ?? "",
+          result.nextFocusUserPhraseId ?? "",
+        ].filter(Boolean),
+      );
+      onCloseFocusActions();
+      onClearDetailConfirm();
+      onDeleteFocusDetailSuccess?.(result, refreshedRows);
+      onSuccess?.(labels.deleteExpressionSuccess ?? "已删除当前表达");
+    } catch (error) {
+      onError?.(error instanceof Error ? error.message : labels.loadFailed);
+    } finally {
+      setDeletingCurrentExpression(false);
+    }
+  }, [
+    deps,
+    focusDetailSavedItem,
+    focusExpression?.userPhraseId,
+    labels.loadFailed,
+    loadPhrases,
+    onClearDetailConfirm,
+    onCloseFocusActions,
+    onDeleteFocusDetailSuccess,
+    onError,
+    onInvalidateSavedRelations,
+    onSuccess,
+  ]);
+
   const handleMoveSelectedIntoCurrentCluster = useCallback(async () => {
     const targetClusterId = focusExpression?.expressionClusterId ?? "";
     const targetMainUserPhraseId = focusExpression?.userPhraseId ?? "";
@@ -199,7 +253,7 @@ export const useExpressionClusterActions = ({
         ]);
 
         const summary = [
-          mergedClusterCount ? `${mergedClusterCount} 个整组` : "",
+          mergedClusterCount ? `${mergedClusterCount} 个整簇` : "",
           movedMemberCount ? `${movedMemberCount} 个子表达` : "",
           attachedMemberCount ? `${attachedMemberCount} 个独立表达` : "",
         ]
@@ -278,9 +332,12 @@ export const useExpressionClusterActions = ({
     setMoveIntoClusterOpen,
     movingIntoCluster,
     ensuringMoveTargetCluster,
+    deletingCurrentExpression,
     detachFocusDetailFromCluster,
+    deleteFocusDetailExpression,
     setFocusDetailAsClusterMain,
     handleMoveSelectedIntoCurrentCluster,
     openMoveIntoCurrentCluster,
   };
 };
+

@@ -15,6 +15,7 @@ export function FocusDetailSheetFooter({
   canSetCurrentClusterMain,
   canMoveIntoCurrentCluster,
   canSetStandaloneMain,
+  canDeleteCurrentExpression,
   focusAssistLoading,
   openingManualAddRelated,
   regeneratingAudio,
@@ -22,6 +23,7 @@ export function FocusDetailSheetFooter({
   movingIntoCluster,
   ensuringMoveTargetCluster,
   detachingClusterMember,
+  deletingCurrentExpression,
   canCompleteAssist,
   completeAssistDisabled,
   primaryActionLabel,
@@ -34,6 +36,7 @@ export function FocusDetailSheetFooter({
   onRequestSetCurrentClusterMain,
   onRequestMoveIntoCluster,
   onRequestSetStandaloneMain,
+  onRequestDeleteCurrentExpression,
   onCompleteAssist,
   onPrimaryAction,
   moreActionsLabel,
@@ -41,6 +44,7 @@ export function FocusDetailSheetFooter({
   manualAddRelatedLabel,
   regenerateAudioLabel,
   retryEnrichmentLabel,
+  deleteExpressionLabel,
   openAsMainLabel,
   moveIntoClusterLabel,
   detachClusterMemberLabel,
@@ -55,6 +59,7 @@ export function FocusDetailSheetFooter({
   canSetCurrentClusterMain: boolean;
   canMoveIntoCurrentCluster: boolean;
   canSetStandaloneMain: boolean;
+  canDeleteCurrentExpression: boolean;
   focusAssistLoading: boolean;
   openingManualAddRelated: boolean;
   regeneratingAudio: boolean;
@@ -62,6 +67,7 @@ export function FocusDetailSheetFooter({
   movingIntoCluster: boolean;
   ensuringMoveTargetCluster: boolean;
   detachingClusterMember: boolean;
+  deletingCurrentExpression: boolean;
   canCompleteAssist: boolean;
   completeAssistDisabled: boolean;
   primaryActionLabel?: ReactNode;
@@ -74,6 +80,7 @@ export function FocusDetailSheetFooter({
   onRequestSetCurrentClusterMain: () => void;
   onRequestMoveIntoCluster: () => void;
   onRequestSetStandaloneMain: () => void;
+  onRequestDeleteCurrentExpression: () => void;
   onCompleteAssist: () => void;
   onPrimaryAction: () => void;
   moreActionsLabel: string;
@@ -81,6 +88,7 @@ export function FocusDetailSheetFooter({
   manualAddRelatedLabel: string;
   regenerateAudioLabel: string;
   retryEnrichmentLabel: string;
+  deleteExpressionLabel: string;
   openAsMainLabel: string;
   moveIntoClusterLabel: string;
   detachClusterMemberLabel: string;
@@ -99,7 +107,8 @@ export function FocusDetailSheetFooter({
               canShowRetryEnrichment ||
               canSetCurrentClusterMain ||
               canMoveIntoCurrentCluster ||
-              canSetStandaloneMain)
+              canSetStandaloneMain ||
+              canDeleteCurrentExpression)
           }
           canShowFindRelations={canShowFindRelations}
           canShowManualAddRelated={canShowManualAddRelated}
@@ -108,6 +117,7 @@ export function FocusDetailSheetFooter({
           canSetCurrentClusterMain={canSetCurrentClusterMain}
           canMoveIntoCurrentCluster={canMoveIntoCurrentCluster}
           canSetStandaloneMain={canSetStandaloneMain}
+          canDeleteCurrentExpression={canDeleteCurrentExpression}
           focusAssistLoading={focusAssistLoading}
           openingManualAddRelated={openingManualAddRelated}
           regeneratingAudio={regeneratingAudio}
@@ -115,6 +125,7 @@ export function FocusDetailSheetFooter({
           movingIntoCluster={movingIntoCluster}
           ensuringMoveTargetCluster={ensuringMoveTargetCluster}
           detachingClusterMember={detachingClusterMember}
+          deletingCurrentExpression={deletingCurrentExpression}
           hasFocusDetailText={Boolean(detail?.text)}
           appleButtonClassName={appleButtonClassName}
           compactTrigger
@@ -124,6 +135,7 @@ export function FocusDetailSheetFooter({
             manualAddRelated: manualAddRelatedLabel,
             regenerateAudio: regenerateAudioLabel,
             retryEnrichment: retryEnrichmentLabel,
+            deleteExpression: deleteExpressionLabel,
             openAsMain: openAsMainLabel,
             moveIntoCluster: moveIntoClusterLabel,
             detachClusterMember: detachClusterMemberLabel,
@@ -136,6 +148,7 @@ export function FocusDetailSheetFooter({
           onRequestSetCurrentClusterMain={onRequestSetCurrentClusterMain}
           onRequestMoveIntoCluster={onRequestMoveIntoCluster}
           onRequestSetStandaloneMain={onRequestSetStandaloneMain}
+          onRequestDeleteCurrentExpression={onRequestDeleteCurrentExpression}
         />
       }
       trailing={

@@ -341,3 +341,20 @@
 3. 再看 [service.ts](/d:/WorkCode/AbandonClaw/src/lib/server/phrases/service.ts) 的 relation / cluster / stats 语义是否要改。
 4. 如影响 cluster 结构操作，再看 [service.ts](/d:/WorkCode/AbandonClaw/src/lib/server/expression-clusters/service.ts)。
 5. 最后同步更新本文档、测试和 OpenSpec spec delta。
+
+### 4.9 删除当前表达的稳定契约（2026-04-01 追加）
+
+入口：
+- `useExpressionClusterActions.deleteFocusDetailExpression`
+- `DELETE /api/phrases/[userPhraseId]`
+- `deleteUserPhraseForUser`
+
+后端规则：
+- 删除的是当前 cluster 主表达，且 cluster 还有剩余成员时，后端必须先补位新的 `main_user_phrase_id`，再删除当前 `user_phrase`。
+- 删除后 cluster 已无成员时，后端必须删除空 cluster，并在返回值里明确 `clusterDeleted = true`。
+- 前端不得自行猜测补位结果，只消费后端返回的 `nextMainUserPhraseId` / `nextFocusUserPhraseId` / `clusterDeleted`。
+
+详情回退：
+- `clusterDeleted = true` 时，详情必须关闭，避免停留在已删除的空簇。
+- `nextMainUserPhraseId` 或 `nextFocusUserPhraseId` 有值时，详情应切换到新的可用表达。
+- 删除的如果不是当前主表达，则主表达保持不变，只刷新受影响的 related rows 和计数。

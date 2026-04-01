@@ -1,5 +1,9 @@
 import { normalizePhraseText } from "@/lib/shared/phrases";
-import { PhraseReviewStatus, UserPhraseItemResponse } from "@/lib/utils/phrases-api";
+import {
+  DeleteUserPhraseResponse,
+  PhraseReviewStatus,
+  UserPhraseItemResponse,
+} from "@/lib/utils/phrases-api";
 import { MoveIntoClusterGroup } from "@/features/chunks/components/types";
 import {
   buildFocusDetailCloseState,
@@ -489,6 +493,42 @@ export const buildManualSheetState = ({
     primaryActionLabel: primaryIdleLabel,
     secondaryActionLabel: labels.saveAndReview,
     showSecondaryAction: manualItemType === "expression",
+  };
+};
+
+export const resolveDeleteFocusDetailSuccessState = ({
+  result,
+  refreshedRows,
+  focusExpression,
+}: {
+  result: DeleteUserPhraseResponse;
+  refreshedRows: UserPhraseItemResponse[];
+  focusExpression: UserPhraseItemResponse | null;
+}) => {
+  if (result.clusterDeleted) {
+    return {
+      action: "close" as const,
+      nextExpression: null,
+    };
+  }
+
+  const preferredNextId =
+    result.nextFocusUserPhraseId ??
+    result.nextMainUserPhraseId ??
+    (focusExpression && focusExpression.userPhraseId !== result.deletedUserPhraseId
+      ? focusExpression.userPhraseId
+      : null);
+
+  const nextExpression =
+    (preferredNextId
+      ? refreshedRows.find((row) => row.userPhraseId === preferredNextId) ?? null
+      : null) ??
+    refreshedRows.find((row) => row.userPhraseId !== result.deletedUserPhraseId) ??
+    null;
+
+  return {
+    action: nextExpression ? ("open" as const) : ("close" as const),
+    nextExpression,
   };
 };
 

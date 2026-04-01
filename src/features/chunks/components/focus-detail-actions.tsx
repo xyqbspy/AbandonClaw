@@ -11,6 +11,7 @@ type FocusDetailActionsLabels = {
   manualAddRelated?: string;
   regenerateAudio?: string;
   retryEnrichment?: string;
+  deleteExpression?: string;
   openAsMain: string;
   moveIntoCluster: string;
   detachClusterMember: string;
@@ -27,6 +28,7 @@ type FocusDetailActionsProps = {
   canSetCurrentClusterMain: boolean;
   canMoveIntoCurrentCluster: boolean;
   canSetStandaloneMain: boolean;
+  canDeleteCurrentExpression: boolean;
   focusAssistLoading: boolean;
   openingManualAddRelated: boolean;
   regeneratingAudio: boolean;
@@ -34,6 +36,7 @@ type FocusDetailActionsProps = {
   movingIntoCluster: boolean;
   ensuringMoveTargetCluster: boolean;
   detachingClusterMember: boolean;
+  deletingCurrentExpression: boolean;
   hasFocusDetailText: boolean;
   appleButtonClassName: string;
   labels: FocusDetailActionsLabels;
@@ -45,6 +48,7 @@ type FocusDetailActionsProps = {
   onRequestSetCurrentClusterMain: () => void;
   onRequestMoveIntoCluster: () => void;
   onRequestSetStandaloneMain: () => void;
+  onRequestDeleteCurrentExpression: () => void;
 };
 
 export function FocusDetailActions({
@@ -58,6 +62,7 @@ export function FocusDetailActions({
   canSetCurrentClusterMain,
   canMoveIntoCurrentCluster,
   canSetStandaloneMain,
+  canDeleteCurrentExpression,
   focusAssistLoading,
   openingManualAddRelated,
   regeneratingAudio,
@@ -65,6 +70,7 @@ export function FocusDetailActions({
   movingIntoCluster,
   ensuringMoveTargetCluster,
   detachingClusterMember,
+  deletingCurrentExpression,
   hasFocusDetailText,
   appleButtonClassName,
   labels,
@@ -76,6 +82,7 @@ export function FocusDetailActions({
   onRequestSetCurrentClusterMain,
   onRequestMoveIntoCluster,
   onRequestSetStandaloneMain,
+  onRequestDeleteCurrentExpression,
 }: FocusDetailActionsProps) {
   if (!show) return <div />;
 
@@ -198,6 +205,21 @@ export function FocusDetailActions({
                 loadingText={`${labels.detachClusterMember}...`}
               >
                 {labels.detachClusterMember}
+              </LoadingContent>
+            </button>
+          ) : null}
+          {canDeleteCurrentExpression ? (
+            <button
+              type="button"
+              className={`${menuItemClassName} text-[#FF3B30] disabled:text-[#FF3B30]/60`}
+              disabled={deletingCurrentExpression}
+              onClick={onRequestDeleteCurrentExpression}
+            >
+              <LoadingContent
+                loading={deletingCurrentExpression}
+                loadingText={`${labels.deleteExpression ?? "删除当前表达"}...`}
+              >
+                {labels.deleteExpression ?? "删除当前表达"}
               </LoadingContent>
             </button>
           ) : null}

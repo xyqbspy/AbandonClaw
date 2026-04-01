@@ -14,7 +14,10 @@ import {
 import { FocusDetailRelatedItem } from "./focus-detail-selectors";
 
 type FocusDetailTabValue = "info" | "similar" | "contrast";
-type FocusDetailConfirmAction = "set-cluster-main" | "set-standalone-main";
+type FocusDetailConfirmAction =
+  | "set-cluster-main"
+  | "set-standalone-main"
+  | "delete-expression";
 
 type FocusDetailState = {
   text: string;
@@ -36,12 +39,14 @@ type FocusDetailSheetProps = {
   canShowManualAddRelated?: boolean;
   canShowRegenerateAudio?: boolean;
   canShowRetryEnrichment?: boolean;
+  canDeleteCurrentExpression?: boolean;
   canCompleteAssist?: boolean;
   completeAssistDisabled?: boolean;
   focusAssistLoading: boolean;
   openingManualAddRelated?: boolean;
   regeneratingAudio?: boolean;
   retryingEnrichment?: boolean;
+  deletingCurrentExpression?: boolean;
   movingIntoCluster: boolean;
   ensuringMoveTargetCluster: boolean;
   detachingClusterMember: boolean;
@@ -76,6 +81,7 @@ type FocusDetailSheetProps = {
   onRequestSetCurrentClusterMain: () => void;
   onRequestMoveIntoCluster: () => void;
   onRequestSetStandaloneMain: () => void;
+  onRequestDeleteCurrentExpression?: () => void;
   onCompleteAssist?: () => void;
   onPrimaryAction: () => void;
   onSpeak: (text: string) => void;
@@ -101,12 +107,14 @@ export function FocusDetailSheet({
   canShowManualAddRelated = false,
   canShowRegenerateAudio = false,
   canShowRetryEnrichment = false,
+  canDeleteCurrentExpression = false,
   canCompleteAssist = false,
   completeAssistDisabled = false,
   focusAssistLoading,
   openingManualAddRelated = false,
   regeneratingAudio = false,
   retryingEnrichment = false,
+  deletingCurrentExpression = false,
   movingIntoCluster,
   ensuringMoveTargetCluster,
   detachingClusterMember,
@@ -141,6 +149,7 @@ export function FocusDetailSheet({
   onRequestSetCurrentClusterMain,
   onRequestMoveIntoCluster,
   onRequestSetStandaloneMain,
+  onRequestDeleteCurrentExpression = () => undefined,
   onCompleteAssist = () => undefined,
   onPrimaryAction,
   onSpeak,
@@ -191,6 +200,7 @@ export function FocusDetailSheet({
             canShowManualAddRelated={canShowManualAddRelated}
             canShowRegenerateAudio={canShowRegenerateAudio}
             canShowRetryEnrichment={canShowRetryEnrichment}
+            canDeleteCurrentExpression={canDeleteCurrentExpression}
             canSetCurrentClusterMain={canSetCurrentClusterMain}
             canMoveIntoCurrentCluster={canMoveIntoCurrentCluster}
             canSetStandaloneMain={canSetStandaloneMain}
@@ -198,6 +208,7 @@ export function FocusDetailSheet({
             openingManualAddRelated={openingManualAddRelated}
             regeneratingAudio={regeneratingAudio}
             retryingEnrichment={retryingEnrichment}
+            deletingCurrentExpression={deletingCurrentExpression}
             movingIntoCluster={movingIntoCluster}
             ensuringMoveTargetCluster={ensuringMoveTargetCluster}
             detachingClusterMember={detachingClusterMember}
@@ -213,6 +224,7 @@ export function FocusDetailSheet({
             onRequestSetCurrentClusterMain={onRequestSetCurrentClusterMain}
             onRequestMoveIntoCluster={onRequestMoveIntoCluster}
             onRequestSetStandaloneMain={onRequestSetStandaloneMain}
+            onRequestDeleteCurrentExpression={onRequestDeleteCurrentExpression}
             onCompleteAssist={onCompleteAssist}
             onPrimaryAction={onPrimaryAction}
             moreActionsLabel={labels.detailMoreActions}
@@ -220,6 +232,7 @@ export function FocusDetailSheet({
             manualAddRelatedLabel={labels.detailManualAddRelated ?? "添加关联表达"}
             regenerateAudioLabel={labels.detailRegenerateAudio ?? "重新生成音频"}
             retryEnrichmentLabel={labels.detailRetryEnrichment ?? "补全当前 chunk"}
+            deleteExpressionLabel={labels.detailDeleteExpression ?? "删除当前表达"}
             openAsMainLabel={labels.detailOpenAsMain}
             moveIntoClusterLabel={labels.moveIntoCluster}
             detachClusterMemberLabel={labels.detachClusterMember}
@@ -266,7 +279,7 @@ export function FocusDetailSheet({
         translation={confirmState.translation}
         confirmLabel={labels.confirmContinue}
         cancelLabel={labels.confirmCancel}
-        submitting={detachingClusterMember}
+        submitting={detachingClusterMember || deletingCurrentExpression}
         appleButtonClassName={appleButtonClassName}
         onClose={onCloseConfirm}
         onConfirm={onConfirm}

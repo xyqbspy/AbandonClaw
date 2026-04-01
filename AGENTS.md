@@ -1,4 +1,4 @@
-﻿# Project Rules
+# Project Rules
 
 - All answers in Chinese
 Act like a high-performing senior engineer. Be concise, direct, and execution-focused.
@@ -9,6 +9,17 @@ Do not overengineer or add heavy abstractions, extra layers, or large dependenci
 Keep APIs small, behavior explicit, and naming clear. Avoid cleverness unless it clearly improves the result.
 
 Use UTF-8 for reading and writing consistently (especially in PowerShell's `Set-Content -Encoding UTF8`).
+
+### 编码与乱码处理硬规则
+
+- 不要用裸 `Get-Content` 的终端显示结果来判断中文文件是否乱码；PowerShell 控制台输出可能乱码，但文件本身仍是正常 UTF-8。
+- 只要文件包含中文或其他非 ASCII 文本，读取时必须显式按 UTF-8 读取；优先使用：
+  - PowerShell: `[System.IO.File]::ReadAllText((Resolve-Path <path>), [System.Text.UTF8Encoding]::new($false))`
+  - 或 `Get-Content -Encoding UTF8`
+- 写入中文文件时，必须使用 UTF-8 显式写回；若不是 `apply_patch`，则必须使用 `Set-Content -Encoding UTF8`。
+- 在把文件判定为“乱码”之前，必须先用显式 UTF-8 方式复读一次；禁止因为一次控制台乱码显示就重复重写本来正常的文件。
+- 对中文文档或 OpenSpec 文档做修改后，若改动范围允许，优先运行 `pnpm run text:check-mojibake` 做二次确认。
+- 若同一文件已经通过显式 UTF-8 读取验证为正常，则后续本轮内不要再用不带编码参数的命令反复读取它来确认是否乱码。
 
 Use `apply_patch` for precise changes whenever possible, and avoid large-scale regular expression replacements.
 

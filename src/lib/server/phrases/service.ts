@@ -1,5 +1,6 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { ensureExpressionClusterForPhrase } from "@/lib/server/expression-clusters/service";
+import { resolveDeleteExpressionClusterResult } from "@/lib/server/phrases/logic";
 import {
   PhraseRow,
   UserPhraseAiEnrichmentStatus,
@@ -84,6 +85,14 @@ export interface UserSavedPhraseRelationItem {
   item: UserSavedPhraseItem;
 }
 
+export interface DeleteUserPhraseResult {
+  deletedUserPhraseId: string;
+  deletedClusterId: string | null;
+  clusterDeleted: boolean;
+  nextMainUserPhraseId: string | null;
+  nextFocusUserPhraseId: string | null;
+}
+
 interface ExpressionClusterContext {
   clusterId: string;
   role: "main" | "variant";
@@ -104,9 +113,9 @@ const hasChinese = (value: string | null | undefined) =>
 const toChineseUsageNoteFallback = (expression: string, translation: string | null) => {
   const zh = parseOptionalTrimmed(translation, 200);
   if (zh) {
-    return `常用于表达“${zh}”这一意思，语气自然，适合日常口语场景。`;
+    return `常用于表达“${zh}”这个意思，语气自然，适合日常口语场景。`;
   }
-  return `常用于日常表达，语气自然。可先用一句简单句练习：I wish I could..., but ....`;
+  return `常用于日常表达，语气自然。可以先用一句简单句练习：${expression}.`;
 };
 
 const toChineseSemanticFocusFallback = (
@@ -464,6 +473,44 @@ async function syncExpressionClusterMembership(params: {
     role,
   });
   return cluster.id;
+}
+
+async function writeClusterMembershipState(params: {
+  clusterId: string;
+  mainUserPhraseId: string;
+  userPhraseIds: string[];
+}) {
+  const admin = createSupabaseAdminClient();
+  const membershipPayload = params.userPhraseIds.map((userPhraseId) => ({
+    cluster_id: params.clusterId,
+    user_phrase_id: userPhraseId,
+    role: userPhraseId === params.mainUserPhraseId ? "main" : "variant",
+  }));
+
+  const { error: membershipError } = await admin
+    .from("user_expression_cluster_members")
+    .upsert(membershipPayload as never, { onConflict: "user_phrase_id" });
+  if (membershipError) {
+    throw new Error(`Failed to update cluster memberships before delete: ${membershipError.message}`);
+  }
+}
+
+async function getOwnedUserPhraseForDelete(userId: string, userPhraseId: string) {
+  const admin = createSupabaseAdminClient();
+  const { data, error } = await admin
+    .from("user_phrases")
+    .select("id,learning_item_type")
+    .eq("id", userPhraseId)
+    .eq("user_id", userId)
+    .maybeSingle<{ id: string; learning_item_type: "expression" | "sentence" | null }>();
+
+  if (error) {
+    throw new Error(`Failed to read user phrase before delete: ${error.message}`);
+  }
+  if (!data) {
+    throw new ValidationError("Expression not found.");
+  }
+  return data;
 }
 
 const toStableSentenceSyntheticText = (sentence: string) => {
@@ -936,6 +983,94 @@ export async function savePhraseForUser(userId: string, input: SavePhraseInput) 
   };
 }
 
+export async function deleteUserPhraseForUser(
+  userId: string,
+  userPhraseId: string,
+): Promise<DeleteUserPhraseResult> {
+  const ownedPhrase = await getOwnedUserPhraseForDelete(userId, userPhraseId);
+  const admin = createSupabaseAdminClient();
+
+  let deletedClusterId: string | null = null;
+  let clusterDeleted = false;
+  let nextMainUserPhraseId: string | null = null;
+
+  if (ownedPhrase.learning_item_type !== "sentence") {
+    const clusterContextMap = await loadExpressionClusterContextMap(userId, [userPhraseId]);
+    const clusterContext = clusterContextMap.get(userPhraseId);
+
+    if (clusterContext?.clusterId) {
+      deletedClusterId = clusterContext.clusterId;
+      const cluster = await findExpressionClusterById(userId, clusterContext.clusterId);
+      const { data: memberRows, error: memberError } = await admin
+        .from("user_expression_cluster_members")
+        .select("user_phrase_id")
+        .eq("cluster_id", clusterContext.clusterId)
+        .order("created_at", { ascending: true });
+
+      if (memberError) {
+        throw new Error(`Failed to read cluster members before delete: ${memberError.message}`);
+      }
+
+      const remainingMemberIds = ((memberRows ?? []) as Array<{ user_phrase_id: string }>)
+        .map((row) => row.user_phrase_id)
+        .filter((memberId) => memberId !== userPhraseId);
+
+      const deleteClusterResult = resolveDeleteExpressionClusterResult({
+        remainingMemberIds,
+        currentMainUserPhraseId: cluster?.main_user_phrase_id,
+      });
+
+      if (deleteClusterResult.clusterDeleted) {
+        if (cluster) {
+          const { error: deleteClusterError } = await admin
+            .from("user_expression_clusters")
+            .delete()
+            .eq("id", cluster.id)
+            .eq("user_id", userId);
+          if (deleteClusterError) {
+            throw new Error(`Failed to delete empty cluster: ${deleteClusterError.message}`);
+          }
+        }
+        clusterDeleted = true;
+      } else if (cluster) {
+        nextMainUserPhraseId = deleteClusterResult.nextMainUserPhraseId;
+
+        await writeClusterMembershipState({
+          clusterId: cluster.id,
+          mainUserPhraseId: nextMainUserPhraseId,
+          userPhraseIds: remainingMemberIds,
+        });
+
+        const { error: updateClusterError } = await admin
+          .from("user_expression_clusters")
+          .update({ main_user_phrase_id: nextMainUserPhraseId } as never)
+          .eq("id", cluster.id)
+          .eq("user_id", userId);
+        if (updateClusterError) {
+          throw new Error(`Failed to update cluster main before delete: ${updateClusterError.message}`);
+        }
+      }
+    }
+  }
+
+  const { error: deletePhraseError } = await admin
+    .from("user_phrases")
+    .delete()
+    .eq("id", userPhraseId)
+    .eq("user_id", userId);
+  if (deletePhraseError) {
+    throw new Error(`Failed to delete user phrase: ${deletePhraseError.message}`);
+  }
+
+  return {
+    deletedUserPhraseId: userPhraseId,
+    deletedClusterId,
+    clusterDeleted,
+    nextMainUserPhraseId,
+    nextFocusUserPhraseId: nextMainUserPhraseId,
+  };
+}
+
 export async function enrichAiExpressionLearningInfo(params: {
   userId: string;
   userPhraseId: string;
@@ -1332,3 +1467,4 @@ export async function getUserPhraseSummary(userId: string) {
     todaySavedPhrases: dailyStats?.phrases_saved ?? 0,
   };
 }
+

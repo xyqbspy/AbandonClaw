@@ -17,6 +17,7 @@ import {
   buildMoveIntoClusterSheetState,
   getClusterIdFromSearchParams,
   parseChunksRouteState,
+  resolveDeleteFocusDetailSuccessState,
   resolveClusterFilterExpressionLabel,
   resolveFocusExpressionId,
   shouldReplaceChunksRoute,
@@ -296,6 +297,79 @@ test("buildFocusDetailSheetState 会稳定输出详情面板派生状态", () =>
       canShowFindRelations: false,
       savingFocusCandidate: false,
       isDetailSpeaking: false,
+    },
+  );
+});
+
+test("resolveDeleteFocusDetailSuccessState 在删空簇时会关闭详情而不是跳到其他表达", () => {
+  const otherExpression = createPhrase({
+    userPhraseId: "other-1",
+    text: "keep it brief",
+    expressionClusterId: "cluster-2",
+    expressionClusterRole: "main",
+    expressionClusterMainUserPhraseId: "other-1",
+  });
+
+  assert.deepEqual(
+    resolveDeleteFocusDetailSuccessState({
+      result: {
+        deletedUserPhraseId: "main-1",
+        deletedClusterId: "cluster-1",
+        clusterDeleted: true,
+        nextMainUserPhraseId: null,
+        nextFocusUserPhraseId: null,
+      },
+      refreshedRows: [otherExpression],
+      focusExpression: createPhrase({
+        userPhraseId: "main-1",
+        expressionClusterId: "cluster-1",
+        expressionClusterRole: "main",
+        expressionClusterMainUserPhraseId: "main-1",
+      }),
+    }),
+    {
+      action: "close",
+      nextExpression: null,
+    },
+  );
+});
+
+test("resolveDeleteFocusDetailSuccessState 在删主表达后会优先切到后端补位的新主表达", () => {
+  const nextMain = createPhrase({
+    userPhraseId: "variant-1",
+    text: "wrap it up",
+    expressionClusterId: "cluster-1",
+    expressionClusterRole: "main",
+    expressionClusterMainUserPhraseId: "variant-1",
+  });
+  const unrelated = createPhrase({
+    userPhraseId: "other-1",
+    text: "keep it brief",
+    expressionClusterId: "cluster-2",
+    expressionClusterRole: "main",
+    expressionClusterMainUserPhraseId: "other-1",
+  });
+
+  assert.deepEqual(
+    resolveDeleteFocusDetailSuccessState({
+      result: {
+        deletedUserPhraseId: "main-1",
+        deletedClusterId: "cluster-1",
+        clusterDeleted: false,
+        nextMainUserPhraseId: "variant-1",
+        nextFocusUserPhraseId: "variant-1",
+      },
+      refreshedRows: [unrelated, nextMain],
+      focusExpression: createPhrase({
+        userPhraseId: "main-1",
+        expressionClusterId: "cluster-1",
+        expressionClusterRole: "main",
+        expressionClusterMainUserPhraseId: "main-1",
+      }),
+    }),
+    {
+      action: "open",
+      nextExpression: nextMain,
     },
   );
 });
