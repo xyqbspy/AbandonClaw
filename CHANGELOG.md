@@ -2,6 +2,39 @@
 
 ## 2026-04-01
 
+### 登录重定向与高成本接口安全边界收紧
+- 统一了 `login`、`signup` 和 `middleware` 的站内重定向校验规则，危险的 `//host` 与跨站地址不再被当作有效回跳目标。
+- 将 `explain-selection`、`practice/generate`、`scene/mutate`、`scene/parse` 等高成本接口收紧为显式受保护入口，未登录请求会在进入模型或重型解析前被拒绝。
+- 为 GLM 与 OpenAI 的服务端调用补充了超时、空响应防御和统一错误收敛，避免上游异常长期占用请求链路。
+- 优化 `/api/me` 的热路径读取，复用同一请求内已获取的用户身份，减少重复认证/资料查询。
+- 补充了重定向 helper、`middleware`、`/api/me`、高成本 route handler 以及模型客户端的直接自动化测试。
+
+影响范围：
+- `login` / `signup` 登录后回跳
+- `middleware` API 访问边界
+- `explain-selection`、`practice/generate`、`scene/mutate`、`scene/parse`
+- `/api/me`
+- GLM / OpenAI 上游调用失败保护
+
+验证情况：
+- `node --import tsx --test middleware.test.ts src/lib/shared/auth-redirect.test.ts src/app/api/me/route.test.ts src/app/api/explain-selection/route.test.ts src/app/api/practice/generate/route.test.ts src/app/api/scene/mutate/route.test.ts src/app/api/scene/parse/handlers.test.ts src/lib/server/glm-client.test.ts src/lib/explain/providers/openai.test.ts`
+- `pnpm run test:unit`
+
+## 2026-04-01
+
+### OpenSpec 维护规范文档编码修复
+- 修复了 `openspec/specs/project-maintenance/spec.md` 的乱码问题，恢复为可读的 UTF-8 中文维护规范。
+- 保留了此前同步进主 spec 的测试基线要求，没有改动规则含义，只修正文档编码与可读性。
+
+影响范围：
+- `openspec/specs/project-maintenance/spec.md`
+- OpenSpec 维护规范的阅读与后续编辑体验
+
+验证情况：
+- `pnpm run spec:validate`
+
+## 2026-04-01
+
 ### 测试基线补强与关键入口回归补齐
 - 修复了 `review-page-messages` 单元测试的失效预期，恢复默认单元测试命令全绿。
 - 为 `middleware` 新增了认证、登录回跳、危险 redirect 拦截和 admin 访问限制测试，并收紧登录页 `redirect` 参数的安全校验，避免 `//host` 形式的协议相对跳转被当作站内地址放行。

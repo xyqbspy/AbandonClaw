@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 import { explainSelection } from "@/lib/explain/provider";
+import { toApiErrorResponse } from "@/lib/server/api-error";
+import { requireCurrentProfile } from "@/lib/server/auth";
+import { ValidationError } from "@/lib/server/errors";
 import { parseJsonBody } from "@/lib/server/validation";
 import { ExplainSelectionRequest } from "@/lib/types";
 
@@ -12,20 +15,35 @@ const isValid = (payload: Partial<ExplainSelectionRequest>): payload is ExplainS
       payload.lessonDifficulty?.trim(),
   );
 
-export async function POST(request: Request) {
+interface ExplainSelectionDependencies {
+  requireCurrentProfile: typeof requireCurrentProfile;
+  explainSelection: typeof explainSelection;
+}
+
+const defaultDependencies: ExplainSelectionDependencies = {
+  requireCurrentProfile,
+  explainSelection,
+};
+
+export async function handleExplainSelectionPost(
+  request: Request,
+  dependencies: ExplainSelectionDependencies = defaultDependencies,
+) {
   try {
+    await dependencies.requireCurrentProfile();
     const payload = await parseJsonBody<Partial<ExplainSelectionRequest>>(request);
 
     if (!isValid(payload)) {
-      return NextResponse.json({ error: "\u53c2\u6570\u4e0d\u5b8c\u6574\u3002" }, { status: 400 });
+      throw new ValidationError("参数不完整。");
     }
 
-    const result = await explainSelection(payload);
-    return NextResponse.json(result);
-  } catch {
-    return NextResponse.json(
-      { error: "\u91ca\u4e49\u670d\u52a1\u6682\u65f6\u4e0d\u53ef\u7528\u3002" },
-      { status: 500 },
-    );
+    const result = await dependencies.explainSelection(payload);
+    return NextResponse.json(result, { status: 200 });
+  } catch (error) {
+    return toApiErrorResponse(error, "释义服务暂时不可用。");
   }
+}
+
+export async function POST(request: Request) {
+  return handleExplainSelectionPost(request);
 }

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { toApiErrorResponse } from "@/lib/server/api-error";
+import { requireCurrentProfile } from "@/lib/server/auth";
 import { isAppError, ValidationError } from "@/lib/server/errors";
 import { parseJsonBody } from "@/lib/server/validation";
 import { ParseSceneRequest } from "@/lib/types/scene-parser";
@@ -18,11 +19,13 @@ const isValidPayload = (
 };
 
 interface SceneParseHandlerDependencies {
+  requireCurrentProfile: typeof requireCurrentProfile;
   parseImportedSceneWithCache: typeof parseImportedSceneWithCache;
   logError: typeof console.error;
 }
 
 const defaultDependencies: SceneParseHandlerDependencies = {
+  requireCurrentProfile,
   parseImportedSceneWithCache,
   logError: console.error,
 };
@@ -32,6 +35,7 @@ export async function handleSceneParsePost(
   dependencies: SceneParseHandlerDependencies = defaultDependencies,
 ) {
   try {
+    await dependencies.requireCurrentProfile();
     const payload = await parseJsonBody<Partial<ParseSceneRequest>>(request);
 
     if (!isValidPayload(payload)) {

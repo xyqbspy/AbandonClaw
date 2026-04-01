@@ -1,4 +1,6 @@
-﻿const GLM_BASE_URL = process.env.GLM_BASE_URL ?? "https://open.bigmodel.cn/api/paas/v4";
+import { fetchWithTimeout, getUpstreamTimeoutMs, isAbortLikeError } from "@/lib/server/upstream";
+
+const GLM_BASE_URL = process.env.GLM_BASE_URL ?? "https://open.bigmodel.cn/api/paas/v4";
 
 type GlmRole = "system" | "user" | "assistant";
 
@@ -38,12 +40,20 @@ const readMessageContent = (value: unknown): string => {
   return "";
 };
 
-export async function callGlmChatCompletion(params: {
-  systemPrompt: string;
-  userPrompt: string;
-  model?: string;
-  temperature?: number;
-}) {
+interface GlmClientDependencies {
+  fetch?: typeof fetch;
+  timeoutMs?: number;
+}
+
+export async function callGlmChatCompletion(
+  params: {
+    systemPrompt: string;
+    userPrompt: string;
+    model?: string;
+    temperature?: number;
+  },
+  dependencies: GlmClientDependencies = {},
+) {
   const apiKey = process.env.GLM_API_KEY;
   if (!apiKey) {
     throw new Error("GLM_API_KEY is not configured.");
@@ -60,18 +70,30 @@ export async function callGlmChatCompletion(params: {
     response_format: { type: "json_object" },
   };
 
-  const response = await fetch(`${GLM_BASE_URL}/chat/completions`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(requestBody),
-  });
+  let response: Response;
+  try {
+    response = await fetchWithTimeout(
+      `${GLM_BASE_URL}/chat/completions`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(requestBody),
+      },
+      getUpstreamTimeoutMs(dependencies.timeoutMs),
+      dependencies.fetch,
+    );
+  } catch (error) {
+    if (isAbortLikeError(error)) {
+      throw new Error("GLM request timed out.");
+    }
+    throw new Error("GLM request failed before receiving a response.");
+  }
 
   if (!response.ok) {
-    const bodyText = await response.text();
-    throw new Error(`GLM request failed: ${response.status} ${bodyText.slice(0, 400)}`);
+    throw new Error(`GLM request failed with status ${response.status}.`);
   }
 
   const data = (await response.json()) as {

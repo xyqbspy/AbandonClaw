@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { getSupabaseAnonKey, getSupabaseUrl } from "@/lib/supabase/env";
+import { resolveSafeRedirectTarget } from "@/lib/shared/auth-redirect";
 import { isAdminEmail } from "@/lib/shared/admin";
 
 const AUTH_PAGE_PATHS = new Set(["/login", "/signup"]);
@@ -15,7 +16,20 @@ const PROTECTED_PAGE_PREFIXES = [
   "/lesson",
   "/admin",
 ];
-const PROTECTED_API_PREFIXES = ["/api/me", "/api/scenes", "/api/admin", "/api/learning"];
+const PROTECTED_API_PREFIXES = [
+  "/api/me",
+  "/api/scenes",
+  "/api/admin",
+  "/api/learning",
+  "/api/review",
+  "/api/phrases",
+  "/api/recommendations",
+  "/api/tts",
+  "/api/expression-map",
+  "/api/explain-selection",
+  "/api/practice",
+  "/api/scene",
+];
 
 const isProtectedPagePath = (pathname: string) =>
   PROTECTED_PAGE_PREFIXES.some(
@@ -26,14 +40,6 @@ const isProtectedApiPath = (pathname: string) =>
   PROTECTED_API_PREFIXES.some(
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
   );
-
-const resolveSafeRedirectTarget = (redirectTarget: string | null | undefined) => {
-  if (!redirectTarget) return "/scenes";
-  if (!redirectTarget.startsWith("/") || redirectTarget.startsWith("//")) {
-    return "/scenes";
-  }
-  return redirectTarget;
-};
 
 interface MiddlewareDependencies {
   createServerClient: typeof createServerClient;

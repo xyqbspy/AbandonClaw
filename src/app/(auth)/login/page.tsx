@@ -7,6 +7,10 @@ import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import {
+  buildAuthRedirectHref,
+  resolveSafeRedirectTarget,
+} from "@/lib/shared/auth-redirect";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 export default function LoginPage() {
@@ -14,7 +18,7 @@ export default function LoginPage() {
   const searchParams = useSearchParams();
   const [submitting, setSubmitting] = useState(false);
   const redirectTo = searchParams.get("redirect");
-  const loginTarget = redirectTo && redirectTo.startsWith("/") ? redirectTo : "/scenes";
+  const loginTarget = resolveSafeRedirectTarget(redirectTo);
 
   const onSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -71,11 +75,7 @@ export default function LoginPage() {
       <p className="text-sm text-muted-foreground">
         还没有账号？{" "}
         <Link
-          href={
-            redirectTo && redirectTo.startsWith("/")
-              ? `/signup?redirect=${encodeURIComponent(redirectTo)}`
-              : "/signup"
-          }
+          href={buildAuthRedirectHref("/signup", redirectTo)}
           className="text-foreground underline underline-offset-4"
         >
           去注册

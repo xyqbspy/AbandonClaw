@@ -97,9 +97,19 @@ test("middleware 会阻止非管理员访问 /admin", async () => {
   assert.equal(response.headers.get("location"), "http://localhost/");
 });
 
-test("middleware 会对未登录的受保护 API 返回 401", async () => {
+test("middleware 会对未登录的受保护 learning API 返回 401", async () => {
   const response = await handleMiddleware(
     createRequest("http://localhost/api/learning/continue"),
+    createDependencies(null),
+  );
+
+  assert.equal(response.status, 401);
+  assert.deepEqual(await response.json(), { error: "Unauthorized" });
+});
+
+test("middleware 会对未登录的高成本 explain-selection 返回 401", async () => {
+  const response = await handleMiddleware(
+    createRequest("http://localhost/api/explain-selection"),
     createDependencies(null),
   );
 

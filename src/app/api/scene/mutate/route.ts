@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { toApiErrorResponse } from "@/lib/server/api-error";
+import { requireCurrentProfile } from "@/lib/server/auth";
 import { ValidationError } from "@/lib/server/errors";
 import { callGlmChatCompletion } from "@/lib/server/glm-client";
 import {
@@ -89,8 +90,22 @@ const isValidSceneMutateResponse = (
   return response.variants.every(isValidParsedScene);
 };
 
-export async function POST(request: Request) {
+interface SceneMutateDependencies {
+  requireCurrentProfile: typeof requireCurrentProfile;
+  callGlmChatCompletion: typeof callGlmChatCompletion;
+}
+
+const defaultDependencies: SceneMutateDependencies = {
+  requireCurrentProfile,
+  callGlmChatCompletion,
+};
+
+export async function handleSceneMutatePost(
+  request: Request,
+  dependencies: SceneMutateDependencies = defaultDependencies,
+) {
   try {
+    await dependencies.requireCurrentProfile();
     const payload = await parseJsonBody<Partial<MutateSceneRequest>>(request);
     const normalized = toValidMutatePayload(payload);
 
@@ -100,7 +115,7 @@ export async function POST(request: Request) {
 
     const { scene, variantCount, retainChunkRatio, theme } = normalized.value;
 
-    const rawModelText = await callGlmChatCompletion({
+    const rawModelText = await dependencies.callGlmChatCompletion({
       systemPrompt: SCENE_MUTATE_SYSTEM_PROMPT,
       userPrompt: buildSceneMutateUserPrompt({
         sceneJson: JSON.stringify(scene),
@@ -123,4 +138,8 @@ export async function POST(request: Request) {
   } catch (error) {
     return toApiErrorResponse(error, "Scene mutate failed.");
   }
+}
+
+export async function POST(request: Request) {
+  return handleSceneMutatePost(request);
 }

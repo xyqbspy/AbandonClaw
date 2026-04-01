@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { toApiErrorResponse } from "@/lib/server/api-error";
+import { requireCurrentProfile } from "@/lib/server/auth";
 import { ValidationError } from "@/lib/server/errors";
 import { callGlmChatCompletion } from "@/lib/server/glm-client";
 import {
@@ -223,8 +224,24 @@ const validatePracticeGenerateResponse = (
   return { ok: true };
 };
 
-export async function POST(request: Request) {
+interface PracticeGenerateDependencies {
+  requireCurrentProfile: typeof requireCurrentProfile;
+  callGlmChatCompletion: typeof callGlmChatCompletion;
+  buildExerciseSpecsFromScene: typeof buildExerciseSpecsFromScene;
+}
+
+const defaultDependencies: PracticeGenerateDependencies = {
+  requireCurrentProfile,
+  callGlmChatCompletion,
+  buildExerciseSpecsFromScene,
+};
+
+export async function handlePracticeGeneratePost(
+  request: Request,
+  dependencies: PracticeGenerateDependencies = defaultDependencies,
+) {
   try {
+    await dependencies.requireCurrentProfile();
     const payload = await parseJsonBody<Partial<PracticeGenerateRequest>>(request);
     const normalized = toValidPayload(payload);
 
@@ -234,7 +251,7 @@ export async function POST(request: Request) {
 
     const { scene, exerciseCount } = normalized.value;
 
-    const rawModelText = await callGlmChatCompletion({
+    const rawModelText = await dependencies.callGlmChatCompletion({
       systemPrompt: PRACTICE_GENERATE_SYSTEM_PROMPT,
       userPrompt: buildPracticeGenerateUserPrompt({
         sceneJson: JSON.stringify(scene),
@@ -248,7 +265,7 @@ export async function POST(request: Request) {
     const parsed = normalizePracticeResponse(parsedJson);
     const validation = validatePracticeGenerateResponse(parsed);
     if (!validation.ok) {
-      const fallback = buildExerciseSpecsFromScene(scene, exerciseCount);
+      const fallback = dependencies.buildExerciseSpecsFromScene(scene, exerciseCount);
       return NextResponse.json(
         {
           version: "v1",
@@ -262,4 +279,8 @@ export async function POST(request: Request) {
   } catch (error) {
     return toApiErrorResponse(error, "Practice generate failed.");
   }
+}
+
+export async function POST(request: Request) {
+  return handlePracticeGeneratePost(request);
 }

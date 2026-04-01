@@ -140,6 +140,11 @@ export async function getCurrentProfile(): Promise<ProfileRow | null> {
   return ensureProfile(user);
 }
 
+export async function getCurrentProfileForUser(user: User | null): Promise<ProfileRow | null> {
+  if (!user) return null;
+  return ensureProfile(user);
+}
+
 export async function requireCurrentProfile(): Promise<{
   user: User;
   profile: ProfileRow;

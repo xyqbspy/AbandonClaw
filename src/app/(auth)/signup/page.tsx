@@ -7,6 +7,10 @@ import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import {
+  buildAuthRedirectHref,
+  isSafeRedirectTarget,
+} from "@/lib/shared/auth-redirect";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 export default function SignupPage() {
@@ -45,7 +49,7 @@ export default function SignupPage() {
       if (error) throw new Error(error.message);
       toast.success("账号已创建。如需验证，请检查邮箱。");
       router.push(
-        redirectTo && redirectTo.startsWith("/")
+        isSafeRedirectTarget(redirectTo)
           ? `/login?redirect=${encodeURIComponent(redirectTo)}`
           : "/login",
       );
@@ -84,11 +88,7 @@ export default function SignupPage() {
       <p className="text-sm text-muted-foreground">
         已有账号？{" "}
         <Link
-          href={
-            redirectTo && redirectTo.startsWith("/")
-              ? `/login?redirect=${encodeURIComponent(redirectTo)}`
-              : "/login"
-          }
+          href={buildAuthRedirectHref("/login", redirectTo)}
           className="text-foreground underline underline-offset-4"
         >
           去登录
