@@ -1,6 +1,8 @@
 const DEFAULT_REDIRECT_TARGET = "/scenes";
 
-export const isSafeRedirectTarget = (redirectTarget: string | null | undefined) =>
+export const isSafeRedirectTarget = (
+  redirectTarget: string | null | undefined,
+): redirectTarget is string =>
   Boolean(
     redirectTarget &&
       redirectTarget.startsWith("/") &&
@@ -10,7 +12,7 @@ export const isSafeRedirectTarget = (redirectTarget: string | null | undefined) 
 export const resolveSafeRedirectTarget = (
   redirectTarget: string | null | undefined,
   fallback = DEFAULT_REDIRECT_TARGET,
-) => {
+): string => {
   if (!isSafeRedirectTarget(redirectTarget)) {
     return fallback;
   }

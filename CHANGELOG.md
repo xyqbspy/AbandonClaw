@@ -553,3 +553,19 @@
 验证情况：
 - `node --import tsx --import ./src/test/setup-dom.ts --test "src/features/lesson/components/sentence-block.interaction.test.tsx" "src/features/lesson/components/selection-detail-panel.interaction.test.tsx" "src/features/lesson/components/selection-detail-sheet.interaction.test.tsx" "src/features/lesson/components/lesson-reader.interaction.test.tsx"`
 - `node --import tsx --import ./src/test/setup-dom.ts --test "src/features/lesson/components/selection-toolbar.interaction.test.tsx" "src/app/(app)/chunks/chunks-list-view.interaction.test.tsx" "src/features/chunks/components/example-sentence-cards.test.tsx" "src/features/chunks/components/focus-detail-content.interaction.test.tsx"`
+
+### Auth Redirect 类型修复
+- 收紧了 `src/lib/shared/auth-redirect.ts` 的类型签名：`isSafeRedirectTarget` 现在是类型谓词，`resolveSafeRedirectTarget` 明确返回 `string`，避免安全跳转目标在 `middleware` 和认证页面里继续被识别成 `string | null | undefined`。
+- 这次修复直接解除 `middleware.ts` 里 `new URL(safeTarget, request.url)` 的构建类型错误，登录页带 `redirect` 参数的安全跳转链路也一起受益。
+
+影响范围：
+- `src/lib/shared/auth-redirect.ts`
+- `middleware.ts`
+- `src/app/(auth)/login/page.tsx`
+- `src/app/(auth)/signup/page.tsx`
+
+验证情况：
+- `node --import tsx --test "src/lib/shared/auth-redirect.test.ts" "middleware.test.ts"`
+- 额外执行 `pnpm exec tsc --noEmit --pretty false`；当前只剩与本次修复无关的既有类型问题：
+  - `src/app/(app)/chunks/use-expression-cluster-actions.ts`
+  - `src/lib/server/phrases/service.ts`
