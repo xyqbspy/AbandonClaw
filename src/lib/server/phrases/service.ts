@@ -1034,6 +1034,9 @@ export async function deleteUserPhraseForUser(
         clusterDeleted = true;
       } else if (cluster) {
         nextMainUserPhraseId = deleteClusterResult.nextMainUserPhraseId;
+        if (!nextMainUserPhraseId) {
+          throw new Error("Failed to resolve next cluster main before delete.");
+        }
 
         await writeClusterMembershipState({
           clusterId: cluster.id,

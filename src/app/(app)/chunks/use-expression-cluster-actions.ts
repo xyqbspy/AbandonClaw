@@ -157,7 +157,7 @@ export const useExpressionClusterActions = ({
 
     setDeletingCurrentExpression(true);
     try {
-      const deletePhrase = deps.deleteUserPhraseFromApi ?? defaultDeps.deleteUserPhraseFromApi;
+      const deletePhrase = deps.deleteUserPhraseFromApi ?? deleteUserPhraseFromApi;
       const result = await deletePhrase(savedItem.userPhraseId);
       const nextRows = await loadPhrases();
       const refreshedRows = Array.isArray(nextRows) ? nextRows : [];
