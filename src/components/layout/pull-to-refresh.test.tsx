@@ -43,6 +43,39 @@ afterEach(() => {
   PullToRefreshModule = null;
 });
 
+test("PullToRefresh 会用非被动 touchmove 监听避免 preventDefault 告警", () => {
+  const PullToRefresh = getPullToRefresh();
+  const DivElement = window.HTMLDivElement;
+  const originalAddEventListener = DivElement.prototype.addEventListener;
+  const listenerOptions: Array<{ type: string; passive: boolean | undefined }> = [];
+
+  DivElement.prototype.addEventListener = function patchedAddEventListener(
+    this: HTMLDivElement,
+    type: string,
+    listener: EventListenerOrEventListenerObject,
+    options?: AddEventListenerOptions | boolean,
+  ) {
+    const normalizedOptions =
+      typeof options === "boolean" ? { capture: options } : (options ?? undefined);
+    listenerOptions.push({
+      type,
+      passive: normalizedOptions?.passive,
+    });
+    return originalAddEventListener.call(this, type, listener, options);
+  };
+
+  render(
+    <PullToRefresh>
+      <div>content</div>
+    </PullToRefresh>,
+  );
+
+  DivElement.prototype.addEventListener = originalAddEventListener;
+
+  const touchMoveListeners = listenerOptions.filter((item) => item.type === "touchmove");
+  assert.equal(touchMoveListeners.some((item) => item.passive === false), true);
+});
+
 test("PullToRefresh 会把尾斜杠路径标准化后再派发刷新事件", async () => {
   const PullToRefresh = getPullToRefresh();
   const receivedPaths: string[] = [];

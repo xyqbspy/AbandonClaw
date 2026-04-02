@@ -1,6 +1,46 @@
 # Changelog
 
 ## 2026-04-02
+### PullToRefresh 被动监听告警修复
+- `PullToRefresh` 改为通过原生触摸监听处理 `touchstart / touchmove / touchend / touchcancel`，并显式把 `touchmove` 注册为 `passive: false`，避免浏览器继续报出 `Unable to preventDefault inside passive event listener invocation.`。
+- 保持现有下拉刷新启用页面、触发阈值与 `app:pull-refresh` 事件契约不变，只修复触摸移动阶段阻止默认滚动的监听语义。
+- 补充 `pull-to-refresh` 回归测试，直接锁住“存在非被动 `touchmove` 监听”和“尾斜杠路径仍会标准化派发刷新事件”两条行为。
+
+影响范围：
+- `src/components/layout/pull-to-refresh.tsx`
+- `src/components/layout/pull-to-refresh.test.tsx`
+- `openspec/changes/fix-pull-refresh-passive-listener/tasks.md`
+
+验证情况：
+- `node --import tsx --import ./src/test/setup-dom.ts --test "src/components/layout/pull-to-refresh.test.tsx"`
+- `pnpm exec tsc --noEmit --pretty false`
+- `node --import tsx scripts/check-mojibake.ts`
+- `node_modules\.bin\openspec.CMD change validate "fix-pull-refresh-passive-listener" --strict --no-interactive`
+
+### Review / Scenes 页面第一轮拆分收口
+- 将 `review/page.tsx` 的数据加载与下拉刷新控制提取到 `use-review-page-data.ts`，并把摘要卡与主阶段内容拆到 `review-page-summary-cards.tsx`、`review-page-stage-panel.tsx`，让页面主文件回到“组装 + 页面级状态”边界。
+- 将 `scenes/page.tsx` 的列表数据、进入前预热、顶部任务态与删除链路提取到 `use-scenes-page-data.ts`，并把滑动删除控制、导入弹窗、删除确认分别拆到 `use-scene-swipe-actions.ts`、`scene-import-dialog.tsx`、`scene-delete-dialog.tsx`。
+- 修正了 `review` 页面阶段重置策略：不再用依赖 active task key 的 effect 直接回压阶段，而是只在复习队列真正换项或刷新完成时显式重置，避免 `微回忆 -> 熟悉度 -> 改写 -> 输出 -> feedback` 链路被误打回首步。
+- 更新 `docs/project-maintenance-playbook.md` 与 OpenSpec tasks，补充 review/scenes 这类高状态密度页面的第一轮拆分优先级与回归要求。
+
+影响范围：
+- `src/app/(app)/review/page.tsx`
+- `src/app/(app)/review/use-review-page-data.ts`
+- `src/app/(app)/review/review-page-summary-cards.tsx`
+- `src/app/(app)/review/review-page-stage-panel.tsx`
+- `src/app/(app)/scenes/page.tsx`
+- `src/app/(app)/scenes/use-scenes-page-data.ts`
+- `src/app/(app)/scenes/use-scene-swipe-actions.ts`
+- `src/app/(app)/scenes/scene-import-dialog.tsx`
+- `src/app/(app)/scenes/scene-delete-dialog.tsx`
+- `docs/project-maintenance-playbook.md`
+- `openspec/changes/decompose-review-and-scenes-pages/tasks.md`
+
+验证情况：
+- `node --import tsx --import ./src/test/setup-dom.ts --test "src/app/(app)/review/page.interaction.test.tsx" "src/app/(app)/scenes/page.interaction.test.tsx"`
+- `pnpm exec tsc --noEmit --pretty false`
+- `node_modules\.bin\openspec.CMD change validate "decompose-review-and-scenes-pages" --strict --no-interactive`
+
 ### 重组件第一轮拆分治理
 - 将 `scene-detail-page` 中的训练浮层入口抽到独立模块 `scene-training-coach-floating-entry.tsx`，把拖拽 / 展开 / 步骤面板相关交互从页面主文件中拆出，降低主学习页的组装复杂度。
 - 将 `lesson-reader` 中的播放编排提取为 `use-lesson-reader-playback.ts`，统一承接 TTS controller、预热调度和句子 / chunk / scene loop 播放动作，让阅读器主组件更聚焦视图与学习交互。

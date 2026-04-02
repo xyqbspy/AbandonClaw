@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactNode, useMemo, useState } from "react";
+import { ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
@@ -37,55 +37,115 @@ const isInteractiveTarget = (target: EventTarget | null) => {
 export function PullToRefresh({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const enabled = useMemo(() => shouldEnablePullRefresh(pathname), [pathname]);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const startYRef = useRef<number | null>(null);
+  const pullDistanceRef = useRef(0);
+  const refreshingRef = useRef(false);
+  const enabledRef = useRef(enabled);
+  const pathnameRef = useRef(pathname);
   const [startY, setStartY] = useState<number | null>(null);
   const [pullDistance, setPullDistance] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
 
-  const onTouchStart: React.TouchEventHandler<HTMLDivElement> = (event) => {
-    if (!enabled || refreshing || isInteractiveTarget(event.target)) return;
-    if (window.scrollY > 0) return;
-    setStartY(event.touches[0]?.clientY ?? null);
-  };
+  useEffect(() => {
+    enabledRef.current = enabled;
+  }, [enabled]);
 
-  const onTouchMove: React.TouchEventHandler<HTMLDivElement> = (event) => {
-    if (!enabled || refreshing || startY === null) return;
-    const currentY = event.touches[0]?.clientY ?? startY;
-    const delta = currentY - startY;
-    if (delta <= 0 || window.scrollY > 0) {
-      setPullDistance(0);
-      return;
-    }
-    const eased = Math.min(110, delta * 0.55);
-    setPullDistance(eased);
-    if (eased > 1) event.preventDefault();
-  };
+  useEffect(() => {
+    pathnameRef.current = pathname;
+  }, [pathname]);
 
-  const onTouchEnd: React.TouchEventHandler<HTMLDivElement> = () => {
-    if (!enabled || refreshing) return;
-    const shouldRefresh = pullDistance >= PULL_THRESHOLD;
-    setStartY(null);
-    setPullDistance(0);
-    if (!shouldRefresh) return;
-    setRefreshing(true);
-    window.setTimeout(() => {
-      const refreshDetail = {
-        pathname: normalizePathname(pathname),
-        handled: false,
-      };
-      window.dispatchEvent(
-        new CustomEvent("app:pull-refresh", {
-          detail: refreshDetail,
-        }),
-      );
-      if (!refreshDetail.handled) {
-        window.location.reload();
+  useEffect(() => {
+    refreshingRef.current = refreshing;
+  }, [refreshing]);
+
+  useEffect(() => {
+    startYRef.current = startY;
+  }, [startY]);
+
+  useEffect(() => {
+    pullDistanceRef.current = pullDistance;
+  }, [pullDistance]);
+
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+
+    const handleTouchStart = (event: TouchEvent) => {
+      if (!enabledRef.current || refreshingRef.current || isInteractiveTarget(event.target)) return;
+      if (window.scrollY > 0) return;
+      const nextStartY = event.touches[0]?.clientY ?? null;
+      startYRef.current = nextStartY;
+      setStartY(nextStartY);
+    };
+
+    const handleTouchMove = (event: TouchEvent) => {
+      if (!enabledRef.current || refreshingRef.current || startYRef.current === null) return;
+      const currentY = event.touches[0]?.clientY ?? startYRef.current;
+      const delta = currentY - startYRef.current;
+      if (delta <= 0 || window.scrollY > 0) {
+        pullDistanceRef.current = 0;
+        setPullDistance(0);
         return;
       }
+      const eased = Math.min(110, delta * 0.55);
+      pullDistanceRef.current = eased;
+      setPullDistance(eased);
+      if (eased > 1) {
+        event.preventDefault();
+      }
+    };
+
+    const handleTouchEnd = () => {
+      if (!enabledRef.current || refreshingRef.current) return;
+      const shouldRefresh = pullDistanceRef.current >= PULL_THRESHOLD;
+      startYRef.current = null;
+      pullDistanceRef.current = 0;
+      setStartY(null);
+      setPullDistance(0);
+      if (!shouldRefresh) return;
+      refreshingRef.current = true;
+      setRefreshing(true);
       window.setTimeout(() => {
-        setRefreshing(false);
-      }, 400);
-    }, 120);
-  };
+        const refreshDetail = {
+          pathname: normalizePathname(pathnameRef.current),
+          handled: false,
+        };
+        window.dispatchEvent(
+          new CustomEvent("app:pull-refresh", {
+            detail: refreshDetail,
+          }),
+        );
+        if (!refreshDetail.handled) {
+          window.location.reload();
+          return;
+        }
+        window.setTimeout(() => {
+          refreshingRef.current = false;
+          setRefreshing(false);
+        }, 400);
+      }, 120);
+    };
+
+    const handleTouchCancel = () => {
+      startYRef.current = null;
+      pullDistanceRef.current = 0;
+      setStartY(null);
+      setPullDistance(0);
+    };
+
+    root.addEventListener("touchstart", handleTouchStart, { passive: true });
+    root.addEventListener("touchmove", handleTouchMove, { passive: false });
+    root.addEventListener("touchend", handleTouchEnd, { passive: true });
+    root.addEventListener("touchcancel", handleTouchCancel, { passive: true });
+
+    return () => {
+      root.removeEventListener("touchstart", handleTouchStart);
+      root.removeEventListener("touchmove", handleTouchMove);
+      root.removeEventListener("touchend", handleTouchEnd);
+      root.removeEventListener("touchcancel", handleTouchCancel);
+    };
+  }, []);
 
   const indicatorText = refreshing
     ? "刷新中..."
@@ -94,12 +154,7 @@ export function PullToRefresh({ children }: { children: ReactNode }) {
       : "下拉刷新";
 
   return (
-    <div
-      className="relative"
-      onTouchStart={onTouchStart}
-      onTouchMove={onTouchMove}
-      onTouchEnd={onTouchEnd}
-    >
+    <div ref={rootRef} className="relative">
       {enabled ? (
         <div
           className={cn(

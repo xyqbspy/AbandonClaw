@@ -97,3 +97,19 @@
 - **WHEN** 维护者发现某个页面或 feature 容器已经同时承担大量状态、派生逻辑、动作编排和视图渲染
 - **THEN** 必须先评估是否需要拆分为 hook、logic、section component 或局部容器
 - **AND** 应在维护文档或 OpenSpec change 中写清拆分边界与回归计划
+
+### Requirement: 高状态密度页面必须优先按数据流与局部交互边界拆分
+仓库 MUST 在维护 `review`、`scenes` 这类同时承载缓存、阶段状态、手势或多弹层装配的页面时，优先按数据流、局部交互和 overlay 装配边界拆分，而不是继续把所有行为保留在单个 `page.tsx` 中。
+
+#### Scenario: 维护者继续扩展 review 或 scenes 页面
+- **WHEN** 维护者发现 `review/page.tsx` 或 `scenes/page.tsx` 同时承担数据刷新、局部状态机和大块 JSX 装配
+- **THEN** 必须先评估是否拆成页面级 data hook、interaction controller 或局部 overlay/component
+- **AND** 应在 OpenSpec change 中写清本轮拆分优先处理的职责块和对应回归范围
+
+### Requirement: 触摸交互必须兼容浏览器被动监听约束
+仓库 MUST 在实现下拉刷新、拖拽或其它触摸移动交互时，避免在被动监听上下文里直接调用 `preventDefault()`，以免产生浏览器运行时告警或导致默认滚动阻止失效。
+
+#### Scenario: PullToRefresh 处理下拉手势
+- **WHEN** 用户在支持页面顶部执行下拉刷新手势
+- **THEN** 系统必须在不触发被动监听告警的前提下维持当前刷新阈值与 `app:pull-refresh` 事件契约
+- **AND** 不得因为监听修复改变现有启用路径或下拉触发结果

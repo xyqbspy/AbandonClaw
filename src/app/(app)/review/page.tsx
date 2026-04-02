@@ -1,53 +1,30 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  clearAllReviewPageCache,
-  getReviewPageCache,
-  setReviewPageCache,
-} from "@/lib/cache/review-page-cache";
-import { LoadingButton, LoadingState } from "@/components/shared/action-loading";
+import { useCallback, useMemo, useState } from "react";
+import { clearAllReviewPageCache, setReviewPageCache } from "@/lib/cache/review-page-cache";
+import { LoadingButton, LoadingContent } from "@/components/shared/action-loading";
 import { PageHeader } from "@/components/shared/page-header";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import {
-  APPLE_BODY_TEXT,
-  APPLE_INPUT_PANEL,
-  APPLE_META_TEXT,
-  APPLE_PANEL,
-  APPLE_PANEL_RAISED,
-} from "@/lib/ui/apple-style";
+import { buttonVariants } from "@/components/ui/button";
+import { APPLE_BODY_TEXT, APPLE_META_TEXT } from "@/lib/ui/apple-style";
 import {
   buildAcceptedPracticeAnswers,
   getPracticeAssessment,
   isPracticeAssessmentComplete,
 } from "@/lib/shared/scene-practice-assessment";
-import { PracticeAssessmentLevel, PracticeMode } from "@/lib/types/learning-flow";
+import { PracticeMode } from "@/lib/types/learning-flow";
 import {
   completeScenePracticeRunFromApi,
   markScenePracticeModeCompleteFromApi,
   recordScenePracticeAttemptFromApi,
   startScenePracticeRunFromApi,
 } from "@/lib/utils/learning-api";
-import { getMyPhrasesFromApi } from "@/lib/utils/phrases-api";
-import { readReviewSession } from "@/lib/utils/review-session";
 import {
   DueReviewItemResponse,
   DueScenePracticeReviewItemResponse,
-  getDueReviewItemsFromApi,
-  getReviewSummaryFromApi,
-  submitPhraseReviewFromApi,
 } from "@/lib/utils/review-api";
-import { cn } from "@/lib/utils";
+import { submitPhraseReviewFromApi } from "@/lib/utils/review-api";
 import { reviewPageLabels as zh } from "./review-page-labels";
-import {
-  assessmentLabelMap,
-  buildReviewInlinePracticeSetId,
-  getInlinePracticeFeedback,
-  getInlinePracticePlaceholder,
-  getReviewModeAccentClassName,
-  reviewModeLabelMap,
-} from "./review-page-messages";
+import { buildReviewInlinePracticeSetId } from "./review-page-messages";
 import {
   notifyInlinePracticeCompleted,
   notifyInlinePracticeFailed,
@@ -55,7 +32,6 @@ import {
   notifyInlinePracticeMissingExpectedAnswer,
   notifyInlinePracticeRecorded,
   notifyPhraseReviewSubmitted,
-  notifyReviewLoadFailed,
   notifyReviewSubmitFailed,
 } from "./review-page-notify";
 import {
@@ -63,40 +39,16 @@ import {
   buildPhraseRewritePrompts,
   buildReviewProgressModel,
   buildReviewTaskStageMeta,
-  buildScenePracticeReviewItemKey,
   getReviewSchedulingReason,
-  mergePrioritizedReviewItems,
   PhraseRewritePrompt,
   resolveReviewHints,
   resolveReviewSourceLabel,
   ReviewTaskStage,
 } from "./review-page-selectors";
-
-const REVIEW_LIMIT = 20;
-
-const normalizePathname = (pathname?: string | null) => {
-  if (typeof pathname !== "string") return "/";
-  return pathname.replace(/\/+$/, "") || "/";
-};
-
-const stagePanelClassName = "rounded-[24px] border border-[var(--app-border-soft)] bg-white p-5 shadow-[0_16px_50px_rgba(15,23,42,0.08)]";
-
-type ReviewSummary = {
-  dueReviewCount: number;
-  reviewedTodayCount: number;
-  reviewAccuracy: number | null;
-  masteredPhraseCount: number;
-  confidentOutputCountToday: number;
-  fullOutputCountToday: number;
-};
-
-type SceneFeedbackState = {
-  assessment: PracticeAssessmentLevel;
-  completed: boolean;
-};
-
-type PhraseRecognitionState = "recognized" | "unknown" | null;
-type PhraseOutputConfidenceState = "high" | "low" | null;
+import { ReviewPageStagePanel } from "./review-page-stage-panel";
+import { ReviewPageSummaryCards } from "./review-page-summary-cards";
+import { ReviewSummary, useReviewPageData } from "./use-review-page-data";
+import { cn } from "@/lib/utils";
 
 export default function ReviewPage() {
   const [loading, setLoading] = useState(true);
@@ -109,126 +61,19 @@ export default function ReviewPage() {
   const [openingSceneHref, setOpeningSceneHref] = useState<string | null>(null);
   const [taskStage, setTaskStage] = useState<ReviewTaskStage>("recall");
   const [showReference, setShowReference] = useState(false);
-  const [phraseRecognition, setPhraseRecognition] = useState<PhraseRecognitionState>(null);
+  const [phraseRecognition, setPhraseRecognition] = useState<"recognized" | "unknown" | null>(null);
   const [phraseOutputConfidence, setPhraseOutputConfidence] =
-    useState<PhraseOutputConfidenceState>(null);
+    useState<"high" | "low" | null>(null);
   const [phraseRewritePromptId, setPhraseRewritePromptId] =
     useState<PhraseRewritePrompt["id"]>("self");
   const [phraseRewriteDraft, setPhraseRewriteDraft] = useState("");
   const [phraseDraft, setPhraseDraft] = useState("");
   const [scenePracticeAnswer, setScenePracticeAnswer] = useState("");
-  const [sceneFeedback, setSceneFeedback] = useState<SceneFeedbackState | null>(null);
-  const activeLoadTokenRef = useRef(0);
-  const phraseRewritePrompts = useMemo(() => buildPhraseRewritePrompts(), []);
-
-  const loadData = useCallback(async (options?: { preferCache?: boolean }) => {
-    const token = activeLoadTokenRef.current + 1;
-    activeLoadTokenRef.current = token;
-    const canApply = () => activeLoadTokenRef.current === token;
-    const preferCache = options?.preferCache ?? false;
-    setLoading(true);
-
-    try {
-      const session = readReviewSession();
-      const prioritizedIds = session?.expressionUserPhraseIds ?? [];
-      if (canApply()) {
-        setIsSessionReview(prioritizedIds.length > 0);
-        setSessionSource(session?.source ?? null);
-      }
-
-      if (preferCache) {
-        const cache = await getReviewPageCache(REVIEW_LIMIT);
-        if (canApply() && cache.found && cache.record) {
-          const cachedRows = cache.record.data.rows;
-          const nextRows =
-            prioritizedIds.length > 0
-              ? mergePrioritizedReviewItems({
-                  prioritizedIds,
-                  dueRows: cachedRows,
-                  phraseRows: [],
-                })
-              : cachedRows;
-          setItems(nextRows);
-          setSummary(cache.record.data.summary);
-          setLoading(false);
-        }
-      }
-
-      const [due, nextSummary, phraseList] = await Promise.all([
-        getDueReviewItemsFromApi(REVIEW_LIMIT),
-        getReviewSummaryFromApi(),
-        prioritizedIds.length > 0
-          ? getMyPhrasesFromApi({
-              page: 1,
-              limit: 100,
-              status: "saved",
-              reviewStatus: "all",
-            })
-          : Promise.resolve(null),
-      ]);
-      if (!canApply()) return;
-
-      const nextRows =
-        prioritizedIds.length > 0
-          ? mergePrioritizedReviewItems({
-              prioritizedIds,
-              dueRows: due.rows,
-              phraseRows: phraseList?.rows ?? [],
-            })
-          : due.rows;
-
-      setItems(nextRows);
-      setScenePracticeItems(due.scenePracticeRows ?? []);
-      setSummary(nextSummary);
-      void setReviewPageCache(
-        {
-          rows: due.rows,
-          total: due.total,
-          summary: nextSummary,
-        },
-        REVIEW_LIMIT,
-      );
-    } catch (error) {
-      notifyReviewLoadFailed(error instanceof Error ? error.message : zh.loadFailed);
-    } finally {
-      if (canApply()) setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void loadData({ preferCache: true });
-  }, [loadData]);
-
-  useEffect(() => {
-    const handlePullRefresh = async (event: Event) => {
-      const customEvent = event as CustomEvent<{ pathname?: string; handled?: boolean }>;
-      if (normalizePathname(customEvent.detail?.pathname) !== "/review") return;
-      customEvent.detail.handled = true;
-      try {
-        await clearAllReviewPageCache();
-        await loadData({ preferCache: false });
-      } catch (error) {
-        notifyReviewLoadFailed(error instanceof Error ? error.message : zh.loadFailed);
-      }
-    };
-
-    window.addEventListener("app:pull-refresh", handlePullRefresh as EventListener);
-    return () => {
-      window.removeEventListener("app:pull-refresh", handlePullRefresh as EventListener);
-    };
-  }, [loadData]);
-
-  const currentScenePracticeItem = scenePracticeItems[0] ?? null;
-  const currentPhraseItem = items[0] ?? null;
-  const activeTaskKind = currentScenePracticeItem ? "scene_practice" : currentPhraseItem ? "phrase_review" : null;
-  const activeTaskKey =
-    currentScenePracticeItem != null
-      ? `scene:${buildScenePracticeReviewItemKey(currentScenePracticeItem)}`
-      : currentPhraseItem != null
-        ? `phrase:${currentPhraseItem.userPhraseId}`
-        : "empty";
-
-  useEffect(() => {
+  const [sceneFeedback, setSceneFeedback] = useState<{
+    assessment: "incorrect" | "keyword" | "structure" | "complete";
+    completed: boolean;
+  } | null>(null);
+  const resetTaskState = useCallback(() => {
     setTaskStage("recall");
     setShowReference(false);
     setPhraseRecognition(null);
@@ -238,7 +83,25 @@ export default function ReviewPage() {
     setPhraseDraft("");
     setScenePracticeAnswer("");
     setSceneFeedback(null);
-  }, [activeTaskKey]);
+  }, []);
+  const { loadData } = useReviewPageData({
+    setLoading,
+    setItems,
+    setScenePracticeItems,
+    setSummary,
+    setIsSessionReview,
+    setSessionSource,
+    onQueueHydrated: resetTaskState,
+  });
+
+  const currentScenePracticeItem = scenePracticeItems[0] ?? null;
+  const currentPhraseItem = items[0] ?? null;
+  const activeTaskKind = currentScenePracticeItem
+    ? "scene_practice"
+    : currentPhraseItem
+      ? "phrase_review"
+      : null;
+  const phraseRewritePrompts = useMemo(() => buildPhraseRewritePrompts(), []);
 
   const progressModel = useMemo(
     () =>
@@ -276,9 +139,9 @@ export default function ReviewPage() {
       manualTrainingHintSubtle: zh.manualTrainingHintSubtle,
     },
   });
-
   const currentPhraseExampleSentence = currentPhraseItem
-    ? currentPhraseItem.sourceSentenceText?.trim() || buildFallbackExampleSentence(currentPhraseItem.text)
+    ? currentPhraseItem.sourceSentenceText?.trim() ||
+      buildFallbackExampleSentence(currentPhraseItem.text)
     : "";
   const currentRewritePrompt =
     phraseRewritePrompts.find((prompt) => prompt.id === phraseRewritePromptId) ??
@@ -290,11 +153,23 @@ export default function ReviewPage() {
     phraseRecognition != null && phraseOutputConfidence != null;
   const phraseCanContinueFromRewrite = phraseRewriteDraft.trim().length > 0;
   const phraseCanContinueFromPractice = phraseDraft.trim().length > 0;
+  const footerPrimaryButtonClassName = buttonVariants({
+    className: "h-14 rounded-full text-base",
+  });
+  const footerSecondaryButtonClassName = buttonVariants({
+    variant: "secondary",
+    className: "w-full",
+  });
+  const footerDangerButtonClassName = buttonVariants({
+    variant: "destructive",
+    className: "w-full",
+  });
 
   const refreshAfterScenePractice = useCallback(async () => {
+    resetTaskState();
     await clearAllReviewPageCache();
     await loadData({ preferCache: false });
-  }, [loadData]);
+  }, [loadData, resetTaskState]);
 
   const submitPhraseReview = async (result: "again" | "hard" | "good") => {
     if (!currentPhraseItem || submitting) return;
@@ -319,6 +194,7 @@ export default function ReviewPage() {
         fullOutputStatus: phraseDraft.trim() ? "completed" : "not_started",
       });
       const nextItems = items.filter((item) => item.userPhraseId !== currentPhraseItem.userPhraseId);
+      resetTaskState();
       setItems(nextItems);
       setSummary(response.summary);
       void setReviewPageCache(
@@ -327,7 +203,7 @@ export default function ReviewPage() {
           total: Math.max(response.summary.dueReviewCount, nextItems.length),
           summary: response.summary,
         },
-        REVIEW_LIMIT,
+        20,
       );
       notifyPhraseReviewSubmitted(zh);
     } catch (error) {
@@ -417,29 +293,6 @@ export default function ReviewPage() {
     window.location.assign(href);
   };
 
-  const renderSummaryCards = () => (
-    <div className="grid grid-cols-3 gap-3">
-      <div className="rounded-[18px] bg-white/88 p-3 shadow-[0_10px_30px_rgba(15,23,42,0.06)] ring-1 ring-black/5">
-        <p className={APPLE_META_TEXT}>{zh.dueNow}</p>
-        <p className="mt-1 text-xl font-semibold text-foreground">
-          {loading ? "..." : progressModel.dueReviewCount + scenePracticeItems.length}
-        </p>
-      </div>
-      <div className="rounded-[18px] bg-white/88 p-3 shadow-[0_10px_30px_rgba(15,23,42,0.06)] ring-1 ring-black/5">
-        <p className={APPLE_META_TEXT}>{zh.doneToday}</p>
-        <p className="mt-1 text-xl font-semibold text-foreground">
-          {loading ? "..." : progressModel.reviewedTodayCount}
-        </p>
-      </div>
-      <div className="rounded-[18px] bg-white/88 p-3 shadow-[0_10px_30px_rgba(15,23,42,0.06)] ring-1 ring-black/5">
-        <p className={APPLE_META_TEXT}>{zh.accuracy}</p>
-        <p className="mt-1 text-xl font-semibold text-foreground">
-          {loading ? "..." : progressModel.accuracyText}
-        </p>
-      </div>
-    </div>
-  );
-
   return (
     <div className="space-y-6 pb-28">
       <section className="overflow-hidden rounded-[32px] bg-[linear-gradient(180deg,#eef5ff_0%,#f8fafc_72%,#ffffff_100%)] p-5 shadow-[0_22px_60px_rgba(37,99,235,0.12)] ring-1 ring-sky-100">
@@ -464,7 +317,15 @@ export default function ReviewPage() {
               />
             </div>
           </div>
-          {renderSummaryCards()}
+          <ReviewPageSummaryCards
+            dueCount={progressModel.dueReviewCount + scenePracticeItems.length}
+            reviewedTodayCount={progressModel.reviewedTodayCount}
+            accuracyText={progressModel.accuracyText}
+            loading={loading}
+            dueLabel={zh.dueNow}
+            doneLabel={zh.doneToday}
+            accuracyLabel={zh.accuracy}
+          />
         </div>
       </section>
 
@@ -477,488 +338,192 @@ export default function ReviewPage() {
         ) : null}
       </div>
 
-      {loading ? (
-        <div className={stagePanelClassName}>
-          <LoadingState text={zh.queueLoading} />
+      <ReviewPageStagePanel
+        loading={loading}
+        activeTaskKind={activeTaskKind}
+        stageMeta={stageMeta}
+        trainingHintSubtle={trainingHintSubtle}
+        currentScenePracticeItem={currentScenePracticeItem}
+        currentPhraseItem={currentPhraseItem}
+        currentPhraseSchedulingReason={currentPhraseSchedulingReason}
+        currentPhraseExampleSentence={currentPhraseExampleSentence}
+        currentRewritePrompt={currentRewritePrompt}
+        phraseRewritePrompts={phraseRewritePrompts}
+        phraseRewritePromptId={phraseRewritePromptId}
+        phraseRewriteDraft={phraseRewriteDraft}
+        phraseDraft={phraseDraft}
+        phraseRecognition={phraseRecognition}
+        phraseOutputConfidence={phraseOutputConfidence}
+        scenePracticeAnswer={scenePracticeAnswer}
+        sceneFeedback={sceneFeedback}
+        showReference={showReference}
+        taskStage={taskStage}
+        labels={zh}
+        setShowReference={setShowReference}
+        setPhraseRecognition={setPhraseRecognition}
+        setPhraseOutputConfidence={setPhraseOutputConfidence}
+        setPhraseRewritePromptId={setPhraseRewritePromptId}
+        setPhraseRewriteDraft={setPhraseRewriteDraft}
+        setPhraseDraft={setPhraseDraft}
+        setScenePracticeAnswer={setScenePracticeAnswer}
+      />
+
+      {activeTaskKind === "scene_practice" && currentScenePracticeItem ? (
+        <div className="flex flex-wrap gap-3">
+          <LoadingButton
+            type="button"
+            variant="outline"
+            loading={openingSceneHref === `/scene/${currentScenePracticeItem.sceneSlug}`}
+            loadingText="进入场景中..."
+            onClick={() => openScene(`/scene/${currentScenePracticeItem.sceneSlug}`)}
+          >
+            {zh.openSourceScene}
+          </LoadingButton>
+          <LoadingButton
+            type="button"
+            variant="outline"
+            loading={openingSceneHref === `/scene/${currentScenePracticeItem.sceneSlug}?view=practice`}
+            loadingText="进入场景中..."
+            onClick={() => openScene(`/scene/${currentScenePracticeItem.sceneSlug}?view=practice`)}
+          >
+            {zh.openScenePractice}
+          </LoadingButton>
         </div>
-      ) : activeTaskKind == null || stageMeta == null ? (
-        <Card className={APPLE_PANEL_RAISED}>
-          <CardContent className="py-10">
-            <p className={`text-center ${APPLE_META_TEXT}`}>{zh.queueEmpty}</p>
-          </CardContent>
-        </Card>
-      ) : (
-        <>
-          <section className={stagePanelClassName}>
-            <div className="mb-4 inline-flex rounded-xl bg-sky-50 px-3 py-1 text-xs font-bold text-sky-700">
-              {stageMeta.stepTag}
+      ) : currentPhraseItem?.sourceSceneSlug ? (
+        <div className="flex flex-wrap gap-3">
+          {currentPhraseItem.sourceSceneAvailable ? (
+            <LoadingButton
+              type="button"
+              variant="outline"
+              loading={openingSceneHref === `/scene/${currentPhraseItem.sourceSceneSlug}`}
+              loadingText="进入场景中..."
+              onClick={() => openScene(`/scene/${currentPhraseItem.sourceSceneSlug}`)}
+            >
+              {zh.openSourceScene}
+            </LoadingButton>
+          ) : (
+            <div className="rounded-full border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-700">
+              <p className="font-medium">{zh.sourceSceneUnavailable}</p>
+              <p className="text-xs text-amber-600">{zh.sourceSceneUnavailableHint}</p>
             </div>
-            <h2 className="text-2xl font-semibold tracking-tight text-slate-950">{stageMeta.title}</h2>
-            <p className={`mt-2 ${APPLE_META_TEXT}`}>{trainingHintSubtle}</p>
+          )}
+        </div>
+      ) : null}
 
-            {activeTaskKind === "scene_practice" && currentScenePracticeItem ? (
-              <div className="mt-6 space-y-4">
-                <div className={`rounded-[20px] p-4 ${APPLE_PANEL}`}>
-                  <p className={APPLE_META_TEXT}>{zh.sceneScenarioLabel}</p>
-                  <p className="mt-2 text-lg font-semibold text-foreground">
-                    {currentScenePracticeItem.sceneTitle}
-                  </p>
-                  {currentScenePracticeItem.displayText ? (
-                    <p className="mt-3 text-base leading-7 text-foreground">
-                      {currentScenePracticeItem.displayText}
-                    </p>
-                  ) : null}
-                </div>
-
-                <div className="rounded-[20px] border-2 border-dashed border-slate-200 bg-slate-50 p-4">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className={APPLE_META_TEXT}>{zh.practiceModePrefix}</span>
-                    <span
-                      className={cn(
-                        "rounded-full px-2.5 py-1 text-xs font-medium",
-                        getReviewModeAccentClassName(
-                          currentScenePracticeItem.recommendedMode as PracticeMode,
-                        ),
-                      )}
-                    >
-                      {reviewModeLabelMap[currentScenePracticeItem.recommendedMode]}
-                    </span>
-                  </div>
-                  {currentScenePracticeItem.promptText ? (
-                    <div className="mt-3">
-                      <p className={APPLE_META_TEXT}>{zh.scenePromptLabel}</p>
-                      <p className="mt-1 text-sm text-foreground">
-                        {currentScenePracticeItem.promptText}
-                      </p>
-                    </div>
-                  ) : null}
-                  {currentScenePracticeItem.hint ? (
-                    <div className="mt-3">
-                      <p className={APPLE_META_TEXT}>{zh.sceneHintLabel}</p>
-                      <p className="mt-1 text-sm text-foreground">{currentScenePracticeItem.hint}</p>
-                    </div>
-                  ) : null}
-                  {taskStage !== "practice" ? (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      className="mt-4 h-auto px-0 text-sm font-medium text-slate-600"
-                      onClick={() => setShowReference((prev) => !prev)}
-                    >
-                      {showReference ? zh.hideReference : zh.showReference}
-                    </Button>
-                  ) : null}
-                  {showReference && currentScenePracticeItem.expectedAnswer ? (
-                    <div className="mt-3 rounded-[18px] bg-white p-4 shadow-sm">
-                      <p className={APPLE_META_TEXT}>{zh.sceneExpectedLabel}</p>
-                      <p className="mt-1 text-base font-medium text-foreground">
-                        {currentScenePracticeItem.expectedAnswer}
-                      </p>
-                    </div>
-                  ) : null}
-                </div>
-
-                {taskStage === "practice" ? (
-                  <div className={`rounded-[20px] p-4 ${APPLE_PANEL}`}>
-                    <p className={APPLE_META_TEXT}>{zh.scenePracticeLabel}</p>
-                    {currentScenePracticeItem.recommendedMode === "full_dictation" ? (
-                      <textarea
-                        className={`mt-3 min-h-28 w-full px-4 py-3 text-sm ${APPLE_INPUT_PANEL}`}
-                        placeholder={getInlinePracticePlaceholder(
-                          currentScenePracticeItem.recommendedMode as PracticeMode,
-                          zh,
-                        )}
-                        value={scenePracticeAnswer}
-                        onChange={(event) => setScenePracticeAnswer(event.target.value)}
-                      />
-                    ) : (
-                      <input
-                        className={`mt-3 h-12 w-full px-4 text-sm ${APPLE_INPUT_PANEL}`}
-                        placeholder={getInlinePracticePlaceholder(
-                          currentScenePracticeItem.recommendedMode as PracticeMode,
-                          zh,
-                        )}
-                        value={scenePracticeAnswer}
-                        onChange={(event) => setScenePracticeAnswer(event.target.value)}
-                      />
-                    )}
-                  </div>
-                ) : null}
-
-                {taskStage === "feedback" && sceneFeedback ? (
-                  <div className="space-y-4">
-                    <div className={`rounded-[20px] p-4 ${APPLE_PANEL}`}>
-                      <p className={APPLE_META_TEXT}>{zh.sceneFeedbackLabel}</p>
-                      <p
-                        className={cn(
-                          "mt-2 text-base font-medium",
-                          sceneFeedback.assessment === "complete"
-                            ? "text-emerald-600"
-                            : sceneFeedback.assessment === "structure"
-                              ? "text-sky-700"
-                              : sceneFeedback.assessment === "keyword"
-                                ? "text-amber-700"
-                                : "text-rose-600",
-                        )}
-                      >
-                        {getInlinePracticeFeedback(sceneFeedback.assessment, zh)}
-                      </p>
-                      <p className={`mt-3 ${APPLE_META_TEXT}`}>
-                        当前记录：
-                        {sceneFeedback.assessment === "complete"
-                          ? " 已达到整句完成"
-                          : ` ${assessmentLabelMap[
-                              sceneFeedback.assessment as keyof typeof assessmentLabelMap
-                            ] ?? sceneFeedback.assessment}`}
-                      </p>
-                    </div>
-                    <div className="rounded-[20px] border border-dashed border-slate-200 bg-slate-50 p-4">
-                      <p className="text-sm font-semibold text-slate-900">{zh.sceneTodoTitle}</p>
-                      <p className={`mt-2 text-sm ${APPLE_META_TEXT}`}>{zh.sceneTodoBody}</p>
-                    </div>
-                  </div>
-                ) : null}
-              </div>
-            ) : currentPhraseItem ? (
-              <div className="mt-6 space-y-4">
-                {currentPhraseSchedulingReason ? (
-                  <div className="rounded-[18px] border border-amber-200 bg-amber-50/80 p-4">
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-700">
-                      调度提示
-                    </p>
-                    <p className="mt-2 text-sm text-amber-800">{currentPhraseSchedulingReason}</p>
-                  </div>
-                ) : null}
-                <div className={`rounded-[20px] p-4 ${APPLE_PANEL}`}>
-                  <p className={APPLE_META_TEXT}>
-                    {taskStage === "recall" ? zh.phraseRecallScenarioLabel : zh.phraseScenarioLabel}
-                  </p>
-                  {taskStage === "recall" && !showReference ? (
-                    <p className="mt-2 text-lg font-semibold text-slate-950">
-                      {zh.phraseMaskedExpression}
-                    </p>
-                  ) : (
-                    <p className="mt-2 text-2xl font-semibold text-slate-950">{currentPhraseItem.text}</p>
-                  )}
-                  <p className={`mt-2 text-sm ${APPLE_META_TEXT}`}>
-                    {currentPhraseItem.translation ?? zh.noTranslation}
-                  </p>
-                </div>
-
-                <div className="rounded-[20px] border-2 border-dashed border-slate-200 bg-slate-50 p-4">
-                  <p className="text-sm font-medium text-slate-700">
-                    {taskStage === "recall" ? zh.phraseMicroRecallTitle : zh.activeRecallHint}
-                  </p>
-                  <p className={`mt-2 text-sm ${APPLE_META_TEXT}`}>
-                    {taskStage === "recall" ? zh.phraseMicroRecallBody : zh.phraseReferenceHint}
-                  </p>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    className="mt-4 h-auto px-0 text-sm font-medium text-slate-600"
-                    onClick={() => setShowReference((prev) => !prev)}
-                    >
-                      {showReference ? zh.hideReference : zh.showReference}
-                    </Button>
-                  {showReference ? (
-                    <div className="mt-3 rounded-[18px] bg-white p-4 shadow-sm">
-                      <p className={APPLE_META_TEXT}>{zh.phraseReferenceLabel}</p>
-                      <p className={`mt-1 ${APPLE_BODY_TEXT}`}>{currentPhraseExampleSentence}</p>
-                      {currentPhraseItem.usageNote ? (
-                        <p className={`mt-2 ${APPLE_META_TEXT}`}>{currentPhraseItem.usageNote}</p>
-                      ) : null}
-                    </div>
-                  ) : null}
-                </div>
-
-                {taskStage === "confidence" ? (
-                  <div className="space-y-4">
-                    <div className={`rounded-[20px] p-4 ${APPLE_PANEL}`}>
-                      <p className={APPLE_META_TEXT}>{zh.phraseConfidenceLabel}</p>
-                      <p className="mt-3 text-sm font-medium text-slate-800">
-                        {zh.phraseRecognitionLabel}
-                      </p>
-                      <div className="mt-3 grid grid-cols-2 gap-2">
-                        <Button
-                          type="button"
-                          variant={phraseRecognition === "recognized" ? "default" : "outline"}
-                          onClick={() => setPhraseRecognition("recognized")}
-                        >
-                          {zh.phraseRecognitionKnown}
-                        </Button>
-                        <Button
-                          type="button"
-                          variant={phraseRecognition === "unknown" ? "default" : "outline"}
-                          onClick={() => setPhraseRecognition("unknown")}
-                        >
-                          {zh.phraseRecognitionUnknown}
-                        </Button>
-                      </div>
-                      <p className="mt-5 text-sm font-medium text-slate-800">
-                        {zh.phraseOutputConfidenceLabel}
-                      </p>
-                      <div className="mt-3 grid grid-cols-2 gap-2">
-                        <Button
-                          type="button"
-                          variant={phraseOutputConfidence === "high" ? "default" : "outline"}
-                          onClick={() => setPhraseOutputConfidence("high")}
-                        >
-                          {zh.phraseOutputConfidenceHigh}
-                        </Button>
-                        <Button
-                          type="button"
-                          variant={phraseOutputConfidence === "low" ? "default" : "outline"}
-                          onClick={() => setPhraseOutputConfidence("low")}
-                        >
-                          {zh.phraseOutputConfidenceLow}
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                ) : null}
-
-                {taskStage === "rewrite" ? (
-                  <div className="space-y-4">
-                    <div className={`rounded-[20px] p-4 ${APPLE_PANEL}`}>
-                      <p className={APPLE_META_TEXT}>{zh.phraseRewriteLabel}</p>
-                      <p className="mt-3 text-sm font-medium text-slate-800">
-                        {zh.phraseRewritePromptLabel}
-                      </p>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {phraseRewritePrompts.map((prompt) => (
-                          <Button
-                            key={prompt.id}
-                            type="button"
-                            variant={phraseRewritePromptId === prompt.id ? "default" : "outline"}
-                            onClick={() => setPhraseRewritePromptId(prompt.id)}
-                          >
-                            {prompt.title}
-                          </Button>
-                        ))}
-                      </div>
-                      <p className={`mt-3 text-sm ${APPLE_META_TEXT}`}>
-                        {currentRewritePrompt?.description}
-                      </p>
-                      <textarea
-                        className={`mt-3 min-h-24 w-full px-4 py-3 text-sm ${APPLE_INPUT_PANEL}`}
-                        placeholder={zh.phraseRewritePlaceholder}
-                        value={phraseRewriteDraft}
-                        onChange={(event) => setPhraseRewriteDraft(event.target.value)}
-                      />
-                    </div>
-                    <div className="rounded-[20px] border border-dashed border-slate-200 bg-slate-50 p-4">
-                      <p className="text-sm font-semibold text-slate-900">{zh.phraseRewriteTodoTitle}</p>
-                      <p className={`mt-2 text-sm ${APPLE_META_TEXT}`}>{zh.phraseRewriteTodoBody}</p>
-                    </div>
-                  </div>
-                ) : null}
-
-                {taskStage === "practice" ? (
-                  <div className={`rounded-[20px] p-4 ${APPLE_PANEL}`}>
-                    <p className={APPLE_META_TEXT}>{zh.phraseOutputLabel}</p>
-                    <textarea
-                      className={`mt-3 min-h-28 w-full px-4 py-3 text-sm ${APPLE_INPUT_PANEL}`}
-                      placeholder={zh.phraseOutputPlaceholder}
-                      value={phraseDraft}
-                      onChange={(event) => setPhraseDraft(event.target.value)}
-                    />
-                  </div>
-                ) : null}
-
-                {taskStage === "feedback" ? (
-                  <div className="space-y-4">
-                    <div className={`rounded-[20px] p-4 ${APPLE_PANEL}`}>
-                      <p className={APPLE_META_TEXT}>{zh.phraseFeedbackLabel}</p>
-                      <p className="mt-2 text-sm text-slate-700">{zh.phraseScoringHint}</p>
-                      <div className="mt-3 flex flex-wrap gap-2 text-xs">
-                        {phraseRecognition ? (
-                          <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">
-                            {phraseRecognition === "recognized"
-                              ? zh.phraseRecognitionKnown
-                              : zh.phraseRecognitionUnknown}
-                          </span>
-                        ) : null}
-                        {phraseOutputConfidence ? (
-                          <span className="rounded-full bg-sky-50 px-3 py-1 text-sky-700">
-                            {phraseOutputConfidence === "high"
-                              ? zh.phraseOutputConfidenceHigh
-                              : zh.phraseOutputConfidenceLow}
-                          </span>
-                        ) : null}
-                        {phraseRewriteDraft.trim() ? (
-                          <span className="rounded-full bg-amber-50 px-3 py-1 text-amber-700">
-                            {currentRewritePrompt?.title}
-                          </span>
-                        ) : null}
-                        {phraseDraft.trim() ? (
-                          <span className="rounded-full bg-emerald-50 px-3 py-1 text-emerald-700">
-                            已完成完整输出草稿
-                          </span>
-                        ) : null}
-                      </div>
-                      <p className={`mt-3 text-sm ${APPLE_META_TEXT}`}>
-                        {zh.reviewStats} {currentPhraseItem.reviewCount}，{zh.correct}{" "}
-                        {currentPhraseItem.correctCount}，{zh.incorrect} {currentPhraseItem.incorrectCount}
-                      </p>
-                    </div>
-                    <div className="rounded-[20px] border border-dashed border-slate-200 bg-slate-50 p-4">
-                      <p className="text-sm font-semibold text-slate-900">{zh.phraseFeedbackTodoTitle}</p>
-                      <p className={`mt-2 text-sm ${APPLE_META_TEXT}`}>{zh.phraseFeedbackTodoBody}</p>
-                    </div>
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
-          </section>
-
-          {activeTaskKind === "scene_practice" && currentScenePracticeItem ? (
-            <div className="flex flex-wrap gap-3">
-              <LoadingButton
+      <div className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200/80 bg-white/90 px-4 py-4 backdrop-blur">
+        <div className="mx-auto flex max-w-3xl flex-col gap-3">
+          {activeTaskKind === "phrase_review" && taskStage === "feedback" ? (
+            <div className="grid grid-cols-3 gap-2">
+              <button
                 type="button"
-                variant="outline"
-                loading={openingSceneHref === `/scene/${currentScenePracticeItem.sceneSlug}`}
-                loadingText="进入场景中..."
-                onClick={() => openScene(`/scene/${currentScenePracticeItem.sceneSlug}`)}
+                className={footerDangerButtonClassName}
+                disabled={submitting}
+                onClick={() => void submitPhraseReview("again")}
               >
-                {zh.openSourceScene}
-              </LoadingButton>
-              <LoadingButton
+                <LoadingContent loading={submitting} loadingText={`${zh.againLabel}...`}>
+                  {zh.againLabel}
+                </LoadingContent>
+              </button>
+              <button
                 type="button"
-                variant="outline"
-                loading={openingSceneHref === `/scene/${currentScenePracticeItem.sceneSlug}?view=practice`}
-                loadingText="进入场景中..."
-                onClick={() => openScene(`/scene/${currentScenePracticeItem.sceneSlug}?view=practice`)}
+                className={footerSecondaryButtonClassName}
+                disabled={submitting}
+                onClick={() => void submitPhraseReview("hard")}
               >
-                {zh.openScenePractice}
-              </LoadingButton>
-            </div>
-          ) : currentPhraseItem?.sourceSceneSlug ? (
-            <div className="flex flex-wrap gap-3">
-              {currentPhraseItem.sourceSceneAvailable ? (
-                <LoadingButton
-                  type="button"
-                  variant="outline"
-                  loading={openingSceneHref === `/scene/${currentPhraseItem.sourceSceneSlug}`}
-                  loadingText="进入场景中..."
-                  onClick={() => openScene(`/scene/${currentPhraseItem.sourceSceneSlug}`)}
-                >
-                  {zh.openSourceScene}
-                </LoadingButton>
-              ) : (
-                <div className="rounded-full border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-700">
-                  <p className="font-medium">{zh.sourceSceneUnavailable}</p>
-                  <p className="text-xs text-amber-600">{zh.sourceSceneUnavailableHint}</p>
-                </div>
-              )}
+                <LoadingContent loading={submitting} loadingText={`${zh.hardLabel}...`}>
+                  {zh.hardLabel}
+                </LoadingContent>
+              </button>
+              <button
+                type="button"
+                className={cn(footerPrimaryButtonClassName, "w-full")}
+                disabled={submitting}
+                onClick={() => void submitPhraseReview("good")}
+              >
+                <LoadingContent loading={submitting} loadingText={`${zh.goodLabel}...`}>
+                  {zh.goodLabel}
+                </LoadingContent>
+              </button>
             </div>
           ) : null}
 
-          <div className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200/80 bg-white/90 px-4 py-4 backdrop-blur">
-            <div className="mx-auto flex max-w-3xl flex-col gap-3">
-              {activeTaskKind === "phrase_review" && taskStage === "feedback" ? (
-                <div className="grid grid-cols-3 gap-2">
-                  <LoadingButton
-                    type="button"
-                    variant="destructive"
-                    loading={submitting}
-                    loadingText={`${zh.againLabel}...`}
-                    onClick={() => void submitPhraseReview("again")}
-                  >
-                    {zh.againLabel}
-                  </LoadingButton>
-                  <LoadingButton
-                    type="button"
-                    variant="secondary"
-                    loading={submitting}
-                    loadingText={`${zh.hardLabel}...`}
-                    onClick={() => void submitPhraseReview("hard")}
-                  >
-                    {zh.hardLabel}
-                  </LoadingButton>
-                  <LoadingButton
-                    type="button"
-                    loading={submitting}
-                    loadingText={`${zh.goodLabel}...`}
-                    onClick={() => void submitPhraseReview("good")}
-                  >
-                    {zh.goodLabel}
-                  </LoadingButton>
-                </div>
-              ) : null}
-
-              {activeTaskKind === "scene_practice" ? (
-                taskStage === "recall" ? (
-                  <LoadingButton type="button" className="h-14 rounded-full text-base" onClick={() => setTaskStage("practice")}>
-                    {zh.sceneRecallCta}
-                  </LoadingButton>
-                ) : taskStage === "practice" ? (
-                  <LoadingButton
-                    type="button"
-                    className="h-14 rounded-full text-base"
-                    loading={submitting}
-                    loadingText={`${zh.practiceCheck}...`}
-                    onClick={() => void submitScenePractice()}
-                  >
-                    {zh.practiceCheck}
-                  </LoadingButton>
-                ) : (
-                  <LoadingButton
-                    type="button"
-                    className="h-14 rounded-full text-base"
-                    loading={submitting}
-                    loadingText={`${zh.sceneNextCta}...`}
-                    onClick={() => void refreshAfterScenePractice()}
-                  >
-                    {sceneFeedback?.completed ? zh.sceneNextCta : zh.sceneRetryCta}
-                  </LoadingButton>
-                )
-              ) : taskStage === "recall" ? (
-                <LoadingButton
-                  type="button"
-                  className="h-14 rounded-full text-base"
-                  onClick={() => {
-                    setShowReference(true);
-                    setTaskStage("confidence");
-                  }}
-                >
-                  {zh.phraseConfidenceCta}
-                </LoadingButton>
-              ) : taskStage === "confidence" ? (
-                <LoadingButton
-                  type="button"
-                  className="h-14 rounded-full text-base"
-                  disabled={!phraseCanContinueFromConfidence}
-                  onClick={() => setTaskStage("rewrite")}
-                >
-                  {zh.phraseRewriteCta}
-                </LoadingButton>
-              ) : taskStage === "rewrite" ? (
-                <LoadingButton
-                  type="button"
-                  className="h-14 rounded-full text-base"
-                  disabled={!phraseCanContinueFromRewrite}
-                  onClick={() => setTaskStage("practice")}
-                >
-                  {zh.phraseOutputCta}
-                </LoadingButton>
-              ) : taskStage === "practice" ? (
-                <LoadingButton
-                  type="button"
-                  className="h-14 rounded-full text-base"
-                  disabled={!phraseCanContinueFromPractice}
-                  onClick={() => setTaskStage("feedback")}
-                >
-                  {zh.phraseFeedbackCta}
-                </LoadingButton>
-              ) : (
-                <div className={`rounded-full px-4 py-3 text-center text-sm ${APPLE_META_TEXT}`}>
-                  选择一个复习判断后会自动进入下一项。
-                </div>
-              )}
+          {activeTaskKind === "scene_practice" ? (
+            taskStage === "recall" ? (
+              <button
+                type="button"
+                className={footerPrimaryButtonClassName}
+                onClick={() => setTaskStage("practice")}
+              >
+                {zh.sceneRecallCta}
+              </button>
+            ) : taskStage === "practice" ? (
+              <button
+                type="button"
+                className={footerPrimaryButtonClassName}
+                disabled={submitting}
+                onClick={() => void submitScenePractice()}
+              >
+                <LoadingContent loading={submitting} loadingText={`${zh.practiceCheck}...`}>
+                  {zh.practiceCheck}
+                </LoadingContent>
+              </button>
+            ) : (
+              <button
+                type="button"
+                className={footerPrimaryButtonClassName}
+                disabled={submitting}
+                onClick={() => void refreshAfterScenePractice()}
+              >
+                <LoadingContent loading={submitting} loadingText={`${zh.sceneNextCta}...`}>
+                  {sceneFeedback?.completed ? zh.sceneNextCta : zh.sceneRetryCta}
+                </LoadingContent>
+              </button>
+            )
+          ) : taskStage === "recall" ? (
+            <button
+              type="button"
+              className={footerPrimaryButtonClassName}
+              onClick={() => {
+                setShowReference(true);
+                setTaskStage("confidence");
+              }}
+            >
+              {zh.phraseConfidenceCta}
+            </button>
+          ) : taskStage === "confidence" ? (
+            <button
+              type="button"
+              className={footerPrimaryButtonClassName}
+              disabled={!phraseCanContinueFromConfidence}
+              onClick={() => setTaskStage("rewrite")}
+            >
+              {zh.phraseRewriteCta}
+            </button>
+          ) : taskStage === "rewrite" ? (
+            <button
+              type="button"
+              className={footerPrimaryButtonClassName}
+              disabled={!phraseCanContinueFromRewrite}
+              onClick={() => setTaskStage("practice")}
+            >
+              {zh.phraseOutputCta}
+            </button>
+          ) : taskStage === "practice" ? (
+            <button
+              type="button"
+              className={footerPrimaryButtonClassName}
+              disabled={!phraseCanContinueFromPractice}
+              onClick={() => setTaskStage("feedback")}
+            >
+              {zh.phraseFeedbackCta}
+            </button>
+          ) : (
+            <div className="rounded-full px-4 py-3 text-center text-sm text-[var(--muted-foreground)]">
+              选择一个复习判断后会自动进入下一项。
             </div>
-          </div>
-        </>
-      )}
+          )}
+        </div>
+      </div>
     </div>
   );
 }
