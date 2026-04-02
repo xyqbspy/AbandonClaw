@@ -4,8 +4,13 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:turbo": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
+    "preview:up": "node scripts/manage-preview-server.mjs up",
+    "preview:down": "node scripts/manage-preview-server.mjs down",
+    "preview:restart": "node scripts/manage-preview-server.mjs restart",
+    "preview:status": "node scripts/manage-preview-server.mjs status",
     "lint": "eslint",
     "test": "pnpm run test:unit",
     "test:unit": "node --import tsx --test src/**/*.test.ts",

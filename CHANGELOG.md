@@ -1,6 +1,22 @@
 # Changelog
 
 ## 2026-04-02
+### 本地运行脚本补齐 preview / dev 双模式
+- 为 `package.json` 补齐 `dev:turbo`、`preview`、`preview:build` 和 `preview:start`，让本地工作流更适合“默认不开服务，按需查看结果”的 Codex 开发方式。
+- `preview` 现在直接串起 `next build + next start`，适合只看结果、不需要热更新时使用，避免长期挂着 `next dev` 占用较高内存。
+- 在 `README.md` 中新增本地运行建议，明确推荐“平时不开服务、看结果用 preview、需要 HMR 再开 dev”的习惯。
+- 进一步补齐 `preview:up / preview:down / preview:restart / preview:status`，支持把生产预览服务一键后台启动、查询状态和关闭，减少需要看页面时的手工操作成本。
+- 将 `README.md` 全量改写为中文说明，保留命令、接口、路径与英文术语，降低本地维护和交接阅读门槛。
+- 根据当前本机实际使用情况，移除了前台 `preview / preview:build / preview:start` 这套入口，只保留后台 `preview:up / down / restart / status` 作为统一预览方案，避免两套脚本并存造成误用。
+
+影响范围：
+- `package.json`
+- `README.md`
+- `scripts/manage-preview-server.mjs`
+
+验证情况：
+- 已通过脚本存在性检查与乱码检查确认
+
 ### Scene 进入空白修复与骨架屏补齐
 - `scene/[slug]` 路由的 loading 不再返回空白，进入场景时会先展示与场景详情结构接近的骨架屏，减少从 `chunks`、`scenes` 等入口跳转时那段明显的白屏感。
 - 场景详情页内部在首屏数据尚未回填时，也从单行 spinner 改成结构化 skeleton，保证路由等待和页内加载两个阶段的反馈一致。
