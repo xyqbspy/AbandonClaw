@@ -182,6 +182,13 @@
 - `review`：先拆数据加载 / 刷新控制，再拆主内容区；阶段状态继续保留在页面单一来源，只有在队列换项时才显式重置
 - `scenes`：先拆列表数据与进入前预热、滑动删除控制、导入/删除弹层装配；不要为了减行数先抽单张卡片
 
+对于 `chunks/page.tsx` 和 `lesson-reader.tsx` 这类已经做过一轮减重的入口，第二轮继续拆分时优先遵循：
+
+- `chunks/page`：先拆页面动作域，再拆多 sheet / panel 装配；优先把 review 启动、focus detail 删除回退、expression map 打开、quick add related 这类成组动作收进本地 action hook，不要把同一条副作用链路拆散到多个零碎回调
+- `chunks/page`：局部装配优先抽 `sheet / detail / map` 这一层，不要为了减行数先把列表卡片继续撕碎；入口页面仍保留路由态、筛选态和最终组装职责
+- `lesson-reader`：先拆 selection / active sentence-chunk / training bridge 这类控制链路，再拆 dialogue / mobile 分支 section；不要反过来只拆 JSX，导致真正的状态控制还留在主文件
+- `lesson-reader`：训练态切句、移动端句子点击、桌面划词工具栏这三条链路必须继续由入口级交互测试保护，局部 section 测试不能替代它们
+
 ### 组件分层要避免横向耦合
 
 - 不要长期保留 feature A 直接依赖 feature B 组件

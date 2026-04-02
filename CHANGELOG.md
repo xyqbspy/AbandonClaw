@@ -666,3 +666,26 @@
 验证情况：
 - `pnpm exec tsc --noEmit --pretty false`
 - `node --import tsx --test "src/lib/server/phrases/logic.test.ts" "src/app/(app)/chunks/use-expression-cluster-actions.test.tsx"`
+
+### 重入口二轮拆分治理
+- 将 `src/app/(app)/chunks/page.tsx` 的页面级动作链路拆到 `src/app/(app)/chunks/use-chunks-page-actions.ts`，集中收口 focus detail 删除回退、expression map 打开、expression map 启动复习和 cluster 补录链路。
+- 将 `src/app/(app)/chunks/page.tsx` 的底部多 sheet / panel 组装拆到 `src/app/(app)/chunks/chunks-page-sheets.tsx`，主页面继续保留路由态、筛选态和总装配职责。
+- 将 `src/features/lesson/components/lesson-reader.tsx` 的 selection、激活短语、训练态详情桥接和桌面划词同步拆到 `src/features/lesson/components/use-lesson-reader-controller.ts`。
+- 将 `lesson-reader` 的对话分支和移动端句子分组装配拆到 `src/features/lesson/components/lesson-reader-dialogue-content.tsx` 与 `src/features/lesson/components/lesson-reader-mobile-sections.tsx`，减少主容器内联分支复杂度。
+- 更新 `docs/project-maintenance-playbook.md`，补充 `chunks/page` 与 `lesson-reader` 第二轮拆分时的优先边界和回归要求。
+
+影响范围：
+- `src/app/(app)/chunks/page.tsx`
+- `src/app/(app)/chunks/use-chunks-page-actions.ts`
+- `src/app/(app)/chunks/chunks-page-sheets.tsx`
+- `src/features/lesson/components/lesson-reader.tsx`
+- `src/features/lesson/components/use-lesson-reader-controller.ts`
+- `src/features/lesson/components/lesson-reader-dialogue-content.tsx`
+- `src/features/lesson/components/lesson-reader-mobile-sections.tsx`
+- `docs/project-maintenance-playbook.md`
+- `openspec/changes/decompose-chunks-page-and-lesson-reader/tasks.md`
+
+验证情况：
+- `node --import tsx --import ./src/test/setup-dom.ts --test "src/app/(app)/chunks/page.interaction.test.tsx"`
+- `node --import tsx --import ./src/test/setup-dom.ts --test "src/features/lesson/components/lesson-reader.interaction.test.tsx"`
+- `pnpm exec tsc --noEmit --pretty false`

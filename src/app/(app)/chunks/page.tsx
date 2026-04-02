@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Search } from "lucide-react";
 import { clearAllPhraseListCache } from "@/lib/cache/phrase-list-cache";
-import { getChunksExpressionMapCache, setChunksExpressionMapCache } from "@/lib/cache/chunks-runtime-cache";
 import { useTtsPlaybackController } from "@/hooks/use-tts-playback-controller";
 import { normalizePhraseText } from "@/lib/shared/phrases";
 import { buildChunkAudioKey } from "@/lib/shared/tts";
@@ -12,35 +11,21 @@ import {
   regenerateChunkAudioBatch,
 } from "@/lib/utils/tts-api";
 import { scheduleChunkAudioWarmup } from "@/lib/utils/resource-actions";
-import { generateExpressionMapFromApi } from "@/lib/utils/expression-map-api";
 import { ExpressionCluster, ExpressionMapResponse } from "@/lib/types/expression-map";
 import {
   enrichSimilarExpressionFromApi,
   ManualExpressionAssistResponse,
   PhraseReviewStatus,
-  savePhrasesBatchFromApi,
   savePhraseFromApi,
   UserPhraseItemResponse,
 } from "@/lib/utils/phrases-api";
 import { startReviewSession } from "@/lib/utils/review-session";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/shared/empty-state";
 import { formatLoadingText, LoadingButton, LoadingState } from "@/components/shared/action-loading";
 import { SegmentedControl } from "@/components/shared/segmented-control";
 import { ExampleSentenceCards } from "@/components/shared/example-sentence-cards";
-import { Button } from "@/components/ui/button";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
-import { MoveIntoClusterSheet } from "@/features/chunks/components/move-into-cluster-sheet";
-import { FocusDetailSheet } from "@/features/chunks/components/focus-detail-sheet";
-import { ExpressionMapSheet } from "@/features/chunks/components/expression-map-sheet";
 import { buildExpressionMapViewModel } from "@/features/chunks/components/expression-map-selectors";
 import { ClusterFocusList } from "@/features/chunks/components/cluster-focus-list";
 import { buildFocusDetailViewModel } from "@/features/chunks/components/focus-detail-selectors";
@@ -83,7 +68,7 @@ import {
   resolveFocusExpressionId,
 } from "./chunks-page-logic";
 import { buildQuickAddRelatedPayload } from "./chunks-save-contract";
-import { ChunksQuickAddRelatedSheet } from "./chunks-quick-add-related-sheet";
+import { ChunksPageSheets } from "./chunks-page-sheets";
 import { useChunksRouteState } from "./use-chunks-route-state";
 import { useExpressionClusterActions } from "./use-expression-cluster-actions";
 import { useFocusAssist } from "./use-focus-assist";
@@ -94,6 +79,7 @@ import { useManualSentenceComposer } from "./use-manual-sentence-composer";
 import { useSavedRelations } from "./use-saved-relations";
 import { useFocusDetailController } from "./use-focus-detail-controller";
 import { ChunksListView } from "./chunks-list-view";
+import { useChunksPageActions } from "./use-chunks-page-actions";
 
 import { buildChunksFocusDetailLabels } from "./chunks-focus-detail-messages";
 import {
@@ -154,21 +140,6 @@ const asReviewSessionExpressions = (rows: UserPhraseItemResponse[]) =>
     text: row.text,
     expressionClusterId: row.expressionClusterId,
   }));
-
-const filterRowsByClusterExpressions = (
-  rows: UserPhraseItemResponse[],
-  cluster: ExpressionCluster,
-  selected: UserPhraseItemResponse | null,
-) => {
-  const clusterTextSet = new Set(cluster.expressions.map((text) => normalizePhraseText(text)));
-  const selectedClusterId = selected?.expressionClusterId ?? null;
-  return rows.filter((row) => {
-    if (selectedClusterId && row.expressionClusterId && row.expressionClusterId === selectedClusterId) {
-      return true;
-    }
-    return clusterTextSet.has(normalizePhraseText(row.text));
-  });
-};
 
 const tokenize = (value: string) =>
   normalizePhraseText(value)
@@ -973,40 +944,18 @@ export default function ChunksPage() {
     focusDetail?.savedItem?.expressionClusterId && focusDetailClusterMemberCount > 1,
   );
   const canDeleteCurrentExpression = Boolean(focusDetail?.savedItem);
-  const handleDeleteFocusDetailSuccess = useCallback((result: {
-    deletedUserPhraseId: string;
-    deletedClusterId: string | null;
-    clusterDeleted: boolean;
-    nextMainUserPhraseId: string | null;
-    nextFocusUserPhraseId: string | null;
-  }, refreshedRows: UserPhraseItemResponse[]) => {
+  const closeFocusDetail = useCallback(() => {
     stop();
-
-    const nextState = resolveDeleteFocusDetailSuccessState({
-      result,
-      refreshedRows,
-      focusExpression,
-    });
-
-    if (nextState.action === "open" && nextState.nextExpression) {
-      setFocusRelationTab("similar");
-      void openFocusDetail({
-        text: nextState.nextExpression.text,
-        kind: "current",
-        chainMode: "reset",
-      });
-      return;
-    }
-
     setFocusDetailOpen(false);
     const closeState = buildFocusDetailClosePayload();
     setFocusDetailActionsOpen(closeState.actionsOpen);
     setFocusDetailTrail(closeState.trail);
     setFocusDetailTab(closeState.tab);
+    setQuickAddRelatedOpen(false);
   }, [
-    focusExpression,
-    openFocusDetail,
+    stop,
     setFocusDetailOpen,
+    setFocusDetailActionsOpen,
     setFocusDetailTab,
     setFocusDetailTrail,
   ]);
@@ -1047,7 +996,7 @@ export default function ChunksPage() {
       setDetailConfirmAction(null);
     },
     onDeleteFocusDetailSuccess: (result, refreshedRows) => {
-      handleDeleteFocusDetailSuccess(result, refreshedRows);
+      void handleDeleteFocusDetailSuccess(result, refreshedRows);
     },
     onSuccess: (message) => {
       notifyChunksActionSucceeded(message);
@@ -1064,60 +1013,44 @@ export default function ChunksPage() {
       deleteExpressionSuccess: "已删除当前表达",
     },
   });
+  const {
+    handleDeleteFocusDetailSuccess,
+    openExpressionMap,
+    handlePracticeCluster,
+    handleAddClusterToReview,
+  } = useChunksPageActions({
+    stop,
+    focusExpression,
+    openFocusDetail,
+    onCloseFocusDetail: closeFocusDetail,
+    setFocusRelationTab,
+    router,
+    phrases,
+    activeCluster,
+    mapSourceExpression,
+    addingCluster,
+    setAddingCluster,
+    setMapOpen,
+    setMapLoading,
+    setMapError,
+    setMapData,
+    setMapSourceExpression,
+    setActiveClusterId,
+    setMapOpeningForId,
+    loadPhrases,
+    query,
+    reviewFilter,
+    contentFilter,
+    expressionClusterFilterId,
+    labels: {
+      mapFailed: zh.mapFailed,
+      addClusterSuccess: zh.addClusterSuccess,
+    },
+    notifyExpressionMapOpened: notifyChunksExpressionMapOpened,
+    notifyActionSucceeded: notifyChunksActionSucceeded,
+    notifyLoadFailed: notifyChunksLoadFailed,
+  });
   // Focus 详情打开与链路切换
-  
-
-  const openExpressionMap = async (expression: UserPhraseItemResponse) => {
-    if (expression.learningItemType === "sentence") return;
-    setMapOpeningForId(expression.userPhraseId);
-    setMapOpen(true);
-    setMapLoading(true);
-    setMapError(null);
-    setMapData(null);
-    setMapSourceExpression(expression);
-    setActiveClusterId(null);
-    try {
-      const cache = await getChunksExpressionMapCache(
-        expression.userPhraseId,
-        expression.expressionClusterId,
-      );
-      if (cache.found && cache.record && !cache.isExpired) {
-        setMapData(cache.record.data.map);
-        setActiveClusterId(cache.record.data.map.clusters[0]?.id ?? null);
-        notifyChunksExpressionMapOpened();
-        return;
-      }
-
-      const grouped = expression.expressionClusterId
-        ? phrases.filter((row) => row.expressionClusterId === expression.expressionClusterId)
-        : [expression];
-      const baseExpressions = Array.from(
-        new Set(grouped.map((row) => row.text).filter((text) => text.trim().length > 0)),
-      ).slice(0, 12);
-
-      const response = await generateExpressionMapFromApi({
-        sourceSceneId: expression.sourceSceneSlug ?? `expression:${expression.userPhraseId}`,
-        sourceSceneTitle: expression.sourceSceneSlug ?? undefined,
-        baseExpressions: baseExpressions.length > 0 ? baseExpressions : [expression.text],
-      });
-
-      setMapData(response);
-      setActiveClusterId(response.clusters[0]?.id ?? null);
-      void setChunksExpressionMapCache({
-        sourceUserPhraseId: expression.userPhraseId,
-        expressionClusterId: expression.expressionClusterId,
-        map: response,
-      }).catch(() => {
-        // Ignore cache failures.
-      });
-      notifyChunksExpressionMapOpened();
-    } catch (error) {
-      setMapError(error instanceof Error ? error.message : zh.mapFailed);
-    } finally {
-      setMapOpeningForId(null);
-      setMapLoading(false);
-    }
-  };
 
   const toggleExpanded = (id: string) => {
     setExpandedIds((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -1346,77 +1279,10 @@ export default function ChunksPage() {
   ]);
   const focusDetailLabels = useMemo(() => buildChunksFocusDetailLabels(zh), []);
 
-  const handlePracticeCluster = () => {
-    if (!activeCluster) return;
-    const selectedRows = filterRowsByClusterExpressions(phrases, activeCluster, mapSourceExpression);
-    if (selectedRows.length > 0) {
-      startReviewSession({
-        router,
-        source: "expression-map-cluster",
-        expressions: asReviewSessionExpressions(selectedRows),
-      });
-      return;
-    }
-    if (mapSourceExpression) {
-      startReviewSession({
-        router,
-        source: "expression-map-single",
-        expressions: asReviewSessionExpressions([mapSourceExpression]),
-      });
-    }
-  };
-
   const openSourceScene = (slug: string) => {
     if (!slug || openingSourceSceneSlug === slug) return;
     setOpeningSourceSceneSlug(slug);
     router.push(`/scene/${slug}`);
-  };
-
-  const handleAddClusterToReview = async () => {
-    if (!activeCluster || !mapSourceExpression || addingCluster) return;
-    setAddingCluster(true);
-    try {
-      const sourceSaveResult = mapSourceExpression.expressionClusterId
-        ? null
-        : await savePhraseFromApi({
-            text: mapSourceExpression.text,
-            expressionClusterId: `create-cluster:${activeCluster.id}`,
-            sourceSceneSlug: mapSourceExpression.sourceSceneSlug ?? undefined,
-            sourceSentenceText: mapSourceExpression.sourceSentenceText ?? undefined,
-            sourceChunkText: mapSourceExpression.text,
-            translation: mapSourceExpression.translation ?? undefined,
-          });
-      const clusterId = mapSourceExpression.expressionClusterId ?? sourceSaveResult?.expressionClusterId ?? null;
-      if (!clusterId) {
-        throw new Error("未能创建表达组。");
-      }
-      const existingNormalized = new Set(phrases.map((row) => normalizePhraseText(row.text)));
-      const newTexts = Array.from(
-        new Set(activeCluster.expressions.map((text) => text.trim()).filter(Boolean)),
-      )
-        .slice(0, 20)
-        .filter((text) => !existingNormalized.has(normalizePhraseText(text)));
-
-      if (newTexts.length > 0) {
-        await savePhrasesBatchFromApi({
-          items: newTexts.map((text) => ({
-            text,
-            sourceSceneSlug: mapSourceExpression.sourceSceneSlug ?? undefined,
-            sourceSentenceText: mapSourceExpression.sourceSentenceText ?? undefined,
-            sourceChunkText: text,
-            expressionClusterId: clusterId,
-          })),
-        });
-        await loadPhrases(query, reviewFilter, contentFilter, expressionClusterFilterId, {
-          preferCache: false,
-        });
-      }
-      notifyChunksActionSucceeded(zh.addClusterSuccess);
-    } catch (error) {
-      notifyChunksLoadFailed(error instanceof Error ? error.message : null);
-    } finally {
-      setAddingCluster(false);
-    }
   };
 
   const resetManualForm = () => {
@@ -1741,11 +1607,7 @@ export default function ChunksPage() {
     onOpenChange: (open: boolean) => {
       setFocusDetailOpen(open);
       if (!open) {
-        const nextState = buildFocusDetailClosePayload();
-        setFocusDetailActionsOpen(nextState.actionsOpen);
-        setFocusDetailTrail(nextState.trail);
-        setFocusDetailTab(nextState.tab);
-        setQuickAddRelatedOpen(false);
+        closeFocusDetail();
         setMoveIntoClusterOpen(false);
         setDetailConfirmAction(null);
       }
@@ -2145,359 +2007,148 @@ export default function ChunksPage() {
         </section>
       )}
 
-      <Sheet
-        open={addSheetOpen}
-        onOpenChange={(open) => {
-          setAddSheetOpen(open);
-          if (!open && !savingManual) resetManualForm();
+      <ChunksPageSheets
+        manual={{
+          open: addSheetOpen,
+          onOpenChange: setAddSheetOpen,
+          itemType: manualItemType,
+          onItemTypeChange: setManualItemType,
+          text: manualText,
+          onTextChange: setManualText,
+          sentence: manualSentence,
+          onSentenceChange: setManualSentence,
+          saving: savingManual,
+          state: manualSheetState,
+          assistLoading: manualAssistLoading,
+          assist: manualExpressionAssist,
+          selectedMap: manualSelectedMap,
+          onLoadAssist: () => void loadManualExpressionAssist(manualText),
+          onToggleSelected: toggleManualSelected,
+          onSave: (mode) => void handleSaveManualExpression(mode),
+          onReset: resetManualForm,
+          clearAssist: clearManualExpressionAssist,
+          normalizeSimilarLabel,
+          renderExampleSentenceCards,
+          handlePronounceSentence,
+          speakingText,
+          loadingText,
+          labels: {
+            itemTypeExpression: zh.itemTypeExpression,
+            itemTypeSentence: zh.itemTypeSentence,
+            expressionTextLabel: zh.expressionTextLabel,
+            expressionTextPlaceholder: zh.expressionTextPlaceholder,
+            generatingSuggestions: zh.generatingSuggestions,
+            findMoreRelated: zh.findMoreRelated,
+            currentInputCard: zh.currentInputCard,
+            similarExpressionsAuto: zh.similarExpressionsAuto,
+            similarEmpty: zh.similarEmpty,
+            contrastExpressionsAuto: zh.contrastExpressionsAuto,
+            noContrastExpressions: zh.noContrastExpressions,
+            sentenceMainLabel: zh.sentenceMainLabel,
+            sentenceMainPlaceholder: zh.sentenceMainPlaceholder,
+            sentenceAutoHint: zh.sentenceAutoHint,
+          },
         }}
-      >
-        <SheetContent
-          side="bottom"
-          className={`max-h-[85vh] overflow-y-auto rounded-t-2xl border border-[var(--app-chunks-sheet-card-border)] bg-[var(--app-chunks-sheet-bg)] ${APPLE_PANEL}`}
-        >
-          <SheetHeader className="space-y-1 px-4 pb-3 pt-4">
-            <SheetTitle>{manualSheetState.title}</SheetTitle>
-            <SheetDescription>{manualSheetState.description}</SheetDescription>
-          </SheetHeader>
-          <div className="space-y-4 px-4 pb-4">
-            <div className="space-y-1">
-              <p className={APPLE_META_TEXT}>{manualSheetState.itemTypeLabel}</p>
-              <SegmentedControl
-                ariaLabel={manualSheetState.itemTypeLabel}
-                value={manualItemType}
-                onChange={(value) =>
-                  setManualItemType(value === "sentence" ? "sentence" : "expression")
-                }
-                options={[
-                  { value: "expression", label: zh.itemTypeExpression },
-                  { value: "sentence", label: zh.itemTypeSentence },
-                ]}
-              />
-            </div>
-
-            {manualItemType === "expression" ? (
-              <div className="space-y-3 pt-1">
-                <div className="space-y-1">
-                  <p className={APPLE_META_TEXT}>{zh.expressionTextLabel}</p>
-                  <Input
-                    className={APPLE_INPUT_PANEL}
-                    value={manualText}
-                    onChange={(event) => {
-                      setManualText(event.target.value);
-                      clearManualExpressionAssist();
-                    }}
-                    placeholder={zh.expressionTextPlaceholder}
-                  />
-                </div>
-                <LoadingButton
-                  type="button"
-                  variant="ghost"
-                  className={appleButtonClassName}
-                  disabled={!manualText.trim()}
-                  loading={manualAssistLoading}
-                  loadingText={formatLoadingText(zh.generatingSuggestions)}
-                  onClick={() => void loadManualExpressionAssist(manualText)}
-                >
-                  {zh.findMoreRelated}
-                </LoadingButton>
-                {manualExpressionAssist ? (
-                  <div className={`space-y-3 p-3 ${APPLE_PANEL}`}>
-                    <div className={`space-y-1 p-3 ${APPLE_LIST_ITEM}`}>
-                      <label className="flex cursor-pointer items-start gap-2">
-                        <input
-                          type="checkbox"
-                          className="mt-0.5"
-                          checked={Boolean(manualSelectedMap[normalizePhraseText(manualExpressionAssist.inputItem.text)])}
-                          onChange={() => toggleManualSelected(manualExpressionAssist.inputItem.text)}
-                        />
-                        <div className="space-y-1">
-                          <p className={APPLE_META_TEXT}>{zh.currentInputCard}</p>
-                          <p className="text-sm font-medium">{manualExpressionAssist.inputItem.text}</p>
-                          {manualExpressionAssist.inputItem.translation ? (
-                            <p className={APPLE_META_TEXT}>
-                              {manualExpressionAssist.inputItem.translation}
-                            </p>
-                          ) : null}
-                          {manualExpressionAssist.inputItem.usageNote ? (
-                            <p className={APPLE_META_TEXT}>
-                              {manualExpressionAssist.inputItem.usageNote}
-                            </p>
-                          ) : null}
-                          {renderExampleSentenceCards(
-                            manualExpressionAssist.inputItem.examples,
-                            manualExpressionAssist.inputItem.text,
-                            {
-                              onSpeak: handlePronounceSentence,
-                              isSpeakingText: (text) => Boolean(text) && speakingText === text.trim(),
-                              isLoadingText: (text) => Boolean(text) && loadingText === text.trim(),
-                            },
-                          )}
-                        </div>
-                      </label>
-                    </div>
-
-                    <div className="space-y-2">
-                      <p className={APPLE_META_TEXT}>{zh.similarExpressionsAuto}</p>
-                      {manualExpressionAssist.similarExpressions.length > 0 ? (
-                        manualExpressionAssist.similarExpressions.map((candidate) => (
-                          <label
-                            key={`similar-${candidate.text}`}
-                            className={`flex cursor-pointer items-start gap-2 p-3 ${APPLE_LIST_ITEM}`}
-                          >
-                            <input
-                              type="checkbox"
-                              className="mt-0.5"
-                              checked={Boolean(manualSelectedMap[normalizePhraseText(candidate.text)])}
-                              onChange={() => toggleManualSelected(candidate.text)}
-                            />
-                            <div className="space-y-0.5">
-                              <p className="text-sm font-medium">{candidate.text}</p>
-                              <p className={APPLE_META_TEXT}>
-                                {normalizeSimilarLabel(candidate.differenceLabel)}
-                              </p>
-                            </div>
-                          </label>
-                        ))
-                      ) : (
-                        <p className={APPLE_META_TEXT}>{zh.similarEmpty}</p>
-                      )}
-                    </div>
-
-                    <div className="space-y-2">
-                      <p className={APPLE_META_TEXT}>{zh.contrastExpressionsAuto}</p>
-                      {manualExpressionAssist.contrastExpressions.length > 0 ? (
-                        manualExpressionAssist.contrastExpressions.map((candidate) => (
-                          <label
-                            key={`contrast-${candidate.text}`}
-                            className={`flex cursor-pointer items-start gap-2 p-3 ${APPLE_LIST_ITEM}`}
-                          >
-                            <input
-                              type="checkbox"
-                              className="mt-0.5"
-                              checked={Boolean(manualSelectedMap[normalizePhraseText(candidate.text)])}
-                              onChange={() => toggleManualSelected(candidate.text)}
-                            />
-                            <div className="space-y-0.5">
-                              <p className="text-sm font-medium">{candidate.text}</p>
-                              <p className={APPLE_META_TEXT}>{candidate.differenceLabel}</p>
-                            </div>
-                          </label>
-                        ))
-                      ) : (
-                        <p className={APPLE_META_TEXT}>{zh.noContrastExpressions}</p>
-                      )}
-                    </div>
-                  </div>
-                ) : null}
-              </div>
-            ) : (
-              <div className="space-y-3 pt-1">
-                <div className="space-y-1">
-                  <p className={APPLE_META_TEXT}>{zh.sentenceMainLabel}</p>
-                  <Textarea
-                    className={APPLE_INPUT_PANEL}
-                    value={manualSentence}
-                    onChange={(event) => setManualSentence(event.target.value)}
-                    rows={4}
-                    placeholder={zh.sentenceMainPlaceholder}
-                  />
-                  <p className={APPLE_META_TEXT}>{zh.sentenceAutoHint}</p>
-                </div>
-              </div>
-            )}
-          </div>
-
-          <SheetFooter className="px-4 pt-3 pb-[calc(env(safe-area-inset-bottom)+12px)]">
-            <div
-              className={`grid gap-2 pb-safe ${
-                manualSheetState.footerGridClassName
-              }`}
-            >
-                <LoadingButton
-                  type="button"
-                  variant="ghost"
-                  className={appleButtonStrongClassName}
-                  disabled={manualSheetState.isSaving}
-                  loading={manualSheetState.isPrimarySaving}
-                  loadingText={formatLoadingText(manualSheetState.primaryActionLabel)}
-                  onClick={() => void handleSaveManualExpression("save")}
-                >
-                {manualSheetState.primaryActionLabel}
-              </LoadingButton>
-              {manualSheetState.showSecondaryAction ? (
-                <LoadingButton
-                  type="button"
-                  variant="ghost"
-                  className={appleButtonClassName}
-                  disabled={manualSheetState.isSaving}
-                  loading={manualSheetState.isSecondarySaving}
-                  loadingText={formatLoadingText(manualSheetState.secondaryActionLabel)}
-                  onClick={() => void handleSaveManualExpression("save_and_review")}
-                >
-                  {manualSheetState.secondaryActionLabel}
-                </LoadingButton>
-              ) : null}
-            </div>
-          </SheetFooter>
-        </SheetContent>
-      </Sheet>
-
-      <ChunksQuickAddRelatedSheet
-        open={quickAddRelatedOpen}
-        saving={savingQuickAddRelated}
-        text={quickAddRelatedText}
-        relationType={quickAddRelatedType}
-        targetText={focusExpression?.text ?? ""}
-        inputRef={quickAddRelatedInputRef}
-        validationMessage={quickAddRelatedValidationMessage}
-        libraryHint={quickAddRelatedLibraryHint}
-        labels={{
-          title: zh.quickAddRelatedTitle,
-          description: zh.quickAddRelatedDesc,
-          targetLabel: zh.quickAddTargetLabel,
-          copyTarget: zh.quickAddCopyTarget,
-          textLabel: zh.quickAddTextLabel,
-          textPlaceholder: zh.quickAddTextPlaceholder,
-          relationTypeLabel: zh.quickAddRelationTypeLabel,
-          similar: zh.quickAddSimilar,
-          contrast: zh.quickAddContrast,
-          submit: zh.quickAddSubmit,
+        quickAdd={{
+          open: quickAddRelatedOpen,
+          saving: savingQuickAddRelated,
+          text: quickAddRelatedText,
+          relationType: quickAddRelatedType,
+          targetText: focusExpression?.text ?? "",
+          inputRef: quickAddRelatedInputRef,
+          validationMessage: quickAddRelatedValidationMessage,
+          libraryHint: quickAddRelatedLibraryHint,
+          labels: {
+            title: zh.quickAddRelatedTitle,
+            description: zh.quickAddRelatedDesc,
+            targetLabel: zh.quickAddTargetLabel,
+            copyTarget: zh.quickAddCopyTarget,
+            textLabel: zh.quickAddTextLabel,
+            textPlaceholder: zh.quickAddTextPlaceholder,
+            relationTypeLabel: zh.quickAddRelationTypeLabel,
+            similar: zh.quickAddSimilar,
+            contrast: zh.quickAddContrast,
+            submit: zh.quickAddSubmit,
+          },
+          applePanelClassName: APPLE_PANEL,
+          appleButtonStrongClassName: appleButtonStrongClassName,
+          appleInputPanelClassName: APPLE_INPUT_PANEL,
+          appleMetaTextClassName: APPLE_META_TEXT,
+          appleBannerDangerClassName: APPLE_BANNER_DANGER,
+          appleBannerInfoClassName: APPLE_BANNER_INFO,
+          appleListItemClassName: APPLE_LIST_ITEM,
+          onOpenChange: (open) => {
+            setQuickAddRelatedOpen(open);
+            if (!open && !savingQuickAddRelated) {
+              resetQuickAddRelatedForm();
+            }
+          },
+          onCopyTarget: () => void handleCopyQuickAddTarget(),
+          onTextChange: setQuickAddRelatedText,
+          onRelationTypeChange: setQuickAddRelatedType,
+          onSubmit: () => void handleSaveQuickAddRelated(),
         }}
-        applePanelClassName={APPLE_PANEL}
-        appleButtonStrongClassName={appleButtonStrongClassName}
-        appleInputPanelClassName={APPLE_INPUT_PANEL}
-        appleMetaTextClassName={APPLE_META_TEXT}
-        appleBannerDangerClassName={APPLE_BANNER_DANGER}
-        appleBannerInfoClassName={APPLE_BANNER_INFO}
-        appleListItemClassName={APPLE_LIST_ITEM}
-        onOpenChange={(open) => {
-          setQuickAddRelatedOpen(open);
-          if (!open && !savingQuickAddRelated) {
-            resetQuickAddRelatedForm();
-          }
+        generatedSimilar={{
+          open: similarSheetOpen,
+          onOpenChange: setSimilarSheetOpen,
+          savingSelected: savingSelectedSimilar,
+          generatingForId: generatingSimilarForId,
+          seedExpressionText: similarSeedExpression?.text ?? "",
+          candidates: generatedSimilarCandidates,
+          selectedMap: selectedSimilarMap,
+          onToggleCandidate: toggleCandidateSelected,
+          onSaveSelected: () => void saveSelectedSimilarCandidates(),
+          onReset: resetGeneratedSimilarSheet,
+          state: generatedSimilarSheetState,
+          normalizeSimilarLabel,
+          close: () => setSimilarSheetOpen(false),
         }}
-        onCopyTarget={() => void handleCopyQuickAddTarget()}
-        onTextChange={setQuickAddRelatedText}
-        onRelationTypeChange={setQuickAddRelatedType}
-        onSubmit={() => void handleSaveQuickAddRelated()}
-      />
-
-      <Sheet
-        open={similarSheetOpen}
-        onOpenChange={(open) => {
-          setSimilarSheetOpen(open);
-          if (!open && !savingSelectedSimilar) {
-            resetGeneratedSimilarSheet();
-          }
+        focusDetail={{ ...focusDetailSheetProps, ...focusDetailSheetHandlers }}
+        moveIntoCluster={moveIntoClusterSheetProps}
+        expressionMap={{
+          open: mapOpen,
+          loading: mapLoading,
+          error: mapError,
+          data: mapData,
+          activeClusterId,
+          activeCluster,
+          centerExpressionText,
+          displayedClusterExpressions,
+          expressionStatusByNormalized,
+          addingCluster,
+          appleButtonClassName: appleButtonClassName,
+          labels: {
+            title: zh.mapTitle,
+            description: zh.mapDesc,
+            loading: zh.mapLoading,
+            empty: zh.mapEmpty,
+            centerExpression: zh.centerExpression,
+            clusterMeaning: zh.clusterMeaning,
+            relatedExpressions: zh.relatedExpressions,
+            clusterEmpty: zh.clusterEmpty,
+            mapLimitedPrefix: zh.mapLimitedPrefix,
+            mapLimitedSuffix: zh.mapLimitedSuffix,
+            statusUnknown: zh.statusUnknown,
+            close: zh.close,
+            practiceCluster: zh.practiceCluster,
+            addCluster: zh.addCluster,
+          },
+          buildDifferenceNote,
+          onOpenChange: setMapOpen,
+          onSelectCluster: setActiveClusterId,
+          onPracticeCluster: handlePracticeCluster,
+          onAddCluster: () => void handleAddClusterToReview(),
         }}
-      >
-        <SheetContent
-          side="bottom"
-          className={`max-h-[85vh] overflow-y-auto rounded-t-2xl border border-[var(--app-chunks-sheet-card-border)] bg-[var(--app-chunks-sheet-bg)] ${APPLE_PANEL}`}
-        >
-          <SheetHeader className="space-y-1 px-4 pb-3 pt-4">
-            <SheetTitle>{generatedSimilarSheetState.title}</SheetTitle>
-            <SheetDescription>{generatedSimilarSheetState.description}</SheetDescription>
-          </SheetHeader>
-
-          <div className="space-y-3 px-4 pb-4">
-            {generatedSimilarSheetState.showSeedExpression ? (
-              <div className={`p-2.5 ${APPLE_PANEL}`}>
-                <p className={APPLE_META_TEXT}>{generatedSimilarSheetState.centerExpressionLabel}</p>
-                <p className="text-sm font-medium">{similarSeedExpression?.text ?? ""}</p>
-              </div>
-            ) : null}
-            {generatedSimilarSheetState.showGenerating ? (
-              <p className={`text-sm ${APPLE_META_TEXT}`}>{generatedSimilarSheetState.generatingLabel}</p>
-            ) : null}
-            {generatedSimilarSheetState.showEmpty ? (
-              <p className={`text-sm ${APPLE_META_TEXT}`}>{generatedSimilarSheetState.emptyLabel}</p>
-            ) : null}
-            {generatedSimilarSheetState.showCandidates ? (
-              <div className="space-y-2">
-                {generatedSimilarCandidates.map((candidate) => {
-                  const normalized = normalizePhraseText(candidate.text);
-                  const checked = Boolean(selectedSimilarMap[normalized]);
-                  return (
-                    <label key={normalized} className={`flex cursor-pointer items-start gap-2 p-2.5 ${APPLE_LIST_ITEM}`}>
-                      <input
-                        type="checkbox"
-                        className="mt-0.5"
-                        checked={checked}
-                        onChange={() => toggleCandidateSelected(candidate.text)}
-                      />
-                      <div className="space-y-0.5">
-                        <p className="text-sm font-medium">{candidate.text}</p>
-                        <p className={APPLE_META_TEXT}>
-                          {normalizeSimilarLabel(candidate.differenceLabel)}
-                        </p>
-                      </div>
-                    </label>
-                  );
-                })}
-              </div>
-            ) : null}
-          </div>
-
-          <SheetFooter className="px-4 pt-3 pb-[calc(env(safe-area-inset-bottom)+12px)]">
-            <div className="grid grid-cols-2 gap-2 pb-safe">
-              <Button type="button" variant="ghost" className={appleButtonClassName} onClick={() => setSimilarSheetOpen(false)}>
-                {generatedSimilarSheetState.closeLabel}
-              </Button>
-              <LoadingButton
-                type="button"
-                variant="ghost"
-                className={appleButtonStrongClassName}
-                disabled={generatingSimilarForId !== null}
-                loading={savingSelectedSimilar}
-                loadingText={formatLoadingText(generatedSimilarSheetState.submitLabel)}
-                onClick={() => void saveSelectedSimilarCandidates()}
-              >
-                {generatedSimilarSheetState.submitLabel}
-              </LoadingButton>
-            </div>
-          </SheetFooter>
-        </SheetContent>
-      </Sheet>
-
-      <FocusDetailSheet {...focusDetailSheetProps} {...focusDetailSheetHandlers} />
-
-      <MoveIntoClusterSheet {...moveIntoClusterSheetProps} />
-
-      <ExpressionMapSheet
-        open={mapOpen}
-        loading={mapLoading}
-        error={mapError}
-        data={mapData}
-        activeClusterId={activeClusterId}
-        activeCluster={activeCluster}
-        centerExpressionText={centerExpressionText}
-        displayedClusterExpressions={displayedClusterExpressions}
-        expressionStatusByNormalized={expressionStatusByNormalized}
-        addingCluster={addingCluster}
-        appleButtonClassName={appleButtonClassName}
-        labels={{
-          title: zh.mapTitle,
-          description: zh.mapDesc,
-          loading: zh.mapLoading,
-          empty: zh.mapEmpty,
-          centerExpression: zh.centerExpression,
-          clusterMeaning: zh.clusterMeaning,
-          relatedExpressions: zh.relatedExpressions,
-          clusterEmpty: zh.clusterEmpty,
-          mapLimitedPrefix: zh.mapLimitedPrefix,
-          mapLimitedSuffix: zh.mapLimitedSuffix,
-          statusUnknown: zh.statusUnknown,
-          close: zh.close,
-          practiceCluster: zh.practiceCluster,
-          addCluster: zh.addCluster,
+        apple={{
+          panel: APPLE_PANEL,
+          button: appleButtonClassName,
+          buttonStrong: appleButtonStrongClassName,
+          inputPanel: APPLE_INPUT_PANEL,
+          metaText: APPLE_META_TEXT,
+          bannerDanger: APPLE_BANNER_DANGER,
+          bannerInfo: APPLE_BANNER_INFO,
+          listItem: APPLE_LIST_ITEM,
         }}
-        buildDifferenceNote={buildDifferenceNote}
-        onOpenChange={setMapOpen}
-        onSelectCluster={setActiveClusterId}
-        onPracticeCluster={handlePracticeCluster}
-        onAddCluster={() => void handleAddClusterToReview()}
       />
     </div>
   );
