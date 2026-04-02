@@ -566,6 +566,17 @@
 
 验证情况：
 - `node --import tsx --test "src/lib/shared/auth-redirect.test.ts" "middleware.test.ts"`
-- 额外执行 `pnpm exec tsc --noEmit --pretty false`；当前只剩与本次修复无关的既有类型问题：
-  - `src/app/(app)/chunks/use-expression-cluster-actions.ts`
-  - `src/lib/server/phrases/service.ts`
+- 额外执行 `pnpm exec tsc --noEmit --pretty false`；当时仓库里仍剩两处与本次修复无关的既有类型问题，已在后续维护中补齐。
+
+### 类型收口补齐
+- 修正了 `src/app/(app)/chunks/use-expression-cluster-actions.ts` 中删除表达依赖的空值兜底写法，避免 `deleteUserPhraseFromApi` 被 TypeScript 继续识别为可能缺失。
+- 修正了 `src/lib/server/phrases/service.ts` 中“删除主表达后补位主表达”的空值收口，在写 cluster membership 前显式守卫 `nextMainUserPhraseId`，让删除补位逻辑和类型约束保持一致。
+- 这次补齐后，仓库当前 `pnpm exec tsc --noEmit --pretty false` 已通过。
+
+影响范围：
+- `src/app/(app)/chunks/use-expression-cluster-actions.ts`
+- `src/lib/server/phrases/service.ts`
+
+验证情况：
+- `pnpm exec tsc --noEmit --pretty false`
+- `node --import tsx --test "src/lib/server/phrases/logic.test.ts" "src/app/(app)/chunks/use-expression-cluster-actions.test.tsx"`
