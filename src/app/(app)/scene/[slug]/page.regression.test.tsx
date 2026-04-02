@@ -168,6 +168,18 @@ let pendingVariantGeneration:
       resolve: (value: VariantSet) => void;
     }
   | null = null;
+let loadSceneDetailImpl:
+  | ((args: {
+      callbacks: {
+        onStart: () => void;
+        onHydrateLesson: (
+          lesson: Lesson,
+          source: "network" | "cache" | "none",
+        ) => void;
+        onStopLoading: () => void;
+      };
+    }) => Promise<void>)
+  | null = null;
 
 const routerPushCalls: string[] = [];
 const deletePracticeSetCalls: Array<{ sceneId: string; practiceSetId: string }> = [];
@@ -589,6 +601,10 @@ const mockedModules = {
         onStopLoading: () => void;
       };
     }) => {
+      if (loadSceneDetailImpl) {
+        await loadSceneDetailImpl({ callbacks });
+        return;
+      }
       callbacks.onStart();
       callbacks.onHydrateLesson(baseLesson, "network");
       callbacks.onStopLoading();
@@ -761,6 +777,7 @@ afterEach(() => {
   currentPracticeSnapshot = null;
   pendingPracticeGeneration = null;
   pendingVariantGeneration = null;
+  loadSceneDetailImpl = null;
   routerPushCalls.length = 0;
   deletePracticeSetCalls.length = 0;
   deleteVariantItemCalls.length = 0;
@@ -846,6 +863,35 @@ test("SceneDetailPage 点击训练浮层遮罩后会关闭面板", async () => {
     assert.equal(screen.queryByRole("button", { name: "收起训练面板" }), null);
   });
   assert.equal(fab.getAttribute("aria-expanded"), "false");
+});
+
+test("SceneDetailPage 在首屏数据未就绪时会先展示场景骨架", async () => {
+  let resolveLoad: (() => void) | null = null;
+  loadSceneDetailImpl = async ({ callbacks }) => {
+    callbacks.onStart();
+    await new Promise<void>((resolve) => {
+      resolveLoad = resolve;
+    });
+    callbacks.onHydrateLesson(baseLesson, "network");
+    callbacks.onStopLoading();
+  };
+
+  const SceneDetailPage = getSceneDetailPage();
+  render(<SceneDetailPage />);
+
+  await waitFor(() => {
+    assert.notEqual(screen.queryByLabelText("场景加载骨架"), null);
+  });
+  assert.equal(screen.queryByText("lesson-reader"), null);
+
+  if (!resolveLoad) {
+    throw new Error("resolveLoad was not initialized");
+  }
+  resolveLoad();
+
+  await waitFor(() => {
+    screen.getByText("lesson-reader");
+  });
 });
 
 test("SceneDetailPage 点击折叠态步骤文字打开面板时，不会被同轮遮罩点击立即关闭", async () => {

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { formatLoadingText, LoadingContent, LoadingState } from "@/components/shared/action-loading";
+import { formatLoadingText, LoadingContent } from "@/components/shared/action-loading";
 import {
   getSceneLearningProgressCacheSnapshotSync,
   getScenePracticeSnapshotCache,
@@ -14,6 +14,7 @@ import {
 import { SelectionDetailSheet } from "@/features/lesson/components/selection-detail-sheet";
 import { SceneExpressionMapView } from "@/features/scene/components/scene-expression-map-view";
 import { ScenePracticeView } from "@/features/scene/components/scene-practice-view";
+import { SceneDetailSkeleton } from "@/features/scene/components/scene-detail-skeleton";
 import { SceneVariantsView } from "@/features/scene/components/scene-variants-view";
 import { sceneViewLabels } from "@/features/scene/components/scene-view-labels";
 import { normalizePhraseText } from "@/lib/shared/phrases";
@@ -684,7 +685,7 @@ export default function SceneDetailClientPage({
   }, [baseLesson, latestVariantSet?.id, latestVariantSet?.status, viewMode]);
 
   if (sceneLoading) {
-    return <LoadingState text={sceneDetailMessages.loading} className="p-[var(--mobile-adapt-space-sheet)]" />;
+    return <SceneDetailSkeleton />;
   }
 
   if (!baseLesson) {

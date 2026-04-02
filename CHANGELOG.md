@@ -1,6 +1,28 @@
 # Changelog
 
 ## 2026-04-02
+### Scene 进入空白修复与骨架屏补齐
+- `scene/[slug]` 路由的 loading 不再返回空白，进入场景时会先展示与场景详情结构接近的骨架屏，减少从 `chunks`、`scenes` 等入口跳转时那段明显的白屏感。
+- 场景详情页内部在首屏数据尚未回填时，也从单行 spinner 改成结构化 skeleton，保证路由等待和页内加载两个阶段的反馈一致。
+- `chunks` 页的“进入场景”现在会像 `scenes` 页一样先触发路由预取和场景详情预热，再执行跳转，进一步缩短缓存未命中时的首屏等待。
+- 补充 `scene detail` 与 `chunks` 的回归测试，锁住“首屏先出骨架”和“入口点击会触发预热”两类行为。
+
+影响范围：
+- `src/app/(app)/scene/[slug]/loading.tsx`
+- `src/app/(app)/scene/[slug]/scene-detail-page.tsx`
+- `src/features/scene/components/scene-detail-skeleton.tsx`
+- `src/app/(app)/scene/[slug]/loading.test.tsx`
+- `src/app/(app)/scene/[slug]/page.regression.test.tsx`
+- `src/app/(app)/chunks/page.tsx`
+- `src/app/(app)/chunks/page.interaction.test.tsx`
+- `openspec/changes/fix-scene-entry-skeleton/tasks.md`
+
+验证情况：
+- `node --import tsx --import ./src/test/setup-dom.ts --test "src/app/(app)/scene/[[]slug[]]/loading.test.tsx" "src/app/(app)/scene/[[]slug[]]/page.regression.test.tsx"`
+- `node --import tsx --import ./src/test/setup-dom.ts --test "src/app/(app)/chunks/page.interaction.test.tsx"`
+- `node_modules\.bin\openspec.CMD change validate "fix-scene-entry-skeleton" --strict --no-interactive`
+- `node --import tsx scripts/check-mojibake.ts`
+
 ### PullToRefresh 被动监听告警修复
 - `PullToRefresh` 改为通过原生触摸监听处理 `touchstart / touchmove / touchend / touchcancel`，并显式把 `touchmove` 注册为 `passive: false`，避免浏览器继续报出 `Unable to preventDefault inside passive event listener invocation.`。
 - 保持现有下拉刷新启用页面、触发阈值与 `app:pull-refresh` 事件契约不变，只修复触摸移动阶段阻止默认滚动的监听语义。

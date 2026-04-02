@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Search } from "lucide-react";
 import { clearAllPhraseListCache } from "@/lib/cache/phrase-list-cache";
+import { prefetchSceneDetail } from "@/lib/cache/scene-prefetch";
 import { useTtsPlaybackController } from "@/hooks/use-tts-playback-controller";
 import { normalizePhraseText } from "@/lib/shared/phrases";
 import { buildChunkAudioKey } from "@/lib/shared/tts";
@@ -1282,6 +1283,8 @@ export default function ChunksPage() {
   const openSourceScene = (slug: string) => {
     if (!slug || openingSourceSceneSlug === slug) return;
     setOpeningSourceSceneSlug(slug);
+    void router.prefetch?.(`/scene/${slug}`);
+    void prefetchSceneDetail(slug).catch(() => undefined);
     router.push(`/scene/${slug}`);
   };
 

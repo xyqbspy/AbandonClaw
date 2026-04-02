@@ -2,6 +2,31 @@
   "files.encoding": "utf8",
   "files.autoGuessEncoding": false,
   "files.eol": "\n",
-  "editor.formatOnSave": true
+  "files.maxMemoryForLargeFilesMB": 4096,
+  "editor.formatOnSave": true,
+  "editor.largeFileOptimizations": true,
+  "workbench.editor.limit.value": 10,
+  "workbench.editor.limit.enabled": true,
+  "editor.minimap.enabled": false,
+  "editor.semanticHighlighting.enabled": false,
+  // 【新增】限制扩展宿主进程的内存占用
+  "extensions.experimental.deactivateAnyExtensionWhenMemoryPressureIsHigh": true,
+  // 【新增】禁用不常用的内置功能，减少后台开销
+  "search.followSymlinks": false, // 如果你不需要搜索符号链接
+  "npm.autoDetect": false, // 如果不用 Node.js 的 npm 脚本自动检测
+  "typescript.disableAutomaticTypeAcquisition": true, // 如果主要写 Python/其他语言
+  // 【调整】进一步减少文件监听范围 (针对大项目)
+  "files.watcherExclude": {
+    "**/.git/objects/**": true,
+    "**/.git/subtree-cache/**": true,
+    "**/node_modules/**": true,
+    "**/__pycache__/**": true,
+    "**/.venv/**": true
+  },
+  // 【新增】如果主要开发前端/脚本，可以排除大文件的语法检查
+  "files.exclude": {
+    "**/node_modules": true,
+    "**/__pycache__": true,
+    "**/*.pyc": true
+  }
 }
-

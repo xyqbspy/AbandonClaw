@@ -2,13 +2,17 @@ import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import test, { afterEach } from "node:test";
 import React from "react";
-import { cleanup, render, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 
 const localRequire = createRequire(import.meta.url);
 const nodeModule = localRequire("node:module") as typeof import("node:module");
 
 let clearAllPhraseListCacheCalls = 0;
 let loadPhrasesError: Error | null = null;
+const routerPushCalls: string[] = [];
+const routerPrefetchCalls: string[] = [];
+const prefetchSceneDetailCalls: string[] = [];
 const notifyChunksLoadFailedCalls: Array<string | null> = [];
 const loadPhrasesCalls: Array<
   [
@@ -23,11 +27,22 @@ const loadPhrasesCalls: Array<
 const mockedModules = {
   "next/navigation": {
     useRouter: () => ({
-      push: () => undefined,
+      push: (href: string) => {
+        routerPushCalls.push(href);
+      },
       replace: () => undefined,
-      prefetch: () => Promise.resolve(),
+      prefetch: (href: string) => {
+        routerPrefetchCalls.push(href);
+        return Promise.resolve();
+      },
     }),
     useSearchParams: () => new URLSearchParams("query=burned+out&review=reviewing&content=sentence&cluster=cluster-1"),
+  },
+  "@/lib/cache/scene-prefetch": {
+    prefetchSceneDetail: async (slug: string) => {
+      prefetchSceneDetailCalls.push(slug);
+      return true;
+    },
   },
   "@/lib/cache/phrase-list-cache": {
     clearAllPhraseListCache: async () => {
@@ -95,7 +110,11 @@ const mockedModules = {
     ClusterFocusList: () => null,
   },
   "./chunks-list-view": {
-    ChunksListView: () => null,
+    ChunksListView: ({ openSourceScene }: { openSourceScene: (slug: string) => void }) => (
+      <button type="button" onClick={() => openSourceScene("scene-from-chunks")}>
+        open-source-scene
+      </button>
+    ),
   },
   "./use-chunks-route-state": {
     useChunksRouteState: () => ({
@@ -112,9 +131,20 @@ const mockedModules = {
   "./use-chunks-list-data": {
     useChunksListData: () => ({
       loading: false,
-      phrases: [],
+      phrases: [
+        {
+          userPhraseId: "phrase-1",
+          text: "burned out",
+          learningItemType: "expression",
+          reviewStatus: "reviewing",
+          translation: "筋疲力尽",
+          aiEnrichmentStatus: "done",
+          exampleSentences: [],
+          sourceSceneSlug: "scene-from-chunks",
+        },
+      ],
       setPhrases: () => undefined,
-      total: 0,
+      total: 1,
       loadPhrases: async (
         query: string,
         reviewFilter: "saved" | "reviewing" | "mastered" | "archived" | "all",
@@ -355,6 +385,9 @@ afterEach(() => {
   cleanup();
   clearAllPhraseListCacheCalls = 0;
   loadPhrasesError = null;
+  routerPushCalls.length = 0;
+  routerPrefetchCalls.length = 0;
+  prefetchSceneDetailCalls.length = 0;
   loadPhrasesCalls.length = 0;
   notifyChunksLoadFailedCalls.length = 0;
   ChunksPageModule = null;
@@ -411,5 +444,19 @@ test("ChunksPage 下拉刷新强制拉取失败时会保留清缓存行为并走
       ],
     ]);
     assert.deepEqual(notifyChunksLoadFailedCalls, ["load failed"]);
+  });
+});
+
+test("ChunksPage 从列表进入场景时会先触发路由与详情预热", async () => {
+  const user = userEvent.setup();
+  const ChunksPage = getChunksPage();
+  render(<ChunksPage />);
+
+  await user.click(await screen.findByRole("button", { name: "open-source-scene" }));
+
+  await waitFor(() => {
+    assert.deepEqual(routerPrefetchCalls, ["/scene/scene-from-chunks"]);
+    assert.deepEqual(prefetchSceneDetailCalls, ["scene-from-chunks"]);
+    assert.deepEqual(routerPushCalls, ["/scene/scene-from-chunks"]);
   });
 });
