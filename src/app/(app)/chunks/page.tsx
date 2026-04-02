@@ -28,8 +28,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { EmptyState } from "@/components/shared/empty-state";
 import { formatLoadingText, LoadingButton, LoadingState } from "@/components/shared/action-loading";
 import { SegmentedControl } from "@/components/shared/segmented-control";
+import { ExampleSentenceCards } from "@/components/shared/example-sentence-cards";
 import { Button } from "@/components/ui/button";
-import { ExampleSentenceCards } from "@/features/chunks/components/example-sentence-cards";
 import {
   Sheet,
   SheetContent,

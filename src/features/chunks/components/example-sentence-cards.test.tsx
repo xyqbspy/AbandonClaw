@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test, { afterEach } from "node:test";
 import React from "react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { ExampleSentenceCards } from "./example-sentence-cards";
+import { ExampleSentenceCards } from "@/components/shared/example-sentence-cards";
 
 afterEach(() => {
   cleanup();

@@ -4,8 +4,8 @@ import { ReactNode } from "react";
 import { Loader2, RotateCcw, Volume2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { DetailInfoBlock, DetailLoadingBlock } from "@/features/chunks/components/detail-info-blocks";
-import { ExampleSentenceCards } from "@/features/chunks/components/example-sentence-cards";
+import { DetailInfoBlock, DetailLoadingBlock } from "@/components/shared/detail-info-blocks";
+import { ExampleSentenceCards } from "@/components/shared/example-sentence-cards";
 import { SelectionChunkLayer } from "@/lib/types";
 import {
   APPLE_BADGE_SUCCESS,

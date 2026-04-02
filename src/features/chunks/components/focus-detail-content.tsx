@@ -9,6 +9,11 @@ import {
   SegmentedTabsTrigger,
 } from "@/components/shared/segmented-tabs";
 import { LoadingState } from "@/components/shared/action-loading";
+import {
+  DetailInfoBlock,
+  DetailLoadingBlock,
+  DetailStageBlock,
+} from "@/components/shared/detail-info-blocks";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { normalizePhraseText } from "@/lib/shared/phrases";
@@ -16,11 +21,6 @@ import {
   ManualExpressionAssistResponse,
   UserPhraseItemResponse,
 } from "@/lib/utils/phrases-api";
-import {
-  DetailInfoBlock,
-  DetailLoadingBlock,
-  DetailStageBlock,
-} from "./detail-info-blocks";
 import { FocusDetailRelatedItem } from "./focus-detail-selectors";
 
 type FocusDetailTabValue = "info" | "similar" | "contrast";

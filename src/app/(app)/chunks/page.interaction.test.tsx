@@ -71,7 +71,7 @@ const mockedModules = {
   "@/components/shared/empty-state": {
     EmptyState: () => null,
   },
-  "@/features/chunks/components/example-sentence-cards": {
+  "@/components/shared/example-sentence-cards": {
     ExampleSentenceCards: () => null,
   },
   "@/components/ui/sheet": {

@@ -44,6 +44,16 @@
 - `src/features/today`: 今日卡片与 selectors
 - `src/features/review`: 复习卡片与复习展示
 
+### 公共组件层
+
+- `src/components/ui`: 最基础的 UI primitives
+- `src/components/shared`: 跨 feature 复用的稳定公共组件
+- `src/components/audio`: 音频动作类公共组件
+
+组件归属与迁移边界优先参考：
+
+- `docs/component-library.md`
+
 ### 服务与数据层
 
 - `src/lib/server/scene`: 场景查询、导入、生成、变体
@@ -149,6 +159,14 @@
 - `actions`: payload 构造、本地数据结构整理
 - `controller`: 动作条件与展示条件
 - `components`: 视图与交互
+
+### 组件分层要避免横向耦合
+
+- 不要长期保留 feature A 直接依赖 feature B 组件
+- 已被多个 feature 直接复用的组件，应迁到 `src/components/*`
+- 只有真实跨域复用且 props 语义稳定，才适合进入公共层
+- 如果组件强依赖某个 feature 的状态模型，就继续留在 feature 内
+- 不确定时先看 `docs/component-library.md`，再决定是否抽公共
 
 ### 改动时优先看链路，不只看单点
 

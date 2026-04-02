@@ -1,5 +1,26 @@
 # Changelog
 
+## 2026-04-02
+### 跨 feature 组件公共化与组件库说明补充
+- 将已被 `chunks` 与 `lesson` 共用的 `detail-info-blocks`、`example-sentence-cards` 迁移到 `src/components/shared`，清理 `lesson` 直接依赖 `chunks` 组件目录的横向耦合。
+- 新增 `docs/component-library.md`，明确 `ui / shared / audio / features / 页面层` 的组件分层规则、当前审计结果和“不该抽公共”的反例。
+- 更新 `docs/project-maintenance-playbook.md`，把组件分层与公共化判断纳入固定维护入口，后续新增组件可以直接按文档判断归属。
+
+影响范围：
+- `src/components/shared/detail-info-blocks.tsx`
+- `src/components/shared/example-sentence-cards.tsx`
+- `src/features/lesson/components/selection-detail-primitives.tsx`
+- `src/features/chunks/components/focus-detail-content.tsx`
+- `src/app/(app)/chunks/page.tsx`
+- `docs/component-library.md`
+- `docs/project-maintenance-playbook.md`
+
+验证情况：
+- `node --import tsx --import ./src/test/setup-dom.ts --test "src/features/chunks/components/example-sentence-cards.test.tsx" "src/features/chunks/components/focus-detail-content.interaction.test.tsx" "src/features/lesson/components/selection-detail-panel.interaction.test.tsx" "src/features/lesson/components/selection-detail-sheet.interaction.test.tsx" "src/app/(app)/chunks/page.interaction.test.tsx"`
+- `pnpm exec tsc --noEmit --pretty false`
+- `node --import tsx scripts/check-mojibake.ts`
+- `node_modules\.bin\openspec.CMD change validate "rationalize-shared-components" --strict --no-interactive`
+
 ## 2026-04-01
 ### 音频链路维护文档补充
 - 新增 `docs/audio-tts-pipeline.md`，整理当前 TTS 生成、Storage 复用、浏览器缓存、预热调度、播放 fallback 和重生成链路。
