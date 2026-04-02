@@ -1,6 +1,20 @@
 # Changelog
 
 ## 2026-04-02
+### 句子页翻译入口收口为纯图标
+- 句子块里的翻译切换继续默认隐藏，但按钮不再显示“翻译 / 收起”文字，只保留翻译图标，减少正文旁边的视觉干扰。
+- 翻译按钮现在与朗读按钮并排展示，且固定放在播放按钮左边，让句子级操作入口更集中。
+- 同步更新 `sentence-block` 交互测试，锁住“默认隐藏翻译、点图标展开/收起、朗读按钮仍可正常使用”这条行为。
+
+影响范围：
+- `src/features/lesson/components/sentence-block.tsx`
+- `src/features/lesson/components/sentence-block.interaction.test.tsx`
+
+验证情况：
+- `node --import tsx --import ./src/test/setup-dom.ts --test "src/features/lesson/components/sentence-block.interaction.test.tsx"`
+- `node --import tsx scripts/check-mojibake.ts`
+- `node_modules\.bin\openspec.CMD change validate "adjust-sentence-translation-toggle" --strict --no-interactive`
+
 ### 本地运行脚本补齐 preview / dev 双模式
 - 为 `package.json` 补齐 `dev:turbo`、`preview`、`preview:build` 和 `preview:start`，让本地工作流更适合“默认不开服务，按需查看结果”的 Codex 开发方式。
 - `preview` 现在直接串起 `next build + next start`，适合只看结果、不需要热更新时使用，避免长期挂着 `next dev` 占用较高内存。
