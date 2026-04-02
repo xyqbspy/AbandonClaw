@@ -1,6 +1,31 @@
 # Changelog
 
 ## 2026-04-02
+### 重组件第一轮拆分治理
+- 将 `scene-detail-page` 中的训练浮层入口抽到独立模块 `scene-training-coach-floating-entry.tsx`，把拖拽 / 展开 / 步骤面板相关交互从页面主文件中拆出，降低主学习页的组装复杂度。
+- 将 `lesson-reader` 中的播放编排提取为 `use-lesson-reader-playback.ts`，统一承接 TTS controller、预热调度和句子 / chunk / scene loop 播放动作，让阅读器主组件更聚焦视图与学习交互。
+- 将 `chunks/page.tsx` 中的 quick add 关联表达 sheet 装配提取为 `chunks-quick-add-related-sheet.tsx`，减少页面里内联 sheet 结构继续膨胀。
+- 更新 `docs/component-library.md` 与 `docs/project-maintenance-playbook.md`，明确“重业务容器优先做 feature 内部拆分，再判断是否值得公共化”的治理规则。
+
+影响范围：
+- `src/app/(app)/scene/[slug]/scene-detail-page.tsx`
+- `src/app/(app)/scene/[slug]/scene-training-coach-floating-entry.tsx`
+- `src/app/(app)/scene/[slug]/scene-training-coach-floating-entry.test.tsx`
+- `src/features/lesson/components/lesson-reader.tsx`
+- `src/features/lesson/audio/use-lesson-reader-playback.ts`
+- `src/app/(app)/chunks/page.tsx`
+- `src/app/(app)/chunks/chunks-quick-add-related-sheet.tsx`
+- `src/app/(app)/chunks/chunks-quick-add-related-sheet.test.tsx`
+- `docs/component-library.md`
+- `docs/project-maintenance-playbook.md`
+- `openspec/changes/decompose-heavy-feature-components/tasks.md`
+
+验证情况：
+- `node --import tsx --import ./src/test/setup-dom.ts --test "src/app/(app)/scene/[[]slug[]]/scene-training-coach-floating-entry.test.tsx" "src/app/(app)/scene/[[]slug[]]/page.regression.test.tsx" "src/features/lesson/components/lesson-reader.interaction.test.tsx" "src/app/(app)/chunks/chunks-quick-add-related-sheet.test.tsx" "src/app/(app)/chunks/page.interaction.test.tsx"`
+- `pnpm exec tsc --noEmit --pretty false`
+- `node --import tsx scripts/check-mojibake.ts`
+- `node_modules\.bin\openspec.CMD change validate "decompose-heavy-feature-components" --strict --no-interactive`
+
 ### 跨 feature 组件公共化与组件库说明补充
 - 将已被 `chunks` 与 `lesson` 共用的 `detail-info-blocks`、`example-sentence-cards` 迁移到 `src/components/shared`，清理 `lesson` 直接依赖 `chunks` 组件目录的横向耦合。
 - 新增 `docs/component-library.md`，明确 `ui / shared / audio / features / 页面层` 的组件分层规则、当前审计结果和“不该抽公共”的反例。

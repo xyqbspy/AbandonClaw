@@ -83,6 +83,7 @@ import {
   resolveFocusExpressionId,
 } from "./chunks-page-logic";
 import { buildQuickAddRelatedPayload } from "./chunks-save-contract";
+import { ChunksQuickAddRelatedSheet } from "./chunks-quick-add-related-sheet";
 import { useChunksRouteState } from "./use-chunks-route-state";
 import { useExpressionClusterActions } from "./use-expression-cluster-actions";
 import { useFocusAssist } from "./use-focus-assist";
@@ -2342,92 +2343,45 @@ export default function ChunksPage() {
         </SheetContent>
       </Sheet>
 
-      <Sheet
+      <ChunksQuickAddRelatedSheet
         open={quickAddRelatedOpen}
+        saving={savingQuickAddRelated}
+        text={quickAddRelatedText}
+        relationType={quickAddRelatedType}
+        targetText={focusExpression?.text ?? ""}
+        inputRef={quickAddRelatedInputRef}
+        validationMessage={quickAddRelatedValidationMessage}
+        libraryHint={quickAddRelatedLibraryHint}
+        labels={{
+          title: zh.quickAddRelatedTitle,
+          description: zh.quickAddRelatedDesc,
+          targetLabel: zh.quickAddTargetLabel,
+          copyTarget: zh.quickAddCopyTarget,
+          textLabel: zh.quickAddTextLabel,
+          textPlaceholder: zh.quickAddTextPlaceholder,
+          relationTypeLabel: zh.quickAddRelationTypeLabel,
+          similar: zh.quickAddSimilar,
+          contrast: zh.quickAddContrast,
+          submit: zh.quickAddSubmit,
+        }}
+        applePanelClassName={APPLE_PANEL}
+        appleButtonStrongClassName={appleButtonStrongClassName}
+        appleInputPanelClassName={APPLE_INPUT_PANEL}
+        appleMetaTextClassName={APPLE_META_TEXT}
+        appleBannerDangerClassName={APPLE_BANNER_DANGER}
+        appleBannerInfoClassName={APPLE_BANNER_INFO}
+        appleListItemClassName={APPLE_LIST_ITEM}
         onOpenChange={(open) => {
           setQuickAddRelatedOpen(open);
           if (!open && !savingQuickAddRelated) {
             resetQuickAddRelatedForm();
           }
         }}
-      >
-        <SheetContent
-          side="bottom"
-          overlayClassName="z-[80]"
-          className={`z-[81] max-h-[85vh] overflow-y-auto rounded-t-2xl border border-[var(--app-chunks-sheet-card-border)] bg-[var(--app-chunks-sheet-bg)] ${APPLE_PANEL}`}
-        >
-          <SheetHeader className="space-y-1 px-4 pb-3 pt-4">
-            <SheetTitle>{zh.quickAddRelatedTitle}</SheetTitle>
-            <SheetDescription>{zh.quickAddRelatedDesc}</SheetDescription>
-          </SheetHeader>
-
-          <div className="space-y-4 px-4 pb-4">
-            <button
-              type="button"
-              className={`w-full p-3 text-left transition ${APPLE_LIST_ITEM}`}
-              onClick={() => void handleCopyQuickAddTarget()}
-            >
-              <div className="space-y-1">
-                <div className="flex items-center justify-between gap-3">
-                  <p className={APPLE_META_TEXT}>{zh.quickAddTargetLabel}</p>
-                  <p className={APPLE_META_TEXT}>{zh.quickAddCopyTarget}</p>
-                </div>
-                <p className="text-sm font-medium">{focusExpression?.text ?? ""}</p>
-              </div>
-            </button>
-
-            <div className="space-y-1">
-              <p className={APPLE_META_TEXT}>{zh.quickAddTextLabel}</p>
-              <Input
-                className={APPLE_INPUT_PANEL}
-                ref={quickAddRelatedInputRef}
-                value={quickAddRelatedText}
-                onChange={(event) => setQuickAddRelatedText(event.target.value)}
-                placeholder={zh.quickAddTextPlaceholder}
-              />
-              {quickAddRelatedValidationMessage ? (
-                <p className={APPLE_BANNER_DANGER}>{quickAddRelatedValidationMessage}</p>
-              ) : quickAddRelatedLibraryHint ? (
-                <p className={APPLE_BANNER_INFO}>{quickAddRelatedLibraryHint}</p>
-              ) : null}
-            </div>
-
-            <div className="space-y-1">
-              <p className={APPLE_META_TEXT}>{zh.quickAddRelationTypeLabel}</p>
-              <SegmentedControl
-                ariaLabel={zh.quickAddRelationTypeLabel}
-                value={quickAddRelatedType}
-                onChange={(value) =>
-                  setQuickAddRelatedType(value === "contrast" ? "contrast" : "similar")
-                }
-                options={[
-                  { value: "similar", label: zh.quickAddSimilar },
-                  { value: "contrast", label: zh.quickAddContrast },
-                ]}
-              />
-            </div>
-          </div>
-
-          <SheetFooter className="px-4 pt-3 pb-[calc(env(safe-area-inset-bottom)+12px)]">
-            <div className="grid gap-2 pb-safe">
-              <LoadingButton
-                type="button"
-                variant="ghost"
-                className={appleButtonStrongClassName}
-                disabled={
-                  !quickAddRelatedText.trim() ||
-                  Boolean(quickAddRelatedValidationMessage)
-                }
-                loading={savingQuickAddRelated}
-                loadingText={formatLoadingText(zh.quickAddSubmit)}
-                onClick={() => void handleSaveQuickAddRelated()}
-              >
-                {zh.quickAddSubmit}
-              </LoadingButton>
-            </div>
-          </SheetFooter>
-        </SheetContent>
-      </Sheet>
+        onCopyTarget={() => void handleCopyQuickAddTarget()}
+        onTextChange={setQuickAddRelatedText}
+        onRelationTypeChange={setQuickAddRelatedType}
+        onSubmit={() => void handleSaveQuickAddRelated()}
+      />
 
       <Sheet
         open={similarSheetOpen}

@@ -140,7 +140,31 @@
 - `SelectionDetailPanel` 和 `FocusDetailSheet` 都是详情容器，但它们服务的业务模型不同，不应该因为都有详情区就合成一个公共组件
 - `chunks` 的表达地图与 `scene` 的学习流程视图都很重要，但它们不是同一种稳定公共组件
 
-## 6. 迁移公共组件时的最低要求
+## 6. 什么时候先做内部拆分，而不是继续抽公共
+
+如果一个组件已经开始同时承担下面几类职责，优先先在 feature 内部拆分：
+
+- 路由态或 query 同步
+- 多个 sheet / panel / overlay 的装配
+- 播放、保存、删除、跳转等多组动作编排
+- 同时维护 loading、错误、禁用、空态和缓存回写
+- 同一文件里既有大段 JSX，又有大量条件派生和副作用
+
+当前项目里更该先拆内部模块的典型对象：
+
+- `src/app/(app)/chunks/page.tsx`
+- `src/app/(app)/scene/[slug]/scene-detail-page.tsx`
+- `src/features/lesson/components/lesson-reader.tsx`
+
+推荐拆分顺序：
+
+1. 先提取 feature 内部 hook 或 logic，收口动作条件和派生状态
+2. 再提取局部装配组件，例如 sheet、floating entry、step actions
+3. 最后再判断拆出的片段是否真的形成跨 feature 稳定复用
+
+不要直接把重业务容器抽到 `src/components/shared`，除非它已经满足跨 feature 稳定复用，并且脱离原 feature 后名称与 props 仍然清晰。
+
+## 7. 迁移公共组件时的最低要求
 
 - 先确认存在真实跨 feature 复用，不做预防性抽象
 - 迁移后清理 feature-to-feature 组件依赖

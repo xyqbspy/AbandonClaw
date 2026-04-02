@@ -160,12 +160,28 @@
 - `controller`: 动作条件与展示条件
 - `components`: 视图与交互
 
+如果页面或 feature 容器已经明显过重，先做内部拆分，不要急着抽成公共组件。当前优先观察的重文件是：
+
+- `src/app/(app)/chunks/page.tsx`
+- `src/app/(app)/scene/[slug]/scene-detail-page.tsx`
+- `src/features/lesson/components/lesson-reader.tsx`
+
+第一轮拆分建议优先挑这些块：
+
+- 局部 sheet / panel 装配
+- 浮层入口或局部步骤视图
+- 音频、保存、删除这类成组动作 controller
+- 纯派生逻辑与状态映射
+
+如果拆出的模块仍然强依赖当前 feature 的状态模型，就继续留在 feature 内；不要因为“拆出来了”就直接升级成 shared。
+
 ### 组件分层要避免横向耦合
 
 - 不要长期保留 feature A 直接依赖 feature B 组件
 - 已被多个 feature 直接复用的组件，应迁到 `src/components/*`
 - 只有真实跨域复用且 props 语义稳定，才适合进入公共层
 - 如果组件强依赖某个 feature 的状态模型，就继续留在 feature 内
+- 当文件过重但仍属于单一 feature 时，优先做 feature 内部拆分，而不是提前公共化
 - 不确定时先看 `docs/component-library.md`，再决定是否抽公共
 
 ### 改动时优先看链路，不只看单点
@@ -178,6 +194,12 @@
 - 列表缓存与详情缓存
 - 学习进度上报
 - continue learning / 今日学习路径文案
+
+如果这次改动涉及重组件拆分，还要额外确认：
+
+- 拆出的 hook / logic / subcomponent 是否仍然完整承接原来的副作用链路
+- 页面层是否只减少了体积，没有把状态判断分散到更多地方
+- 回归测试是否覆盖“原入口还能照常打开 / 提交 / 关闭 / 跳转”
 
 ### 文档与编码
 

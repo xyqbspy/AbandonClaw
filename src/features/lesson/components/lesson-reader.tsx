@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { appCopy } from "@/lib/constants/copy";
 import { LoopActionButton } from "@/components/audio/loop-action-button";
 import { TtsActionButton } from "@/components/audio/tts-action-button";
+import { useLessonReaderPlayback } from "@/features/lesson/audio/use-lesson-reader-playback";
 import {
   findMatchingChunkInSentence,
   getChunkLayerFromLesson,
@@ -23,7 +24,6 @@ import {
   getSentenceById,
 } from "@/lib/data/mock-lessons";
 import { useMobile } from "@/hooks/use-mobile";
-import { useTtsPlaybackController } from "@/hooks/use-tts-playback-controller";
 import { Lesson, LessonBlock, LessonSentence, SelectionChunkLayer } from "@/lib/types";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -32,10 +32,7 @@ import { SelectionDetailPanel } from "@/features/lesson/components/selection-det
 import { SelectionDetailSheet } from "@/features/lesson/components/selection-detail-sheet";
 import { SelectionToolbar } from "@/features/lesson/components/selection-toolbar";
 import { normalizePhraseText } from "@/lib/shared/phrases";
-import { buildChunkAudioKey } from "@/lib/shared/tts";
 import { trackChunksFromApi } from "@/lib/utils/chunks-api";
-import { getSentenceSpeakText } from "@/lib/utils/audio-warmup";
-import { scheduleLessonAudioWarmup } from "@/lib/utils/resource-actions";
 import {
   getLessonBlocks,
   getLessonSentences,
@@ -146,7 +143,6 @@ export function LessonReader({
   const readerRef = useRef<HTMLDivElement | null>(null);
   const suppressSelectionClearRef = useRef(false);
   const sentenceNodeMapRef = useRef<Record<string, HTMLDivElement | null>>({});
-  const sentenceLoopRef = useRef<string | null>(null);
   const trackedEncounterKeysRef = useRef<Set<string>>(new Set());
   const [sheetOpen, setSheetOpen] = useState(false);
   const [mobileActiveGroup, setMobileActiveGroup] =
@@ -324,118 +320,29 @@ export function LessonReader({
     };
   }, [chunkDetail, currentSentence, lesson.slug, sentenceOrder]);
 
-  const playbackController = useTtsPlaybackController();
-  const { playbackState, speakingText: effectiveSpeakingText, loadingText: effectiveLoadingText, stop } =
-    playbackController;
-  const isSceneLooping = playbackController.isSceneLooping(lesson.slug);
-  const isSentencePlaying = useCallback(
-    (sentenceId: string, mode?: "normal" | "slow") =>
-      playbackController.isSentenceActive(sentenceId, mode),
-    [playbackController],
-  );
-  const isSentenceLoading = useCallback(
-    (sentenceId: string, mode?: "normal" | "slow") =>
-      playbackController.isSentenceLoading(sentenceId, mode),
-    [playbackController],
-  );
-  const isChunkLoading = useCallback(
-    (text: string) => playbackController.isChunkLoading(text),
-    [playbackController],
-  );
-  const loadingChunkKey =
-    playbackState.kind === "chunk" && playbackState.status === "loading" && effectiveLoadingText
-      ? effectiveLoadingText
-      : null;
-  const isSceneLoopLoading = playbackController.isSceneLoopLoading(lesson.slug);
-  const stopAudio = useCallback(() => {
-    sentenceLoopRef.current = null;
-    stop();
-  }, [stop]);
-
-  const playBlockTts = useCallback(
-    async (block: LessonBlock) => {
-      const blockReadText =
-        block.tts?.trim() ||
-        block.sentences
-          .map((sentence) => sentence.tts?.trim() || sentence.audioText?.trim() || sentence.text)
-          .filter(Boolean)
-          .join(" ");
-      if (!blockReadText) return;
-
-      const blockPlaybackId = `block-${block.id}`;
-      if (
-        playbackController.isSentenceActive(blockPlaybackId, "normal")
-      ) {
-        stopAudio();
-        return;
-      }
-
-      sentenceLoopRef.current = null;
-      await playbackController.toggleSentencePlayback({
-        sceneSlug: lesson.slug,
-        sentenceId: blockPlaybackId,
-        text: blockReadText,
-        mode: "normal",
-        speaker: block.speaker,
-        onError: (error) => {
-          toast.error(error instanceof Error ? error.message : "发音失败，请稍后重试");
-        },
-      });
-    },
-    [lesson.slug, playbackController, stopAudio],
-  );
-
-  useEffect(
-    () => () => {
-      stopAudio();
-    },
-    [stopAudio],
-  );
-
-  useEffect(() => {
-    const anchorSentence =
-      (state.activeSentenceId
-        ? sentenceOrder.find((item) => item.id === state.activeSentenceId)
-        : null) ?? firstSentence;
-    if (!anchorSentence) return;
-
-    const anchorIndex = sentenceOrder.findIndex((item) => item.id === anchorSentence.id);
-    const candidateSentences = [
-      anchorSentence,
-      anchorIndex >= 0 ? sentenceOrder[anchorIndex + 1] ?? null : null,
-    ].filter((item): item is LessonSentence => Boolean(item));
-
-    const timer = window.setTimeout(() => {
-      scheduleLessonAudioWarmup(
-        {
-          ...lesson,
-          sections: [
-            {
-              id: "warmup-section",
-              title: "warmup",
-              summary: "",
-              blocks: [
-                {
-                  id: "warmup-block",
-                  speaker: anchorSentence.speaker,
-                  sentences: candidateSentences,
-                },
-              ],
-            },
-          ],
-        },
-        {
-          sentenceLimit: candidateSentences.length,
-          chunkLimit: 2,
-          key: `lesson-reader:${lesson.id}:${anchorSentence.id}`,
-        },
-      );
-    }, 80);
-
-    return () => {
-      window.clearTimeout(timer);
-    };
-  }, [firstSentence, lesson.slug, sentenceOrder, state.activeSentenceId]);
+  const {
+    playbackState,
+    loadingChunkKey,
+    speakingText: effectiveSpeakingText,
+    loadingText: effectiveLoadingText,
+    isSceneLooping,
+    isSceneLoopLoading,
+    isSentencePlaying,
+    isSentenceLoading,
+    isChunkLoading,
+    stopAudio,
+    playBlockTts,
+    handlePronounce,
+    handleLoopSentence,
+    toggleSceneLoopPlayback,
+  } = useLessonReaderPlayback({
+    lesson,
+    blockOrder,
+    sentenceOrder,
+    firstSentence,
+    activeSentenceId: state.activeSentenceId,
+    onSceneLoopPlayback,
+  });
 
   const findSentenceById = useCallback(
     (sentenceId: string) => getSentenceById(lesson, sentenceId),
@@ -628,97 +535,6 @@ export function LessonReader({
       left,
     } satisfies SelectionState;
   }, [locateSourceSentenceFromRange]);
-
-  const handlePronounce = useCallback(
-    (text: string) => {
-      const clean = text.trim();
-      if (!clean) return;
-      if (effectiveSpeakingText === clean) {
-        stopAudio();
-        return;
-      }
-      const sentence = sentenceOrder.find((item) => item.text.trim() === clean);
-      if (sentence) {
-        void playbackController.toggleSentencePlayback({
-          sceneSlug: lesson.slug,
-          sentenceId: sentence.id,
-          text: getSentenceSpeakText(sentence),
-          mode: "normal",
-          speaker: sentence.speaker,
-          onError: (error) => {
-            toast.error(error instanceof Error ? error.message : "发音失败，请稍后重试");
-          },
-        });
-        return;
-      }
-
-      void playbackController.toggleChunkPlayback({
-        chunkText: clean,
-        chunkKey: buildChunkAudioKey(clean),
-        onError: (error) => {
-          toast.error(error instanceof Error ? error.message : "发音失败，请稍后重试");
-        },
-      });
-    },
-    [effectiveSpeakingText, lesson.slug, playbackController, sentenceOrder, stopAudio],
-  );
-
-  const handleLoopSentence = useCallback(
-    (text: string) => {
-      const clean = text.trim();
-      if (!clean) return;
-
-      if (sentenceLoopRef.current === clean && effectiveSpeakingText === clean) {
-        sentenceLoopRef.current = null;
-        stopAudio();
-        return;
-      }
-
-      sentenceLoopRef.current = clean;
-      void playbackController.toggleRepeatingChunkLoop({
-        chunkText: clean,
-        chunkKey: buildChunkAudioKey(clean),
-        intervalMs: 80,
-        onError: (error) => {
-          sentenceLoopRef.current = null;
-          toast.error(error instanceof Error ? error.message : "播放失败，请稍后重试");
-        },
-      });
-    },
-    [effectiveSpeakingText, playbackController, stopAudio],
-  );
-
-  const toggleSceneLoopPlayback = useCallback(() => {
-    if (isSceneLooping) {
-      stopAudio();
-      return;
-    }
-
-    const segments = blockOrder
-      .flatMap((block) =>
-        block.sentences.map((sentence) => ({
-          text: (sentence.tts?.trim() || sentence.audioText?.trim() || sentence.text).trim(),
-          speaker: (block.speaker ?? sentence.speaker ?? "").trim().toUpperCase() || undefined,
-        })),
-      )
-      .filter((segment) => Boolean(segment.text));
-    if (segments.length === 0) {
-      toast.message("当前场景没有可播放内容。");
-      return;
-    }
-
-    void playbackController.toggleSceneLoopPlayback({
-      sceneSlug: lesson.slug,
-      sceneType: lesson.sceneType ?? "monologue",
-      segments,
-      onBeforePlay: () => {
-        onSceneLoopPlayback?.({ lesson });
-      },
-      onError: (error) => {
-        toast.error(error instanceof Error ? error.message : "完整场景音频暂不可用");
-      },
-    });
-  }, [blockOrder, isSceneLooping, lesson, lesson.sceneType, lesson.slug, onSceneLoopPlayback, playbackController, stopAudio]);
 
   useEffect(() => {
     if (!sheetOpen) return;
