@@ -385,12 +385,11 @@ export function LessonReader({
                   active={isSceneLooping}
                   loading={isSceneLoopLoading}
                   variant="ghost"
-                  size="sm"
+                  size="icon"
                   className={cn(
-                    appleButtonLgClassName,
-                    "whitespace-nowrap text-foreground/85",
+                    "size-[var(--mobile-control-height)] border-transparent bg-transparent px-0 whitespace-nowrap text-foreground/85 hover:bg-transparent hover:text-foreground",
                     isMobile &&
-                      "px-[var(--mobile-space-md)] py-[var(--mobile-space-2xs)] text-[length:var(--mobile-font-body)]",
+                      "size-[var(--mobile-icon-button)] text-[length:var(--mobile-font-body)]",
                   )}
                   iconClassName={cn("size-4", isMobile && "size-3.5")}
                   onClick={toggleSceneLoopPlayback}
@@ -407,12 +406,11 @@ export function LessonReader({
                   active={isSceneLooping}
                   loading={isSceneLoopLoading}
                   variant="ghost"
-                  size="sm"
+                  size="icon"
                   className={cn(
-                    appleButtonLgClassName,
-                    "whitespace-nowrap text-foreground/85",
+                    "size-[var(--mobile-control-height)] border-transparent bg-transparent px-0 whitespace-nowrap text-foreground/85 hover:bg-transparent hover:text-foreground",
                     isMobile &&
-                      "px-[var(--mobile-space-md)] py-[var(--mobile-space-2xs)] text-[length:var(--mobile-font-body)]",
+                      "size-[var(--mobile-icon-button)] text-[length:var(--mobile-font-body)]",
                   )}
                   iconClassName={cn("size-4", isMobile && "size-3.5")}
                   onClick={toggleSceneLoopPlayback}
@@ -444,9 +442,9 @@ export function LessonReader({
                       active={isSceneLooping}
                       loading={isSceneLoopLoading}
                       variant="ghost"
-                      size="sm"
-                      className={`h-[var(--mobile-control-height)] px-[var(--mobile-space-sm)] text-[length:var(--mobile-font-caption)] ${APPLE_META_TEXT}`}
-                      iconClassName="size-3"
+                      size="icon"
+                      className={`size-[var(--mobile-control-height)] border-transparent bg-transparent px-0 text-[length:var(--mobile-font-caption)] ${APPLE_META_TEXT} hover:bg-transparent hover:text-foreground`}
+                      iconClassName="size-4"
                       onClick={toggleSceneLoopPlayback}
                     />
                   </div>
@@ -483,8 +481,10 @@ export function LessonReader({
                     <LoopActionButton
                       active={isSceneLooping}
                       loading={isSceneLoopLoading}
-                      variant="outline"
-                      className="cursor-pointer transition-all duration-150 hover:border-primary/40 hover:bg-accent"
+                      variant="ghost"
+                      size="icon"
+                      className="size-9 cursor-pointer border-transparent bg-transparent px-0 transition-all duration-150 hover:bg-transparent hover:text-foreground"
+                      iconClassName="size-4"
                       onClick={toggleSceneLoopPlayback}
                     />
                     <TtsActionButton
@@ -493,8 +493,10 @@ export function LessonReader({
                           ? isSentenceLoading(currentSentence.id, "normal")
                           : false
                       }
-                      variant="outline"
-                      className="cursor-pointer transition-all duration-150 hover:border-primary/40 hover:bg-accent"
+                      variant="ghost"
+                      size="icon"
+                      className="size-9 cursor-pointer border-transparent bg-transparent px-0 transition-all duration-150 hover:bg-transparent hover:text-foreground"
+                      iconClassName="size-4"
                       onClick={() =>
                         handlePronounce(currentSentence?.text ?? lesson.title)
                       }
@@ -575,9 +577,11 @@ export function LessonReader({
                                 .join(" "),
                           )}
                           variant="ghost"
-                          size="icon-sm"
+                          size="icon"
+                          surface="soft"
                           ariaLabel="朗读"
-                          className="text-inherit hover:text-foreground"
+                          className="text-inherit"
+                          iconClassName="size-4"
                           onClick={() => handlePronounce(
                             block.tts?.trim() ||
                               block.sentences

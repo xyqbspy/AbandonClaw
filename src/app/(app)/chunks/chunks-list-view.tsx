@@ -452,10 +452,10 @@ export function ChunksListView({
                         <TtsActionButton
                           active={playingText === (item.exampleSentences[0]?.en ?? item.sourceSentenceText ?? "").trim()}
                           loading={ttsLoadingText === (item.exampleSentences[0]?.en ?? item.sourceSentenceText ?? "").trim()}
-                          size="sm"
+                          size="icon"
                           variant="ghost"
-                          className="h-6 px-2 text-xs [@media(max-height:760px)]:h-5 [@media(max-height:760px)]:px-1.5 [@media(max-height:760px)]:text-[11px]"
-                          iconClassName="size-3"
+                          className="size-8 border-transparent bg-transparent px-0 text-[var(--app-foreground-muted)] hover:bg-transparent hover:text-[var(--app-foreground)] [@media(max-height:760px)]:size-7"
+                          iconClassName="size-4 [@media(max-height:760px)]:size-3.5"
                           onClick={() =>
                             handlePronounceSentence(item.exampleSentences[0]?.en ?? item.sourceSentenceText)
                           }

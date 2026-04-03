@@ -65,9 +65,10 @@ export function SelectionToolbar({
       </Button>
       <TtsActionButton
         loading={loadingPronounce}
-        size="sm"
+        size="icon"
         variant="ghost"
-        className={`px-[var(--mobile-adapt-space-sm)] ${APPLE_META_TEXT}`}
+        className={`size-[var(--mobile-adapt-control-height)] border-transparent bg-transparent px-0 ${APPLE_META_TEXT} hover:bg-transparent hover:text-foreground`}
+        iconClassName="size-4"
         label="朗读"
         activeLabel="停止"
         ariaLabel="朗读"

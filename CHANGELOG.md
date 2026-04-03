@@ -1,6 +1,83 @@
 # Changelog
 
+## 2026-04-03
+### 对话气泡播放按钮尺寸与底色统一
+- 对话气泡和移动端分组气泡下方的播放按钮已经放大到与翻译按钮一致的点击区和图标尺寸，动作区不再出现一大一小的割裂感。
+- 公共音频按钮新增了可复用的表面样式能力；句子气泡下方的播放按钮这次最终收口为无边框、贴合当前背景层的做法，不再单独顶着突兀的白底或描边。
+- selection detail 里的主句朗读按钮和相关短语朗读按钮也已经并入统一公共按钮组件，详情面板与详情弹层不再继续保留那套独立音频按钮封装。
+- `sentence block` 和非对话 `lesson reader` 里的纯 icon 朗读按钮也已升级到统一尺寸和软表面规格，不再继续混用更小一档的旧按钮层级。
+- `chunks` 的例句卡片和 detail 顶部纯 icon 朗读按钮也已去掉独立描边和凸起底板，统一到贴合当前背景层的样式方向。
+- `chunks list` 来源句朗读、`selection toolbar` 朗读，以及 `lesson-reader` 头部 / 卡片里的纯 icon 音频按钮也都继续收口到同一套无边框、贴背景层的规则。
+- 保持朗读、停止朗读、加载中这些状态语义不变，只收口视觉规格和表面色，并补上对应样式回归测试。
+
+影响范围：
+- `src/components/audio/tts-action-button.tsx`
+- `src/components/audio/loop-action-button.tsx`
+- `src/components/audio/tts-action-button.test.tsx`
+- `src/features/lesson/components/lesson-reader-dialogue-content.tsx`
+- `src/features/lesson/components/lesson-reader-mobile-sections.tsx`
+- `src/features/lesson/components/selection-detail-primitives.tsx`
+- `src/features/lesson/components/selection-detail-panel.tsx`
+- `src/features/lesson/components/selection-detail-sheet.tsx`
+- `src/features/lesson/components/sentence-block.tsx`
+- `src/features/lesson/components/lesson-reader.tsx`
+- `src/components/shared/example-sentence-cards.tsx`
+- `src/features/chunks/components/focus-detail-content.tsx`
+- `src/app/(app)/chunks/chunks-list-view.tsx`
+- `src/features/lesson/components/selection-toolbar.tsx`
+- `openspec/changes/tune-audio-button-size-and-surface/tasks.md`
+
+验证情况：
+- `node --import tsx --import ./src/test/setup-dom.ts --test "src/components/audio/tts-action-button.test.tsx" "src/components/audio/loop-action-button.test.tsx" "src/features/lesson/components/lesson-reader.interaction.test.tsx"`
+- `node --import tsx --import ./src/test/setup-dom.ts --test "src/features/lesson/components/selection-detail-panel.interaction.test.tsx" "src/features/lesson/components/selection-detail-sheet.interaction.test.tsx" "src/features/chunks/components/example-sentence-cards.test.tsx"`
+- `node --import tsx --import ./src/test/setup-dom.ts --test "src/features/lesson/components/sentence-block.interaction.test.tsx" "src/features/lesson/components/lesson-reader.interaction.test.tsx"`
+- `node --import tsx --import ./src/test/setup-dom.ts --test "src/features/chunks/components/example-sentence-cards.test.tsx" "src/features/chunks/components/focus-detail-content.interaction.test.tsx" "src/app/(app)/chunks/chunks-list-view.interaction.test.tsx"`
+- `node --import tsx --import ./src/test/setup-dom.ts --test "src/app/(app)/chunks/chunks-list-view.interaction.test.tsx" "src/features/lesson/components/selection-toolbar.interaction.test.tsx" "src/features/lesson/components/lesson-reader.interaction.test.tsx"`
+- `node --import tsx scripts/check-mojibake.ts`
+- `node_modules\.bin\openspec.CMD change validate "tune-audio-button-size-and-surface" --strict --no-interactive`
+
 ## 2026-04-02
+### 详情区播放按钮并入统一状态组件
+- 修正了共享 `tts` 图标的画布和波纹路径，避免播放中状态最右侧波纹在小尺寸按钮里显得被裁掉。
+- 将句子详情、chunk 详情和例句卡片使用的播放按钮接入统一的 `AudioStateIcon`，不再保留详情区那套旧版 `Volume2` 样式。
+- 这样正文、气泡、详情区和例句卡片现在共用同一套默认 / 播放中 / 暂停 / 加载中的状态语言。
+
+影响范围：
+- `src/components/audio/audio-state-icon.tsx`
+- `src/features/lesson/components/selection-detail-primitives.tsx`
+
+验证情况：
+- `node --import tsx --import ./src/test/setup-dom.ts --test "src/components/audio/tts-action-button.test.tsx" "src/components/audio/loop-action-button.test.tsx" "src/features/lesson/components/selection-detail-panel.interaction.test.tsx" "src/features/lesson/components/selection-detail-sheet.interaction.test.tsx" "src/features/chunks/components/example-sentence-cards.test.tsx"`
+- `node --import tsx scripts/check-mojibake.ts`
+- `node_modules\.bin\openspec.CMD change validate "unify-all-audio-button-variants" --strict --no-interactive`
+
+### 公共播放按钮状态视觉统一
+- 参考 `newApphtml/palyerIcon.html`，为公共音频按钮补上统一的默认、播放中、暂停和加载中状态图标能力，避免 `TtsActionButton` 与 `LoopActionButton` 继续各自维护不同的状态语言。
+- 播放按钮默认态统一为项目常用中性色，播放中、暂停和加载中统一收口到项目主色，状态反馈不再依赖零散的局部样式。
+- 新增公共按钮测试，并回归 `lesson-reader` 与 `sentence-block` 的朗读入口，确保状态视觉升级不影响现有交互。
+
+影响范围：
+- `src/components/audio/audio-state-icon.tsx`
+- `src/components/audio/tts-action-button.tsx`
+- `src/components/audio/loop-action-button.tsx`
+- `src/components/audio/tts-action-button.test.tsx`
+- `src/components/audio/loop-action-button.test.tsx`
+
+验证情况：
+- `node --import tsx --import ./src/test/setup-dom.ts --test "src/components/audio/tts-action-button.test.tsx" "src/components/audio/loop-action-button.test.tsx" "src/features/lesson/components/sentence-block.interaction.test.tsx" "src/features/lesson/components/lesson-reader.interaction.test.tsx"`
+- `node --import tsx scripts/check-mojibake.ts`
+- `node_modules\.bin\openspec.CMD change validate "unify-audio-button-states" --strict --no-interactive`
+
+### README 补充后台预览访问地址说明
+- 在 `README.md` 的本地运行建议里补充说明：`pnpm run preview:up` 成功启动后，默认也通过 `http://localhost:3000/` 访问。
+- 保持脚本行为不变，只让后台预览的访问方式写得更直白。
+
+影响范围：
+- `README.md`
+
+验证情况：
+- 已人工复核 README 文案
+
 ### 对话气泡操作区按钮间距再次收紧
 - 在上一轮基础上继续收紧了对话气泡与移动端分组气泡下方翻译图标和播放按钮之间的距离，让两个按钮更贴近。
 - 不改变按钮顺序、翻译显隐和朗读交互，只进一步压缩视觉留白。

@@ -10,6 +10,8 @@ import { cn } from "@/lib/utils";
 const normalizeSpeaker = (speaker?: string) => (speaker ?? "").trim().toUpperCase();
 const isPrimarySpeaker = (speaker?: string) => normalizeSpeaker(speaker) === "A";
 const speakerLabel = (speaker?: string) => normalizeSpeaker(speaker);
+const dialogueActionButtonClassName =
+  "size-[var(--mobile-icon-button)] rounded-full border-transparent bg-transparent text-[var(--app-foreground-muted)] shadow-none transition-colors hover:bg-transparent hover:text-[var(--app-foreground)]";
 
 type LessonReaderDialogueContentProps = {
   blockOrder: LessonBlock[];
@@ -178,11 +180,15 @@ export function LessonReaderDialogueContent({
                   </div>
                 </article>
 
-                <div className="flex items-center gap-1 px-[var(--mobile-space-xs)]">
+                <div className="flex items-center gap-[var(--mobile-space-sm)] px-[var(--mobile-space-xs)]">
                   <button
                     type="button"
                     aria-label={translationOpen ? "隐藏翻译" : "显示翻译"}
-                    className="inline-flex size-[var(--mobile-icon-button)] items-center justify-center text-[#8e9aaf] transition hover:text-[#2c3e50]"
+                    className={cn(
+                      "inline-flex items-center justify-center",
+                      dialogueActionButtonClassName,
+                      translationOpen && "text-primary hover:text-primary",
+                    )}
                     onClick={(event) => {
                       event.stopPropagation();
                       setOpenTranslations((prev) => ({
@@ -191,19 +197,20 @@ export function LessonReaderDialogueContent({
                       }));
                     }}
                   >
-                    <Languages className="size-3.5" />
+                    <Languages className="size-4" />
                   </button>
                   <TtsActionButton
                     active={isBlockSpeaking}
                     loading={isBlockLoading}
                     variant="ghost"
-                    size="icon-sm"
+                    size="icon"
+                    surface="soft"
                     ariaLabel={isBlockSpeaking ? "停止朗读" : "朗读"}
                     className={cn(
-                      "text-[#8e9aaf] hover:text-[#2c3e50]",
-                      isBlockSpeaking && "text-[#4a90e2] hover:text-[#4a90e2]",
+                      dialogueActionButtonClassName,
+                      (isBlockSpeaking || isBlockLoading) && "text-primary hover:text-primary",
                     )}
-                    iconClassName="size-3.5"
+                    iconClassName="size-4"
                     onClick={(event) => {
                       event.stopPropagation();
                       void playBlockTts(block);

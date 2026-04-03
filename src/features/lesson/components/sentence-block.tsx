@@ -62,8 +62,10 @@ export function SentenceBlock({
       active={speaking}
       loading={loading}
       variant="ghost"
-      size="icon-sm"
-      className={`mt-0.5 ${APPLE_META_TEXT} hover:text-foreground`}
+      size="icon"
+      surface="soft"
+      className={`mt-0.5 ${APPLE_META_TEXT}`}
+      iconClassName="size-4"
       ariaLabel={speaking ? "停止朗读" : "朗读"}
       onClick={(event) => {
         event.stopPropagation();

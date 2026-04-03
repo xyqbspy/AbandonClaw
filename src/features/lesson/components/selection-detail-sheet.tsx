@@ -1,12 +1,12 @@
 "use client";
 
 import { useMemo } from "react";
+import { TtsActionButton } from "@/components/audio/tts-action-button";
 import { DetailSheetShell } from "@/components/shared/detail-sheet-shell";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { LessonBlock, LessonSentence, SelectionChunkLayer } from "@/lib/types";
 import {
-  SelectionAudioButton,
   SelectionChunkDetailBlocks,
   SelectionDetailActions,
   SelectionSentenceCard,
@@ -199,19 +199,23 @@ export function SelectionDetailSheet({
                         {chunk}
                       </button>
                       {showRelatedChunkAudio ? (
-                        <SelectionAudioButton
+                        <TtsActionButton
                           active={Boolean(
                             playingChunkKey && playingChunkKey.toLowerCase() === normalizedChunk,
                           )}
                           loading={Boolean(
                             loadingChunkKey && loadingChunkKey.toLowerCase() === normalizedChunk,
                           )}
-                          label={`朗读 ${chunk}`}
+                          ariaLabel={`朗读 ${chunk}`}
+                          variant="ghost"
+                          size="icon"
+                          surface="soft"
                           className={cn(
                             selectionIconButtonClassName,
                             sounding &&
                               "bg-[var(--app-chunks-sheet-info-soft)] text-[var(--app-primary)]",
                           )}
+                          iconClassName="size-4"
                           onClick={(event) => {
                             event.stopPropagation();
                             onPronounce(chunk);

@@ -43,7 +43,7 @@ export function ExampleSentenceCards({
                 active={isSpeakingText?.(example.en) ?? false}
                 loading={isLoadingText?.(example.en) ?? false}
                 onClick={() => onSpeak(example.en)}
-                className="mt-0.5 size-9 shrink-0 rounded-full border border-[var(--app-chunks-sheet-secondary-border)] bg-[var(--app-chunks-sheet-info-soft)] px-0 text-[var(--app-chunks-sheet-secondary-text)] shadow-none hover:bg-[var(--app-chunks-sheet-secondary-hover)]"
+                className="mt-0.5 size-9 shrink-0 rounded-full border-transparent bg-transparent px-0 text-[var(--app-chunks-sheet-secondary-text)] shadow-none hover:bg-transparent hover:text-[var(--app-chunks-sheet-title)]"
                 iconClassName="size-4"
                 label={speakLabel}
                 iconOnly

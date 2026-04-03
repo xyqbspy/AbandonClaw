@@ -9,6 +9,9 @@ import { getSectionSentences } from "@/lib/shared/lesson-content";
 import { APPLE_META_TEXT, APPLE_PANEL } from "@/lib/ui/apple-style";
 import { groupSentencesForMobile, MobileSentenceGroup } from "./lesson-reader-logic";
 
+const mobileDialogueActionButtonClassName =
+  "size-[var(--mobile-icon-button)] rounded-full border-transparent bg-transparent text-[var(--app-foreground-muted)] shadow-none transition-colors hover:bg-transparent hover:text-[var(--app-foreground)]";
+
 type LessonReaderMobileSectionsProps = {
   lesson: Lesson;
   currentSectionId: string | null;
@@ -81,20 +84,17 @@ export function LessonReaderMobileSections({
                       )}
                       onClick={() => handleMobileGroupTap(groupContext)}
                     >
-                      <div
-                        className={cn(
-                          "mb-[var(--mobile-space-sm)] flex items-center justify-end gap-1",
-                          groupSelected && "text-primary",
-                        )}
-                      >
+                      <div className="mb-[var(--mobile-space-sm)] flex items-center justify-end gap-[var(--mobile-space-sm)]">
                         <button
                           type="button"
                           aria-label={translationOpen ? "隐藏翻译" : "显示翻译"}
                           className={cn(
-                            "inline-flex size-[var(--mobile-icon-button)] items-center justify-center transition-colors",
-                            groupSelected
-                              ? "text-primary/80 hover:text-primary/95"
-                              : `${APPLE_META_TEXT} hover:text-foreground`,
+                            "inline-flex items-center justify-center",
+                            mobileDialogueActionButtonClassName,
+                            translationOpen && "text-primary hover:text-primary",
+                            groupSelected &&
+                              !translationOpen &&
+                              "text-primary/80 hover:text-primary/95",
                           )}
                           onClick={(event) => {
                             event.stopPropagation();
@@ -104,21 +104,24 @@ export function LessonReaderMobileSections({
                             }));
                           }}
                         >
-                          <Languages className="size-3" />
+                          <Languages className="size-4" />
                         </button>
                         <TtsActionButton
                           active={groupPlaying}
                           loading={isChunkLoading(groupText)}
                           variant="ghost"
-                          size="icon-sm"
+                          size="icon"
+                          surface="soft"
                           ariaLabel={groupPlaying ? "停止朗读" : "朗读"}
                           className={cn(
-                            "text-[length:var(--mobile-font-caption)] leading-none",
+                            "leading-none",
+                            mobileDialogueActionButtonClassName,
                             groupSelected
                               ? "text-primary/80 hover:text-primary/95"
-                              : `${APPLE_META_TEXT} hover:text-foreground`,
+                              : APPLE_META_TEXT,
+                            (groupPlaying || isChunkLoading(groupText)) && "text-primary hover:text-primary",
                           )}
-                          iconClassName="size-3"
+                          iconClassName="size-4"
                           onClick={(event) => {
                             event.stopPropagation();
                             handleLoopSentence(groupText);

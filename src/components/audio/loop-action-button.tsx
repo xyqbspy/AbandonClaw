@@ -1,12 +1,14 @@
 "use client";
 
 import type { MouseEventHandler } from "react";
-import { Loader2, Play, Volume2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { AudioStateIcon, type AudioIconFamily, type AudioVisualState } from "./audio-state-icon";
 
 type LoopActionButtonProps = {
   active?: boolean;
+  paused?: boolean;
   loading?: boolean;
   onClick: MouseEventHandler<HTMLButtonElement>;
   label?: string;
@@ -19,10 +21,12 @@ type LoopActionButtonProps = {
   ariaLabel?: string;
   iconOnly?: boolean;
   icon?: "play" | "tts";
+  surface?: "plain" | "soft";
 };
 
 export function LoopActionButton({
   active = false,
+  paused = false,
   loading = false,
   onClick,
   label = "循环播放",
@@ -35,10 +39,19 @@ export function LoopActionButton({
   ariaLabel,
   iconOnly = true,
   icon = "play",
+  surface = "plain",
 }: LoopActionButtonProps) {
   const resolvedLabel = loading ? loadingLabel : active ? activeLabel : label;
   const resolvedAriaLabel = ariaLabel ?? resolvedLabel;
-  const Icon = icon === "tts" ? Volume2 : Play;
+  const visualState: AudioVisualState = loading
+    ? "loading"
+    : paused
+      ? "paused"
+      : active
+        ? "playing"
+        : "idle";
+  const family: AudioIconFamily = icon === "tts" ? "tts" : "play";
+  const useSoftSurface = surface === "soft";
 
   return (
     <Button
@@ -47,17 +60,22 @@ export function LoopActionButton({
       variant={variant}
       className={cn(
         "shrink-0",
-        active && "text-primary",
+        useSoftSurface
+          ? "border-[var(--app-border-soft)] bg-[var(--app-surface-subtle)] text-[var(--app-foreground-muted)] hover:bg-[var(--app-surface-hover)] hover:text-[var(--app-foreground)]"
+          : "text-[var(--muted-foreground)] hover:text-foreground",
+        useSoftSurface && visualState !== "idle" && "border-primary/10 bg-primary/12 text-primary hover:bg-primary/16 hover:text-primary",
+        !useSoftSurface && visualState !== "idle" && "text-primary hover:text-primary",
         iconOnly && (size === "sm" || size === "default") && "aspect-square px-0",
         className,
       )}
       onClick={onClick}
       aria-label={resolvedAriaLabel}
+      data-audio-state={visualState}
     >
       {loading ? (
         <Loader2 className={cn("size-4 animate-spin", iconClassName)} />
       ) : (
-        <Icon className={cn("size-4", active && icon === "tts" && "animate-pulse text-primary", iconClassName)} />
+        <AudioStateIcon family={family} state={visualState} className={iconClassName} />
       )}
       {iconOnly ? null : resolvedLabel}
     </Button>

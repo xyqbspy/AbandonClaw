@@ -1,7 +1,8 @@
 "use client";
 
 import { ReactNode } from "react";
-import { Loader2, RotateCcw, Volume2 } from "lucide-react";
+import { RotateCcw } from "lucide-react";
+import { TtsActionButton } from "@/components/audio/tts-action-button";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DetailInfoBlock, DetailLoadingBlock } from "@/components/shared/detail-info-blocks";
@@ -97,39 +98,6 @@ export function hasChinese(value?: string) {
   return /[\u4e00-\u9fff]/.test((value ?? "").trim());
 }
 
-export function SelectionAudioIcon({
-  active,
-  loading,
-}: {
-  active?: boolean;
-  loading?: boolean;
-}) {
-  if (loading) {
-    return <Loader2 className="size-4 animate-spin" />;
-  }
-  return <Volume2 className={cn("size-4", active && "text-[var(--app-primary)]")} />;
-}
-
-export function SelectionAudioButton({
-  active = false,
-  loading = false,
-  label,
-  className,
-  onClick,
-}: {
-  active?: boolean;
-  loading?: boolean;
-  label: string;
-  className?: string;
-  onClick: React.MouseEventHandler<HTMLButtonElement>;
-}) {
-  return (
-    <button type="button" aria-label={label} className={cn(className)} onClick={onClick}>
-      <SelectionAudioIcon active={active} loading={loading} />
-    </button>
-  );
-}
-
 export function SelectionSentenceCard({
   sentenceText,
   translationText,
@@ -155,17 +123,17 @@ export function SelectionSentenceCard({
             <p className="min-w-0 flex-1 text-[length:clamp(1rem,4.4vw,1.125rem)] font-medium leading-[var(--mobile-adapt-overlay-body-line-height)] text-[var(--app-foreground)]">
               {sentenceText}
             </p>
-            <button
-              type="button"
-              aria-label={speakingText === blockSpeakText ? "停止朗读" : "朗读"}
-              className={selectionIconButtonClassName}
+            <TtsActionButton
+              active={speakingText === blockSpeakText}
+              loading={loadingText === blockSpeakText}
               onClick={onPronounceBlock}
-            >
-              <SelectionAudioIcon
-                active={speakingText === blockSpeakText}
-                loading={loadingText === blockSpeakText}
-              />
-            </button>
+              ariaLabel={speakingText === blockSpeakText ? "停止朗读" : "朗读"}
+              variant="ghost"
+              size="icon"
+              surface="soft"
+              className={selectionIconButtonClassName}
+              iconClassName="size-4"
+            />
           </div>
           <p className="mt-[var(--mobile-space-xl)] text-[length:var(--mobile-font-body)] leading-[var(--mobile-adapt-overlay-body-line-height)] text-[var(--app-chunks-sheet-body)]">
             {translationText || "该句翻译待补充。"}

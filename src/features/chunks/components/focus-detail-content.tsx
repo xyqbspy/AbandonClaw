@@ -252,7 +252,7 @@ export function FocusDetailContent({
                 onClick={() => onSpeak(detailSpeakText)}
                 label={labels.speakSentence}
                 ariaLabel={labels.speakSentence}
-                className="size-[var(--mobile-control-height)] rounded-full border border-[var(--app-chunks-sheet-secondary-border)] bg-[var(--app-chunks-sheet-info-soft)] px-0 text-[var(--app-chunks-sheet-secondary-text)] shadow-none hover:bg-[var(--app-chunks-sheet-secondary-hover)] [@media(max-height:760px)]:size-[var(--mobile-icon-button)]"
+                className="size-[var(--mobile-control-height)] rounded-full border-transparent bg-transparent px-0 text-[var(--app-chunks-sheet-secondary-text)] shadow-none hover:bg-transparent hover:text-[var(--app-chunks-sheet-title)] [@media(max-height:760px)]:size-[var(--mobile-icon-button)]"
                 iconClassName="size-4"
                 iconOnly
               />
