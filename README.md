@@ -56,7 +56,7 @@ pnpm run dev:turbo
 
 如果你在 Windows 上想要更低操作成本的预览流：
 
-- `pnpm run preview:up`：后台构建并启动 preview
+- `pnpm run preview:up`：后台构建并启动 preview，成功后可直接访问 `http://localhost:3000/`
 - `pnpm run preview:status`：查看 preview 是否在运行
 - `pnpm run preview:down`：关闭后台 preview 服务
 - `pnpm run preview:restart`：重新构建并重启 preview
@@ -69,6 +69,7 @@ pnpm run start
 ```
 
 后台预览管理器会把运行状态写到 `.tmp/preview-server.json`，日志写到 `.tmp/preview-server.log`。
+如果 `preview:up` 已成功启动，默认访问地址也是 `http://localhost:3000/`。
 
 ## 3）数据库初始化（Supabase SQL Editor）
 
