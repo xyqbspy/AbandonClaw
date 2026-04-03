@@ -45,10 +45,10 @@ test("SentenceBlock 会处理句子点击、翻译切换和朗读", () => {
   assert.ok(translationContainer);
   assert.match(translationContainer.className, /opacity-0/);
 
-  fireEvent.click(screen.getByRole("button", { name: "显示翻译" }));
+  fireEvent.click(screen.getByRole("button", { name: "翻译" }));
   assert.match(translationContainer.className, /opacity-100/);
 
-  fireEvent.click(screen.getByRole("button", { name: "隐藏翻译" }));
+  fireEvent.click(screen.getByRole("button", { name: "收起" }));
   assert.match(translationContainer.className, /opacity-0/);
 
   fireEvent.click(screen.getByRole("button", { name: "朗读" }));

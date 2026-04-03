@@ -1,7 +1,6 @@
 ﻿"use client";
 
 import { useState } from "react";
-import { Languages } from "lucide-react";
 import { LessonSentence } from "@/lib/types";
 import { TtsActionButton } from "@/components/audio/tts-action-button";
 import { Badge } from "@/components/ui/badge";
@@ -58,19 +57,6 @@ export function SentenceBlock({
 }) {
   const [translationOpen, setTranslationOpen] = useState(false);
   const translationText = sentence.translation.trim() || "该句翻译暂未提供。";
-  const translationButton = (
-    <button
-      type="button"
-      className={`mt-0.5 inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-accent hover:text-foreground ${APPLE_META_TEXT}`}
-      aria-label={translationOpen ? "隐藏翻译" : "显示翻译"}
-      onClick={(event) => {
-        event.stopPropagation();
-        setTranslationOpen((prev) => !prev);
-      }}
-    >
-      <Languages className="size-3.5" />
-    </button>
-  );
   const audioButton = (
     <TtsActionButton
       active={speaking}
@@ -125,10 +111,7 @@ export function SentenceBlock({
             >
               {sentence.text}
             </p>
-            <div className="flex shrink-0 items-center gap-1">
-              {translationButton}
-              {audioButton}
-            </div>
+            {audioButton}
           </div>
         </div>
       ) : (
@@ -144,16 +127,26 @@ export function SentenceBlock({
           >
             {sentence.text}
           </p>
-          <div className="flex shrink-0 items-center gap-1">
-            {translationButton}
-            {audioButton}
-          </div>
+          {audioButton}
         </div>
       )}
 
+      <div className={`mt-[var(--mobile-adapt-space-2xs)] flex items-center gap-[var(--mobile-adapt-space-md)] text-[length:var(--mobile-adapt-font-meta)] ${APPLE_META_TEXT}`}>
+        <button
+          type="button"
+          className="inline-flex cursor-pointer items-center gap-1 transition-colors hover:text-foreground"
+          onClick={(event) => {
+            event.stopPropagation();
+            setTranslationOpen((prev) => !prev);
+          }}
+        >
+          {translationOpen ? "收起" : "翻译"}
+        </button>
+      </div>
+
       <div
         className={cn(
-          "mt-[var(--mobile-adapt-space-2xs)] grid overflow-hidden transition-all duration-200",
+          "grid overflow-hidden transition-all duration-200",
           translationOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
         )}
       >

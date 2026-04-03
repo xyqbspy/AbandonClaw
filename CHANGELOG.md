@@ -1,6 +1,47 @@
 # Changelog
 
 ## 2026-04-02
+### 对话气泡操作区按钮间距再次收紧
+- 在上一轮基础上继续收紧了对话气泡与移动端分组气泡下方翻译图标和播放按钮之间的距离，让两个按钮更贴近。
+- 不改变按钮顺序、翻译显隐和朗读交互，只进一步压缩视觉留白。
+
+影响范围：
+- `src/features/lesson/components/lesson-reader-dialogue-content.tsx`
+- `src/features/lesson/components/lesson-reader-mobile-sections.tsx`
+
+验证情况：
+- `node --import tsx scripts/check-mojibake.ts`
+- `node_modules\.bin\openspec.CMD change validate "tighten-dialogue-action-button-gap-again" --strict --no-interactive`
+
+### 对话气泡操作区按钮间距收紧
+- 收紧了对话气泡与移动端分组气泡下方操作区的翻译图标和播放按钮间距，让两个按钮更靠近、更紧凑。
+- 不改变按钮顺序、翻译默认隐藏行为和朗读交互，只调整视觉留白。
+
+影响范围：
+- `src/features/lesson/components/lesson-reader-dialogue-content.tsx`
+- `src/features/lesson/components/lesson-reader-mobile-sections.tsx`
+
+验证情况：
+- `node --import tsx scripts/check-mojibake.ts`
+- `node_modules\.bin\openspec.CMD change validate "tighten-dialogue-action-button-gap" --strict --no-interactive`
+
+### 对话气泡下方翻译入口改到真实操作区
+- 回退了误加在 `sentence-block` 里的图标化翻译按钮，避免未接入实际页面的通用句子块继续带着错误范围的改动。
+- `lesson reader` 对话气泡和移动端分组气泡现在改为默认隐藏翻译，只在气泡下方按钮区提供翻译图标，位置固定在播放按钮左边。
+- 同步更新 `lesson-reader` 与 `sentence-block` 交互测试，锁住“图标只出现在真实气泡操作区、翻译默认隐藏、朗读按钮仍不误触详情”这条行为。
+
+影响范围：
+- `src/features/lesson/components/sentence-block.tsx`
+- `src/features/lesson/components/sentence-block.interaction.test.tsx`
+- `src/features/lesson/components/lesson-reader-dialogue-content.tsx`
+- `src/features/lesson/components/lesson-reader-mobile-sections.tsx`
+- `src/features/lesson/components/lesson-reader.interaction.test.tsx`
+
+验证情况：
+- `node --import tsx --import ./src/test/setup-dom.ts --test "src/features/lesson/components/sentence-block.interaction.test.tsx" "src/features/lesson/components/lesson-reader.interaction.test.tsx"`
+- `node --import tsx scripts/check-mojibake.ts`
+- `node_modules\.bin\openspec.CMD change validate "move-translation-toggle-to-dialogue-actions" --strict --no-interactive`
+
 ### 句子页翻译入口收口为纯图标
 - 句子块里的翻译切换继续默认隐藏，但按钮不再显示“翻译 / 收起”文字，只保留翻译图标，减少正文旁边的视觉干扰。
 - 翻译按钮现在与朗读按钮并排展示，且固定放在播放按钮左边，让句子级操作入口更集中。

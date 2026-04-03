@@ -1,6 +1,7 @@
 "use client";
 
-import { RefObject } from "react";
+import { RefObject, useState } from "react";
+import { Languages } from "lucide-react";
 import { TtsActionButton } from "@/components/audio/tts-action-button";
 import { Lesson, LessonSentence } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -31,6 +32,8 @@ export function LessonReaderMobileSections({
   handleMobileSentenceTap,
   sentenceNodeMapRef,
 }: LessonReaderMobileSectionsProps) {
+  const [openTranslations, setOpenTranslations] = useState<Record<string, boolean>>({});
+
   return (
     <div className="overflow-hidden bg-transparent">
       {lesson.sections.map((section) => {
@@ -56,6 +59,7 @@ export function LessonReaderMobileSections({
                 relatedChunks: groupRelatedChunks,
                 speaker: group.length === 1 ? group[0]?.speaker : undefined,
               };
+              const translationOpen = Boolean(openTranslations[groupKey]);
 
               return (
                 <div
@@ -79,10 +83,29 @@ export function LessonReaderMobileSections({
                     >
                       <div
                         className={cn(
-                          "mb-[var(--mobile-space-sm)] flex items-center justify-end gap-[var(--mobile-space-sm)]",
+                          "mb-[var(--mobile-space-sm)] flex items-center justify-end gap-1",
                           groupSelected && "text-primary",
                         )}
                       >
+                        <button
+                          type="button"
+                          aria-label={translationOpen ? "隐藏翻译" : "显示翻译"}
+                          className={cn(
+                            "inline-flex size-[var(--mobile-icon-button)] items-center justify-center transition-colors",
+                            groupSelected
+                              ? "text-primary/80 hover:text-primary/95"
+                              : `${APPLE_META_TEXT} hover:text-foreground`,
+                          )}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setOpenTranslations((prev) => ({
+                              ...prev,
+                              [groupKey]: !prev[groupKey],
+                            }));
+                          }}
+                        >
+                          <Languages className="size-3" />
+                        </button>
                         <TtsActionButton
                           active={groupPlaying}
                           loading={isChunkLoading(groupText)}
@@ -103,11 +126,18 @@ export function LessonReaderMobileSections({
                         />
                       </div>
 
-                      <p
-                        className={`mb-[var(--mobile-space-md)] rounded-[var(--app-radius-panel)] px-[var(--mobile-space-md)] py-[var(--mobile-space-sm)] text-[length:var(--mobile-font-body-sm)] leading-[1.55] ${APPLE_META_TEXT} ${APPLE_PANEL}`}
+                      <div
+                        className={cn(
+                          "mb-[var(--mobile-space-md)] grid overflow-hidden transition-all duration-200",
+                          translationOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
+                        )}
                       >
-                        {groupTranslation || "该段翻译暂未提供。"}
-                      </p>
+                        <p
+                          className={`min-h-0 rounded-[var(--app-radius-panel)] px-[var(--mobile-space-md)] py-[var(--mobile-space-sm)] text-[length:var(--mobile-font-body-sm)] leading-[1.55] ${APPLE_META_TEXT} ${APPLE_PANEL}`}
+                        >
+                          {groupTranslation || "该段翻译暂未提供。"}
+                        </p>
+                      </div>
                     </div>
 
                     <div className="space-y-[var(--mobile-space-sm)]">

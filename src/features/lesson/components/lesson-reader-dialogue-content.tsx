@@ -1,7 +1,7 @@
 "use client";
 
-import { ReactNode } from "react";
-import { ArrowLeft } from "lucide-react";
+import { ReactNode, useState } from "react";
+import { ArrowLeft, Languages } from "lucide-react";
 import { LoopActionButton } from "@/components/audio/loop-action-button";
 import { TtsActionButton } from "@/components/audio/tts-action-button";
 import { LessonBlock } from "@/lib/types";
@@ -48,6 +48,8 @@ export function LessonReaderDialogueContent({
   handleSentenceTap,
   playBlockTts,
 }: LessonReaderDialogueContentProps) {
+  const [openTranslations, setOpenTranslations] = useState<Record<string, boolean>>({});
+
   return (
     <div
       className={cn(
@@ -127,6 +129,7 @@ export function LessonReaderDialogueContent({
             playbackState.status === "loading" &&
             playbackState.sentenceId === blockPlaybackId;
           const speakerText = speakerLabel(speaker) || "A";
+          const translationOpen = Boolean(openTranslations[block.id]);
 
           return (
             <div
@@ -175,7 +178,21 @@ export function LessonReaderDialogueContent({
                   </div>
                 </article>
 
-                <div className="flex items-center gap-[var(--mobile-space-lg)] px-[var(--mobile-space-xs)]">
+                <div className="flex items-center gap-1 px-[var(--mobile-space-xs)]">
+                  <button
+                    type="button"
+                    aria-label={translationOpen ? "隐藏翻译" : "显示翻译"}
+                    className="inline-flex size-[var(--mobile-icon-button)] items-center justify-center text-[#8e9aaf] transition hover:text-[#2c3e50]"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setOpenTranslations((prev) => ({
+                        ...prev,
+                        [block.id]: !prev[block.id],
+                      }));
+                    }}
+                  >
+                    <Languages className="size-3.5" />
+                  </button>
                   <TtsActionButton
                     active={isBlockSpeaking}
                     loading={isBlockLoading}
@@ -194,9 +211,16 @@ export function LessonReaderDialogueContent({
                   />
                 </div>
 
-                <p className="px-[var(--mobile-space-xs)] text-[length:var(--mobile-font-body-sm)] leading-[1.55] text-[#8e9aaf]">
-                  {blockTranslation || "该段翻译暂未提供。"}
-                </p>
+                <div
+                  className={cn(
+                    "grid overflow-hidden px-[var(--mobile-space-xs)] transition-all duration-200",
+                    translationOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
+                  )}
+                >
+                  <p className="min-h-0 text-[length:var(--mobile-font-body-sm)] leading-[1.55] text-[#8e9aaf]">
+                    {blockTranslation || "该段翻译暂未提供。"}
+                  </p>
+                </div>
               </div>
             </div>
           );
