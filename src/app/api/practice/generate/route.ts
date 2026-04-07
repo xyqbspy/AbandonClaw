@@ -228,15 +228,15 @@ const normalizePracticeResponse = (value: unknown): unknown => {
         ...item,
         id: normalizedId,
         ...((item.prompt === undefined || item.prompt === null) &&
-        typeof item.question === "string"
+          typeof item.question === "string"
           ? { prompt: item.question }
           : {}),
         ...(item.targetChunk === undefined &&
-        typeof item.target_chunk === "string"
+          typeof item.target_chunk === "string"
           ? { targetChunk: item.target_chunk }
           : {}),
         ...(item.referenceSentence === undefined &&
-        typeof item.reference_sentence === "string"
+          typeof item.reference_sentence === "string"
           ? { referenceSentence: item.reference_sentence }
           : {}),
       };
@@ -363,7 +363,7 @@ export async function handlePracticeGeneratePost(
       const { parsed: parsedJson } = parseWithDiagnostics(rawModelText);
       const parsed = normalizePracticeResponse(parsedJson);
       const validation = validatePracticeGenerateResponse(parsed);
-      if (!validation.ok) {
+      if (!validation.ok || !isObject(parsed)) {
         return NextResponse.json(
           {
             version: "v1",
@@ -374,9 +374,10 @@ export async function handlePracticeGeneratePost(
         );
       }
 
+      const response = parsed as unknown as PracticeGenerateResponse;
       return NextResponse.json(
         {
-          ...parsed,
+          ...response,
           generationSource: "ai",
         },
         { status: 200 },
