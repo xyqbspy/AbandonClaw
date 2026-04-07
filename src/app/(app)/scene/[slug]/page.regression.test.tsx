@@ -162,6 +162,7 @@ let pendingPracticeGeneration:
       resolve: (value: PracticeSet) => void;
     }
   | null = null;
+let practiceGenerationFailureMessage: string | null = null;
 let pendingVariantGeneration:
   | {
       promise: Promise<VariantSet>;
@@ -294,11 +295,13 @@ const mockedModules = {
   "@/features/scene/components/scene-practice-view": {
       ScenePracticeView: ({
         onDelete,
+        onRegenerate,
         onSentenceCompleted,
         onPracticeAttempt,
         onPracticeRunStart,
       }: {
         onDelete: () => void;
+        onRegenerate?: () => void;
         onSentenceCompleted?: () => void;
         onPracticeAttempt?: (payload: {
           practiceSetId: string;
@@ -320,6 +323,9 @@ const mockedModules = {
           <div>practice-view</div>
           <button type="button" onClick={onDelete}>
             delete-practice
+          </button>
+          <button type="button" onClick={onRegenerate}>
+            regenerate-practice
           </button>
           <button
             type="button"
@@ -623,6 +629,9 @@ const mockedModules = {
     },
     generateScenePracticeSet: async ({ baseLesson }: { baseLesson: Lesson }) => {
       generatedPracticeCalls.push({ baseLesson });
+      if (practiceGenerationFailureMessage) {
+        throw new Error(practiceGenerationFailureMessage);
+      }
       if (pendingPracticeGeneration) {
         return pendingPracticeGeneration.promise;
       }
@@ -776,6 +785,7 @@ afterEach(() => {
   currentVariantRunSnapshot = { run: null };
   currentPracticeSnapshot = null;
   pendingPracticeGeneration = null;
+  practiceGenerationFailureMessage = null;
   pendingVariantGeneration = null;
   loadSceneDetailImpl = null;
   routerPushCalls.length = 0;
@@ -828,6 +838,39 @@ test("SceneDetailPage 在 practice 路由下删除练习后会回到 scene 路�
     { sceneId: "scene-1", practiceSetId: "practice-1" },
   ]);
   assert.equal(routerPushCalls.at(-1), "/scene/test-scene");
+});
+
+test("SceneDetailPage 删除练习后自动预热失败时会展示中文错误", async () => {
+  currentGeneratedState = {
+    latestPracticeSet: null,
+    latestVariantSet: null,
+    practiceStatus: "idle",
+    variantStatus: "idle",
+  };
+  currentLearningState = buildLearningState({
+    progress: {
+      masteryStage: "scene_practice",
+      masteryPercent: 80,
+    },
+    session: {
+      currentStep: "scene_practice",
+      fullPlayCount: 1,
+      openedExpressionCount: 1,
+      practicedSentenceCount: 1,
+    },
+  });
+  practiceGenerationFailureMessage = "生成练习题失败，请稍后重试。";
+
+  const SceneDetailPage = getSceneDetailPage();
+  render(<SceneDetailPage initialLesson={baseLesson} />);
+
+  await waitFor(() => {
+    assert.equal(generatedPracticeCalls.length, 1);
+  });
+
+  await waitFor(() => {
+    screen.getByText("生成练习题失败，请稍后重试。");
+  });
 });
 
 test("SceneDetailPage 主场景页默认只显示折叠入口，展开后才显示训练浮层", async () => {
@@ -1106,6 +1149,26 @@ test("SceneDetailPage 到已并入练习的旧状态后，会后台预热场景�
     assert.equal(generatedPracticeCalls.length, 1);
   });
   assert.equal(screen.queryByText("practice-view"), null);
+});
+
+test("SceneDetailPage 在已有练习时支持手动重新生成题目", async () => {
+  currentSearchParams = new URLSearchParams("view=practice");
+  currentGeneratedState = {
+    latestPracticeSet: practiceSet,
+    latestVariantSet: null,
+    practiceStatus: "generated",
+    variantStatus: "idle",
+  };
+
+  const SceneDetailPage = getSceneDetailPage();
+  render(<SceneDetailPage initialLesson={baseLesson} />);
+
+  await screen.findByText("practice-view");
+  fireEvent.click(screen.getByRole("button", { name: "regenerate-practice" }));
+
+  await waitFor(() => {
+    assert.equal(generatedPracticeCalls.length, 1);
+  });
 });
 
 test("SceneDetailPage 生成场景练习时会锁定主 CTA，并保持加载文案稳定", async () => {

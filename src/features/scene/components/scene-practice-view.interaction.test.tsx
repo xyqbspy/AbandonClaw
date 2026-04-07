@@ -427,6 +427,7 @@ test("ScenePracticeView 会显示练习题对应的 chunk 文本而不是 chunk 
 
 test("ScenePracticeView 在空态下会禁用练习菜单入口", () => {
   let deleteCount = 0;
+  let regenerateCount = 0;
   let completeCount = 0;
 
   render(
@@ -439,6 +440,9 @@ test("ScenePracticeView 在空态下会禁用练习菜单入口", () => {
       onBack={() => undefined}
       onDelete={() => {
         deleteCount += 1;
+      }}
+      onRegenerate={() => {
+        regenerateCount += 1;
       }}
       onComplete={() => {
         completeCount += 1;
@@ -457,6 +461,7 @@ test("ScenePracticeView 在空态下会禁用练习菜单入口", () => {
   fireEvent.click(menuButton);
 
   assert.equal(deleteCount, 0);
+  assert.equal(regenerateCount, 0);
   assert.equal(completeCount, 0);
 });
 
@@ -481,8 +486,9 @@ test("ScenePracticeView 在练习已完成时会禁用完成按钮", () => {
   assert.equal(screen.getByRole("button", { name: sceneViewLabels.practice.complete }).hasAttribute("disabled"), true);
 });
 
-test("ScenePracticeView 头部菜单会触发删除和完成动作", async () => {
+test("ScenePracticeView 头部菜单会触发重新生成、删除和完成动作", async () => {
   let deleteCount = 0;
+  let regenerateCount = 0;
   let completeCount = 0;
 
   render(
@@ -496,6 +502,9 @@ test("ScenePracticeView 头部菜单会触发删除和完成动作", async () =>
       onDelete={() => {
         deleteCount += 1;
       }}
+      onRegenerate={() => {
+        regenerateCount += 1;
+      }}
       onComplete={() => {
         completeCount += 1;
       }}
@@ -504,6 +513,10 @@ test("ScenePracticeView 头部菜单会触发删除和完成动作", async () =>
       onToggleAnswer={() => undefined}
     />,
   );
+
+  openHeaderMenu();
+  fireEvent.click(screen.getByRole("button", { name: sceneViewLabels.practice.regenerate }));
+  assert.equal(regenerateCount, 1);
 
   openHeaderMenu();
   fireEvent.click(screen.getByRole("button", { name: sceneViewLabels.practice.delete }));

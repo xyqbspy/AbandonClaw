@@ -54,7 +54,7 @@ test("practice generate handler 会拒绝未登录请求", async () => {
 
   assert.equal(response.status, 401);
   assert.deepEqual(await response.json(), {
-    error: "Unauthorized",
+    error: "请先登录后再生成练习题。",
     code: "AUTH_UNAUTHORIZED",
     details: null,
   });
@@ -106,8 +106,28 @@ test("practice generate handler 会拒绝超大 scene", async () => {
 
   assert.equal(response.status, 400);
   assert.deepEqual(await response.json(), {
-    error: "scene sections exceed limit 12.",
+    error: "场景分段数超过上限 12。",
     code: "VALIDATION_ERROR",
     details: null,
+  });
+});
+
+test("practice generate handler 在模型请求失败时也会回退到本地 exercise 构建", async () => {
+  const response = await handlePracticeGeneratePost(
+    createJsonRequest({ scene: sampleScene, exerciseCount: 4 }),
+    {
+      requireCurrentProfile: async () => ({ user: { id: "user-1" }, profile: {} } as never),
+      callGlmChatCompletion: async () => {
+        throw new Error("GLM request timed out.");
+      },
+      buildExerciseSpecsFromScene: () =>
+        [{ id: "fallback-1", type: "typing", prompt: "p", answer: { text: "a" } }] as never,
+    },
+  );
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), {
+    version: "v1",
+    exercises: [{ id: "fallback-1", type: "typing", prompt: "p", answer: { text: "a" } }],
   });
 });

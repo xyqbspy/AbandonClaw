@@ -74,6 +74,8 @@ import { SceneVariantStudyView } from "./scene-variant-study-view";
 const appleButtonSmClassName = `${APPLE_BUTTON_BASE} ${APPLE_BUTTON_TEXT_SM}`;
 const appleButtonLgClassName = `${APPLE_BUTTON_BASE} ${APPLE_BUTTON_TEXT_LG}`;
 const appleDangerButtonSmClassName = `${APPLE_BUTTON_DANGER} ${APPLE_BUTTON_TEXT_SM}`;
+const PRACTICE_PREWARM_FAILURE_LIMIT = 3;
+const PRACTICE_PREWARM_FAILURE_WINDOW_MS = 60_000;
 
 type SavePhrasePayload = {
   text: string;
@@ -96,6 +98,10 @@ export default function SceneDetailClientPage({
   const sessionDoneRef = useRef(false);
   const focusExpressionPromptShownRef = useRef(false);
   const sceneResumeToastShownRef = useRef(false);
+  const practicePrewarmFailureRef = useRef<{ count: number; firstFailureAt: number | null }>({
+    count: 0,
+    firstFailureAt: null,
+  });
   const currentTrainingStepRef = useRef<TrainingStepKey | "done">("listen");
   const variantUnlockedRef = useRef(false);
   const latestPracticeStatusRef = useRef<"idle" | "generated" | "completed">("idle");
@@ -114,6 +120,8 @@ export default function SceneDetailClientPage({
   );
   const [practiceSnapshot, setPracticeSnapshot] = useState<ScenePracticeSnapshotResponse | null>(null);
   const [viewResetVersion, setViewResetVersion] = useState(0);
+  const [practicePrewarmBlocked, setPracticePrewarmBlocked] = useState(false);
+  const [practiceRetryError, setPracticeRetryError] = useState<string | null>(null);
 
   const {
     baseLesson,
@@ -193,6 +201,7 @@ export default function SceneDetailClientPage({
     expressionMap,
     canGeneratePractice,
     handleGeneratePractice,
+    handleRegeneratePractice,
     handleMarkPracticeComplete,
     handleMarkVariantSetComplete,
     handleOpenVariant,
@@ -250,6 +259,12 @@ export default function SceneDetailClientPage({
     sceneResumeToastShownRef.current = false;
     setTrainingState(null);
     setPracticeSnapshot(null);
+    practicePrewarmFailureRef.current = {
+      count: 0,
+      firstFailureAt: null,
+    };
+    setPracticePrewarmBlocked(false);
+    setPracticeRetryError(null);
     setViewResetVersion((current) => current + 1);
   };
 
@@ -430,6 +445,51 @@ export default function SceneDetailClientPage({
     notifySceneLoadError(loadErrorMessage);
   }, [loadErrorMessage]);
 
+  const resetPracticePrewarmFailures = useCallback(() => {
+    practicePrewarmFailureRef.current = {
+      count: 0,
+      firstFailureAt: null,
+    };
+    setPracticePrewarmBlocked(false);
+    setPracticeRetryError(null);
+  }, []);
+
+  const registerPracticePrewarmFailure = useCallback(() => {
+    const now = Date.now();
+    const current = practicePrewarmFailureRef.current;
+    const withinWindow =
+      current.firstFailureAt !== null &&
+      now - current.firstFailureAt <= PRACTICE_PREWARM_FAILURE_WINDOW_MS;
+    const nextCount = withinWindow ? current.count + 1 : 1;
+    practicePrewarmFailureRef.current = {
+      count: nextCount,
+      firstFailureAt: withinWindow ? current.firstFailureAt : now,
+    };
+
+    if (nextCount >= PRACTICE_PREWARM_FAILURE_LIMIT) {
+      setPracticePrewarmBlocked(true);
+      setPracticeRetryError("练习题生成多次失败，请稍后手动重试。");
+    }
+  }, []);
+
+  const handlePracticeToolAction = useCallback(() => {
+    resetPracticePrewarmFailures();
+    handlePracticeToolClick();
+  }, [handlePracticeToolClick, resetPracticePrewarmFailures]);
+
+  const handleGeneratePracticeManually = useCallback(
+    (lesson: Lesson) => {
+      resetPracticePrewarmFailures();
+      return handleGeneratePractice(lesson);
+    },
+    [handleGeneratePractice, resetPracticePrewarmFailures],
+  );
+
+  const handleRegeneratePracticeManually = useCallback(() => {
+    resetPracticePrewarmFailures();
+    return handleRegeneratePractice();
+  }, [handleRegeneratePractice, resetPracticePrewarmFailures]);
+
   const handleTrainingListenStep = useCallback(() => {
     handleSceneFullPlay();
   }, [handleSceneFullPlay]);
@@ -478,7 +538,7 @@ export default function SceneDetailClientPage({
             handleRepeatPractice();
             return;
           }
-          handlePracticeToolClick();
+          handlePracticeToolAction();
         },
         disabled: practiceLoading,
         loading: practiceLoading,
@@ -517,7 +577,7 @@ export default function SceneDetailClientPage({
     generatedState.variantStatus,
     latestPracticeSet?.status,
     latestVariantSet?.status,
-    handlePracticeToolClick,
+    handlePracticeToolAction,
     handleRepeatPractice,
     handleRepeatVariants,
     handleTrainingFocusExpressionStep,
@@ -550,7 +610,7 @@ export default function SceneDetailClientPage({
   latestVariantStatusRef.current = latestVariantSet?.status ?? generatedState.variantStatus;
   listenStepActionRef.current = handleTrainingListenStep;
   focusExpressionStepActionRef.current = handleTrainingFocusExpressionStep;
-  practiceToolActionRef.current = handlePracticeToolClick;
+  practiceToolActionRef.current = handlePracticeToolAction;
   variantToolActionRef.current = handleVariantToolClick;
   repeatPracticeActionRef.current = handleRepeatPractice;
   repeatVariantsActionRef.current = handleRepeatVariants;
@@ -564,7 +624,8 @@ export default function SceneDetailClientPage({
       !baseLesson ||
       (currentStep !== "practice_sentence" && currentStep !== "scene_practice") ||
       generatedState.practiceStatus !== "idle" ||
-      practiceLoading
+      practiceLoading ||
+      practicePrewarmBlocked
     ) {
       if (scheduleKey) {
         cancelScheduledIdleAction(scheduleKey);
@@ -572,7 +633,13 @@ export default function SceneDetailClientPage({
       return;
     }
     scheduleIdleAction(scheduleKey, () => {
-      void prewarmPractice(baseLesson);
+      void prewarmPractice(baseLesson).then((result) => {
+        if (result) {
+          resetPracticePrewarmFailures();
+          return;
+        }
+        registerPracticePrewarmFailure();
+      });
     });
     return () => {
       cancelScheduledIdleAction(scheduleKey);
@@ -580,8 +647,11 @@ export default function SceneDetailClientPage({
   }, [
     baseLesson,
     generatedState.practiceStatus,
+    practicePrewarmBlocked,
     practiceLoading,
     prewarmPractice,
+    registerPracticePrewarmFailure,
+    resetPracticePrewarmFailures,
     trainingState?.session?.currentStep,
   ]);
 
@@ -796,6 +866,7 @@ export default function SceneDetailClientPage({
           }}
           onBack={() => setViewModeWithRoute("scene")}
           onDelete={handleDeletePracticeSet}
+          onRegenerate={() => void handleRegeneratePracticeManually()}
           onComplete={() => {
             const shouldNotifyMilestone = !sceneRawCompletedMap.scene_practice;
             if (!latestPracticeSet) {
@@ -987,7 +1058,7 @@ export default function SceneDetailClientPage({
           type="button"
           className={`${appleButtonLgClassName} px-3 py-1.5 disabled:opacity-60`}
           disabled={!canGeneratePractice}
-          onClick={() => handleGeneratePractice(activeVariantLesson)}
+          onClick={() => void handleGeneratePracticeManually(activeVariantLesson)}
         >
           <LoadingContent
             loading={practiceLoading}
@@ -1029,7 +1100,7 @@ export default function SceneDetailClientPage({
   return (
       <SceneBaseView
         lesson={baseLesson}
-        practiceError={practiceError}
+        practiceError={practiceRetryError ?? practiceError}
         variantsError={variantsError}
         trainingPanel={trainingPanel}
         headerTools={null}

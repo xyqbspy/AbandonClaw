@@ -398,6 +398,30 @@ test("useSceneDetailActions 会静默预热 practice，且不切换当前视图"
   assert.deepEqual(viewModeCalls, []);
 });
 
+test("useSceneDetailActions 会在已有练习时手动重新生成当前题集", async () => {
+  const useSceneDetailActions = getUseSceneDetailActions();
+
+  const { result } = renderHook(() =>
+    useSceneDetailActions({
+      baseLesson: lesson,
+      latestPracticeSet: practiceSet,
+      latestVariantSet: null,
+      activeVariantId: null,
+      setActiveVariantId: (variantId) => activeVariantCalls.push(variantId),
+      setViewModeWithRoute: (viewMode, variantId) => viewModeCalls.push({ viewMode, variantId }),
+      refreshGeneratedState: (sceneKey) => refreshCalls.push(sceneKey),
+    }),
+  );
+
+  await act(async () => {
+    await result.current.handleRegeneratePractice();
+  });
+
+  assert.equal(generatedPracticeCalls.length, 1);
+  assert.equal(savedPracticeSets.at(-1)?.id, "practice-1");
+  assert.deepEqual(viewModeCalls.at(-1), { viewMode: "practice", variantId: undefined });
+});
+
 test("useSceneDetailActions 会从已完成练习开启新一轮", () => {
   const useSceneDetailActions = getUseSceneDetailActions();
 

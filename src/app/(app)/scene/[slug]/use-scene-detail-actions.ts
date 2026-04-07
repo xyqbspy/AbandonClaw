@@ -41,9 +41,34 @@ type UseSceneDetailActionsArgs = {
   latestVariantSet: VariantSet | null;
   activeVariantId: string | null;
   setActiveVariantId: (variantId: string | null) => void;
-  setViewModeWithRoute: (viewMode: "scene" | "practice" | "variants" | "expression-map" | "variant-study", variantId?: string | null) => void;
+  setViewModeWithRoute: (
+    viewMode: "scene" | "practice" | "variants" | "expression-map" | "variant-study",
+    variantId?: string | null,
+  ) => void;
   refreshGeneratedState: (sceneKey: string) => void;
   onLearningStateChange?: (state: Awaited<ReturnType<typeof completeSceneLearningFromApi>>) => void;
+};
+
+const resolvePracticeSourceLesson = ({
+  baseLesson,
+  latestVariantSet,
+  practiceSet,
+}: {
+  baseLesson: Lesson;
+  latestVariantSet: VariantSet | null;
+  practiceSet: PracticeSet;
+}) => {
+  if (practiceSet.sourceType !== "variant") {
+    return baseLesson;
+  }
+
+  return (
+    latestVariantSet?.variants.find(
+      (variant) =>
+        variant.id === practiceSet.sourceVariantId ||
+        variant.lesson.id === practiceSet.sourceVariantId,
+    )?.lesson ?? baseLesson
+  );
 };
 
 export function useSceneDetailActions({
@@ -69,9 +94,13 @@ export function useSceneDetailActions({
     useState<string | null>(null);
 
   const canGeneratePractice =
-    latestPracticeSet === null ? !practiceLoading : latestPracticeSet.status !== "generated" && !practiceLoading;
+    latestPracticeSet === null
+      ? !practiceLoading
+      : latestPracticeSet.status !== "generated" && !practiceLoading;
   const canGenerateVariants =
-    latestVariantSet === null ? !variantsLoading : latestVariantSet.status !== "generated" && !variantsLoading;
+    latestVariantSet === null
+      ? !variantsLoading
+      : latestVariantSet.status !== "generated" && !variantsLoading;
 
   const resetRouteScopedState = useCallback(() => {
     setPracticeError(null);
@@ -85,7 +114,7 @@ export function useSceneDetailActions({
 
   const handleGeneratePractice = useCallback(
     async (sourceLesson: Lesson) => {
-      if (!baseLesson || !canGeneratePractice) return;
+      if (!baseLesson || !canGeneratePractice) return null;
 
       setPracticeLoading(true);
       setPracticeError(null);
@@ -93,6 +122,7 @@ export function useSceneDetailActions({
         const practiceSet = await generateScenePracticeSet({
           baseLesson,
           sourceLesson,
+          requestPolicy: "manual",
         });
 
         savePracticeSet(practiceSet);
@@ -102,7 +132,7 @@ export function useSceneDetailActions({
         return practiceSet;
       } catch (error) {
         setPracticeError(
-          error instanceof Error ? error.message : "Failed to generate practice.",
+          error instanceof Error ? error.message : "生成练习题失败，请稍后重试。",
         );
         return null;
       } finally {
@@ -112,22 +142,67 @@ export function useSceneDetailActions({
     [baseLesson, canGeneratePractice, refreshGeneratedState, setViewModeWithRoute],
   );
 
-  const ensurePracticeSetReady = useCallback(async ({
-    sourceLesson,
-    openOnReady,
-  }: {
-    sourceLesson: Lesson;
-    openOnReady: boolean;
-  }) => {
-    if (!baseLesson) return null;
-    if (latestPracticeSet) {
-      if (openOnReady) {
-        setShowAnswerMap({});
-        setViewModeWithRoute("practice");
+  const ensurePracticeSetReady = useCallback(
+    async ({
+      sourceLesson,
+      openOnReady,
+      requestPolicy,
+    }: {
+      sourceLesson: Lesson;
+      openOnReady: boolean;
+      requestPolicy: "manual" | "auto";
+    }) => {
+      if (!baseLesson) return null;
+      if (latestPracticeSet) {
+        if (openOnReady) {
+          setShowAnswerMap({});
+          setViewModeWithRoute("practice");
+        }
+        return latestPracticeSet;
       }
-      return latestPracticeSet;
-    }
-    if (!canGeneratePractice) return null;
+      if (!canGeneratePractice) return null;
+
+      setPracticeLoading(true);
+      setPracticeError(null);
+      try {
+        const practiceSet = await generateScenePracticeSet({
+          baseLesson,
+          sourceLesson,
+          requestPolicy,
+        });
+
+        savePracticeSet(practiceSet);
+        refreshGeneratedState(baseLesson.id);
+        setShowAnswerMap({});
+        if (openOnReady) {
+          setViewModeWithRoute("practice");
+        }
+        return practiceSet;
+      } catch (error) {
+        setPracticeError(
+          error instanceof Error ? error.message : "生成练习题失败，请稍后重试。",
+        );
+        return null;
+      } finally {
+        setPracticeLoading(false);
+      }
+    },
+    [
+      baseLesson,
+      canGeneratePractice,
+      latestPracticeSet,
+      refreshGeneratedState,
+      setViewModeWithRoute,
+    ],
+  );
+
+  const handleRegeneratePractice = useCallback(async () => {
+    if (!baseLesson || !latestPracticeSet) return null;
+    const sourceLesson = resolvePracticeSourceLesson({
+      baseLesson,
+      latestVariantSet,
+      practiceSet: latestPracticeSet,
+    });
 
     setPracticeLoading(true);
     setPracticeError(null);
@@ -135,18 +210,17 @@ export function useSceneDetailActions({
       const practiceSet = await generateScenePracticeSet({
         baseLesson,
         sourceLesson,
+        requestPolicy: "manual",
       });
 
       savePracticeSet(practiceSet);
       refreshGeneratedState(baseLesson.id);
       setShowAnswerMap({});
-      if (openOnReady) {
-        setViewModeWithRoute("practice");
-      }
+      setViewModeWithRoute("practice");
       return practiceSet;
     } catch (error) {
       setPracticeError(
-        error instanceof Error ? error.message : "Failed to generate practice.",
+        error instanceof Error ? error.message : "生成练习题失败，请稍后重试。",
       );
       return null;
     } finally {
@@ -154,14 +228,14 @@ export function useSceneDetailActions({
     }
   }, [
     baseLesson,
-    canGeneratePractice,
     latestPracticeSet,
+    latestVariantSet,
     refreshGeneratedState,
     setViewModeWithRoute,
   ]);
 
   const handleGenerateVariants = useCallback(async () => {
-    if (!baseLesson || !canGenerateVariants) return;
+    if (!baseLesson || !canGenerateVariants) return null;
 
     setVariantsLoading(true);
     setVariantsError(null);
@@ -177,7 +251,7 @@ export function useSceneDetailActions({
       return variantSet;
     } catch (error) {
       setVariantsError(
-        error instanceof Error ? error.message : "Failed to generate variants.",
+        error instanceof Error ? error.message : "生成变体失败，请稍后重试。",
       );
       return null;
     } finally {
@@ -191,61 +265,68 @@ export function useSceneDetailActions({
     setViewModeWithRoute,
   ]);
 
-  const ensureVariantSetReady = useCallback(async ({
-    openOnReady,
-  }: {
-    openOnReady: boolean;
-  }) => {
-    if (!baseLesson) return null;
-    if (latestVariantSet) {
-      if (openOnReady) {
-        setViewModeWithRoute("variants");
+  const ensureVariantSetReady = useCallback(
+    async ({
+      openOnReady,
+    }: {
+      openOnReady: boolean;
+    }) => {
+      if (!baseLesson) return null;
+      if (latestVariantSet) {
+        if (openOnReady) {
+          setViewModeWithRoute("variants");
+        }
+        return latestVariantSet;
       }
-      return latestVariantSet;
-    }
-    if (!canGenerateVariants) return null;
+      if (!canGenerateVariants) return null;
 
-    setVariantsLoading(true);
-    setVariantsError(null);
-    try {
-      const variantSet = await generateSceneVariantSet({
-        baseLesson,
-      });
+      setVariantsLoading(true);
+      setVariantsError(null);
+      try {
+        const variantSet = await generateSceneVariantSet({
+          baseLesson,
+        });
 
-      saveVariantSet(variantSet);
-      refreshGeneratedState(baseLesson.id);
-      setActiveVariantId(null);
-      if (openOnReady) {
-        setViewModeWithRoute("variants");
+        saveVariantSet(variantSet);
+        refreshGeneratedState(baseLesson.id);
+        setActiveVariantId(null);
+        if (openOnReady) {
+          setViewModeWithRoute("variants");
+        }
+        return variantSet;
+      } catch (error) {
+        setVariantsError(
+          error instanceof Error ? error.message : "生成变体失败，请稍后重试。",
+        );
+        return null;
+      } finally {
+        setVariantsLoading(false);
       }
-      return variantSet;
-    } catch (error) {
-      setVariantsError(
-        error instanceof Error ? error.message : "Failed to generate variants.",
-      );
-      return null;
-    } finally {
-      setVariantsLoading(false);
-    }
-  }, [
-    baseLesson,
-    canGenerateVariants,
-    refreshGeneratedState,
-    setActiveVariantId,
-    setViewModeWithRoute,
-  ]);
+    },
+    [
+      baseLesson,
+      canGenerateVariants,
+      refreshGeneratedState,
+      setActiveVariantId,
+      setViewModeWithRoute,
+    ],
+  );
 
   const prewarmVariants = useCallback(async () => {
-    await ensureVariantSetReady({ openOnReady: false });
+    return ensureVariantSetReady({ openOnReady: false });
   }, [ensureVariantSetReady]);
 
-  const prewarmPractice = useCallback(async (sourceLesson?: Lesson | null) => {
-    if (!sourceLesson) return;
-    await ensurePracticeSetReady({
-      sourceLesson,
-      openOnReady: false,
-    });
-  }, [ensurePracticeSetReady]);
+  const prewarmPractice = useCallback(
+    async (sourceLesson?: Lesson | null) => {
+      if (!sourceLesson) return null;
+      return ensurePracticeSetReady({
+        sourceLesson,
+        openOnReady: false,
+        requestPolicy: "auto",
+      });
+    },
+    [ensurePracticeSetReady],
+  );
 
   const handleRepeatPractice = useCallback(() => {
     if (!baseLesson || !latestPracticeSet) return null;
@@ -301,7 +382,7 @@ export function useSceneDetailActions({
       .finally(() => {
         setSceneCompleting(false);
       });
-  }, [baseLesson, latestPracticeSet, refreshGeneratedState]);
+  }, [baseLesson, latestPracticeSet, onLearningStateChange, refreshGeneratedState]);
 
   const handleMarkVariantSetComplete = useCallback(() => {
     if (!baseLesson || !latestVariantSet) return;
@@ -323,7 +404,7 @@ export function useSceneDetailActions({
       .finally(() => {
         setSceneCompleting(false);
       });
-  }, [baseLesson, latestVariantSet, refreshGeneratedState]);
+  }, [baseLesson, latestVariantSet, onLearningStateChange, refreshGeneratedState]);
 
   const handleCompleteBaseScene = useCallback(() => {
     if (!baseLesson || sceneCompleting) return;
@@ -354,7 +435,13 @@ export function useSceneDetailActions({
       setActiveVariantId(variantId);
       setViewModeWithRoute("variant-study", variantId);
     },
-    [baseLesson, latestVariantSet, refreshGeneratedState, setActiveVariantId, setViewModeWithRoute],
+    [
+      baseLesson,
+      latestVariantSet,
+      refreshGeneratedState,
+      setActiveVariantId,
+      setViewModeWithRoute,
+    ],
   );
 
   const handleDeletePracticeSet = useCallback(() => {
@@ -424,14 +511,15 @@ export function useSceneDetailActions({
       void ensurePracticeSetReady({
         sourceLesson: baseLesson,
         openOnReady: true,
+        requestPolicy: "manual",
       });
       return;
     }
     setViewModeWithRoute("practice");
   }, [
     baseLesson,
-    handleRepeatPractice,
     ensurePracticeSetReady,
+    handleRepeatPractice,
     latestPracticeSet,
     practiceLoading,
     setViewModeWithRoute,
@@ -452,7 +540,10 @@ export function useSceneDetailActions({
       void ensureVariantSetReady({ openOnReady: true });
       return;
     }
-    if (activeVariantId && latestVariantSet?.variants.some((variant) => variant.id === activeVariantId)) {
+    if (
+      activeVariantId &&
+      latestVariantSet?.variants.some((variant) => variant.id === activeVariantId)
+    ) {
       setViewModeWithRoute("variant-study", activeVariantId);
       return;
     }
@@ -485,7 +576,7 @@ export function useSceneDetailActions({
       return result.expressionMap;
     } catch (error) {
       setExpressionMapError(
-        error instanceof Error ? error.message : "Failed to build expression map.",
+        error instanceof Error ? error.message : "生成表达地图失败，请稍后重试。",
       );
       return null;
     } finally {
@@ -533,6 +624,7 @@ export function useSceneDetailActions({
     setShowAnswerMap,
     resetRouteScopedState,
     handleGeneratePractice,
+    handleRegeneratePractice,
     handleGenerateVariants,
     handleRepeatPractice,
     handleRepeatVariants,

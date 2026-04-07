@@ -1,8 +1,5 @@
-# scene-practice-generation Specification
+## MODIFIED Requirements
 
-## Purpose
-TBD - created by archiving change increase-scene-practice-coverage. Update Purpose after archive.
-## Requirements
 ### Requirement: 场景填空模块必须提供稳定的最少题量覆盖
 系统 MUST 在 scene 练习的 `cloze` 模块中提供稳定的最少题量覆盖，避免中等以上句子数量的场景只生成极少数填空题。
 
@@ -27,16 +24,3 @@ TBD - created by archiving change increase-scene-practice-coverage. Update Purpo
 - **THEN** 系统必须允许重新生成新的练习集
 - **AND** 用户不应被要求先删除练习再回到 scene 页
 - **AND** 新生成结果必须成为当前最新练习集
-
-### Requirement: 半句复现必须覆盖更多中短句
-系统 MUST 让 `guided_recall` 覆盖更多仍有练习价值的中短句，而不是只保留偏长句。
-
-#### Scenario: 句子长度刚达到放宽后的阈值
-- **WHEN** 某句词数达到当前半句复现最小阈值，且前后半句都非空
-- **THEN** 系统必须为该句生成半句复现题
-
-#### Scenario: 场景存在多条可做半句复现的句子
-- **WHEN** 场景里可用的半句复现句子多于单轮上限
-- **THEN** 系统应保留不超过当前上限的题量
-- **AND** 该上限必须高于旧版的 4 题限制
-

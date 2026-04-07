@@ -1,6 +1,32 @@
 # Changelog
 
 ## 2026-04-07
+### 场景练习生成失败收口与手动重生入口
+- scene 练习删除后如果自动预热失败，前端不再继续暴露英文 `Practice generate failed.`；相关错误提示现在统一收口为中文。
+- `practice generate` 接口在上游模型请求超时、失败或空响应时，也会优先回退到本地出题，避免重新生成时直接卡死在 500。
+- 练习生成请求补上了短时间失败保护；同一场景短时间内连续失败达到阈值后，会直接返回最终中文错误，不再继续打接口。
+- 已经生成出来的练习现在支持在练习页菜单里直接“重新生成题目”，不需要先删除练习再退回句子页绕一圈。
+
+影响范围：
+- `src/lib/utils/practice-generate-api.ts`
+- `src/lib/utils/practice-generate-api.test.ts`
+- `src/app/api/practice/generate/route.ts`
+- `src/app/api/practice/generate/route.test.ts`
+- `src/app/(app)/scene/[slug]/scene-detail-generation-logic.ts`
+- `src/app/(app)/scene/[slug]/use-scene-detail-actions.ts`
+- `src/app/(app)/scene/[slug]/use-scene-detail-actions.test.tsx`
+- `src/app/(app)/scene/[slug]/scene-detail-page.tsx`
+- `src/app/(app)/scene/[slug]/page.regression.test.tsx`
+- `src/features/scene/components/scene-practice-view.tsx`
+- `src/features/scene/components/scene-practice-view.interaction.test.tsx`
+- `src/features/scene/components/scene-view-labels.ts`
+
+验证情况：
+- `node --import tsx --test "src/lib/utils/practice-generate-api.test.ts" "src/app/api/practice/generate/route.test.ts"`
+- `node --import tsx --import ./src/test/setup-dom.ts --test "src/features/scene/components/scene-practice-view.interaction.test.tsx" "src/app/(app)/scene/[[]slug[]]/use-scene-detail-actions.test.tsx" "src/app/(app)/scene/[[]slug[]]/page.regression.test.tsx"`
+- `pnpm run text:check-mojibake`
+
+## 2026-04-07
 ### 场景练习题覆盖率提升
 - scene 练习的 `cloze` 模块现在会按场景句子数补足填空覆盖：如果 AI 返回的 `chunk_cloze` 太少，会自动用本地 chunk 挖空补齐，不再让十句左右的场景只剩两道填空。
 - 半句复现的最小句长阈值从 6 词放宽到 5 词，模块上限也从 4 题提高到 5 题，让更多中短句能进入第二层训练。

@@ -102,10 +102,12 @@ export const syncSceneVariantsFromDb = async ({
 export const generateScenePracticeSet = async ({
   baseLesson,
   sourceLesson,
+  requestPolicy = "manual",
   deps,
 }: {
   baseLesson: Lesson;
   sourceLesson: Lesson;
+  requestPolicy?: "manual" | "auto";
   deps?: {
     mapLessonToParsedScene?: typeof mapLessonToParsedScene;
     practiceGenerateFromApi?: typeof practiceGenerateFromApi;
@@ -117,6 +119,8 @@ export const generateScenePracticeSet = async ({
   const generatedExercises = await (deps?.practiceGenerateFromApi ?? practiceGenerateFromApi)({
     scene: parsedScene,
     exerciseCount: 8,
+  }, {
+    bypassFailureGuard: requestPolicy === "manual",
   });
   const normalizedExercises = normalizePracticeExercisesForScene(parsedScene, generatedExercises);
   const clozeExercises = ensureSceneClozeCoverage({

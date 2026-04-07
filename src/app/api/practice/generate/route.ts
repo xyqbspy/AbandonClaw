@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { toApiErrorResponse } from "@/lib/server/api-error";
 import { requireCurrentProfile } from "@/lib/server/auth";
-import { ValidationError } from "@/lib/server/errors";
+import { AuthError, ForbiddenError, ValidationError } from "@/lib/server/errors";
 import { callGlmChatCompletion } from "@/lib/server/glm-client";
 import {
   buildPracticeGenerateUserPrompt,
@@ -32,6 +32,8 @@ const sanitizeExerciseCount = (value: unknown) => {
   if (typeof value !== "number" || Number.isNaN(value)) return 6;
   return clamp(Math.round(value), 3, 12);
 };
+
+const PRACTICE_GENERATE_FALLBACK_MESSAGE = "生成练习题失败，请稍后重试。";
 
 const isValidExerciseType = (value: unknown): value is PracticeExerciseType =>
   value === "chunk_cloze" ||
@@ -164,24 +166,24 @@ const toValidPayload = (
   | { ok: true; value: { scene: PracticeGenerateRequest["scene"]; exerciseCount: number } }
   | { ok: false; error: string } => {
   if (!isValidParsedScene(payload.scene)) {
-    return { ok: false, error: "Invalid payload.scene structure." };
+    return { ok: false, error: "练习题生成请求无效。" };
   }
 
   const metrics = measureScenePayload(payload.scene);
   if (metrics.sections > PRACTICE_MAX_SECTIONS) {
-    return { ok: false, error: `scene sections exceed limit ${PRACTICE_MAX_SECTIONS}.` };
+    return { ok: false, error: `场景分段数超过上限 ${PRACTICE_MAX_SECTIONS}。` };
   }
   if (metrics.blocks > PRACTICE_MAX_BLOCKS) {
-    return { ok: false, error: `scene blocks exceed limit ${PRACTICE_MAX_BLOCKS}.` };
+    return { ok: false, error: `场景块数超过上限 ${PRACTICE_MAX_BLOCKS}。` };
   }
   if (metrics.sentences > PRACTICE_MAX_SENTENCES) {
-    return { ok: false, error: `scene sentences exceed limit ${PRACTICE_MAX_SENTENCES}.` };
+    return { ok: false, error: `场景句子数超过上限 ${PRACTICE_MAX_SENTENCES}。` };
   }
   if (metrics.chunks > PRACTICE_MAX_CHUNKS) {
-    return { ok: false, error: `scene chunks exceed limit ${PRACTICE_MAX_CHUNKS}.` };
+    return { ok: false, error: `场景表达块数超过上限 ${PRACTICE_MAX_CHUNKS}。` };
   }
   if (metrics.textLength > PRACTICE_MAX_TEXT_LENGTH) {
-    return { ok: false, error: `scene text exceeds limit ${PRACTICE_MAX_TEXT_LENGTH}.` };
+    return { ok: false, error: `场景文本长度超过上限 ${PRACTICE_MAX_TEXT_LENGTH}。` };
   }
 
   return {
@@ -299,6 +301,25 @@ const validatePracticeGenerateResponse = (
   return { ok: true };
 };
 
+const localizePracticeGenerateError = (error: unknown) => {
+  if (error instanceof AuthError) {
+    return new AuthError("请先登录后再生成练习题。");
+  }
+  if (error instanceof ForbiddenError) {
+    return new ForbiddenError("你暂无权限生成练习题。");
+  }
+  if (error instanceof ValidationError) {
+    return error;
+  }
+  if (error instanceof Error && error.message === "Unauthorized") {
+    return new AuthError("请先登录后再生成练习题。");
+  }
+  if (error instanceof Error && error.message === "Forbidden") {
+    return new ForbiddenError("你暂无权限生成练习题。");
+  }
+  return error;
+};
+
 interface PracticeGenerateDependencies {
   requireCurrentProfile: typeof requireCurrentProfile;
   callGlmChatCompletion: typeof callGlmChatCompletion;
@@ -326,33 +347,47 @@ export async function handlePracticeGeneratePost(
 
     const { scene, exerciseCount } = normalized.value;
 
-    const rawModelText = await dependencies.callGlmChatCompletion({
-      systemPrompt: PRACTICE_GENERATE_SYSTEM_PROMPT,
-      userPrompt: buildPracticeGenerateUserPrompt({
-        sceneJson: JSON.stringify(scene),
-        expressionFamilies: buildExpressionClustersForPrompt(scene),
-        exerciseCount,
-      }),
-      temperature: 0.3,
-    });
+    const fallbackExercises = dependencies.buildExerciseSpecsFromScene(scene, exerciseCount);
 
-    const { parsed: parsedJson } = parseWithDiagnostics(rawModelText);
-    const parsed = normalizePracticeResponse(parsedJson);
-    const validation = validatePracticeGenerateResponse(parsed);
-    if (!validation.ok) {
-      const fallback = dependencies.buildExerciseSpecsFromScene(scene, exerciseCount);
+    try {
+      const rawModelText = await dependencies.callGlmChatCompletion({
+        systemPrompt: PRACTICE_GENERATE_SYSTEM_PROMPT,
+        userPrompt: buildPracticeGenerateUserPrompt({
+          sceneJson: JSON.stringify(scene),
+          expressionFamilies: buildExpressionClustersForPrompt(scene),
+          exerciseCount,
+        }),
+        temperature: 0.3,
+      });
+
+      const { parsed: parsedJson } = parseWithDiagnostics(rawModelText);
+      const parsed = normalizePracticeResponse(parsedJson);
+      const validation = validatePracticeGenerateResponse(parsed);
+      if (!validation.ok) {
+        return NextResponse.json(
+          {
+            version: "v1",
+            exercises: fallbackExercises,
+          },
+          { status: 200 },
+        );
+      }
+
+      return NextResponse.json(parsed, { status: 200 });
+    } catch {
       return NextResponse.json(
         {
           version: "v1",
-          exercises: fallback,
+          exercises: fallbackExercises,
         },
         { status: 200 },
       );
     }
-
-    return NextResponse.json(parsed, { status: 200 });
   } catch (error) {
-    return toApiErrorResponse(error, "Practice generate failed.");
+    return toApiErrorResponse(
+      localizePracticeGenerateError(error),
+      PRACTICE_GENERATE_FALLBACK_MESSAGE,
+    );
   }
 }
 

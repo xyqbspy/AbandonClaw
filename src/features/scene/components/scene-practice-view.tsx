@@ -58,6 +58,7 @@ type ScenePracticeViewProps = {
   labels: ScenePracticeViewLabels;
   onBack: () => void;
   onDelete: () => void;
+  onRegenerate?: () => void;
   onComplete: () => void;
   onSentenceCompleted?: (payload: {
     exerciseId: string;
@@ -101,6 +102,7 @@ export function ScenePracticeView({
   labels,
   onBack,
   onDelete,
+  onRegenerate,
   onComplete,
   onSentenceCompleted,
   onPracticeRunStart,
@@ -523,6 +525,17 @@ export function ScenePracticeView({
                   <button
                     type="button"
                     className="flex w-full items-center justify-between px-[var(--mobile-space-xl)] py-[var(--mobile-space-md)] text-left text-[length:var(--mobile-font-body-sm)] font-semibold text-foreground transition-colors hover:bg-[var(--app-surface-subtle)]"
+                    onClick={() => {
+                      setHeaderMenuOpen(false);
+                      onRegenerate?.();
+                    }}
+                    disabled={!practiceSet || !onRegenerate}
+                  >
+                    <span>{labels.regenerate}</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="flex w-full items-center justify-between border-t border-[var(--app-border-soft)] px-[var(--mobile-space-xl)] py-[var(--mobile-space-md)] text-left text-[length:var(--mobile-font-body-sm)] font-semibold text-foreground transition-colors hover:bg-[var(--app-surface-subtle)]"
                     onClick={() => {
                       setHeaderMenuOpen(false);
                       onDelete();
