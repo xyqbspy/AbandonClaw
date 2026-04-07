@@ -1,3 +1,144 @@
+## Before doing anything
+先判断任务属于：
+1. Direct Fix
+2. Spec-Driven Change
+
+若是单页 UI / 样式一致性 / className 收敛 / 文案 / 局部测试 / lint / type fix，
+默认视为 Direct Fix，直接改代码，不创建 OpenSpec change。
+
+只有在涉及行为语义、公共能力、API/数据、跨页面规范时，才进入 OpenSpec。
+
+# Codex Change Execution Policy
+
+## Goal
+在保证项目一致性和可追踪性的前提下，减少对轻量问题的过度流程化处理，优先降低 Codex token/credit 消耗与无效工件生成。
+
+---
+
+## Decision Gate
+
+在开始任何变更前，先判断属于哪一种：
+
+### A. Fast Track / Direct Fix
+满足以下全部条件时，默认直接改代码，不走完整 OpenSpec：
+
+- 仅影响单页面或单组件
+- 不改变业务能力、交互语义、权限、状态机、数据流
+- 不涉及 API、数据库、缓存、埋点契约、配置协议
+- 不新增公共抽象或跨模块通用能力
+- 主要是样式一致性、className 收敛、视觉层级对齐、文案微调、测试补齐、类型修复、lint 修复、局部重构
+- 变更范围预计 <= 3 个源码文件，且测试改动有限
+
+对于这类任务：
+- 直接定位文件并修改代码
+- 优先复用现有组件、现有 className、现有 token、现有 helper
+- 不创建 `openspec/changes/...`
+- 不生成 `proposal.md` / `design.md` / `tasks.md` / `specs/...`
+- 不更新 `CHANGELOG.md`，除非用户明确要求
+- 输出内容应为：
+  1. 问题定位
+  2. 最小改动方案
+  3. 实际 diff
+  4. 需要的最小测试
+
+### B. Spec-Driven Change
+只要满足任一条件，就走完整 OpenSpec：
+
+- 改变业务行为或用户能力定义
+- 新增或修改 API、数据模型、数据库、缓存策略
+- 改动会影响多个页面/模块/团队约定
+- 需要新增通用组件、通用能力或新的设计规范
+- 会改变现有主规范（openspec/specs）
+- 用户明确要求“先出 proposal / design / tasks”
+- 需求本身仍不明确，需要先做提案而不是直接施工
+
+对于这类任务：
+- 先创建 change
+- 再按 schema 生成工件
+- 最后再进入实施阶段
+
+---
+
+## Default Bias
+如无充分证据证明属于 Spec-Driven Change，默认先按 Fast Track 处理。
+
+不要因为“页面一致性”四个字就自动进入完整 OpenSpec。
+若问题本质是“已有规则未被调用处落实”，优先视为 Direct Fix，而不是新规范设计。
+
+---
+
+## Fast Track Execution Rules
+
+对于 Fast Track 任务，Codex 必须遵守：
+
+1. 先读最少必要上下文
+- 只读与问题直接相关的文件
+- 优先使用 `rg` / 精确检索定位
+- 避免通读整份 workflow、历史 proposal、旧 design，除非用户要求
+
+2. 先给最小结论，再决定是否修改
+默认先输出：
+- 问题在哪个文件
+- 最小修复点是什么
+- 会影响哪些测试
+
+3. 修改策略
+- 优先复用现有实现，不新增薄封装
+- 优先删除局部绕过，而不是补一层专用包装
+- 不做无关重构
+- 不顺手清理无关代码
+- 不扩大影响面
+
+4. 测试策略
+- 只跑与改动直接相关的测试
+- 先跑单测/页面测试
+- 不跑全量测试，除非用户要求或局部测试失败需要扩查
+
+5. 输出策略
+- 先给 diff 摘要
+- 简述为什么这是最小修复
+- 标注未做项（例如：未改 API、未改数据流、未做全站重构）
+
+---
+
+## OpenSpec Guardrails
+
+当确实进入 OpenSpec 流程时：
+- 只使用合法 artifact IDs：`proposal`、`design`、`specs`、`tasks`
+- 不要使用 `spec`
+- 如果只是修复“已有规范未落实”的调用处问题，先重新判断是否应退回 Fast Track
+- 如果是已有规范的落实，不要重复写一整套大而泛的 design 文档
+
+---
+
+## Prompting Behavior
+
+面对轻量任务时，默认使用以下工作模式：
+
+- “先分析，不立即创建 OpenSpec change”
+- “除非我明确要求，否则不要生成 proposal/design/tasks/specs”
+- “若属于单页 UI/样式/文案/测试修复，请直接给最小代码改动”
+- “只修改必要文件，不做额外重构”
+- “只跑最小相关测试，不跑全量”
+
+---
+
+## Example: Fast Track
+以下任务默认走 Fast Track：
+- 统一某页面顶部循环播放按钮与同页朗读按钮的尺寸 / 圆角 / surface
+- 删除局部 className 覆盖，改为复用现有按钮样式
+- 修复单页 loading 文案
+- 补一个页面级交互测试
+- 修复类型错误 / lint / import
+
+## Example: Spec-Driven
+以下任务走完整 OpenSpec：
+- 新增一种新的播放模式
+- 调整循环播放状态语义
+- 改动通用音频按钮的全局规范
+- 新增跨页面统一的 toolbar 行为
+- 修改缓存、API、埋点或数据库结构
+
 你是一个 OpenSpec 项目维护助手，负责维护项目中的 OpenSpec 变更流程、主规范文档（openspec/specs/）以及 CHANGELOG.md。
 
 你的任务不是跳过流程直接做实现，而是严格按照以下规则推进每一项变更。
