@@ -15,6 +15,62 @@ import { shouldReuseExpressionMapCache } from "./scene-detail-controller";
 import { buildPracticeSet, buildVariantSet, createGeneratedId } from "./scene-detail-actions";
 import { buildReusedChunks } from "./scene-detail-logic";
 
+const MIN_SCENE_CLOZE_EXERCISES = 5;
+const MAX_SCENE_CLOZE_EXERCISES = 8;
+
+const countSceneSentences = (
+  scene: Pick<ReturnType<typeof mapLessonToParsedScene>, "sections">,
+) =>
+  scene.sections.reduce(
+    (count, section) =>
+      count + section.blocks.reduce((blockCount, block) => blockCount + block.sentences.length, 0),
+    0,
+  );
+
+const getClozeTargetCount = (scene: Pick<ReturnType<typeof mapLessonToParsedScene>, "sections">) =>
+  Math.min(
+    MAX_SCENE_CLOZE_EXERCISES,
+    Math.max(MIN_SCENE_CLOZE_EXERCISES, countSceneSentences(scene)),
+  );
+
+const toExerciseDedupKey = (exercise: ReturnType<typeof normalizePracticeExercisesForScene>[number]) =>
+  [
+    exercise.sentenceId ?? "",
+    exercise.chunkId ?? "",
+  ].join("::");
+
+const ensureSceneClozeCoverage = ({
+  parsedScene,
+  normalizedExercises,
+}: {
+  parsedScene: ReturnType<typeof mapLessonToParsedScene>;
+  normalizedExercises: ReturnType<typeof normalizePracticeExercisesForScene>;
+}) => {
+  const targetCount = getClozeTargetCount(parsedScene);
+  const clozeExercises = normalizedExercises.filter((exercise) => exercise.type === "chunk_cloze");
+  if (clozeExercises.length >= targetCount) {
+    return clozeExercises;
+  }
+
+  const fallbackExercises = normalizePracticeExercisesForScene(
+    parsedScene,
+    buildExerciseSpecsFromScene(parsedScene, targetCount),
+  ).filter((exercise) => exercise.type === "chunk_cloze");
+
+  const merged: typeof clozeExercises = [];
+  const seen = new Set<string>();
+
+  for (const exercise of [...clozeExercises, ...fallbackExercises]) {
+    const key = toExerciseDedupKey(exercise);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    merged.push(exercise);
+    if (merged.length >= targetCount) break;
+  }
+
+  return merged;
+};
+
 export const syncSceneVariantsFromDb = async ({
   baseLesson,
   hasExistingVariantSet,
@@ -63,11 +119,14 @@ export const generateScenePracticeSet = async ({
     exerciseCount: 8,
   });
   const normalizedExercises = normalizePracticeExercisesForScene(parsedScene, generatedExercises);
-  const clozeExercises = normalizedExercises.filter((exercise) => exercise.type === "chunk_cloze");
+  const clozeExercises = ensureSceneClozeCoverage({
+    parsedScene,
+    normalizedExercises,
+  });
   const exercises =
     clozeExercises.length > 0
       ? clozeExercises
-      : buildExerciseSpecsFromScene(parsedScene, 8);
+      : buildExerciseSpecsFromScene(parsedScene, getClozeTargetCount(parsedScene));
 
   return buildPracticeSet({
     baseLesson,

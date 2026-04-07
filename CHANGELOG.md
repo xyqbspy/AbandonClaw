@@ -1,5 +1,62 @@
 # Changelog
 
+## 2026-04-07
+### 场景练习题覆盖率提升
+- scene 练习的 `cloze` 模块现在会按场景句子数补足填空覆盖：如果 AI 返回的 `chunk_cloze` 太少，会自动用本地 chunk 挖空补齐，不再让十句左右的场景只剩两道填空。
+- 半句复现的最小句长阈值从 6 词放宽到 5 词，模块上限也从 4 题提高到 5 题，让更多中短句能进入第二层训练。
+- `practice generate` prompt 现在会明确要求优先产出 `chunk_cloze`，并先覆盖更多不同句子，减少模型一开始就把题量分散到其它题型上。
+- fallback 补题现在不再死守“每句只挖第一个 chunk”，而是允许长句在需要时再补一个高价值 chunk，进一步提高填空覆盖。
+- fallback 的高价值判断也从纯长度启发式升级成会参考 `grammarLabel / meaningInSentence / usageNote`，优先短语动词、固定搭配、习语这类更值得练的表达。
+- 这样即使同一句里存在更长但更泛的片段，fallback 也会更倾向先抽真正该练的表达，不会只按字数抢优先级。
+- 同步补齐 OpenSpec 变更工件，并更新 `docs/scene-practice-generation.md`，把新的题量规则和补足逻辑写清楚。
+
+影响范围：
+- `src/app/(app)/scene/[slug]/scene-detail-generation-logic.ts`
+- `src/app/(app)/scene/[slug]/scene-detail-actions.ts`
+- `src/app/(app)/scene/[slug]/scene-detail-generation-logic.test.ts`
+- `src/app/(app)/scene/[slug]/scene-detail-actions.test.ts`
+- `src/lib/server/prompts/practice-generate-prompt.ts`
+- `src/lib/server/prompts/practice-generate-prompt.test.ts`
+- `src/lib/server/exercises/spec-builder.ts`
+- `src/lib/server/exercises/spec-builder.test.ts`
+- `docs/scene-practice-generation.md`
+- `openspec/changes/increase-scene-practice-coverage/`
+
+验证情况：
+- `node --import tsx --test "src/app/(app)/scene/[[]slug[]]/scene-detail-generation-logic.test.ts" "src/app/(app)/scene/[[]slug[]]/scene-detail-actions.test.ts"`
+- `node --import tsx --test "src/lib/server/prompts/practice-generate-prompt.test.ts"`
+- `node --import tsx --test "src/lib/server/exercises/spec-builder.test.ts"`
+- `pnpm run text:check-mojibake`
+
+## 2026-04-07
+### 场景练习出题链路文档补齐
+- 新增 `docs/scene-practice-generation.md`，把 scene 练习题从 AI 生成、回退挖空、`chunk_cloze` 收口、半句复现过滤到前端模块解锁的整条链路补成专项维护文档。
+- 文档里明确说明了为什么当前会出现“一个句子通常只有一个空、整轮填空偏少、半句复现偏少”的现象，后续要增大题量时该优先改哪几层也一起写清楚了。
+- 在 `docs/project-maintenance-playbook.md` 的 `scene/[slug]` 维护入口补挂了这份文档，后续查 scene 练习生成逻辑不用再散着翻文件。
+
+影响范围：
+- `docs/scene-practice-generation.md`
+- `docs/project-maintenance-playbook.md`
+
+验证情况：
+- `pnpm run text:check-mojibake`
+
+## 2026-04-05
+### 播放中按钮扩散效果增强
+- 公共音频图标里的 `play` 家族播放中状态改成了更明显的扩散波纹，不再只是单独的三角播放图标轻微闪动。
+- 循环播放等共用这套公共按钮的入口现在在播放中会出现更清晰的扩散感，状态识别更直接。
+- 在此基础上继续加大了扩散半径、层数和发光强度，播放中的动态存在感会更强，不容易看起来像普通 hover。
+- 进一步把播放态动画拆成“低位接近背景、高潮才明显抬亮”的节奏，低和高之间的对比会更清楚，不会一直维持偏亮的扩散。
+- 又把低位透明度和中段亮度继续压低了一档，让播放中大部分时间更贴近背景，只在高位瞬间明显亮起来。
+
+影响范围：
+- `src/components/audio/audio-state-icon.tsx`
+- `src/app/globals.css`
+- `src/components/audio/loop-action-button.test.tsx`
+
+验证情况：
+- `node --import tsx --import ./src/test/setup-dom.ts --test "src/components/audio/loop-action-button.test.tsx" "src/components/audio/tts-action-button.test.tsx"`
+- `pnpm run text:check-mojibake`
 ## 2026-04-03
 ### 对话气泡播放按钮尺寸与底色统一
 - 对话气泡和移动端分组气泡下方的播放按钮已经放大到与翻译按钮一致的点击区和图标尺寸，动作区不再出现一大一小的割裂感。

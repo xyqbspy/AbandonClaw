@@ -381,3 +381,88 @@ test("generateScenePracticeSet 会把填空练习模块收敛成纯 chunk_cloze"
     ["chunk_cloze"],
   );
 });
+
+test("generateScenePracticeSet 会在 AI 的 chunk_cloze 偏少时补足到按句子数收口的最少覆盖", async () => {
+  const sentences = Array.from({ length: 6 }, (_, index) => ({
+    id: `sentence-${index + 1}`,
+    text: `I should call it a day ${index + 1}.`,
+    translation: `我该收工了 ${index + 1}。`,
+    chunks: [
+      {
+        id: `chunk-${index + 1}`,
+        key: `call it a day ${index + 1}`,
+        text: "call it a day",
+        start: 9,
+        end: 22,
+      },
+    ],
+  }));
+
+  const result = await generateScenePracticeSet({
+    baseLesson,
+    sourceLesson: variantLesson,
+    deps: {
+      mapLessonToParsedScene: () => ({
+        id: variantLesson.id,
+        slug: variantLesson.slug,
+        title: variantLesson.title,
+        type: "dialogue",
+        sections: [
+          {
+            id: "section-1",
+            blocks: [
+              {
+                id: "block-1",
+                type: "dialogue",
+                speaker: "A",
+                sentences,
+              },
+            ],
+          },
+        ],
+      }),
+      practiceGenerateFromApi: async () => [
+        {
+          id: "exercise-1",
+          type: "chunk_cloze",
+          inputMode: "typing",
+          sceneId: variantLesson.id,
+          sentenceId: "sentence-1",
+          chunkId: "chunk-1",
+          prompt: "补全句子中的表达",
+          answer: {
+            text: "call it a day",
+            acceptedAnswers: ["call it a day"],
+          },
+          cloze: {
+            displayText: "I should ____ 1.",
+          },
+        },
+        {
+          id: "exercise-2",
+          type: "chunk_cloze",
+          inputMode: "typing",
+          sceneId: variantLesson.id,
+          sentenceId: "sentence-2",
+          chunkId: "chunk-2",
+          prompt: "补全句子中的表达",
+          answer: {
+            text: "call it a day",
+            acceptedAnswers: ["call it a day"],
+          },
+          cloze: {
+            displayText: "I should ____ 2.",
+          },
+        },
+      ],
+      nowIso: () => "2026-03-22T00:00:00.000Z",
+      createId: () => "practice-fixed",
+    },
+  });
+
+  assert.equal(result.exercises.length, 6);
+  assert.equal(
+    result.modules?.find((module) => module.mode === "cloze")?.exercises.length,
+    6,
+  );
+});

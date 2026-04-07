@@ -9,7 +9,7 @@ export const createGeneratedId = (prefix: string) =>
 const splitSentenceForGuidedRecall = (sentenceText: string) => {
   const normalizedText = sentenceText.trim().replace(/\s+/g, " ");
   const words = normalizedText.split(" ").filter(Boolean);
-  if (words.length < 6) return null;
+  if (words.length < 5) return null;
 
   const prefixLength = Math.max(3, Math.ceil(words.length / 2));
   const prefixWords = words.slice(0, prefixLength);
@@ -59,7 +59,7 @@ const buildGuidedRecallModule = ({
         },
       }];
     })
-    .slice(0, 4);
+    .slice(0, 5);
 
   return {
     mode: "guided_recall",
