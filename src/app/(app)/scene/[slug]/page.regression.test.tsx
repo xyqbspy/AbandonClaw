@@ -329,7 +329,7 @@ const mockedModules = {
             mode: "cloze",
             sourceType: "original",
           });
-        }, [onPracticeRunStart, practiceSet?.id]);
+        }, [practiceSet?.id]);
 
         return (
           <div>

@@ -7,6 +7,7 @@ import {
   Lock,
   MoreHorizontal,
 } from "lucide-react";
+import { AnimatedLoadingText } from "@/components/shared/action-loading";
 import {
   APPLE_BADGE_INFO,
   APPLE_BADGE_SUBTLE,
@@ -56,6 +57,7 @@ type ScenePracticeViewProps = {
   appleButtonSmClassName: string;
   appleDangerButtonSmClassName: string;
   labels: ScenePracticeViewLabels;
+  regenerating?: boolean;
   onBack: () => void;
   onDelete: () => void;
   onRegenerate?: () => void;
@@ -100,6 +102,7 @@ export function ScenePracticeView({
   appleButtonSmClassName: _appleButtonSmClassName,
   appleDangerButtonSmClassName: _appleDangerButtonSmClassName,
   labels,
+  regenerating = false,
   onBack,
   onDelete,
   onRegenerate,
@@ -541,14 +544,20 @@ export function ScenePracticeView({
                 <div className="absolute right-0 top-10 z-20 min-w-[clamp(160px,42vw,172px)] overflow-hidden rounded-[18px] border border-[var(--app-border-soft)] bg-[var(--app-surface)] shadow-[var(--app-shadow-raised)]">
                   <button
                     type="button"
-                    className="flex w-full items-center justify-between px-[var(--mobile-space-xl)] py-[var(--mobile-space-md)] text-left text-[length:var(--mobile-font-body-sm)] font-semibold text-foreground transition-colors hover:bg-[var(--app-surface-subtle)]"
+                    className="flex w-full items-center justify-between px-[var(--mobile-space-xl)] py-[var(--mobile-space-md)] text-left text-[length:var(--mobile-font-body-sm)] font-semibold text-foreground transition-colors hover:bg-[var(--app-surface-subtle)] disabled:text-[var(--muted-foreground)]"
                     onClick={() => {
-                      setHeaderMenuOpen(false);
+                      if (regenerating) return;
                       onRegenerate?.();
                     }}
-                    disabled={!practiceSet || !onRegenerate}
+                    disabled={!practiceSet || !onRegenerate || regenerating}
                   >
-                    <span>{labels.regenerate}</span>
+                    <span>
+                      {regenerating ? (
+                        <AnimatedLoadingText text={labels.regenerating} />
+                      ) : (
+                        labels.regenerate
+                      )}
+                    </span>
                   </button>
                   <button
                     type="button"

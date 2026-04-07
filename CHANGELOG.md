@@ -1,6 +1,24 @@
 # Changelog
 
 ## 2026-04-07
+### 公共生成中动效组件与练习重生加载反馈
+- 共享 loading 组件新增了可复用的动态省略号文案能力，现在可以统一显示类似“正在生成中.”、“正在生成中..”、“正在生成中...”的轮流反馈。
+- scene 练习页点击“重新生成题目”后，菜单项会切成统一的“正在生成中”加载态，并禁用重复点击，不再只是静态文案或无反馈等待。
+
+影响范围：
+- `src/components/shared/action-loading.tsx`
+- `src/components/shared/action-loading.test.tsx`
+- `src/features/scene/components/scene-practice-view.tsx`
+- `src/features/scene/components/scene-practice-view.interaction.test.tsx`
+- `src/features/scene/components/scene-view-labels.ts`
+- `src/app/(app)/scene/[slug]/scene-detail-page.tsx`
+
+验证情况：
+- `node --import tsx --import ./src/test/setup-dom.ts --test "src/components/shared/action-loading.test.tsx" "src/features/scene/components/scene-practice-view.interaction.test.tsx"`
+- `node --import tsx --import ./src/test/setup-dom.ts --test "src/app/(app)/scene/[[]slug[]]/page.regression.test.tsx"`
+- `pnpm run text:check-mojibake`
+
+## 2026-04-07
 ### 练习页运行态防重与题目来源提示
 - 修正了场景练习题目页在点击“重新生成题目”后可能持续重复调用 `practice/run` 的问题；现在同一题集同一题型只会启动一次运行态，不会因为页面重渲染反复打接口。
 - scene 练习集新增了生成来源标记，题目页顶部现在会直接展示 `AI生成` 或 `系统生成`，方便区分模型生成结果和本地回退结果。

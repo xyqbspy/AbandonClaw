@@ -1,7 +1,7 @@
 "use client";
 
 import { Loader2 } from "lucide-react";
-import { ReactNode } from "react";
+import { ReactNode, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -15,6 +15,41 @@ type LoadingContentProps = {
 
 export function formatLoadingText(label: string, suffix = "...") {
   return label.endsWith("...") ? label : `${label}${suffix}`;
+}
+
+type AnimatedLoadingTextProps = {
+  text: string;
+  className?: string;
+  dotClassName?: string;
+  intervalMs?: number;
+};
+
+export function AnimatedLoadingText({
+  text,
+  className,
+  dotClassName,
+  intervalMs = 360,
+}: AnimatedLoadingTextProps) {
+  const [dotCount, setDotCount] = useState(1);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setDotCount((current) => (current >= 3 ? 1 : current + 1));
+    }, intervalMs);
+    return () => window.clearInterval(timer);
+  }, [intervalMs]);
+
+  return (
+    <span className={cn("inline-flex items-center", className)}>
+      <span className="sr-only">{`${text}...`}</span>
+      <span aria-hidden="true">
+        {text}
+        <span className={cn("inline-block min-w-[3ch] text-left", dotClassName)}>
+          {".".repeat(dotCount)}
+        </span>
+      </span>
+    </span>
+  );
 }
 
 export function LoadingContent({

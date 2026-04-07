@@ -9,6 +9,7 @@ export type ScenePracticeViewLabels = {
   back: string;
   delete: string;
   regenerate: string;
+  regenerating: string;
   complete: string;
   practiceEntryTitle: string;
   practiceModePrefix: string;
@@ -104,6 +105,7 @@ export const sceneViewLabels: SceneViewLabels = {
     back: "返回原场景",
     delete: "删除当前练习",
     regenerate: "重新生成题目",
+    regenerating: "正在生成中",
     complete: "完成本轮练习",
     practiceEntryTitle: "开始练习",
     practiceModePrefix: "当前题型：",

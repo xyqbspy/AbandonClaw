@@ -3,6 +3,7 @@ import test, { afterEach } from "node:test";
 import React from "react";
 import { cleanup, render, screen } from "@testing-library/react";
 import {
+  AnimatedLoadingText,
   formatLoadingText,
   LoadingButton,
   LoadingContent,
@@ -48,6 +49,23 @@ test("LoadingState 会渲染统一的区块加载提示", () => {
   render(<LoadingState text="场景加载中..." />);
 
   screen.getByText("场景加载中...");
+});
+
+test("AnimatedLoadingText 会轮流展示省略号", async () => {
+  const { container } = render(<AnimatedLoadingText text="正在生成中" intervalMs={20} />);
+
+  await screen.findByText((_content, element) =>
+    element === container.firstChild &&
+    Boolean(element?.textContent?.includes("正在生成中.")),
+  );
+  await screen.findByText((_content, element) =>
+    element === container.firstChild &&
+    Boolean(element?.textContent?.includes("正在生成中..")),
+  );
+  await screen.findByText((_content, element) =>
+    element === container.firstChild &&
+    Boolean(element?.textContent?.includes("正在生成中...")),
+  );
 });
 
 test("formatLoadingText 会避免重复追加省略号", () => {

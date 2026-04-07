@@ -907,6 +907,7 @@ export default function SceneDetailClientPage({
             ...sceneViewLabels.practice,
             complete: "完成本轮练习",
           }}
+          regenerating={practiceLoading}
           onBack={() => setViewModeWithRoute("scene")}
           onDelete={handleDeletePracticeSet}
           onRegenerate={() => void handleRegeneratePracticeManually()}
