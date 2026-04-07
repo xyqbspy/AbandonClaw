@@ -386,12 +386,8 @@ export function LessonReader({
                   loading={isSceneLoopLoading}
                   variant="ghost"
                   size="icon"
-                  className={cn(
-                    "size-[var(--mobile-control-height)] border-transparent bg-transparent px-0 whitespace-nowrap text-foreground/85 hover:bg-transparent hover:text-foreground",
-                    isMobile &&
-                      "size-[var(--mobile-icon-button)] text-[length:var(--mobile-font-body)]",
-                  )}
-                  iconClassName={cn("size-4", isMobile && "size-3.5")}
+                  className="size-9 cursor-pointer border-transparent bg-transparent px-0 transition-all duration-150 hover:bg-transparent hover:text-foreground"
+                  iconClassName="size-4"
                   onClick={toggleSceneLoopPlayback}
                 />
               ) : null}
@@ -407,12 +403,8 @@ export function LessonReader({
                   loading={isSceneLoopLoading}
                   variant="ghost"
                   size="icon"
-                  className={cn(
-                    "size-[var(--mobile-control-height)] border-transparent bg-transparent px-0 whitespace-nowrap text-foreground/85 hover:bg-transparent hover:text-foreground",
-                    isMobile &&
-                      "size-[var(--mobile-icon-button)] text-[length:var(--mobile-font-body)]",
-                  )}
-                  iconClassName={cn("size-4", isMobile && "size-3.5")}
+                  className="size-9 cursor-pointer border-transparent bg-transparent px-0 transition-all duration-150 hover:bg-transparent hover:text-foreground"
+                  iconClassName="size-4"
                   onClick={toggleSceneLoopPlayback}
                 />
               ) : null}

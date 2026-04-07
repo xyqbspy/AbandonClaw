@@ -97,8 +97,8 @@ export function LessonReaderDialogueContent({
                 iconOnly
                 icon="tts"
                 ariaLabel={isSceneLooping ? "停止循环播放" : "循环播放场景"}
-                className="absolute right-0 top-0 size-[var(--mobile-icon-button)] text-[#2c3e50]"
-                iconClassName="size-3.5"
+                className="absolute right-0 top-0 size-9 cursor-pointer border-transparent bg-transparent px-0 transition-all duration-150 hover:bg-transparent hover:text-foreground"
+                iconClassName="size-4"
                 onClick={toggleSceneLoopPlayback}
               />
             ) : null}

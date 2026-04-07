@@ -8,7 +8,7 @@ afterEach(() => {
   cleanup();
 });
 
-test("LoopActionButton 会渲染播放家族的默认与暂停状态", () => {
+test("LoopActionButton 会渲染播放家族的默认、播放中与暂停状态", () => {
   const { rerender } = render(
     <LoopActionButton onClick={() => undefined} ariaLabel="循环播放" icon="play" />,
   );
@@ -16,6 +16,14 @@ test("LoopActionButton 会渲染播放家族的默认与暂停状态", () => {
   let button = screen.getByRole("button", { name: "循环播放" });
   assert.equal(button.getAttribute("data-audio-state"), "idle");
   assert.equal(button.querySelector('[data-audio-icon-family="play"]') !== null, true);
+
+  rerender(
+    <LoopActionButton active onClick={() => undefined} ariaLabel="停止循环" icon="play" />,
+  );
+
+  button = screen.getByRole("button", { name: "停止循环" });
+  assert.equal(button.getAttribute("data-audio-state"), "playing");
+  assert.equal(button.querySelectorAll('[data-audio-wave]').length >= 6, true);
 
   rerender(
     <LoopActionButton paused onClick={() => undefined} ariaLabel="暂停循环" icon="play" />,

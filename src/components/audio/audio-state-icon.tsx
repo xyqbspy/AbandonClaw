@@ -26,11 +26,68 @@ export function AudioStateIcon({
       );
     }
 
+    if (state === "playing") {
+      return (
+        <svg
+          viewBox="0 0 30 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          data-audio-icon-family="play"
+          data-audio-icon-state={state}
+          className={cn("size-4 overflow-visible", className)}
+        >
+          <circle
+            cx="10"
+            cy="12"
+            r="5.8"
+            data-audio-wave="inner-ring"
+            className="origin-center opacity-9 [animation:audio-play-ring_1.18s_ease-out_infinite] [transform-box:fill-box]"
+          />
+          <circle
+            cx="10"
+            cy="12"
+            r="8.8"
+            data-audio-wave="outer-ring"
+            className="origin-center opacity-7 [animation:audio-play-ring_1.18s_ease-out_infinite_150ms] [transform-box:fill-box]"
+          />
+          <circle
+            cx="10"
+            cy="12"
+            r="11"
+            data-audio-wave="halo-ring"
+            className="origin-center opacity-5 [animation:audio-play-ring_1.18s_ease-out_infinite_300ms] [transform-box:fill-box]"
+          />
+          <path
+            d="M7 6.2l8 5.8-8 5.8V6.2z"
+            className="fill-current stroke-current"
+          />
+          <path
+            d="M17.6 8.8a4.4 4.4 0 0 1 0 6.4"
+            data-audio-wave="inner-arc"
+            className="opacity-16 [animation:audio-play-arc_1.02s_ease-in-out_infinite]"
+          />
+          <path
+            d="M20.7 6.2a8.2 8.2 0 0 1 0 11.6"
+            data-audio-wave="outer-arc"
+            className="opacity-11 [animation:audio-play-arc_1.02s_ease-in-out_infinite_120ms]"
+          />
+          <path
+            d="M24 3.8a11.2 11.2 0 0 1 0 16.4"
+            data-audio-wave="far-arc"
+            className="opacity-7 [animation:audio-play-arc_1.02s_ease-in-out_infinite_240ms]"
+          />
+        </svg>
+      );
+    }
+
     return (
       <Play
         data-audio-icon-family="play"
         data-audio-icon-state={state}
-        className={cn("size-4", state === "playing" && "animate-pulse", className)}
+        className={cn("size-4", className)}
       />
     );
   }
