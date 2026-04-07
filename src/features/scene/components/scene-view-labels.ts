@@ -14,6 +14,9 @@ export type ScenePracticeViewLabels = {
   practiceModePrefix: string;
   basedOnVariantPrefix: string;
   basedOnScenePrefix: string;
+  sourceDivider: string;
+  generatedByAi: string;
+  generatedBySystem: string;
   practiceHint: string;
   empty: string;
   chunkPrefix: string;
@@ -106,6 +109,9 @@ export const sceneViewLabels: SceneViewLabels = {
     practiceModePrefix: "当前题型：",
     basedOnVariantPrefix: "当前练习基于：",
     basedOnScenePrefix: "来源场景：",
+    sourceDivider: " | ",
+    generatedByAi: "AI生成",
+    generatedBySystem: "系统生成",
     practiceHint: "练习阶段和题型已经拆开。首发先从填空开始，后面会逐步补上半句复现、整句复现和全文默写。",
     empty: "还没有可查看的练习集。",
     chunkPrefix: "chunk:",

@@ -490,6 +490,49 @@ export default function SceneDetailClientPage({
     return handleRegeneratePractice();
   }, [handleRegeneratePractice, resetPracticePrewarmFailures]);
 
+  const handlePracticeRunStart = useCallback(
+    (payload: {
+      practiceSetId: string;
+      mode: "cloze" | "guided_recall" | "sentence_recall" | "full_dictation";
+      sourceType: "original" | "variant";
+      sourceVariantId?: string | null;
+    }) => {
+      if (!baseLesson) return;
+      void startScenePracticeRunFromApi(baseLesson.slug, payload)
+        .then((result) => {
+          if (
+            (trainingState?.session?.practicedSentenceCount ?? 0) < 1 &&
+            (result.learningState?.session?.practicedSentenceCount ?? 0) >= 1
+          ) {
+            notifySceneMilestone("practice_sentence", baseLesson.title);
+          }
+          if (result.learningState) {
+            handleLearningStateChange(result.learningState);
+          }
+          setPracticeSnapshot((current) => {
+            const next = {
+              run: result.run,
+              latestAttempt: current?.latestAttempt ?? null,
+              summary: current?.summary ?? {
+                completedModeCount: result.run.completedModes.length,
+                totalAttemptCount: 0,
+                correctAttemptCount: 0,
+                latestAssessmentLevel: null,
+              },
+            };
+            void setScenePracticeSnapshotCache(baseLesson.slug, payload.practiceSetId, next).catch(() => {
+              // Ignore cache failures.
+            });
+            return next;
+          });
+        })
+        .catch(() => {
+          // Non-blocking.
+        });
+    },
+    [baseLesson, handleLearningStateChange, trainingState?.session?.practicedSentenceCount],
+  );
+
   const handleTrainingListenStep = useCallback(() => {
     handleSceneFullPlay();
   }, [handleSceneFullPlay]);
@@ -912,39 +955,7 @@ export default function SceneDetailClientPage({
             handleMarkPracticeComplete();
           }}
           onSentenceCompleted={handleSentenceCompleted}
-          onPracticeRunStart={(payload) => {
-            void startScenePracticeRunFromApi(baseLesson.slug, payload)
-              .then((result) => {
-                if (
-                  (trainingState?.session?.practicedSentenceCount ?? 0) < 1 &&
-                  (result.learningState?.session?.practicedSentenceCount ?? 0) >= 1
-                ) {
-                  notifySceneMilestone("practice_sentence", baseLesson.title);
-                }
-                if (result.learningState) {
-                  handleLearningStateChange(result.learningState);
-                }
-                setPracticeSnapshot((current) => {
-                  const next = {
-                    run: result.run,
-                    latestAttempt: current?.latestAttempt ?? null,
-                    summary: current?.summary ?? {
-                      completedModeCount: result.run.completedModes.length,
-                      totalAttemptCount: 0,
-                      correctAttemptCount: 0,
-                      latestAssessmentLevel: null,
-                    },
-                  };
-                  void setScenePracticeSnapshotCache(baseLesson.slug, payload.practiceSetId, next).catch(() => {
-                    // Ignore cache failures.
-                  });
-                  return next;
-                });
-              })
-              .catch(() => {
-                // Non-blocking.
-              });
-          }}
+          onPracticeRunStart={handlePracticeRunStart}
           onPracticeAttempt={(payload) => {
             if (!payload.practiceSetId) return;
             void recordScenePracticeAttemptFromApi(baseLesson.slug, payload)

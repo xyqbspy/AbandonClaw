@@ -1,5 +1,5 @@
 import { Lesson } from "@/lib/types";
-import { PracticeExercise } from "@/lib/types/scene-parser";
+import { PracticeExercise, PracticeGenerationSource } from "@/lib/types/scene-parser";
 
 export type GeneratedSetStatus = "generated" | "completed";
 export type VariantItemStatus = "unviewed" | "viewed" | "completed";
@@ -32,6 +32,7 @@ export interface PracticeSet {
   sourceSceneId: string;
   sourceSceneTitle: string;
   sourceType: "original" | "variant";
+  generationSource?: PracticeGenerationSource;
   sourceVariantId?: string;
   sourceVariantTitle?: string;
   stageKey?: PracticeStageKey;

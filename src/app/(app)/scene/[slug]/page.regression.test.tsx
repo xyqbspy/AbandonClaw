@@ -163,6 +163,7 @@ let pendingPracticeGeneration:
     }
   | null = null;
 let practiceGenerationFailureMessage: string | null = null;
+let practiceRunStartCount = 0;
 let pendingVariantGeneration:
   | {
       promise: Promise<VariantSet>;
@@ -294,12 +295,14 @@ const mockedModules = {
   },
   "@/features/scene/components/scene-practice-view": {
       ScenePracticeView: ({
+        practiceSet,
         onDelete,
         onRegenerate,
         onSentenceCompleted,
         onPracticeAttempt,
         onPracticeRunStart,
       }: {
+        practiceSet: PracticeSet | null;
         onDelete: () => void;
         onRegenerate?: () => void;
         onSentenceCompleted?: () => void;
@@ -318,49 +321,60 @@ const mockedModules = {
           mode: "cloze";
           sourceType: "original";
         }) => void;
-      }) => (
-        <div>
-          <div>practice-view</div>
-          <button type="button" onClick={onDelete}>
-            delete-practice
-          </button>
-          <button type="button" onClick={onRegenerate}>
-            regenerate-practice
-          </button>
-          <button
-            type="button"
-            onClick={() =>
-              onPracticeRunStart?.({
-                practiceSetId: "practice-1",
-                mode: "cloze",
-                sourceType: "original",
-              })
-            }
-          >
-            start-practice-run
-          </button>
-          <button
-            type="button"
-            onClick={() =>
-              onPracticeAttempt?.({
-                practiceSetId: "practice-1",
-                mode: "cloze",
-                sourceType: "original",
-                exerciseId: "exercise-1",
-                sentenceId: "sentence-1",
-                userAnswer: "answer",
-                assessmentLevel: "complete",
-                isCorrect: true,
-              })
-            }
-          >
-            complete-practice-attempt
-          </button>
-          <button type="button" onClick={() => onSentenceCompleted?.()}>
-            practice-sentence
-          </button>
-        </div>
-    ),
+      }) => {
+        React.useEffect(() => {
+          if (!practiceSet || !onPracticeRunStart) return;
+          onPracticeRunStart({
+            practiceSetId: practiceSet.id,
+            mode: "cloze",
+            sourceType: "original",
+          });
+        }, [onPracticeRunStart, practiceSet?.id]);
+
+        return (
+          <div>
+            <div>practice-view</div>
+            <button type="button" onClick={onDelete}>
+              delete-practice
+            </button>
+            <button type="button" onClick={onRegenerate}>
+              regenerate-practice
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                onPracticeRunStart?.({
+                  practiceSetId: "practice-1",
+                  mode: "cloze",
+                  sourceType: "original",
+                })
+              }
+            >
+              start-practice-run
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                onPracticeAttempt?.({
+                  practiceSetId: "practice-1",
+                  mode: "cloze",
+                  sourceType: "original",
+                  exerciseId: "exercise-1",
+                  sentenceId: "sentence-1",
+                  userAnswer: "answer",
+                  assessmentLevel: "complete",
+                  isCorrect: true,
+                })
+              }
+            >
+              complete-practice-attempt
+            </button>
+            <button type="button" onClick={() => onSentenceCompleted?.()}>
+              practice-sentence
+            </button>
+          </div>
+        );
+      },
   },
   "@/features/scene/components/scene-variants-view": {
     SceneVariantsView: ({
@@ -499,6 +513,7 @@ const mockedModules = {
     },
     startSceneLearningFromApi: async () => currentLearningState,
     startScenePracticeRunFromApi: async () => {
+      practiceRunStartCount += 1;
       currentLearningState = buildLearningState({
         progress: {
           masteryStage: "sentence_practice",
@@ -786,6 +801,7 @@ afterEach(() => {
   currentPracticeSnapshot = null;
   pendingPracticeGeneration = null;
   practiceGenerationFailureMessage = null;
+  practiceRunStartCount = 0;
   pendingVariantGeneration = null;
   loadSceneDetailImpl = null;
   routerPushCalls.length = 0;
@@ -1168,6 +1184,24 @@ test("SceneDetailPage 在已有练习时支持手动重新生成题目", async (
 
   await waitFor(() => {
     assert.equal(generatedPracticeCalls.length, 1);
+  });
+});
+
+test("SceneDetailPage 在题目页重渲染时不会持续重复启动 practice run", async () => {
+  currentSearchParams = new URLSearchParams("view=practice");
+  currentGeneratedState = {
+    latestPracticeSet: practiceSet,
+    latestVariantSet: null,
+    practiceStatus: "generated",
+    variantStatus: "idle",
+  };
+
+  const SceneDetailPage = getSceneDetailPage();
+  render(<SceneDetailPage initialLesson={baseLesson} />);
+
+  await screen.findByText("practice-view");
+  await waitFor(() => {
+    assert.equal(practiceRunStartCount, 1);
   });
 });
 

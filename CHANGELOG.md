@@ -1,6 +1,30 @@
 # Changelog
 
 ## 2026-04-07
+### 练习页运行态防重与题目来源提示
+- 修正了场景练习题目页在点击“重新生成题目”后可能持续重复调用 `practice/run` 的问题；现在同一题集同一题型只会启动一次运行态，不会因为页面重渲染反复打接口。
+- scene 练习集新增了生成来源标记，题目页顶部现在会直接展示 `AI生成` 或 `系统生成`，方便区分模型生成结果和本地回退结果。
+- 来源场景文案也一起收口，原始场景会显示类似 `来源场景 | 系统生成：...`，变体练习则会保留变体来源并补上生成方式说明。
+
+影响范围：
+- `src/features/scene/components/scene-practice-view.tsx`
+- `src/features/scene/components/scene-practice-messages.ts`
+- `src/features/scene/components/scene-view-labels.ts`
+- `src/app/(app)/scene/[slug]/scene-detail-page.tsx`
+- `src/app/(app)/scene/[slug]/scene-detail-generation-logic.ts`
+- `src/app/(app)/scene/[slug]/scene-detail-actions.ts`
+- `src/lib/utils/practice-generate-api.ts`
+- `src/app/api/practice/generate/route.ts`
+- `src/lib/types/scene-parser.ts`
+- `src/lib/types/learning-flow.ts`
+
+验证情况：
+- `node --import tsx --test "src/app/api/practice/generate/route.test.ts" "src/app/(app)/scene/[[]slug[]]/scene-detail-generation-logic.test.ts"`
+- `node --import tsx --import ./src/test/setup-dom.ts --test "src/features/scene/components/scene-practice-view.interaction.test.tsx" "src/app/(app)/scene/[[]slug[]]/page.regression.test.tsx"`
+- `node --import tsx --test "src/lib/utils/practice-generate-api.test.ts"`
+- `pnpm run text:check-mojibake`
+
+## 2026-04-07
 ### 场景练习生成失败收口与手动重生入口
 - scene 练习删除后如果自动预热失败，前端不再继续暴露英文 `Practice generate failed.`；相关错误提示现在统一收口为中文。
 - `practice generate` 接口在上游模型请求超时、失败或空响应时，也会优先回退到本地出题，避免重新生成时直接卡死在 500。

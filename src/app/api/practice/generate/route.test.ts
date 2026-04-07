@@ -81,6 +81,7 @@ test("practice generate handler 在模型结果不合法时会回退到本地 ex
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), {
     version: "v1",
+    generationSource: "system",
     exercises: [{ id: "fallback-1", type: "typing", prompt: "p", answer: { text: "a" } }],
   });
   assert.deepEqual(fallbackArgs, [sampleScene, 4]);
@@ -128,6 +129,7 @@ test("practice generate handler 在模型请求失败时也会回退到本地 ex
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), {
     version: "v1",
+    generationSource: "system",
     exercises: [{ id: "fallback-1", type: "typing", prompt: "p", answer: { text: "a" } }],
   });
 });

@@ -33,18 +33,29 @@ export const getPracticeCompletionHint = ({
 };
 
 export const getPracticeSourceText = ({
+  generationSource,
   sourceType,
   sourceSceneTitle,
   sourceVariantTitle,
   labels,
 }: {
+  generationSource?: "ai" | "system";
   sourceType?: "original" | "variant";
   sourceSceneTitle?: string | null;
   sourceVariantTitle?: string | null;
   labels: ScenePracticeViewLabels;
 }) => {
+  const generationLabel =
+    generationSource === "system" ? labels.generatedBySystem : labels.generatedByAi;
+
   if (sourceType === "variant") {
-    return `${sourceVariantTitle ?? "Variant"} / ${labels.basedOnScenePrefix}${sourceSceneTitle ?? "-"}`;
+    return [
+      labels.basedOnVariantPrefix.replace(/[:：]\s*$/, ""),
+      generationLabel,
+    ].join(labels.sourceDivider) + `：${sourceVariantTitle ?? "Variant"} / ${labels.basedOnScenePrefix}${sourceSceneTitle ?? "-"}`;
   }
-  return sourceSceneTitle ?? "-";
+  return [
+    labels.basedOnScenePrefix.replace(/[:：]\s*$/, ""),
+    generationLabel,
+  ].join(labels.sourceDivider) + `：${sourceSceneTitle ?? "-"}`;
 };

@@ -1,4 +1,5 @@
 import {
+  PracticeGenerationSource,
   PracticeGenerateRequest,
   PracticeGenerateResponse,
 } from "@/lib/types/scene-parser";
@@ -19,7 +20,11 @@ const isPracticeGenerateResponse = (
 ): value is PracticeGenerateResponse => {
   if (!value || typeof value !== "object") return false;
   const response = value as PracticeGenerateResponse;
-  return response.version === "v1" && Array.isArray(response.exercises);
+  return (
+    response.version === "v1" &&
+    (response.generationSource === "ai" || response.generationSource === "system") &&
+    Array.isArray(response.exercises)
+  );
 };
 
 const buildPracticeGenerateRequestKey = (payload: PracticeGenerateRequest) =>
@@ -64,7 +69,10 @@ export async function practiceGenerateFromApi(
     bypassFailureGuard?: boolean;
     now?: () => number;
   },
-) {
+): Promise<{
+  exercises: PracticeGenerateResponse["exercises"];
+  generationSource: PracticeGenerationSource;
+}> {
   const now = options?.now ?? Date.now;
   const requestKey = buildPracticeGenerateRequestKey(payload);
   if (!options?.bypassFailureGuard) {
@@ -113,5 +121,8 @@ export async function practiceGenerateFromApi(
   }
 
   resetPracticeGenerateFailure(requestKey);
-  return data.exercises;
+  return {
+    exercises: data.exercises,
+    generationSource: data.generationSource,
+  };
 }

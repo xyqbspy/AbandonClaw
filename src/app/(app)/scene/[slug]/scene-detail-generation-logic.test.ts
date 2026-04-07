@@ -103,24 +103,27 @@ test("generateScenePracticeSet 会生成基于来源 lesson 的练习集", async
         type: "dialogue",
         sections: [],
       }),
-      practiceGenerateFromApi: async () => [
-        {
-          id: "exercise-1",
-          type: "chunk_cloze",
-          inputMode: "typing",
-          sceneId: variantLesson.id,
-          sentenceId: "sentence-1",
-          chunkId: "chunk-1",
-          prompt: "Prompt",
-          answer: {
-            text: "How are you",
-            acceptedAnswers: ["How are you"],
+      practiceGenerateFromApi: async () => ({
+        generationSource: "ai",
+        exercises: [
+          {
+            id: "exercise-1",
+            type: "chunk_cloze",
+            inputMode: "typing",
+            sceneId: variantLesson.id,
+            sentenceId: "sentence-1",
+            chunkId: "chunk-1",
+            prompt: "Prompt",
+            answer: {
+              text: "How are you",
+              acceptedAnswers: ["How are you"],
+            },
+            cloze: {
+              displayText: "____?",
+            },
           },
-          cloze: {
-            displayText: "____?",
-          },
-        },
-      ],
+        ],
+      }),
       nowIso: () => "2026-03-22T00:00:00.000Z",
       createId: () => "practice-fixed",
     },
@@ -128,6 +131,7 @@ test("generateScenePracticeSet 会生成基于来源 lesson 的练习集", async
 
   assert.equal(result.id, "practice-fixed");
   assert.equal(result.sourceType, "variant");
+  assert.equal(result.generationSource, "ai");
   assert.equal(result.sourceVariantId, "variant-1");
   assert.equal(result.exercises.length, 1);
   assert.equal(result.exercises[0]?.type, "chunk_cloze");
@@ -267,24 +271,27 @@ test("generateScenePracticeSet 会把 chunk_cloze 题面的挖空答案和判题
           },
         ],
       }),
-      practiceGenerateFromApi: async () => [
-        {
-          id: "exercise-1",
-          type: "chunk_cloze",
-          inputMode: "typing",
-          sceneId: variantLesson.id,
-          sentenceId: "sentence-1",
-          chunkId: "chunk-1",
-          prompt: "补全句子中的表达",
-          answer: {
-            text: "burn yourself out",
-            acceptedAnswers: ["burn yourself out"],
+      practiceGenerateFromApi: async () => ({
+        generationSource: "ai",
+        exercises: [
+          {
+            id: "exercise-1",
+            type: "chunk_cloze",
+            inputMode: "typing",
+            sceneId: variantLesson.id,
+            sentenceId: "sentence-1",
+            chunkId: "chunk-1",
+            prompt: "补全句子中的表达",
+            answer: {
+              text: "burn yourself out",
+              acceptedAnswers: ["burn yourself out"],
+            },
+            cloze: {
+              displayText: "Don't ___ yourself out.",
+            },
           },
-          cloze: {
-            displayText: "Don't ___ yourself out.",
-          },
-        },
-      ],
+        ],
+      }),
       nowIso: () => "2026-03-22T00:00:00.000Z",
       createId: () => "practice-fixed",
     },
@@ -335,38 +342,41 @@ test("generateScenePracticeSet 会把填空练习模块收敛成纯 chunk_cloze"
           },
         ],
       }),
-      practiceGenerateFromApi: async () => [
-        {
-          id: "exercise-1",
-          type: "chunk_cloze",
-          inputMode: "typing",
-          sceneId: variantLesson.id,
-          sentenceId: "sentence-1",
-          chunkId: "chunk-1",
-          prompt: "补全句子中的表达",
-          answer: {
-            text: "burn yourself out",
-            acceptedAnswers: ["burn yourself out"],
+      practiceGenerateFromApi: async () => ({
+        generationSource: "ai",
+        exercises: [
+          {
+            id: "exercise-1",
+            type: "chunk_cloze",
+            inputMode: "typing",
+            sceneId: variantLesson.id,
+            sentenceId: "sentence-1",
+            chunkId: "chunk-1",
+            prompt: "补全句子中的表达",
+            answer: {
+              text: "burn yourself out",
+              acceptedAnswers: ["burn yourself out"],
+            },
+            cloze: {
+              displayText: "Don't ___ yourself out.",
+            },
           },
-          cloze: {
-            displayText: "Don't ___ yourself out.",
+          {
+            id: "exercise-2",
+            type: "translation_prompt",
+            inputMode: "typing",
+            sceneId: variantLesson.id,
+            sentenceId: "sentence-1",
+            prompt: "看中文提示，完整复现这句",
+            answer: {
+              text: "Don't burn yourself out.",
+            },
+            cloze: {
+              displayText: "别把自己累垮了。",
+            },
           },
-        },
-        {
-          id: "exercise-2",
-          type: "translation_prompt",
-          inputMode: "typing",
-          sceneId: variantLesson.id,
-          sentenceId: "sentence-1",
-          prompt: "看中文提示，完整复现这句",
-          answer: {
-            text: "Don't burn yourself out.",
-          },
-          cloze: {
-            displayText: "别把自己累垮了。",
-          },
-        },
-      ],
+        ],
+      }),
       nowIso: () => "2026-03-22T00:00:00.000Z",
       createId: () => "practice-fixed",
     },
@@ -421,46 +431,50 @@ test("generateScenePracticeSet 会在 AI 的 chunk_cloze 偏少时补足到按�
           },
         ],
       }),
-      practiceGenerateFromApi: async () => [
-        {
-          id: "exercise-1",
-          type: "chunk_cloze",
-          inputMode: "typing",
-          sceneId: variantLesson.id,
-          sentenceId: "sentence-1",
-          chunkId: "chunk-1",
-          prompt: "补全句子中的表达",
-          answer: {
-            text: "call it a day",
-            acceptedAnswers: ["call it a day"],
+      practiceGenerateFromApi: async () => ({
+        generationSource: "system",
+        exercises: [
+          {
+            id: "exercise-1",
+            type: "chunk_cloze",
+            inputMode: "typing",
+            sceneId: variantLesson.id,
+            sentenceId: "sentence-1",
+            chunkId: "chunk-1",
+            prompt: "补全句子中的表达",
+            answer: {
+              text: "call it a day",
+              acceptedAnswers: ["call it a day"],
+            },
+            cloze: {
+              displayText: "I should ____ 1.",
+            },
           },
-          cloze: {
-            displayText: "I should ____ 1.",
+          {
+            id: "exercise-2",
+            type: "chunk_cloze",
+            inputMode: "typing",
+            sceneId: variantLesson.id,
+            sentenceId: "sentence-2",
+            chunkId: "chunk-2",
+            prompt: "补全句子中的表达",
+            answer: {
+              text: "call it a day",
+              acceptedAnswers: ["call it a day"],
+            },
+            cloze: {
+              displayText: "I should ____ 2.",
+            },
           },
-        },
-        {
-          id: "exercise-2",
-          type: "chunk_cloze",
-          inputMode: "typing",
-          sceneId: variantLesson.id,
-          sentenceId: "sentence-2",
-          chunkId: "chunk-2",
-          prompt: "补全句子中的表达",
-          answer: {
-            text: "call it a day",
-            acceptedAnswers: ["call it a day"],
-          },
-          cloze: {
-            displayText: "I should ____ 2.",
-          },
-        },
-      ],
+        ],
+      }),
       nowIso: () => "2026-03-22T00:00:00.000Z",
       createId: () => "practice-fixed",
     },
   });
 
   assert.equal(result.exercises.length, 6);
+  assert.equal(result.generationSource, "system");
   assert.equal(
     result.modules?.find((module) => module.mode === "cloze")?.exercises.length,
     6,

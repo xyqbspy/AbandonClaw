@@ -145,6 +145,8 @@ export function ScenePracticeView({
   const reportedModeCompletionRef = useRef<Set<string>>(new Set());
   const reportedUnlockedModesRef = useRef<Set<PracticeMode>>(new Set());
   const reportedAllModulesCompletedRef = useRef(false);
+  const startedPracticeRunKeysRef = useRef<Set<string>>(new Set());
+  const onPracticeRunStartRef = useRef(onPracticeRunStart);
 
   const modules = useMemo(() => derivePracticeModules(practiceSet), [practiceSet]);
 
@@ -159,6 +161,10 @@ export function ScenePracticeView({
   );
 
   useEffect(() => {
+    onPracticeRunStartRef.current = onPracticeRunStart;
+  }, [onPracticeRunStart]);
+
+  useEffect(() => {
     const sessionState = practiceSet?.sessionState;
     setAnswerMap(sessionState?.answerMap ?? {});
     setResultMap(sessionState?.resultMap ?? {});
@@ -171,6 +177,7 @@ export function ScenePracticeView({
     reportedModeCompletionRef.current = new Set();
     reportedUnlockedModesRef.current = buildReportedUnlockedModesSeed(modules);
     reportedAllModulesCompletedRef.current = false;
+    startedPracticeRunKeysRef.current = new Set();
   }, [modules, practiceSet?.id, practiceSet?.mode, practiceSet?.sessionState]);
 
   useEffect(() => {
@@ -234,6 +241,7 @@ export function ScenePracticeView({
   const isCompletedPractice = practiceSet?.status === "completed";
   const summaryAllModulesCompleted = allModulesCompleted || isCompletedPractice;
   const sourceText = getPracticeSourceText({
+    generationSource: practiceSet?.generationSource,
     sourceType: practiceSet?.sourceType,
     sourceSceneTitle: practiceSet?.sourceSceneTitle,
     sourceVariantTitle: practiceSet?.sourceVariantTitle,
@@ -248,13 +256,22 @@ export function ScenePracticeView({
 
   useEffect(() => {
     if (!practiceSet || !activeModule || practiceSet.status === "completed") return;
-    onPracticeRunStart?.({
+    const runKey = `${practiceSet.id}:${activeModule.mode}`;
+    if (startedPracticeRunKeysRef.current.has(runKey)) return;
+    startedPracticeRunKeysRef.current.add(runKey);
+    onPracticeRunStartRef.current?.({
       practiceSetId: practiceSet.id,
       mode: activeModule.mode,
       sourceType: practiceSet.sourceType,
       sourceVariantId: practiceSet.sourceVariantId,
     });
-  }, [activeModule, onPracticeRunStart, practiceSet]);
+  }, [
+    activeModule?.mode,
+    practiceSet?.id,
+    practiceSet?.sourceType,
+    practiceSet?.sourceVariantId,
+    practiceSet?.status,
+  ]);
 
   useEffect(() => {
     const activeExerciseId = activeExercise?.id;
@@ -615,7 +632,6 @@ export function ScenePracticeView({
 
         {practiceSet ? (
           <p className="text-[length:var(--mobile-font-meta)] leading-5 text-[var(--muted-foreground)]">
-            {practiceSet.sourceType === "variant" ? labels.basedOnVariantPrefix : labels.basedOnScenePrefix}
             <span className="font-semibold text-foreground">{sourceText}</span>
           </p>
         ) : null}

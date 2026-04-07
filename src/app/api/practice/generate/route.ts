@@ -367,17 +367,25 @@ export async function handlePracticeGeneratePost(
         return NextResponse.json(
           {
             version: "v1",
+            generationSource: "system",
             exercises: fallbackExercises,
           },
           { status: 200 },
         );
       }
 
-      return NextResponse.json(parsed, { status: 200 });
+      return NextResponse.json(
+        {
+          ...parsed,
+          generationSource: "ai",
+        },
+        { status: 200 },
+      );
     } catch {
       return NextResponse.json(
         {
           version: "v1",
+          generationSource: "system",
           exercises: fallbackExercises,
         },
         { status: 200 },

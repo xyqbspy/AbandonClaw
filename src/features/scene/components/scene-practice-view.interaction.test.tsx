@@ -404,6 +404,72 @@ test("ScenePracticeView 在来源为 variant 时会展示变体与原场景说�
   assert.ok(screen.getByText(/Coffee Chat/));
 });
 
+test("ScenePracticeView 会在来源场景文案中展示系统生成提示", () => {
+  render(
+    <ScenePracticeView
+      practiceSet={{
+        ...practiceSet,
+        generationSource: "system",
+      }}
+      showAnswerMap={{}}
+      appleButtonSmClassName="btn"
+      appleDangerButtonSmClassName="danger"
+      labels={sceneViewLabels.practice}
+      onBack={() => undefined}
+      onDelete={() => undefined}
+      onComplete={() => undefined}
+      onReviewScene={() => undefined}
+      onOpenVariants={() => undefined}
+      onToggleAnswer={() => undefined}
+    />,
+  );
+
+  assert.ok(screen.getByText(/来源场景 \| 系统生成：Coffee Chat/));
+});
+
+test("ScenePracticeView 在父层回调引用变化时不会重复启动同一题型的 practice run", () => {
+  const runStarts: string[] = [];
+  const { rerender } = render(
+    <ScenePracticeView
+      practiceSet={practiceSet}
+      showAnswerMap={{}}
+      appleButtonSmClassName="btn"
+      appleDangerButtonSmClassName="danger"
+      labels={sceneViewLabels.practice}
+      onBack={() => undefined}
+      onDelete={() => undefined}
+      onComplete={() => undefined}
+      onPracticeRunStart={(payload) => {
+        runStarts.push(`${payload.practiceSetId}:${payload.mode}`);
+      }}
+      onReviewScene={() => undefined}
+      onOpenVariants={() => undefined}
+      onToggleAnswer={() => undefined}
+    />,
+  );
+
+  rerender(
+    <ScenePracticeView
+      practiceSet={practiceSet}
+      showAnswerMap={{}}
+      appleButtonSmClassName="btn"
+      appleDangerButtonSmClassName="danger"
+      labels={sceneViewLabels.practice}
+      onBack={() => undefined}
+      onDelete={() => undefined}
+      onComplete={() => undefined}
+      onPracticeRunStart={(payload) => {
+        runStarts.push(`${payload.practiceSetId}:${payload.mode}:rerender`);
+      }}
+      onReviewScene={() => undefined}
+      onOpenVariants={() => undefined}
+      onToggleAnswer={() => undefined}
+    />,
+  );
+
+  assert.deepEqual(runStarts, ["practice-1:cloze"]);
+});
+
 test("ScenePracticeView 会显示练习题对应的 chunk 文本而不是 chunk id", () => {
   render(
     <ScenePracticeView

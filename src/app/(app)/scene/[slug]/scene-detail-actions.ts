@@ -183,12 +183,14 @@ const buildFullDictationModule = ({
 export const buildPracticeSet = ({
   baseLesson,
   sourceLesson,
+  generationSource = "ai",
   exercises,
   nowIso,
   createId = createGeneratedId,
 }: {
   baseLesson: Lesson;
   sourceLesson: Lesson;
+  generationSource?: PracticeSet["generationSource"];
   exercises: PracticeExercise[];
   nowIso: string;
   createId?: (prefix: string) => string;
@@ -225,6 +227,7 @@ export const buildPracticeSet = ({
     sourceSceneId: baseLesson.id,
     sourceSceneTitle: baseLesson.title,
     sourceType: isVariantSource ? "variant" : "original",
+    generationSource,
     sourceVariantId: isVariantSource ? sourceLesson.id : undefined,
     sourceVariantTitle: isVariantSource ? sourceLesson.title : undefined,
     stageKey: "scene_practice",

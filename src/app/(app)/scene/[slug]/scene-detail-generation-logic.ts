@@ -116,13 +116,13 @@ export const generateScenePracticeSet = async ({
   };
 }): Promise<PracticeSet> => {
   const parsedScene = (deps?.mapLessonToParsedScene ?? mapLessonToParsedScene)(sourceLesson);
-  const generatedExercises = await (deps?.practiceGenerateFromApi ?? practiceGenerateFromApi)({
+  const generatedResult = await (deps?.practiceGenerateFromApi ?? practiceGenerateFromApi)({
     scene: parsedScene,
     exerciseCount: 8,
   }, {
     bypassFailureGuard: requestPolicy === "manual",
   });
-  const normalizedExercises = normalizePracticeExercisesForScene(parsedScene, generatedExercises);
+  const normalizedExercises = normalizePracticeExercisesForScene(parsedScene, generatedResult.exercises);
   const clozeExercises = ensureSceneClozeCoverage({
     parsedScene,
     normalizedExercises,
@@ -135,6 +135,7 @@ export const generateScenePracticeSet = async ({
   return buildPracticeSet({
     baseLesson,
     sourceLesson,
+    generationSource: generatedResult.generationSource,
     exercises,
     nowIso: deps?.nowIso?.() ?? new Date().toISOString(),
     createId: deps?.createId ?? createGeneratedId,

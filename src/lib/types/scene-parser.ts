@@ -152,7 +152,10 @@ export interface PracticeGenerateRequest {
   exerciseCount?: number;
 }
 
+export type PracticeGenerationSource = "ai" | "system";
+
 export interface PracticeGenerateResponse {
   version: "v1";
+  generationSource: PracticeGenerationSource;
   exercises: ExerciseSpec[];
 }
