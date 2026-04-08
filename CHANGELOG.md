@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-04-08
+### 维护文档补齐 scenes、progress 与 chunks 详情链路
+- 新增了 `scenes` 列表与进入链路说明，补清列表缓存、进入前预热、导入 / 生成 / 删除、侧滑删除和下拉刷新之间的关系。
+- 新增了 `progress` 学习概览字段映射说明，明确页面卡片与 `LearningOverview` 聚合字段、失败降级和 `review summary` 的边界。
+- 新增了 `chunks` focus detail / expression map 专项维护文档，补清详情浮层、更多操作、表达地图和“加入这一簇”这几条高频维护链路。
+- `project-maintenance-playbook` 也同步挂上了这几份文档入口，后续不用再靠翻代码找维护说明。
+
+影响范围：
+- `docs/scenes-entry-flow.md`
+- `docs/progress-overview-mapping.md`
+- `docs/chunks-focus-detail-map.md`
+- `docs/project-maintenance-playbook.md`
+
+验证情况：
+- `pnpm run text:check-mojibake`
+
 ## 2026-04-07
 ### 公共生成中动效组件与练习重生加载反馈
 - 共享 loading 组件新增了可复用的动态省略号文案能力，现在可以统一显示类似“正在生成中.”、“正在生成中..”、“正在生成中...”的轮流反馈。

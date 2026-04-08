@@ -76,6 +76,10 @@
 - 场景卡片的 loading / entering 反馈是否稳定
 - 如果页面开始同时承接列表数据、预热、滑动删除和多个弹层，优先把这些职责拆到 data hook、swipe controller 和局部 dialog，不要先抽 scene card
 
+专项说明参考：
+
+- `docs/scenes-entry-flow.md`
+
 ### `scene/[slug]`
 
 这里是主学习工作台。用户会在这里阅读句子、点选 chunk、听音频、做练习、看变体、看表达地图，并驱动学习状态同步。
@@ -117,6 +121,14 @@
 - cluster 相关操作是否破坏详情态或缓存态
 - 手动录入、AI 补全、加入复习之间的链路是否断裂
 
+保存、relation、cluster 与 review 契约参考：
+
+- `docs/chunks-data-mapping.md`
+
+详情浮层与表达地图的页面职责参考：
+
+- `docs/chunks-focus-detail-map.md`
+
 ### 音频 / TTS
 
 音频不是单点能力，而是跨服务端生成、Storage、浏览器缓存、预热调度和页面播放的一整条链路。
@@ -154,6 +166,10 @@
 
 - 聚合接口字段变化是否同步到 selectors
 - continue learning、review summary、overview 是否仍对得上真实学习状态
+
+`progress` 学习概览字段映射与失败降级参考：
+
+- `docs/progress-overview-mapping.md`
 
 ## 4. 当前工程约定
 

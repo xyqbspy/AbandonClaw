@@ -1,9 +1,7 @@
 ## Purpose
 
 定义仓库长期维护时必须遵守的基础规则，确保维护者可以快速理解项目、按 OpenSpec 流程推进改动，并为每次实际变更留下可追踪的记录。
-
 ## Requirements
-
 ### Requirement: 项目维护必须有统一入口文档
 仓库 MUST 提供一份面向维护者的项目说明，覆盖产品主链路、核心目录职责、改动入口和回归检查点。
 
@@ -121,3 +119,13 @@
 - **WHEN** 维护者发现 `chunks/page.tsx` 或 `lesson-reader.tsx` 仍同时承担多组局部动作、分支装配和大块 JSX
 - **THEN** 必须先评估是否拆成页面动作模块、selection/controller、section 组件或 sheet 装配模块
 - **AND** 不应为了减行数优先抽离不稳定的 shared 组件或零散原子组件
+
+### Requirement: 高维护成本页面必须有专项维护文档入口
+系统 MUST 为已经承接稳定用户功能、但同时包含聚合字段解释、缓存 / 预热 / 回退策略或复杂详情交互的高维护成本页面提供专项维护文档入口。至少应覆盖 `scenes` 列表进入链路、`progress` 学习概览聚合，以及 `chunks` 的 focus detail / expression map 维护说明。
+
+#### Scenario: 维护者需要调整 scenes、progress 或 chunks 详情链路
+- **WHEN** 维护者需要修改 `scenes/page.tsx`、`progress/page.tsx` 或 `chunks` 的 focus detail / expression map
+- **THEN** 仓库中必须存在对应的专项维护文档
+- **AND** 文档必须说明关键状态来源、主要动作链路、失败回退和回归点
+- **AND** `docs/project-maintenance-playbook.md` 必须能直接指向这些文档入口
+
