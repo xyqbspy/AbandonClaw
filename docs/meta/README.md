@@ -6,6 +6,8 @@
 
 ## 当前目录
 
+- [product-overview.md](/d:/WorkCode/AbandonClaw/docs/meta/product-overview.md)
+  - 产品说明总览，适合对外或对内快速说明产品结构与价值
 - [project-learning-guide.md](/d:/WorkCode/AbandonClaw/docs/meta/project-learning-guide.md)
   - 讲解主入口，适合第一次系统性理解项目
 - [project-tree-map.md](/d:/WorkCode/AbandonClaw/docs/meta/project-tree-map.md)
@@ -17,6 +19,8 @@
 
 ## 推荐使用方式
 
+- 需要一份产品总览说明
+  - 先看 `product-overview.md`
 - 第一次读项目
   - 先看 `project-learning-guide.md`
 - 想快速讲清结构
@@ -26,6 +30,8 @@
 
 ## 维护原则
 
+- `product-overview.md`
+  - 作为产品定位、用户价值和闭环说明的总览文档
 - `project-learning-guide.md`
   - 作为叙述式主入口，负责讲清项目主线和阅读路径
 - `project-tree-map.md`
