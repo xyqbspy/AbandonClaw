@@ -19,7 +19,14 @@
 - [expression-item.md](/d:/WorkCode/AbandonClaw/docs/feature-map/expression-item.md)
 - [review.md](/d:/WorkCode/AbandonClaw/docs/feature-map/review.md)
 
-## 阅读顺序
+## 推荐使用方式
+
+- 第一次理解项目骨架
+  - 建议按下面顺序阅读
+- 修改某个模块但还没理清职责边界
+  - 先看对应模块文档，再决定是否继续进入 `feature-flows`
+
+## 推荐阅读顺序
 
 建议按这条顺序理解项目骨架：
 
@@ -43,3 +50,26 @@
 - 单纯样式调整
 - 不影响模块职责的局部重构
 - 纯测试代码改动
+
+## 与其它文档的边界
+
+- `feature-map/`
+  - 解释模块本身是什么、负责什么、边界在哪里
+- `feature-flows/`
+  - 解释多个模块串起来后具体怎么流转
+- `domain-rules/`
+  - 解释模块或链路背后的稳定判定标准
+- `system-design/`
+  - 解释这些职责和规则最终落在哪些实现结构上
+
+## 建议正文模板
+
+新增或重写 `feature-map` 文档时，优先按这组章节组织：
+
+1. 模块目标
+2. 输入
+3. 输出
+4. 核心规则
+5. 上下游依赖
+6. 常见改动风险
+7. 测试关注点

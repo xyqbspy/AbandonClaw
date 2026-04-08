@@ -17,7 +17,7 @@
 4. 服务端写回 review logs、summary、next review
 5. today / progress / review summary 消费更新后的聚合
 
-## 4. 正式回写内容
+## 4. 关键状态/回写节点
 
 - review result
 - output confidence / full output 等正式信号
@@ -35,3 +35,10 @@
 - review source contract
 - review practice signals
 - review scheduling signals
+
+## 7. 建议回归
+
+- review 提交成功后会刷新 summary 和下一条队列状态
+- scene practice 回补提交不会误走普通表达提交流程
+- 提交失败时不会误清当前队列或误前进到下一项
+- 来源场景不可访问时仍能稳定降级

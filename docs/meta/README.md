@@ -1,0 +1,48 @@
+# Meta
+
+本目录用于维护“项目认知层”文档。
+
+这里不负责定义正式业务规则，也不负责描述实现细节，而是帮助新维护者、分享者或 AI 快速建立整个项目的认知骨架。
+
+## 当前目录
+
+- [project-learning-guide.md](/d:/WorkCode/AbandonClaw/docs/meta/project-learning-guide.md)
+  - 讲解主入口，适合第一次系统性理解项目
+- [project-tree-map.md](/d:/WorkCode/AbandonClaw/docs/meta/project-tree-map.md)
+  - 结构总览图，适合讲项目和做结构化展示
+- [project-mindmap.md](/d:/WorkCode/AbandonClaw/docs/meta/project-mindmap.md)
+  - Mermaid 思维导图版本，适合在支持脑图的工具里快速浏览
+- [project-mindmap-outline.md](/d:/WorkCode/AbandonClaw/docs/meta/project-mindmap-outline.md)
+  - 脑图工具导入用的大纲文本，不作为首选阅读入口
+
+## 推荐使用方式
+
+- 第一次读项目
+  - 先看 `project-learning-guide.md`
+- 想快速讲清结构
+  - 优先看 `project-tree-map.md`
+- 想导入脑图工具或快速改画布
+  - 使用 `project-mindmap.md` 或 `project-mindmap-outline.md`
+
+## 维护原则
+
+- `project-learning-guide.md`
+  - 作为叙述式主入口，负责讲清项目主线和阅读路径
+- `project-tree-map.md`
+  - 作为结构展示主图，优先保持稳定
+- `project-mindmap.md`
+  - 作为树状图的可视化变体，允许表达形式不同，但不应出现相反语义
+- `project-mindmap-outline.md`
+  - 只服务于导入工具，不单独承载新增项目规则
+
+如果同一信息已经在其它 `docs/` 分类里有正式落点，这里应引用或概括，不要重新发明规则定义。
+
+## 建议正文模板
+
+新增或重写 `meta` 文档时，优先按这组章节组织：
+
+1. 文档目标
+2. 适用场景
+3. 主体内容
+4. 推荐用法
+5. 与其它文档的关系

@@ -129,6 +129,128 @@
 
 ---
 
+### [2026-04-08] 收敛 docs 目录职责边界并迁移错层文档
+
+- 类型：文档
+- 状态：已完成
+
+#### 背景
+`docs/` 顶层 taxonomy 已经固定为 `feature-map / feature-flows / domain-rules / system-design / dev / meta`，但实际文档里仍有少量“规则层混入实现映射”的情况。继续放任不收口，会让后续 AI 和人工维护时很难判断文档应该补在哪一层。
+
+#### 本次改动
+- 新增 `docs/domain-rules/README.md`，固定规则层边界和核心术语
+- 新增 `docs/system-design/README.md`，固定实现层边界
+- 迁移并改名：
+  - `docs/domain-rules/progress-overview.md -> docs/system-design/learning-overview-mapping.md`
+  - `docs/domain-rules/review-practice-rules.md -> docs/system-design/review-practice-signals.md`
+- 更新 `docs/README.md`、维护手册、项目学习指南和相关交叉引用
+- 收敛 `learning-evidence.md` 中缺少落点的规范提示，改为明确指向 OpenSpec 主规范
+
+#### 影响范围
+- 影响模块：文档 taxonomy、阅读入口、维护入口
+- 影响页面：无
+- 是否影响主链路：否
+- 是否影响用户可感知行为：否
+- 是否需要同步文档：是
+
+#### 测试 / 验证
+- 已运行测试：全局检索旧路径残留、复核新目录索引
+- 手动验证路径：
+  - 检查 `docs/domain-rules` 与 `docs/system-design` 当前文件列表
+  - 检查 `docs/README.md` 阅读顺序是否覆盖实现层入口
+- 未验证部分：docs 内其余历史绝对路径链接未做全量清扫
+
+#### 风险 / 未完成项
+- 仓库外部资料或历史聊天仍可能引用旧路径
+- docs 内仍有部分旧式绝对路径和个别不可点击链接，后续可再统一一轮
+
+#### 后续计划
+- 后续新增规则文档优先落到 `domain-rules`，避免再写字段映射类文档
+- 之后如再整理 docs，可单独做一轮链接格式统一
+
+---
+
+### [2026-04-08] 补齐 meta 目录入口并区分讲解文档职责
+
+- 类型：文档
+- 状态：已完成
+
+#### 背景
+`docs/meta/` 里已经有学习讲解文档、树状图、思维导图和导入大纲，但缺少目录级说明。后续维护时容易出现“同主题多份文档但不知道谁是主入口、谁只是展示变体”的问题。
+
+#### 本次改动
+- 新增 `docs/meta/README.md`
+- 明确 `project-learning-guide.md`、`project-tree-map.md`、`project-mindmap.md`、`project-mindmap-outline.md` 的用途分工
+- 在 `docs/README.md` 的 `meta` 示例里补上目录入口
+
+#### 影响范围
+- 影响模块：文档认知入口、分享材料维护入口
+- 影响页面：无
+- 是否影响主链路：否
+- 是否影响用户可感知行为：否
+- 是否需要同步文档：是
+
+#### 测试 / 验证
+- 已运行测试：手动复核 `meta` 目录当前文件与 README 对应关系
+- 手动验证路径：
+  - 从 `docs/README.md` 进入 `meta/README.md`
+  - 复核 `meta/README.md` 中各文件职责是否互补而不冲突
+- 未验证部分：无
+
+#### 风险 / 未完成项
+- `project-tree-map.md` 与 `project-mindmap.md` 仍然存在内容上的天然重叠，后续若只更新其一，仍可能慢慢漂移
+
+#### 后续计划
+- 后续若继续精简 `meta`，优先保留 `project-learning-guide.md` 和 `project-tree-map.md` 作为主入口
+
+---
+
+### [2026-04-08] 统一 docs 目录 README 模板并收口核心正文结构
+
+- 类型：文档
+- 状态：已完成
+
+#### 背景
+`docs/` 顶层 taxonomy、目录入口和错层文档迁移完成后，剩下的问题不再是“文档放哪里”，而是“同类文档怎么写更一致”。如果目录 README 和核心正文没有统一模板，后续新增文档时仍会慢慢重新发散。
+
+#### 本次改动
+- 为 `feature-map / feature-flows / domain-rules / system-design / dev / meta` 六个目录 README 补齐建议正文模板
+- 收口 `domain-rules` 核心正文：
+  - `learning-evidence.md`
+  - `review-scheduling-rules.md`
+- 收口 `system-design` 对应正文：
+  - `learning-overview-mapping.md`
+  - `review-practice-signals.md`
+- 收口 `feature-flows` 核心正文：
+  - `today-recommendation.md`
+  - `review-writeback.md`
+  - `scene-training-flow.md`
+  - `session-resume.md`
+
+#### 影响范围
+- 影响模块：文档模板、一致性、阅读体验
+- 影响页面：无
+- 是否影响主链路：否
+- 是否影响用户可感知行为：否
+- 是否需要同步文档：是
+
+#### 测试 / 验证
+- 已运行测试：文档结构人工复核、全局检索主要旧标题和坏链格式
+- 手动验证路径：
+  - 复核 6 个目录 README 是否都包含目录说明与建议正文模板
+  - 复核 `domain-rules / system-design / feature-flows` 核心正文是否已基本对齐模板
+- 未验证部分：未对所有历史 `system-design` 文档逐篇做模板化收口
+
+#### 风险 / 未完成项
+- `scene-practice-generation.md`、`review-source-mapping.md`、`review-progressive-practice.md` 等历史 `system-design` 文档仍保留旧标题口径，但不影响当前阅读
+- `scene-entry.md` 的章节风格比其它 `feature-flows` 更细，后续如需要可以再做一轮轻量统一
+
+#### 后续计划
+- 如果继续整理，优先收 `system-design` 中仍使用旧标题体系的几份专项文档
+- 当前阶段可以先停止大范围文档改写，后续按需增量维护
+
+---
+
 ### [2026-04-08] 补齐 scenes、progress 与 chunks 详情专项维护文档
 
 - 类型：文档
@@ -139,7 +261,7 @@
 
 #### 本次改动
 - 新增 `docs/feature-flows/scene-entry.md`
-- 新增 `docs/domain-rules/progress-overview.md`
+- 新增 `docs/system-design/learning-overview-mapping.md`
 - 新增 `docs/system-design/chunks-focus-detail-map.md`
 - 在 `docs/dev/project-maintenance-playbook.md` 挂接对应入口
 
@@ -202,7 +324,7 @@
 - 按 `feature-map / feature-flows / domain-rules / system-design / dev / meta` 六层 taxonomy 重构 `docs/`
 - 迁移并重命名原有专项文档，例如：
   - `scenes-entry-flow.md -> feature-flows/scene-entry.md`
-  - `progress-overview-mapping.md -> domain-rules/progress-overview.md`
+  - `progress-overview-mapping.md -> system-design/learning-overview-mapping.md`
   - `scene-practice-generation.md -> system-design/scene-practice-generation.md`
 - 更新 `docs/README.md`、目录索引、维护手册和项目学习指南中的文档引用
 

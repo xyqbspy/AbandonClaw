@@ -10,7 +10,7 @@
 - 单次进入页面、单次点击或单次浏览，不应直接等价成学习完成
 - 场景步骤推进、句子完成、场景练习完成、场景 done 必须是不同层级的证据
 
-## 3. 当前稳定证据层级
+## 3. 当前规则定义
 
 ### 3.1 场景步骤证据
 
@@ -41,7 +41,9 @@
 
 `done` 高于 `scene_practice`，只有在练习完成且下游条件满足后，才允许进入 `done`。
 
-## 4. Review 里的证据边界
+## 4. 消费边界
+
+### 4.1 Review 里的证据边界
 
 `review` 里要区分：
 
@@ -50,15 +52,19 @@
 
 只有已经正式落库并被聚合消费的信号，才属于稳定学习证据。
 
+### 4.2 页面与聚合消费边界
+
+- `today` / `progress` / `review` 只能消费稳定聚合字段
+- 页面不应各自发明新的证据解释
+- 前端临时阶段或草稿不应直接上升为正式学习完成
+
 ## 5. 维护约束
 
 - 不得把“进入练习”直接近似为“句子已完成”
 - 不得把本地临时阶段误写成正式学习完成
-- today / progress / review 只能消费稳定聚合字段，不应各自发明新的证据解释
 
 ## 6. 改动时一起检查
 
-- `learning-loop-overview` 主规范
-- `sentence-progression` 规范
-- `sentence-completion-tracking` 规范
+- `openspec/specs/learning-loop-overview/spec.md`
+- 如果这次改动引入新的句子级里程碑或完成判定，再补对应 OpenSpec spec，而不是只在这里追加约定
 - scene / review / today 的聚合消费逻辑

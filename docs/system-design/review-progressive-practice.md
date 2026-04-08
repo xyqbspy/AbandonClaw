@@ -118,7 +118,7 @@
 
 新增正式字段、聚合摘要和 `today` 消费规则，见：
 
-- `docs/domain-rules/review-practice-rules.md`
+- `docs/system-design/review-practice-signals.md`
 
 其余未接通能力在页面上仍只能作为训练位和说明存在，不能伪造成已经写入正式学习状态。
 

@@ -171,7 +171,7 @@
 
 `progress` 学习概览字段映射与失败降级参考：
 
-- `docs/domain-rules/progress-overview.md`
+- `docs/system-design/learning-overview-mapping.md`
 
 ## 4. 当前工程约定
 

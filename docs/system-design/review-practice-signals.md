@@ -1,16 +1,29 @@
-# Review 正式信号维护说明
+# Review 正式信号实现说明
 
-## 1. 文档目的
+## 1. 目标
 
 这份文档说明 `review` 递进式练习里，哪些结果已经进入正式后端信号、这些信号当前记录在哪、如何被聚合，以及 `today` / dashboard 应该怎样消费。
 
 它的重点不是页面交互本身，而是：
 
 - 正式字段边界
+- 落库位置
 - 聚合摘要规则
 - 历史数据兼容策略
 
-## 2. 当前正式信号范围
+## 2. 对应入口/实现位置
+
+- `public.phrase_review_logs`
+- `src/app/(app)/review/page.tsx`
+- `src/app/api/review/submit/route.ts`
+- `src/lib/server/review/*`
+- `src/lib/server/learning/service.ts`
+- `supabase/sql/20260317_phase6_review_loop_mvp.sql`
+- `supabase/sql/20260331_phase20_review_practice_signals.sql`
+
+## 3. 关键结构或字段来源
+
+### 3.1 当前正式信号范围
 
 当前 `review` 普通表达复习里，已经纳入正式后端记录的新增信号有：
 
@@ -26,16 +39,11 @@
 
 也就是说，当前正式记录模型不是替换旧的 `again / hard / good`，而是在保留原有调度结果的基础上，增加更细的训练维度。
 
-## 3. 当前落库位置
+### 3.2 当前落库位置
 
 当前正式信号记录在：
 
 - `public.phrase_review_logs`
-
-对应迁移：
-
-- `supabase/sql/20260317_phase6_review_loop_mvp.sql`
-- `supabase/sql/20260331_phase20_review_practice_signals.sql`
 
 新增字段语义：
 
@@ -49,7 +57,7 @@
   - `completed`
   - `not_started`
 
-## 4. 为什么先挂到 review log，而不是直接改 user_phrases
+### 3.3 事件层挂载策略
 
 第一版选择把正式信号挂到 `phrase_review_logs`，而不是直接写进 `user_phrases`，原因是：
 
@@ -62,7 +70,9 @@
 - 事件层先保留细粒度信号
 - 聚合层再根据这些事件生成稳定摘要
 
-## 5. 当前服务端聚合摘要
+## 4. 页面/服务端映射
+
+### 4.1 当前服务端聚合摘要
 
 当前 `getReviewSummary()` 会额外返回：
 
@@ -79,11 +89,11 @@
 这些字段当前属于：
 
 - 轻量聚合摘要
-- 面向 `today` / dashboard / review summary 的消费字段
+- 面向 `today` / `dashboard` / `review summary` 的稳定消费字段
 
-## 6. 当前前端如何消费
+### 4.2 当前前端如何消费
 
-### 6.1 review 页面
+#### review 页面
 
 `review` 页面在最终提交 `again / hard / good` 时，会把当前已确定的正式信号一起带到后端：
 
@@ -96,7 +106,7 @@
 - `src/app/(app)/review/page.tsx`
 - `src/app/api/review/submit/route.ts`
 
-### 6.2 today 页面
+#### today 页面
 
 `today` 当前不直接消费原始 review 日志，而是消费服务端聚合后的摘要字段。
 
@@ -110,7 +120,7 @@
 - `today` 不需要自己解释 review 原始事件
 - 页面之间不会各自发明新的正式学习语义
 
-## 7. 历史数据兼容
+## 5. 失败回退或兼容策略
 
 这次新增信号采用保守兼容策略：
 
@@ -123,7 +133,14 @@
 - 新功能上线后，新日志会逐步带出更细的训练摘要
 - 历史数据不会因为缺字段而被错误解释
 
-## 8. 当前仍未正式化的部分
+## 6. 和其它模块/页面的边界
+
+- `review`
+  - 负责提交正式信号，不负责自己解释长期聚合摘要
+- `today`
+  - 只消费聚合后的稳定字段，不直接解释原始 review 日志
+- `domain-rules/review-scheduling-rules.md`
+  - 负责定义这些正式信号如何影响调度语义
 
 以下内容目前仍然不属于正式后端信号：
 
@@ -134,7 +151,14 @@
 
 这些能力后续如果要接入正式语义，需要继续扩这个文档和对应 OpenSpec 规范。
 
-## 9. 建议回归点
+## 7. 什么时候必须同步更新
+
+- 正式信号字段新增、删减或含义变化
+- 正式信号落库位置变化
+- `getReviewSummary()` 聚合字段变化
+- `today` / `review` 的消费方式变化
+
+## 8. 建议回归
 
 - `review` 最终提交时会带上熟悉度、输出信心和完整输出状态
 - 服务端能在 `phrase_review_logs` 中写入新增字段

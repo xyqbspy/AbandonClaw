@@ -1,15 +1,19 @@
-# Progress 学习概览映射说明
+# Learning Overview Mapping
 
 ## 1. 目标
 
 这份文档说明 `progress` 页展示的学习概览字段来自哪里、失败时如何降级，以及后续调整卡片内容时要一起检查哪些服务端聚合逻辑。
+
+## 2. 对应入口/实现位置
 
 对应入口：
 
 - [page.tsx](/d:/WorkCode/AbandonClaw/src/app/(app)/progress/page.tsx)
 - [service.ts](/d:/WorkCode/AbandonClaw/src/lib/server/learning/service.ts)
 
-## 2. 页面职责
+## 3. 关键结构或字段来源
+
+### 3.1 页面职责
 
 `progress/page.tsx` 本身很薄，只做三件事：
 
@@ -19,7 +23,7 @@
 
 它不自己读原始表，也不自己计算任何统计。
 
-## 3. `LearningOverview` 字段来源
+### 3.2 `LearningOverview` 字段来源
 
 服务端结构定义在 [service.ts](/d:/WorkCode/AbandonClaw/src/lib/server/learning/service.ts) 的 `LearningOverview`：
 
@@ -41,7 +45,9 @@
 - `reviewAccuracy`
   - 来自 `getReviewSummary(userId)`
 
-## 4. 页面展示映射
+## 4. 页面/服务端映射
+
+### 4.1 页面展示映射
 
 当前页面映射关系：
 
@@ -57,7 +63,7 @@
 - 如果未来要改展示口径，优先改 `getLearningOverview()`
 - 页面层不应自己再拼新的“近 30 天”或“本周”统计
 
-## 5. 失败回退
+## 5. 失败回退或兼容策略
 
 `progress/page.tsx` 对 `getLearningOverview()` 做了保守降级：
 
@@ -83,7 +89,7 @@
 - 如果新增字段，也要同步补 fallback
 - 不要让页面直接消费 `undefined` 聚合值
 
-## 6. 和 Today / Review 的边界
+## 6. 和其它模块/页面的边界
 
 `progress` 和 `today`、`review` 都会消费学习聚合，但职责不同：
 

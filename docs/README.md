@@ -17,8 +17,9 @@
 1. `feature-map/README.md`（理解整体模块结构）
 2. 对应模块文档（如 today / scene / session）
 3. `feature-flows/` 对应链路文档
-4. `domain-rules/` 中的规则说明
-5. 最后再进入代码
+4. `domain-rules/README.md` 与对应规则文档
+5. 如果问题涉及字段来源、落库、缓存、fallback 或组件协作，再看 `system-design/README.md` 与对应实现文档
+6. 最后再进入代码
 
 禁止：
 - 直接从局部代码推断业务
@@ -75,7 +76,6 @@
 示例：
 - learning-evidence.md
 - review-scheduling-rules.md
-- progress-overview.md
 
 ---
 
@@ -92,6 +92,8 @@
 - chunks-data-mapping.md
 - audio-tts-pipeline.md
 - component-library.md
+- learning-overview-mapping.md
+- review-practice-signals.md
 
 ---
 
@@ -105,6 +107,7 @@
 - 变更模板
 
 示例：
+- dev/README.md
 - testing-policy.md
 - openspec-workflow.md
 - dev-log.md
@@ -120,6 +123,7 @@
 - 结构说明
 
 示例：
+- meta/README.md
 - project-mindmap.md
 - project-tree-map.md
 - project-learning-guide.md

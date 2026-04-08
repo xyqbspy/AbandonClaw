@@ -8,11 +8,17 @@
 
 - [page.tsx](/d:/WorkCode/AbandonClaw/src/app/(app)/today/page.tsx)
 - [today-page-client.tsx](/d:/WorkCode/AbandonClaw/src/features/today/components/today-page-client.tsx)
-- [today-page-selectors.ts](d:/WorkCode/AbandonClaw/src/features/today/components/today-page-selectors.ts)
+- [today-page-selectors.ts](/d:/WorkCode/AbandonClaw/src/features/today/components/today-page-selectors.ts)
 - [route.ts](/d:/WorkCode/AbandonClaw/src/app/api/learning/dashboard/route.ts)
 - [service.ts](/d:/WorkCode/AbandonClaw/src/lib/server/learning/service.ts)
 
-## 2. 链路总览
+## 2. 入口
+
+- `src/app/(app)/today/page.tsx`
+- `src/features/today/components/today-page-client.tsx`
+- `/api/learning/dashboard`
+
+## 3. 主链路
 
 `today` 的主要推荐链路是：
 
@@ -21,7 +27,7 @@
 3. 服务端 `getLearningDashboard()` 聚合 `overview`、`continueLearning`、`todayTasks`
 4. 前端选择器把聚合结果翻译成主 CTA、任务和说明文案
 
-## 3. 数据层级
+## 4. 关键状态/回写节点
 
 `today` 页有三层数据来源，优先级固定：
 
@@ -36,9 +42,9 @@
 
 前端不得绕过这套顺序重新创造新的学习完成语义。
 
-## 4. 推荐所依赖的核心字段
+### 4.1 推荐所依赖的核心字段
 
-### 4.1 `continueLearning`
+#### `continueLearning`
 
 来源：
 
@@ -60,7 +66,7 @@
 - `isRepeat`
   - 是否属于完成后的回炉链路
 
-### 4.2 `todayTasks`
+#### `todayTasks`
 
 来源：
 
@@ -79,7 +85,7 @@
 - `reviewTask`
   - 是否已完成一轮回忆，或当前是否仍有待复习项
 
-### 4.3 `overview`
+#### `overview`
 
 来源：
 
@@ -90,9 +96,9 @@
 - 欢迎卡片和概览摘要
 - 回忆正确率、已保存表达等统计
 
-## 5. 前端推荐规则
+### 4.2 前端推荐规则
 
-### 5.1 继续学习入口
+#### 继续学习入口
 
 优先级：
 
@@ -105,7 +111,7 @@
 - 前端只能决定“从哪里兜底拿入口”
 - 不能重写服务端的 continue 语义
 
-### 5.2 当前有效步骤 / 进度
+#### 当前有效步骤 / 进度
 
 步骤优先级：
 
@@ -126,7 +132,7 @@
 - continue scene 预热
 - 顶部进度条
 
-### 5.3 任务解锁
+#### 任务解锁
 
 规则：
 
@@ -135,9 +141,9 @@
 - `reviewTask` 只有在场景链路已推进后才可用
 - repeat continue 不得把场景任务直接标记为已完成
 
-## 6. 页面展示块与字段来源
+### 4.3 页面展示块与字段来源
 
-### 6.1 继续学习卡片
+#### 继续学习卡片
 
 来源：
 
@@ -147,7 +153,7 @@
 - href：`getContinueLearningHref()`
 - 进度：`effectiveProgressPercent`
 
-### 6.2 今日任务区
+#### 今日任务区
 
 来源：
 
@@ -158,7 +164,7 @@
 - `sceneTask` 解释当前该先做什么
 - `outputTask`、`reviewTask` 决定下游任务锁定状态
 
-### 6.3 表达沉淀区与回忆摘要区
+#### 表达沉淀区与回忆摘要区
 
 来源：
 
@@ -167,13 +173,13 @@
 - `todayTasks.reviewTask.dueReviewCount`
 - `overview.reviewAccuracy`
 
-## 7. 失败与降级
+## 5. 失败与降级
 
 - dashboard 缺失时，前端只能按约定退回本地 repeat 或场景列表兜底
 - 不允许页面自己解释底层 review 原始事件
 - repeat continue 不得误判为“今日场景已完成”
 
-## 8. 维护边界
+## 6. 改动时一起检查
 
 以下变更发生时，必须同步更新本文档与相关测试：
 
@@ -183,11 +189,11 @@
 - `sceneTask.done`、`outputTask.done`、`reviewTask.done` 的判定变化
 - continue card、today task 文案和锁定逻辑变化
 
-## 9. 建议回归
+## 7. 建议回归
 
-- [today-page-selectors.test.ts](d:/WorkCode/AbandonClaw/src/features/today/components/today-page-selectors.test.ts)
-- [today-page-client.test.tsx](d:/WorkCode/AbandonClaw/src/features/today/components/today-page-client.test.tsx)
-- [service.logic.test.ts](d:/WorkCode/AbandonClaw/src/lib/server/learning/service.logic.test.ts)
+- [today-page-selectors.test.ts](/d:/WorkCode/AbandonClaw/src/features/today/components/today-page-selectors.test.ts)
+- [today-page-client.test.tsx](/d:/WorkCode/AbandonClaw/src/features/today/components/today-page-client.test.tsx)
+- [service.logic.test.ts](/d:/WorkCode/AbandonClaw/src/lib/server/learning/service.logic.test.ts)
 
 至少覆盖：
 
