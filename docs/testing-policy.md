@@ -9,6 +9,20 @@
 
 ---
 
+## 链路文档与测试联动
+
+若改动涉及主链路、状态流转、回写规则、恢复逻辑：
+- 先检查对应 feature-flow 是否仍然成立
+- 若链路已变化，先更新文档，再判断测试应保留、重写还是删除
+- 验收测试应优先保护 feature-flow 中定义的核心规则
+
+当前默认链路文档目录：
+
+- `docs/feature-flows/today-recommendation.md`
+- `docs/feature-flows/scene-training-flow.md`
+- `docs/feature-flows/session-resume.md`
+- `docs/feature-flows/review-writeback.md`
+
 ## 0. 测试分层
 
 项目中的测试分为三层：

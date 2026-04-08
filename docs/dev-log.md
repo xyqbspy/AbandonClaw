@@ -126,3 +126,84 @@
 - 重大重构优先记录“为什么改”和“主链路是否变化”
 - 删除功能时一定记录删除依据
 - 若行为变化已稳定且准备发布，再从这里提炼正式 CHANGELOG
+
+---
+
+### [2026-04-08] 补齐 scenes、progress 与 chunks 详情专项维护文档
+
+- 类型：文档
+- 状态：已完成
+
+#### 背景
+仓库原本已经有 `today`、`review`、`scene practice`、`chunks data`、`audio tts` 等专项维护文档，但 `scenes` 列表页、`progress` 聚合页，以及 `chunks` 的 focus detail / expression map 仍缺独立说明。后续继续改这些区域时，只能翻代码和测试，不利于快速判断链路边界。
+
+#### 本次改动
+- 新增 `docs/scenes-entry-flow.md`
+- 新增 `docs/progress-overview-mapping.md`
+- 新增 `docs/chunks-focus-detail-map.md`
+- 在 `docs/project-maintenance-playbook.md` 挂接对应入口
+
+#### 影响范围
+- 影响模块：Scenes、Progress、Chunks
+- 影响页面：`/scenes`、`/progress`、`/chunks`
+- 是否影响主链路：否
+- 是否影响用户可感知行为：否
+- 是否需要同步文档：是
+
+#### 测试 / 验证
+- 已运行测试：`pnpm run text:check-mojibake`
+- 手动验证路径：已复核文档索引与维护入口
+- 未验证部分：无
+
+#### 风险 / 未完成项
+- 新文档目前是首版，后续若对应链路继续演进，需要继续维护
+- 仍有部分旧文档命名体系未完全收口到新目录分层
+
+#### 后续计划
+- 后续文档新增优先收敛到 `feature-map / feature-flows / system-design / dev / meta`
+- 继续减少“同一逻辑分散在多个说明文件”的情况
+
+---
+
+### [2026-04-08] 固定 feature-map 与 feature-flows 目录结构
+
+- 类型：文档
+- 状态：已完成
+
+#### 背景
+仓库开始引入 `docs/feature-map/`、`docs/feature-flows/`、`docs/dev-log.md`、`docs/testing-policy.md` 这一套新文档体系，但 `feature-map` 与 `feature-flows` 当时只有 README，缺少稳定子文档。若不先固定结构，后续文档会继续散落，模块地图和链路说明也会混写。
+
+#### 本次改动
+- 固定 `docs/feature-map/` 目录并补齐：
+  - `today.md`
+  - `scene.md`
+  - `session.md`
+  - `expression-item.md`
+  - `review.md`
+- 固定 `docs/feature-flows/` 目录并补齐：
+  - `today-recommendation.md`
+  - `scene-training-flow.md`
+  - `session-resume.md`
+  - `review-writeback.md`
+- 更新两个 README 的索引和边界说明
+- 在 `docs/testing-policy.md`、`docs/project-maintenance-playbook.md` 补入口
+
+#### 影响范围
+- 影响模块：文档体系、维护入口
+- 影响页面：无直接页面影响
+- 是否影响主链路：否
+- 是否影响用户可感知行为：否
+- 是否需要同步文档：是
+
+#### 测试 / 验证
+- 已运行测试：`pnpm run text:check-mojibake`
+- 手动验证路径：复核目录结构与 README 索引
+- 未验证部分：无
+
+#### 风险 / 未完成项
+- 部分旧文档仍然使用旧命名习惯，后续还需要继续迁移或收口
+- 新目录结构虽然固定了，但不同类别文档的边界仍需在后续改动中持续执行
+
+#### 后续计划
+- 后续主链路文档优先落到 `feature-flows/`
+- 后续模块职责说明优先落到 `feature-map/`

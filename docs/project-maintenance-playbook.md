@@ -53,6 +53,8 @@
 组件归属与迁移边界优先参考：
 
 - `docs/component-library.md`
+- `docs/feature-map/README.md`
+- `docs/feature-flows/README.md`
 
 ### 服务与数据层
 
