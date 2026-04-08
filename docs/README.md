@@ -1,51 +1,195 @@
-# Docs Index
+# Documentation Index
 
-本目录用于描述项目结构、功能链路、规则与开发方式。
+本目录用于描述项目的功能结构、核心链路、规则系统与开发方式。
 
-## 阅读顺序（强制建议）
+目标：
 
-当需要理解或修改复杂功能时，请按以下顺序阅读：
+- 让开发者和 AI 在修改代码前，先理解系统结构
+- 避免从局部代码反推业务逻辑
+- 保证主链路、状态流转和核心规则不会被误改
 
-1. feature-map/README.md（理解系统模块）
-2. 对应模块文档（如 today.md / scene.md）
-3. feature-flows/ 对应链路文档
-4. domain-rules/ 相关规则
-5. 再进入代码
+---
 
-不要直接从局部代码开始推断业务逻辑。
+## 推荐阅读顺序（重要）
+
+当需要理解或修改复杂功能时，请按以下顺序：
+
+1. `feature-map/README.md`（理解整体模块结构）
+2. 对应模块文档（如 today / scene / session）
+3. `feature-flows/` 对应链路文档
+4. `domain-rules/` 中的规则说明
+5. 最后再进入代码
+
+禁止：
+- 直接从局部代码推断业务
+- 未理解链路就修改核心逻辑
 
 ---
 
 ## 文档分层说明
 
-### feature-map
-描述“模块是什么、做什么、依赖什么”
+### 1. feature-map（模块层：是什么）
 
-### feature-flows
-描述“功能链路如何运行（入口 → 状态 → 输出 → 回退）”
+描述系统中有哪些核心模块，每个模块：
 
-### domain-rules
-描述“规则系统（调度、阶段、信号）”
+- 做什么
+- 依赖什么
+- 影响什么
+- 哪些规则不能乱动
 
-### system-design
-描述“技术实现、数据结构、映射关系”
-
-### dev
-开发规则、测试策略、workflow
-
-### meta
-项目认知、脑图、结构理解
+示例：
+- today.md
+- scene.md
+- session.md
+- expression-item.md
+- review.md
 
 ---
 
-## 修改规则
+### 2. feature-flows（链路层：怎么跑）
 
-当修改以下内容时必须同步文档：
+描述功能链路：
 
-- 主链路（Today / Scene / Session / Review）
+- 从哪里进入（入口）
+- 中间经过哪些步骤（状态流转）
+- 最后输出什么（回写 / 跳转）
+- 异常和回退路径
+
+示例：
+- today-recommendation.md
+- scene-training-flow.md
+- session-resume.md
+- review-writeback.md
+
+---
+
+### 3. domain-rules（规则层：为什么这样跑）
+
+描述系统规则：
+
+- 推荐优先级
+- 学习证据模型
+- review 调度策略
+- 状态推进规则
+
+示例：
+- learning-evidence.md
+- review-scheduling-rules.md
+- progress-overview.md
+
+---
+
+### 4. system-design（实现层：怎么实现）
+
+描述技术实现与数据结构：
+
+- 数据映射
+- pipeline
+- 生成逻辑
+- 组件结构
+
+示例：
+- chunks-data-mapping.md
+- audio-tts-pipeline.md
+- component-library.md
+
+---
+
+### 5. dev（开发层）
+
+描述开发方式与流程：
+
+- workflow
+- 测试策略
+- 开发日志
+- 变更模板
+
+示例：
+- testing-policy.md
+- openspec-workflow.md
+- dev-log.md
+
+---
+
+### 6. meta（认知层）
+
+帮助理解整个项目：
+
+- 项目脑图
+- 学习路径
+- 结构说明
+
+示例：
+- project-mindmap.md
+- project-tree-map.md
+- project-learning-guide.md
+
+---
+
+## 文档使用规则（必须遵守）
+
+### 1. 修改前必须理解链路
+
+涉及以下内容时：
+
+- 推荐逻辑
 - 状态流转
+- 回写逻辑
+- Session 恢复
+- Scene 完成判定
+
+必须：
+
+- 先读 feature-map
+- 再读 feature-flow
+- 再改代码
+
+---
+
+### 2. 文档必须同步更新
+
+当修改以下内容时：
+
+- 主链路
+- 状态逻辑
 - 推荐逻辑
 - 回写逻辑
-- 恢复逻辑
+- 删除功能
 
-若不确定影响范围，优先更新 feature-flow 文档。
+必须同步更新：
+
+- feature-flow 文档
+- 必要时 feature-map
+
+---
+
+### 3. 文档归类规则
+
+新增文档时必须归类到：
+
+- feature-map
+- feature-flows
+- domain-rules
+- system-design
+- dev
+- meta
+
+禁止：
+
+- 新建模糊分类（如 mapping / logic / misc）
+- 同一逻辑写在多个文件
+
+---
+
+### 4. 优先更新而不是新建
+
+如果已有类似文档：
+
+- 优先修改已有文档
+- 不要创建重复文件
+
+---
+
+## 一句话原则
+
+> 文档用于保证“系统理解一致”，而不是记录“代码细节”

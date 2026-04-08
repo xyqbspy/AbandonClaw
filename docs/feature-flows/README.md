@@ -28,6 +28,7 @@
 
 ## 当前目录
 
+- [scene-entry.md](/d:/WorkCode/AbandonClaw/docs/feature-flows/scene-entry.md)
 - [today-recommendation.md](/d:/WorkCode/AbandonClaw/docs/feature-flows/today-recommendation.md)
 - [scene-training-flow.md](/d:/WorkCode/AbandonClaw/docs/feature-flows/scene-training-flow.md)
 - [session-resume.md](/d:/WorkCode/AbandonClaw/docs/feature-flows/session-resume.md)
@@ -39,7 +40,7 @@
   - 解释模块本身的职责与边界
 - `feature-flows/`
   - 解释跨模块链路如何触发、流转、回写和降级
-- `dev-log.md`
+- `docs/dev/dev-log.md`
   - 记录开发过程和中间态决策
-- `testing-policy.md`
+- `docs/dev/testing-policy.md`
   - 约束测试策略，而不是解释具体链路

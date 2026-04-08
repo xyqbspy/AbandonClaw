@@ -2,34 +2,197 @@
 
 ## 1. 目标
 
-说明 `today` 页如何决定主推荐动作，以及不同任务之间的优先级。
+这份文档用于说明 `today` 页面展示数据、推荐动作、当前学习步骤与后端学习聚合之间的对应关系，避免后续修改 `scene` 学习链路、`learning dashboard` 聚合或 `today` selectors 时再次出现语义漂移。
 
-## 2. 主要输入
+适用范围：
 
-- continue learning scene
-- repeat practice / repeat variants
-- due review summary
-- output task
+- [page.tsx](/d:/WorkCode/AbandonClaw/src/app/(app)/today/page.tsx)
+- [today-page-client.tsx](/d:/WorkCode/AbandonClaw/src/features/today/components/today-page-client.tsx)
+- [today-page-selectors.ts](d:/WorkCode/AbandonClaw/src/features/today/components/today-page-selectors.ts)
+- [route.ts](/d:/WorkCode/AbandonClaw/src/app/api/learning/dashboard/route.ts)
+- [service.ts](/d:/WorkCode/AbandonClaw/src/lib/server/learning/service.ts)
 
-## 3. 流转
+## 2. 链路总览
 
-1. 先判断是否存在可继续的 scene / session
-2. 再判断是否存在 repeat practice / variant continue
-3. 再展示 review / output 等聚合任务
-4. 页面把结果翻译成主 CTA、任务卡片和说明文案
+`today` 的主要推荐链路是：
 
-## 4. 回写与下游
+1. 页面入口只负责鉴权和基础壳层
+2. 客户端页读取缓存并请求 `/api/learning/dashboard`
+3. 服务端 `getLearningDashboard()` 聚合 `overview`、`continueLearning`、`todayTasks`
+4. 前端选择器把聚合结果翻译成主 CTA、任务和说明文案
 
-- 用户点击主 CTA 会进入 scene 或 review
-- 完成 scene / review 后，today 的推荐结果会跟随聚合数据变化
+## 3. 数据层级
 
-## 5. 失败与降级
+`today` 页有三层数据来源，优先级固定：
 
-- 如果聚合字段缺失，today 不应自己推断底层原始事件
-- continue learning 缺失时，允许降级到其它可做任务
+1. 服务端 dashboard 主来源
+2. 本地 repeat generated state 回退层
+3. 场景列表首项回退层
 
-## 6. 改动时一起检查
+对应实现：
 
-- continue learning 选择规则
-- review task 展示
-- output task 锁定 / 解锁条件
+- `resolveContinueLearningState()` 决定 continue 入口来自哪里
+- `resolveTodayLearningSnapshot()` 决定当前有效步骤 / 阶段 / 进度
+
+前端不得绕过这套顺序重新创造新的学习完成语义。
+
+## 4. 推荐所依赖的核心字段
+
+### 4.1 `continueLearning`
+
+来源：
+
+- `getContinueLearningScene(userId)`
+- `getRepeatPracticeContinueScene(userId)`
+- `getRepeatVariantContinueScene(userId)`
+- `pickMostRecentContinueScene(...)`
+
+关键语义：
+
+- `currentStep`
+  - 当前应该恢复到哪一个学习阶段
+- `masteryStage`
+  - 当前场景主掌握阶段
+- `completedSentenceCount`
+  - 当前已稳定完成的句子数量
+- `repeatMode`
+  - `practice` 或 `variants`
+- `isRepeat`
+  - 是否属于完成后的回炉链路
+
+### 4.2 `todayTasks`
+
+来源：
+
+- `getTodayLearningTasks(userId)`
+
+关键语义：
+
+- `sceneTask.done`
+  - 非 repeat 场景下表示今天是否已完成至少一个场景
+- `sceneTask.currentStep`
+  - today 推荐与 continue 文案的第一优先级步骤来源
+- `sceneTask.progressPercent`
+  - today 页面主进度显示优先值
+- `outputTask`
+  - 是否已经沉淀表达
+- `reviewTask`
+  - 是否已完成一轮回忆，或当前是否仍有待复习项
+
+### 4.3 `overview`
+
+来源：
+
+- `getLearningOverview(userId)`
+
+用途：
+
+- 欢迎卡片和概览摘要
+- 回忆正确率、已保存表达等统计
+
+## 5. 前端推荐规则
+
+### 5.1 继续学习入口
+
+优先级：
+
+1. `dashboard.continueLearning`
+2. 本地 repeat practice / repeat variant
+3. 场景列表第一项
+
+注意：
+
+- 前端只能决定“从哪里兜底拿入口”
+- 不能重写服务端的 continue 语义
+
+### 5.2 当前有效步骤 / 进度
+
+步骤优先级：
+
+1. `todayTasks.sceneTask.currentStep`
+2. `continueLearning.currentStep`
+3. `todayTasks.sceneTask.masteryStage`
+4. `continueLearning.masteryStage`
+
+进度优先级：
+
+1. `todayTasks.sceneTask.progressPercent`
+2. `continueLearning.progressPercent`
+
+这组规则用于：
+
+- continue card 步骤文案
+- helper 文案
+- continue scene 预热
+- 顶部进度条
+
+### 5.3 任务解锁
+
+规则：
+
+- `sceneTask` 是主入口任务
+- `outputTask` 只有在主场景任务完成，或当前是 repeat continue 时才解锁
+- `reviewTask` 只有在场景链路已推进后才可用
+- repeat continue 不得把场景任务直接标记为已完成
+
+## 6. 页面展示块与字段来源
+
+### 6.1 继续学习卡片
+
+来源：
+
+- 标题、副标题：`continueLearning.title` / `subtitle`
+- 步骤：`resolveTodayLearningSnapshot()` + `getContinueLearningStepLabel()`
+- helper 文案：`getContinueLearningHelperText()`
+- href：`getContinueLearningHref()`
+- 进度：`effectiveProgressPercent`
+
+### 6.2 今日任务区
+
+来源：
+
+- `buildTodayTasks({ dashboard, continueLearning, labels })`
+
+显示重点：
+
+- `sceneTask` 解释当前该先做什么
+- `outputTask`、`reviewTask` 决定下游任务锁定状态
+
+### 6.3 表达沉淀区与回忆摘要区
+
+来源：
+
+- `todayTasks.outputTask.phrasesSavedToday`
+- `continueLearning.savedPhraseCount`
+- `todayTasks.reviewTask.dueReviewCount`
+- `overview.reviewAccuracy`
+
+## 7. 失败与降级
+
+- dashboard 缺失时，前端只能按约定退回本地 repeat 或场景列表兜底
+- 不允许页面自己解释底层 review 原始事件
+- repeat continue 不得误判为“今日场景已完成”
+
+## 8. 维护边界
+
+以下变更发生时，必须同步更新本文档与相关测试：
+
+- `currentStep`、`masteryStage`、`completedSentenceCount` 语义变化
+- continue 聚合优先级变化
+- repeat practice / variants 入口变化
+- `sceneTask.done`、`outputTask.done`、`reviewTask.done` 的判定变化
+- continue card、today task 文案和锁定逻辑变化
+
+## 9. 建议回归
+
+- [today-page-selectors.test.ts](d:/WorkCode/AbandonClaw/src/features/today/components/today-page-selectors.test.ts)
+- [today-page-client.test.tsx](d:/WorkCode/AbandonClaw/src/features/today/components/today-page-client.test.tsx)
+- [service.logic.test.ts](d:/WorkCode/AbandonClaw/src/lib/server/learning/service.logic.test.ts)
+
+至少覆盖：
+
+- dashboard continue 优先于本地 fallback
+- 本地 repeat continue 能在 dashboard 缺失时接住入口
+- `sceneTask` 步骤优先于 `continueLearning` 步骤
+- repeat continue 不误判今日场景已完成
+- output / review 在 repeat continue 场景下不被重新锁住

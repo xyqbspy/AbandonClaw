@@ -802,9 +802,9 @@
 
 `review` 页的来源契约、原场景跳转和降级规则，可配合阅读：
 
-- `docs/review-source-mapping.md`
-- `docs/review-practice-signals.md`
-- `docs/review-scheduling-signals.md`
+- `docs/system-design/review-source-mapping.md`
+- `docs/domain-rules/review-practice-rules.md`
+- `docs/domain-rules/review-scheduling-rules.md`
 
 可总结成三句话：
 
@@ -920,7 +920,7 @@
 3. `src/app/(app)/today/page.tsx`
 4. `src/features/today/components/today-page-client.tsx`
 5. `src/features/today/components/today-page-selectors.ts`
-6. `docs/today-learning-mapping.md`
+6. `docs/feature-flows/today-recommendation.md`
 
 ### 第二轮：读主线 `scene`
 
@@ -940,7 +940,7 @@
 4. `src/features/chunks/components/*`
 5. `src/features/chunks/expression-clusters/ui-logic.ts`
 6. `src/lib/server/expression-clusters/service.ts`
-7. `docs/chunks-data-mapping.md`
+7. `docs/system-design/chunks-data-mapping.md`
 
 ### 第四轮：读后端聚合
 

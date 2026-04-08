@@ -4,7 +4,7 @@
 
 这份文档专门说明 `review` 页里新的递进式练习流怎么组织、当前哪些阶段已经接到正式后端、哪些还只是前端 TODO 占位，以及失败后应该如何降级而不是直接判错结束。
 
-它和 `docs/review-source-mapping.md` 的分工不同：
+它和 `docs/system-design/review-source-mapping.md` 的分工不同：
 
 - `review-source-mapping.md` 解释复习项来自哪里、和原场景是什么关系
 - 本文解释单次复习内部怎么从识别推进到输出
@@ -118,7 +118,7 @@
 
 新增正式字段、聚合摘要和 `today` 消费规则，见：
 
-- `docs/review-practice-signals.md`
+- `docs/domain-rules/review-practice-rules.md`
 
 其余未接通能力在页面上仍只能作为训练位和说明存在，不能伪造成已经写入正式学习状态。
 

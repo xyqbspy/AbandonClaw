@@ -8,7 +8,7 @@
 
 如果要维护单次复习内部“从识别到输出”的阶段训练，请同时查看：
 
-- `docs/review-progressive-practice.md`
+- `docs/system-design/review-progressive-practice.md`
 
 ## 2. 当前复习项分成两类
 

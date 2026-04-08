@@ -52,7 +52,7 @@
 
 组件归属与迁移边界优先参考：
 
-- `docs/component-library.md`
+- `docs/system-design/component-library.md`
 - `docs/feature-map/README.md`
 - `docs/feature-flows/README.md`
 
@@ -80,7 +80,7 @@
 
 专项说明参考：
 
-- `docs/scenes-entry-flow.md`
+- `docs/feature-flows/scene-entry.md`
 
 ### `scene/[slug]`
 
@@ -103,7 +103,7 @@
 
 练习题生成、题型分层与“为什么填空 / 半句数量偏少”的专项说明参考：
 
-- `docs/scene-practice-generation.md`
+- `docs/system-design/scene-practice-generation.md`
 
 ### `chunks`
 
@@ -125,11 +125,11 @@
 
 保存、relation、cluster 与 review 契约参考：
 
-- `docs/chunks-data-mapping.md`
+- `docs/system-design/chunks-data-mapping.md`
 
 详情浮层与表达地图的页面职责参考：
 
-- `docs/chunks-focus-detail-map.md`
+- `docs/system-design/chunks-focus-detail-map.md`
 
 ### 音频 / TTS
 
@@ -137,7 +137,7 @@
 
 优先参考：
 
-- `docs/audio-tts-pipeline.md`
+- `docs/system-design/audio-tts-pipeline.md`
 
 维护时重点关注：
 
@@ -171,7 +171,7 @@
 
 `progress` 学习概览字段映射与失败降级参考：
 
-- `docs/progress-overview-mapping.md`
+- `docs/domain-rules/progress-overview.md`
 
 ## 4. 当前工程约定
 
@@ -218,7 +218,7 @@
 - 只有真实跨域复用且 props 语义稳定，才适合进入公共层
 - 如果组件强依赖某个 feature 的状态模型，就继续留在 feature 内
 - 当文件过重但仍属于单一 feature 时，优先做 feature 内部拆分，而不是提前公共化
-- 不确定时先看 `docs/component-library.md`，再决定是否抽公共
+- 不确定时先看 `docs/system-design/component-library.md`，再决定是否抽公共
 
 ### 改动时优先看链路，不只看单点
 
@@ -293,8 +293,8 @@ node_modules\.bin\openspec.CMD archive <change-name>
 
 相关文档：
 
-- `docs/openspec-workflow.md`
-- `docs/change-intake-template.md`
+- `docs/dev/openspec-workflow.md`
+- `docs/dev/change-intake-template.md`
 
 ## 7. 改动前后检查清单
 
@@ -325,7 +325,7 @@ node_modules\.bin\openspec.CMD archive <change-name>
 ## 8. 新维护者推荐阅读顺序
 
 1. `README.md`
-2. `docs/project-maintenance-playbook.md`
+2. `docs/dev/project-maintenance-playbook.md`
 3. `openspec/config.yaml`
 4. `openspec/specs/project-maintenance/spec.md`
 5. `openspec/specs/learning-loop-overview/spec.md`

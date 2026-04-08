@@ -138,10 +138,10 @@
 仓库原本已经有 `today`、`review`、`scene practice`、`chunks data`、`audio tts` 等专项维护文档，但 `scenes` 列表页、`progress` 聚合页，以及 `chunks` 的 focus detail / expression map 仍缺独立说明。后续继续改这些区域时，只能翻代码和测试，不利于快速判断链路边界。
 
 #### 本次改动
-- 新增 `docs/scenes-entry-flow.md`
-- 新增 `docs/progress-overview-mapping.md`
-- 新增 `docs/chunks-focus-detail-map.md`
-- 在 `docs/project-maintenance-playbook.md` 挂接对应入口
+- 新增 `docs/feature-flows/scene-entry.md`
+- 新增 `docs/domain-rules/progress-overview.md`
+- 新增 `docs/system-design/chunks-focus-detail-map.md`
+- 在 `docs/dev/project-maintenance-playbook.md` 挂接对应入口
 
 #### 影响范围
 - 影响模块：Scenes、Progress、Chunks
@@ -171,7 +171,7 @@
 - 状态：已完成
 
 #### 背景
-仓库开始引入 `docs/feature-map/`、`docs/feature-flows/`、`docs/dev-log.md`、`docs/testing-policy.md` 这一套新文档体系，但 `feature-map` 与 `feature-flows` 当时只有 README，缺少稳定子文档。若不先固定结构，后续文档会继续散落，模块地图和链路说明也会混写。
+仓库开始引入 `docs/feature-map/`、`docs/feature-flows/`、`docs/dev/dev-log.md`、`docs/dev/testing-policy.md` 这一套新文档体系，但 `feature-map` 与 `feature-flows` 当时只有 README，缺少稳定子文档。若不先固定结构，后续文档会继续散落，模块地图和链路说明也会混写。
 
 #### 本次改动
 - 固定 `docs/feature-map/` 目录并补齐：
@@ -186,7 +186,47 @@
   - `session-resume.md`
   - `review-writeback.md`
 - 更新两个 README 的索引和边界说明
-- 在 `docs/testing-policy.md`、`docs/project-maintenance-playbook.md` 补入口
+- 在 `docs/dev/testing-policy.md`、`docs/dev/project-maintenance-playbook.md` 补入口
+
+---
+
+### [2026-04-08] 重构 docs taxonomy 并统一目录归类
+
+- 类型：文档
+- 状态：已完成
+
+#### 背景
+随着专项文档持续增加，原先的 `docs/` 顶层已经同时混放模块说明、链路说明、规则、系统设计、开发规范和项目认知文档。继续沿用旧结构会让维护入口越来越分散，也会让后续 AI 和人工维护时难以判断文档应该落在哪一层。
+
+#### 本次改动
+- 按 `feature-map / feature-flows / domain-rules / system-design / dev / meta` 六层 taxonomy 重构 `docs/`
+- 迁移并重命名原有专项文档，例如：
+  - `scenes-entry-flow.md -> feature-flows/scene-entry.md`
+  - `progress-overview-mapping.md -> domain-rules/progress-overview.md`
+  - `scene-practice-generation.md -> system-design/scene-practice-generation.md`
+- 更新 `docs/README.md`、目录索引、维护手册和项目学习指南中的文档引用
+
+#### 影响范围
+- 影响模块：文档体系、维护入口、项目认知入口
+- 影响页面：无直接页面影响
+- 是否影响主链路：否
+- 是否影响用户可感知行为：否
+- 是否需要同步文档：是
+
+#### 测试 / 验证
+- 已运行测试：`pnpm run text:check-mojibake`
+- 手动验证路径：
+  - 全局检索旧路径残留
+  - 复核 `docs/README.md` 与 `docs/feature-flows/README.md` 索引
+- 未验证部分：无
+
+#### 风险 / 未完成项
+- 部分历史聊天或外部资料仍可能引用旧路径，不在仓库本次迁移范围内
+- 后续新增文档若不遵守 taxonomy，仍可能重新出现散落问题
+
+#### 后续计划
+- 后续新增文档统一先判断属于模块、链路、规则、系统设计、开发规范还是 meta
+- 若 taxonomy 再扩展，优先先更新 `docs/README.md` 与维护规则
 
 #### 影响范围
 - 影响模块：文档体系、维护入口
