@@ -1,69 +1,259 @@
-# Project Rules
+# Project Agent Rules
 
-- All answers in Chinese
-Act like a high-performing senior engineer. Be concise, direct, and execution-focused.
+所有回答使用中文。
+保持高水平资深工程师风格：简洁、直接、可执行。
 
-Prefer simple, maintainable, production-friendly solutions. Write low-complexity code that is easy to read, debug, and modify.
-Do not overengineer or add heavy abstractions, extra layers, or large dependencies for small features.
+目标：
+- 优先产出可维护、低复杂度、适合生产环境的方案
+- 避免过度设计、无意义抽象、额外依赖和大规模无关重构
+- 优先保证功能链路完整、行为明确、改动可追踪、token/credit 消耗可控
 
-Keep APIs small, behavior explicit, and naming clear. Avoid cleverness unless it clearly improves the result.
+---
 
-Use UTF-8 for reading and writing consistently (especially in PowerShell's `Set-Content -Encoding UTF8`).
+## 0. 规则优先级
 
-### Git 提交信息规则
+若规则冲突，按以下优先级执行：
 
-- 提交信息必须使用中文摘要，不要写英文 `feat: xxx`、`fix: xxx`、`test: xxx`。
-- 提交前缀仍使用 Conventional Commits 风格，但摘要内容必须为中文，例如：`feat: 补齐表达删除回退逻辑`、`fix: 修正详情弹框关闭条件`、`test: 补充接口越权分支测试`。
-- 若一次提交同时包含多类改动，优先按主要目的选择前缀；不要为了凑规则拆出低价值提交。
+1. 用户当前明确指令
+2. 本文件中的「任务分流规则」
+3. 本文件中的其他硬规则
+4. `docs/openspec-workflow.md`
+5. 其他补充文档
 
-### 编码与乱码处理硬规则
+---
 
-- 不要用裸 `Get-Content` 的终端显示结果来判断中文文件是否乱码；PowerShell 控制台输出可能乱码，但文件本身仍是正常 UTF-8。
-- 只要文件包含中文或其他非 ASCII 文本，读取时必须显式按 UTF-8 读取；优先使用：
-  - PowerShell: `[System.IO.File]::ReadAllText((Resolve-Path <path>), [System.Text.UTF8Encoding]::new($false))`
-  - 或 `Get-Content -Encoding UTF8`
-- 写入中文文件时，必须使用 UTF-8 显式写回；若不是 `apply_patch`，则必须使用 `Set-Content -Encoding UTF8`。
-- 在把文件判定为“乱码”之前，必须先用显式 UTF-8 方式复读一次；禁止因为一次控制台乱码显示就重复重写本来正常的文件。
-- 对中文文档或 OpenSpec 文档做修改后，若改动范围允许，优先运行 `pnpm run text:check-mojibake` 做二次确认。
-- 若同一文件已经通过显式 UTF-8 读取验证为正常，则后续本轮内不要再用不带编码参数的命令反复读取它来确认是否乱码。
+## 1. 任务分流规则（先判断，再行动）
 
-Use `apply_patch` for precise changes whenever possible, and avoid large-scale regular expression replacements.
+开始任何改动前，先判断任务属于哪一类：
 
-## 工作前置原则
+### A. Fast Track（直接修）
+满足以下特征时，直接改代码，不走完整 OpenSpec：
 
-- 做之前需要考虑全流程功能逻辑，不能按惯性去做。
-- 任何改动都要评估功能连续性，避免只修局部导致链路断裂。
-- 任何改动都要考虑测试影响：已有测试是否需要更新，是否需要补充回归测试，是否会引入未覆盖风险。
-- 每次完成实际改动后，都要同步维护根目录 `CHANGELOG.md`，记录本次变更内容、影响范围、验证情况与日期，方便回溯。
+- 单页 UI / 样式一致性 / className 收敛
+- 文案微调
+- 局部测试补齐或修正
+- lint / type / import 修复
+- 小范围重构，且**不改变业务语义**
+- 删除局部冗余、重复调用、坏味道实现
+- 虽然涉及多个文件，但本质仍是局部实现修正，**不影响主链路、状态机、数据流、API 契约**
 
-# OpenSpec Agent Rules
+Fast Track 规则：
+- 可以直接修改代码
+- 不创建 OpenSpec change
+- 不生成 `proposal.md` / `design.md` / `tasks.md`
+- 不更新正式发布 CHANGELOG
+- 只读取最少必要上下文
+- 只运行最小相关测试
+- 不做无关重构，不顺手扩大改动
 
-You are an OpenSpec project maintenance assistant.
+---
 
-## Workflow
+### B. Spec-Driven Change（规范驱动变更）
+满足任一条件时，进入 OpenSpec：
+
+- 改变业务行为或用户能力定义
+- 改变主链路、状态流、数据流
+- 新增或修改 API / 数据模型 / 数据库 / 缓存策略 / 埋点契约
+- 改动权限、校验、安全策略
+- 影响多个页面/模块/团队约定
+- 新增公共能力、通用组件、设计规范
+- 修复会改变系统外部行为的 Bug
+- 用户明确要求先出 proposal / design / tasks / spec
+
+Spec-Driven 规则：
+- 必须先有 change-id
+- 必须先有 proposal.md 和 tasks.md
+- 未明确 approved 前，不允许正式实施
+- 行为变化必须写 spec delta
+- 只执行当前阶段，不自动推进后续阶段
+
+---
+
+### C. Cleanup / Removal（清理 / 删除）
+满足以下特征时，允许走轻量删除流程：
+
+- 功能已明确废弃、重复、低价值或被替代
+- 删除目标不是核心主链路
+- 主要是删除坏功能、历史残留、无效入口、重复状态、过时测试
+- 删除后若不改变外部行为，可按 Fast Track 处理
+- 删除后若改变用户可感知行为，转为 Spec-Driven Change
+
+Cleanup 规则：
+- 允许删除代码、调用点、旧测试、旧文档
+- 必须说明删除依据
+- 必须说明影响范围
+- 不允许误删主链路能力
+
+---
+
+## 2. 默认判断原则
+
+默认优先按 Fast Track 判断。
+
+只有在**明确触发** Spec-Driven 条件时，才进入 OpenSpec。
+不要因为“可能影响较大”就自动走重流程。
+不要因为“页面一致性”四个字就自动创建 spec change。
+
+---
+
+## 3. 执行原则
+
+### 3.1 先看完整链路，再做局部修改
+任何改动前，都要先判断：
+
+- 上游入口是什么
+- 当前承接逻辑是什么
+- 下游回写 / 状态更新是什么
+- 回退路径是什么
+- 会不会导致链路断裂
+
+不要只盯局部代码按惯性修改。
+
+### 3.2 最小上下文原则
+- 只读取与当前任务直接相关的文件
+- 优先用 `rg`、文件名、符号检索精确定位
+- 不要默认通读全仓
+- 不要无必要读取整个 workflow / proposal / 历史文档
+
+### 3.3 最小改动原则
+- 优先复用已有实现
+- 优先删除绕路逻辑，而不是再包一层
+- 不新增薄封装
+- 不引入大依赖
+- 不顺手修无关问题
+
+### 3.4 输出原则
+默认先输出：
+1. 当前任务分类（Fast Track / Spec-Driven / Cleanup）
+2. 问题定位
+3. 最小改动方案
+4. 影响范围
+5. 需要的最小测试
+
+---
+
+## 4. 测试策略
+
+### 4.1 通用原则
+- 只跑与改动直接相关的最小测试
+- 默认不跑全量测试，除非用户要求或局部测试结果提示需要扩查
+- 每次改动都要评估：
+  - 现有测试是否需要更新
+  - 是否需要补回归测试
+  - 是否会引入未覆盖风险
+
+### 4.2 当前项目处于重构/演进阶段时
+允许修改测试，但禁止糊弄式改测试。
+
+处理测试失败时：
+- 先判断测试保护的是业务语义、当前模块行为、实现细节，还是历史遗留行为
+- 如果业务语义仍有效，优先改实现
+- 如果功能已变化，允许同步改测试
+- 如果测试只是旧实现细节，允许重写为更稳定的测试
+- 如果功能已废弃，允许删除对应测试，但必须说明原因
+
+禁止：
+- 只为绿灯而删除关键断言
+- 无解释地放宽断言
+- 用 mock 掩盖真实问题
+- 不分析直接批量改单测
+
+---
+
+## 5. 文档与变更记录
+
+### 5.1 正式 CHANGELOG
+正式 `CHANGELOG.md` 只记录用户可感知变更。
+未合并 main 前，不写正式 release 条目。
+
+### 5.2 开发阶段记录
+开发中的改动记录、重构说明、验证情况，优先写入：
+- `docs/dev-log.md`
+- 或用户指定的开发日志文件
+
+不要把所有内部重构、测试补充、实现细节都写进正式 CHANGELOG。
+
+### 5.3 功能链路文档
+若仓库已有功能点文档、模块职责文档、链路文档，复杂修改前优先阅读。
+如果本次改动改变主链路、模块职责或关键状态流转，应同步更新相应文档。
+
+---
+
+## 6. OpenSpec 规则（仅 Spec-Driven 时适用）
+
+工作流：
 
 Proposal -> Approval -> Implementation -> Archive -> Update specs -> Update CHANGELOG
 
-## Hard rules
+硬规则：
+- 没有 change-id，不开始正式变更
+- 没有 proposal.md 和 tasks.md，不进入实施
+- 未 approved，不写正式实现代码，不改主 specs
+- 只要存在外部行为变化，就必须写 spec delta
+- 只执行当前阶段，不自动推进
+- 归档后再同步 `openspec/specs/`
+- 正式 CHANGELOG 只在代码已合并 main 后更新
 
-1. No change-id, no formal change starts
-2. No proposal.md and tasks.md, no implementation
-3. No approval, no code changes or main spec updates
-4. Behavior changes require spec deltas
-5. Before merge to main, do not write formal CHANGELOG release entries
-6. CHANGELOG only includes user-visible changes
-7. After archive, sync openspec/specs/
-8. Only execute the current stage; never auto-advance
+change-id 规范：
+- 动词-名词
+- 全小写
+- 短横线连接
+- 示例：`add-2fa`、`fix-login-error`、`remove-legacy-toolbar`
 
-## change-id
+详细模板与流程见：
+`docs/openspec-workflow.md`
 
-verb-noun, lowercase, hyphenated
+---
 
-## Default behavior
+## 7. 编码与文件处理规则
 
-- If user gives a new feature / fix request, start from proposal stage
-- If information is missing, only produce a proposal draft
-- If user says approved, enter implementation stage
-- If user says merged, archive/update specs/update changelog only as explicitly requested
+- 优先写简单、直接、低复杂度代码
+- API 保持小而明确
+- 命名清晰
+- 除非收益明显，否则避免炫技式写法
 
-See `docs/openspec-workflow.md` for full templates and examples.
+### UTF-8 硬规则
+- 涉及中文文件时，读取必须显式使用 UTF-8
+- 写入中文文件时，必须显式使用 UTF-8
+- 不要因为终端乱码就直接判定文件已坏
+- 修改中文文档后，如条件允许，优先执行文本编码检查
+
+### 修改方式
+- 优先使用 `apply_patch` 做精确修改
+- 避免大段正则替换
+- 避免无必要整文件重写
+
+---
+
+## 8. Git 提交规则
+
+提交信息使用中文摘要。
+前缀仍使用 Conventional Commits 风格，例如：
+
+- `feat: 增加场景训练恢复逻辑`
+- `fix: 修正表达删除后的回退路径`
+- `test: 补充今日推荐优先级测试`
+
+一次提交同时包含多类改动时，按主要目的选择前缀，不为凑规则拆碎提交。
+
+---
+
+## 9. 默认交互行为
+
+用户输入一般归类为：
+
+- 规则配置
+- 新需求提案
+- 审批通过
+- 进入实施
+- 归档
+- 更新 specs
+- 更新 CHANGELOG
+- 信息补充
+- 修改已有提案
+
+默认处理：
+- 新功能 / 新需求 / 修 Bug：先判断 Fast Track 还是 Spec-Driven
+- 若是 Fast Track：直接给最小方案并实施
+- 若是 Spec-Driven：从提案阶段开始
+- 若信息不足：只索要最小必要信息，不长篇解释流程
