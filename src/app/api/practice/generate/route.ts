@@ -301,6 +301,13 @@ const validatePracticeGenerateResponse = (
   return { ok: true };
 };
 
+const isPracticeGenerateResponse = (value: unknown): value is PracticeGenerateResponse => {
+  if (!isObject(value)) return false;
+  if (value.version !== "v1") return false;
+  if (!Array.isArray(value.exercises)) return false;
+  return true;
+};
+
 const localizePracticeGenerateError = (error: unknown) => {
   if (error instanceof AuthError) {
     return new AuthError("请先登录后再生成练习题。");
@@ -363,7 +370,7 @@ export async function handlePracticeGeneratePost(
       const { parsed: parsedJson } = parseWithDiagnostics(rawModelText);
       const parsed = normalizePracticeResponse(parsedJson);
       const validation = validatePracticeGenerateResponse(parsed);
-      if (!validation.ok || !isObject(parsed)) {
+      if (!validation.ok || !isPracticeGenerateResponse(parsed)) {
         return NextResponse.json(
           {
             version: "v1",
@@ -374,11 +381,11 @@ export async function handlePracticeGeneratePost(
         );
       }
 
-      const response = parsed as unknown as PracticeGenerateResponse;
       return NextResponse.json(
         {
-          ...response,
+          version: parsed.version,
           generationSource: "ai",
+          exercises: parsed.exercises,
         },
         { status: 200 },
       );
