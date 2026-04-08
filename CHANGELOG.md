@@ -4,6 +4,7 @@
 ### 公共生成中动效组件与练习重生加载反馈
 - 共享 loading 组件新增了可复用的动态省略号文案能力，现在可以统一显示类似“正在生成中.”、“正在生成中..”、“正在生成中...”的轮流反馈。
 - scene 练习页点击“重新生成题目”后，菜单项会切成统一的“正在生成中”加载态，并禁用重复点击，不再只是静态文案或无反馈等待。
+- 共享 loading 组件现在会把传入的静态 `...` 文案自动转成动态省略号，因此场景生成、导入、句子保存、后台场景动作、复习页进入场景等首批长等待入口也一起统一成同一套加载反馈，不需要各页面再单独接线。
 
 影响范围：
 - `src/components/shared/action-loading.tsx`
@@ -12,10 +13,16 @@
 - `src/features/scene/components/scene-practice-view.interaction.test.tsx`
 - `src/features/scene/components/scene-view-labels.ts`
 - `src/app/(app)/scene/[slug]/scene-detail-page.tsx`
+- `src/components/scenes/generate-scene-sheet.tsx`
+- `src/app/(app)/scenes/scene-import-dialog.tsx`
+- `src/components/admin/scene-sentence-editor-sheet.tsx`
+- `src/components/admin/scene-admin-actions.tsx`
+- `src/app/(app)/review/page.tsx`
 
 验证情况：
 - `node --import tsx --import ./src/test/setup-dom.ts --test "src/components/shared/action-loading.test.tsx" "src/features/scene/components/scene-practice-view.interaction.test.tsx"`
 - `node --import tsx --import ./src/test/setup-dom.ts --test "src/app/(app)/scene/[[]slug[]]/page.regression.test.tsx"`
+- `node --import tsx --import ./src/test/setup-dom.ts --test "src/app/(app)/scenes/page.interaction.test.tsx" "src/app/(app)/review/page.interaction.test.tsx"`
 - `pnpm run text:check-mojibake`
 
 ## 2026-04-07

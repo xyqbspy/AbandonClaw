@@ -1,9 +1,7 @@
 ## Purpose
 
 定义仓库组件分层、跨 feature 复用组件公共化和组件库说明文档的维护规则，避免长期保留 feature-to-feature 组件依赖和失控抽象。
-
 ## Requirements
-
 ### Requirement: 已跨 feature 复用的组件必须迁移到公共层
 系统 MUST 将已经被多个 feature 直接复用的组件视为公共职责，而不是继续保留在某个单独 feature 的组件目录中。
 
@@ -35,3 +33,13 @@
 - **WHEN** 某个组件体量很大，但它的状态模型、交互语义和输入输出仍明显属于单一 feature
 - **THEN** 维护者必须优先考虑拆成该 feature 内部的 hook、logic 或 section component
 - **AND** 不得仅因文件过大就把它提升到 `src/components/*`
+
+### Requirement: 共享交互组件必须优先提供统一反馈能力
+系统 MUST 为跨页面复用的共享交互组件提供统一、可复用的反馈能力，避免同类状态在不同页面各自实现。
+
+#### Scenario: 共享 loading 文案需要展示动态等待反馈
+- **WHEN** 某个页面需要展示“生成中”“进入中”“加载中”之类的 loading 文案
+- **THEN** 系统必须提供可复用的共享 loading 文案组件
+- **AND** 该组件必须支持统一的动态省略号反馈
+- **AND** 使用方不应各自重复实现省略号动画
+

@@ -28,6 +28,21 @@ test("LoadingButton 在 loading 时会显示统一加载文案并禁用按钮", 
   screen.getByText("进入中...");
 });
 
+test("LoadingButton 会把字符串 loadingText 自动转成动态省略号", async () => {
+  const { container } = render(
+    <LoadingButton loading loadingText="生成中...">
+      提交
+    </LoadingButton>,
+  );
+
+  const button = screen.getByRole("button", { name: "生成中..." });
+  assert.equal(button.getAttribute("aria-busy"), "true");
+  await screen.findByText((_content, element) =>
+    element === container.querySelector("button span:last-child span") &&
+    Boolean(element?.textContent?.includes("生成中.")),
+  );
+});
+
 test("LoadingContent 在非 loading 时保留原始文案", () => {
   render(<LoadingContent loading={false}>保存</LoadingContent>);
 
@@ -43,6 +58,16 @@ test("LoadingOverlay 在 loading 时会渲染覆盖提示", () => {
   );
 
   screen.getByText("进入场景中...");
+});
+
+test("LoadingState 会把字符串 text 自动转成动态省略号", async () => {
+  const { container } = render(<LoadingState text="场景加载中..." />);
+
+  await screen.findByText((_content, element) =>
+    element === container.querySelector("div span:last-child span") &&
+    Boolean(element?.textContent?.includes("场景加载中.")),
+  );
+  screen.getByText("场景加载中...");
 });
 
 test("LoadingState 会渲染统一的区块加载提示", () => {

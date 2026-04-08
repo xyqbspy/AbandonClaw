@@ -52,6 +52,20 @@ export function AnimatedLoadingText({
   );
 }
 
+function renderLoadingNode(content: ReactNode) {
+  if (typeof content !== "string") {
+    return content;
+  }
+  if (!content.endsWith("...")) {
+    return content;
+  }
+  const baseText = content.slice(0, -3);
+  if (!baseText) {
+    return content;
+  }
+  return <AnimatedLoadingText text={baseText} />;
+}
+
 export function LoadingContent({
   loading,
   children,
@@ -66,7 +80,7 @@ export function LoadingContent({
   return (
     <span className={cn("inline-flex items-center justify-center gap-1.5", className)}>
       <Loader2 className={cn("size-3.5 animate-spin", spinnerClassName)} aria-hidden="true" />
-      <span>{loadingText ?? children}</span>
+      <span>{renderLoadingNode(loadingText ?? children)}</span>
     </span>
   );
 }
@@ -125,7 +139,7 @@ export function LoadingOverlay({
         )}
       >
         <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
-        <span>{loadingText}</span>
+        <span>{renderLoadingNode(loadingText)}</span>
       </div>
     </div>
   );
@@ -156,7 +170,7 @@ export function LoadingState({
       aria-live="polite"
     >
       <Loader2 className={cn("size-4 animate-spin", spinnerClassName)} aria-hidden="true" />
-      <span className={textClassName}>{text}</span>
+      <span className={textClassName}>{renderLoadingNode(text)}</span>
     </div>
   );
 }

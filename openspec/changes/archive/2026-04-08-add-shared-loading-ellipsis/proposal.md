@@ -9,6 +9,7 @@
 - 新增一个公共 loading 文案组件，支持基础文本加动态省略号动画
 - 让 `LoadingContent` 体系可以复用这套公共动态文案，而不是每处手写“生成中...”
 - 先在 scene 练习“重新生成题目”这条链路接入统一 loading 展示，文案为“正在生成中”
+- 把首批等待时间较明显、用户可感知的入口统一接入动态 loading 文案，避免项目内同时存在动态和静态两套等待反馈
 - 为公共 loading 组件和 scene 练习入口补充测试
 
 ## Capabilities
@@ -25,5 +26,11 @@
   - `src/components/shared/action-loading.test.tsx`
   - `src/features/scene/components/scene-practice-view.tsx`
   - `src/features/scene/components/scene-practice-view.interaction.test.tsx`
+  - `src/components/scenes/generate-scene-sheet.tsx`
+  - `src/app/(app)/scenes/scene-import-dialog.tsx`
+  - `src/components/admin/scene-sentence-editor-sheet.tsx`
+  - `src/components/admin/scene-admin-actions.tsx`
+  - `src/app/(app)/review/page.tsx`
 - 受影响链路：
   - scene 练习页“重新生成题目”
+  - 场景生成、导入、句子保存、后台生成/删除、复习页进入场景等长等待动作
