@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { toApiErrorResponse } from "@/lib/server/api-error";
 import { requireCurrentProfile } from "@/lib/server/auth";
 import { AuthError, ForbiddenError, ValidationError } from "@/lib/server/errors";
+import { logApiError } from "@/lib/server/logger";
+import { enforceRateLimit } from "@/lib/server/rate-limit";
+import { assertAllowedOrigin } from "@/lib/server/request-guard";
 import { callGlmChatCompletion } from "@/lib/server/glm-client";
 import {
   buildPracticeGenerateUserPrompt,
@@ -27,6 +30,8 @@ const PRACTICE_MAX_BLOCKS = 80;
 const PRACTICE_MAX_SENTENCES = 400;
 const PRACTICE_MAX_CHUNKS = 1200;
 const PRACTICE_MAX_TEXT_LENGTH = 40000;
+const PRACTICE_GENERATE_RATE_LIMIT = 5;
+const RATE_LIMIT_WINDOW_MS = 60_000;
 
 const sanitizeExerciseCount = (value: unknown) => {
   if (typeof value !== "number" || Number.isNaN(value)) return 6;
@@ -344,7 +349,14 @@ export async function handlePracticeGeneratePost(
   dependencies: PracticeGenerateDependencies = defaultDependencies,
 ) {
   try {
-    await dependencies.requireCurrentProfile();
+    assertAllowedOrigin(request);
+    const { user } = await dependencies.requireCurrentProfile();
+    enforceRateLimit({
+      key: user.id,
+      limit: PRACTICE_GENERATE_RATE_LIMIT,
+      windowMs: RATE_LIMIT_WINDOW_MS,
+      scope: "api-practice-generate",
+    });
     const payload = await parseJsonBody<Partial<PracticeGenerateRequest>>(request);
     const normalized = toValidPayload(payload);
 
@@ -400,9 +412,13 @@ export async function handlePracticeGeneratePost(
       );
     }
   } catch (error) {
+    logApiError("api/practice/generate", error, {
+      request,
+    });
     return toApiErrorResponse(
       localizePracticeGenerateError(error),
       PRACTICE_GENERATE_FALLBACK_MESSAGE,
+      { request },
     );
   }
 }

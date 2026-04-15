@@ -3,6 +3,11 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getSupabaseAnonKey, getSupabaseUrl } from "@/lib/supabase/env";
 import { resolveSafeRedirectTarget } from "@/lib/shared/auth-redirect";
 import { isAdminEmail } from "@/lib/shared/admin";
+import {
+  attachRequestIdToResponse,
+  getOrCreateRequestId,
+  REQUEST_ID_HEADER,
+} from "@/lib/server/request-context";
 
 const AUTH_PAGE_PATHS = new Set(["/login", "/signup"]);
 const PROTECTED_PAGE_PREFIXES = [
@@ -46,7 +51,7 @@ interface MiddlewareDependencies {
   getSupabaseUrl: typeof getSupabaseUrl;
   getSupabaseAnonKey: typeof getSupabaseAnonKey;
   isAdminEmail: typeof isAdminEmail;
-  next: (request: NextRequest) => NextResponse;
+  next: (request: NextRequest, requestId: string) => NextResponse;
   redirect: (url: URL) => NextResponse;
   json: (body: unknown, init: { status: number }) => NextResponse;
 }
@@ -56,7 +61,15 @@ const defaultDependencies: MiddlewareDependencies = {
   getSupabaseUrl,
   getSupabaseAnonKey,
   isAdminEmail,
-  next: (request) => NextResponse.next({ request }),
+  next: (request, requestId) => {
+    const headers = new Headers(request.headers);
+    headers.set(REQUEST_ID_HEADER, requestId);
+    return NextResponse.next({
+      request: {
+        headers,
+      },
+    });
+  },
   redirect: (url) => NextResponse.redirect(url),
   json: (body, init) => NextResponse.json(body, init),
 };
@@ -66,9 +79,10 @@ export async function handleMiddleware(
   dependencies: MiddlewareDependencies = defaultDependencies,
 ) {
   const { pathname, search } = request.nextUrl;
+  const requestId = getOrCreateRequestId(request);
 
   if (pathname.startsWith("/api/") && !isProtectedApiPath(pathname)) {
-    return dependencies.next(request);
+    return attachRequestIdToResponse(dependencies.next(request, requestId), requestId);
   }
 
   if (
@@ -76,10 +90,13 @@ export async function handleMiddleware(
     !AUTH_PAGE_PATHS.has(pathname) &&
     !isProtectedApiPath(pathname)
   ) {
-    return dependencies.next(request);
+    return attachRequestIdToResponse(dependencies.next(request, requestId), requestId);
   }
 
-  const response = dependencies.next(request);
+  const response = attachRequestIdToResponse(
+    dependencies.next(request, requestId),
+    requestId,
+  );
 
   const supabase = dependencies.createServerClient(
     dependencies.getSupabaseUrl(),
@@ -106,13 +123,16 @@ export async function handleMiddleware(
   if (!user && isProtectedPagePath(pathname)) {
     const redirectUrl = new URL("/login", request.url);
     redirectUrl.searchParams.set("redirect", `${pathname}${search}`);
-    return NextResponse.redirect(redirectUrl);
+    return attachRequestIdToResponse(NextResponse.redirect(redirectUrl), requestId);
   }
 
   if (user && AUTH_PAGE_PATHS.has(pathname)) {
     const redirectTarget = request.nextUrl.searchParams.get("redirect");
     const safeTarget = resolveSafeRedirectTarget(redirectTarget);
-    return dependencies.redirect(new URL(safeTarget, request.url));
+    return attachRequestIdToResponse(
+      dependencies.redirect(new URL(safeTarget, request.url)),
+      requestId,
+    );
   }
 
   if (
@@ -120,11 +140,17 @@ export async function handleMiddleware(
     (pathname === "/admin" || pathname.startsWith("/admin/")) &&
     !dependencies.isAdminEmail(user.email)
   ) {
-    return dependencies.redirect(new URL("/", request.url));
+    return attachRequestIdToResponse(
+      dependencies.redirect(new URL("/", request.url)),
+      requestId,
+    );
   }
 
   if (!user && isProtectedApiPath(pathname)) {
-    return dependencies.json({ error: "Unauthorized" }, { status: 401 });
+    return attachRequestIdToResponse(
+      dependencies.json({ error: "Unauthorized", requestId }, { status: 401 }),
+      requestId,
+    );
   }
 
   return response;

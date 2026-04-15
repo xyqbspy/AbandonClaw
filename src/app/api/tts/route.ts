@@ -1,12 +1,25 @@
 import { NextResponse } from "next/server";
 import { requireCurrentProfile } from "@/lib/server/auth";
 import { toApiErrorResponse } from "@/lib/server/api-error";
+import { logApiError } from "@/lib/server/logger";
+import { enforceRateLimit } from "@/lib/server/rate-limit";
+import { assertAllowedOrigin } from "@/lib/server/request-guard";
 import { generateTtsAudio, TtsRequestPayload } from "@/lib/server/tts/service";
 import { parseJsonBody } from "@/lib/server/validation";
 
+const TTS_RATE_LIMIT = 30;
+const RATE_LIMIT_WINDOW_MS = 60_000;
+
 export async function POST(request: Request) {
   try {
-    await requireCurrentProfile();
+    assertAllowedOrigin(request);
+    const { user } = await requireCurrentProfile();
+    enforceRateLimit({
+      key: user.id,
+      limit: TTS_RATE_LIMIT,
+      windowMs: RATE_LIMIT_WINDOW_MS,
+      scope: "api-tts",
+    });
     const payload = await parseJsonBody<TtsRequestPayload>(request);
     const result = await generateTtsAudio(payload);
 
@@ -17,10 +30,9 @@ export async function POST(request: Request) {
       },
     });
   } catch (error) {
-    console.error("[api/tts] failed", {
-      error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
+    logApiError("api/tts", error, {
+      request,
     });
-    return toApiErrorResponse(error, "Failed to generate tts audio.");
+    return toApiErrorResponse(error, "Failed to generate tts audio.", { request });
   }
 }

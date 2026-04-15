@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { toApiErrorResponse } from "@/lib/server/api-error";
 import { isAppError, ValidationError } from "@/lib/server/errors";
+import { enforceRateLimit } from "@/lib/server/rate-limit";
+import { assertAllowedOrigin } from "@/lib/server/request-guard";
 import {
   parseJsonBody,
   parseOptionalTrimmedString,
@@ -10,6 +12,9 @@ import { SceneSourceLanguage } from "@/lib/types/scene-parser";
 import { parseImportedSceneWithCache } from "@/lib/server/scene/import";
 import { createImportedScene } from "@/lib/server/scene/service";
 import { requireCurrentProfile } from "@/lib/server/auth";
+
+const SCENE_IMPORT_RATE_LIMIT = 5;
+const RATE_LIMIT_WINDOW_MS = 60_000;
 
 interface ImportScenePayload extends Record<string, unknown> {
   sourceText?: unknown;
@@ -40,7 +45,14 @@ export async function handleSceneImportPost(
   dependencies: SceneImportHandlerDependencies = defaultDependencies,
 ) {
   try {
+    assertAllowedOrigin(request);
     const { user } = await dependencies.requireCurrentProfile();
+    enforceRateLimit({
+      key: user.id,
+      limit: SCENE_IMPORT_RATE_LIMIT,
+      windowMs: RATE_LIMIT_WINDOW_MS,
+      scope: "api-scenes-import",
+    });
 
     const payload = await parseJsonBody<ImportScenePayload>(request);
     const sourceText = parseRequiredTrimmedString(payload.sourceText, "sourceText", 8000);
@@ -85,6 +97,6 @@ export async function handleSceneImportPost(
         ...(isAppError(error) ? { code: error.code, details: error.details ?? null } : {}),
       });
     }
-    return toApiErrorResponse(error, "Failed to import scene.");
+    return toApiErrorResponse(error, "Failed to import scene.", { request });
   }
 }

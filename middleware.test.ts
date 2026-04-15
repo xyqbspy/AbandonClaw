@@ -8,6 +8,7 @@ const createRequest = (url: string) =>
   ({
     url,
     nextUrl: new URL(url),
+    headers: new Headers(),
     cookies: {
       getAll: () => [],
       set: () => {},
@@ -75,6 +76,7 @@ test("middleware 会将已登录用户从登录页安全重定向回站内路径
 
   assert.equal(response.status, 307);
   assert.equal(response.headers.get("location"), "http://localhost/review");
+  assert.ok(response.headers.get("x-request-id"));
 });
 
 test("middleware 会拦截危险的协议相对 redirect 参数", async () => {
@@ -104,7 +106,9 @@ test("middleware 会对未登录的受保护 learning API 返回 401", async () 
   );
 
   assert.equal(response.status, 401);
-  assert.deepEqual(await response.json(), { error: "Unauthorized" });
+  const body = await response.json();
+  assert.equal(body.error, "Unauthorized");
+  assert.equal(typeof body.requestId, "string");
 });
 
 test("middleware 会对未登录的高成本 explain-selection 返回 401", async () => {
@@ -114,5 +118,7 @@ test("middleware 会对未登录的高成本 explain-selection 返回 401", asyn
   );
 
   assert.equal(response.status, 401);
-  assert.deepEqual(await response.json(), { error: "Unauthorized" });
+  const body = await response.json();
+  assert.equal(body.error, "Unauthorized");
+  assert.equal(typeof body.requestId, "string");
 });

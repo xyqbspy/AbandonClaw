@@ -17,6 +17,7 @@ import {
   parseReviewResult,
 } from "@/lib/server/validation";
 import { ValidationError } from "@/lib/server/errors";
+import { assertAllowedOrigin } from "@/lib/server/request-guard";
 
 const parseLimit = (raw: string | null) => {
   if (!raw) return 20;
@@ -83,6 +84,7 @@ export async function handleReviewSubmitPost(
   dependencies: ReviewSubmitHandlerDependencies = defaultReviewSubmitDependencies,
 ) {
   try {
+    assertAllowedOrigin(request);
     const { user } = await dependencies.requireCurrentProfile();
     const payload = await parseJsonBody<SubmitReviewPayload>(request);
     const item = await dependencies.submitPhraseReview(user.id, {
@@ -96,6 +98,6 @@ export async function handleReviewSubmitPost(
     const summary = await dependencies.getReviewSummary(user.id);
     return NextResponse.json({ item, summary }, { status: 200 });
   } catch (error) {
-    return toApiErrorResponse(error, "Failed to submit review.");
+    return toApiErrorResponse(error, "Failed to submit review.", { request });
   }
 }

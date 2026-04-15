@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { AuthError, ForbiddenError } from "@/lib/server/errors";
+import { clearRateLimitStore } from "@/lib/server/rate-limit";
 import { handleTtsRegeneratePost } from "./route";
 
 const createJsonRequest = (body: unknown) =>
@@ -11,6 +12,7 @@ const createJsonRequest = (body: unknown) =>
   });
 
 test("tts regenerate handler 会拒绝未登录请求", async () => {
+  clearRateLimitStore();
   const response = await handleTtsRegeneratePost(createJsonRequest({ items: [{ text: "hello" }] }), {
     requireAdmin: async () => {
       throw new AuthError();
@@ -18,15 +20,14 @@ test("tts regenerate handler 会拒绝未登录请求", async () => {
     regenerateChunkTtsAudioBatch: async () => ({ regeneratedCount: 0 }),
   });
 
+  const body = await response.json();
   assert.equal(response.status, 401);
-  assert.deepEqual(await response.json(), {
-    error: "Unauthorized",
-    code: "AUTH_UNAUTHORIZED",
-    details: null,
-  });
+  assert.equal(body.code, "AUTH_UNAUTHORIZED");
+  assert.equal(typeof body.requestId, "string");
 });
 
 test("tts regenerate handler 会拒绝非管理员请求", async () => {
+  clearRateLimitStore();
   const response = await handleTtsRegeneratePost(createJsonRequest({ items: [{ text: "hello" }] }), {
     requireAdmin: async () => {
       throw new ForbiddenError();
@@ -34,29 +35,28 @@ test("tts regenerate handler 会拒绝非管理员请求", async () => {
     regenerateChunkTtsAudioBatch: async () => ({ regeneratedCount: 0 }),
   });
 
+  const body = await response.json();
   assert.equal(response.status, 403);
-  assert.deepEqual(await response.json(), {
-    error: "Only admins can regenerate tts audio.",
-    code: "AUTH_FORBIDDEN",
-    details: null,
-  });
+  assert.equal(body.error, "Only admins can regenerate tts audio.");
+  assert.equal(body.code, "AUTH_FORBIDDEN");
+  assert.equal(typeof body.requestId, "string");
 });
 
 test("tts regenerate handler 会拒绝空批量", async () => {
+  clearRateLimitStore();
   const response = await handleTtsRegeneratePost(createJsonRequest({ items: [] }), {
     requireAdmin: async () => ({ id: "admin-1" } as never),
     regenerateChunkTtsAudioBatch: async () => ({ regeneratedCount: 0 }),
   });
 
+  const body = await response.json();
   assert.equal(response.status, 400);
-  assert.deepEqual(await response.json(), {
-    error: "items must contain at least 1 item(s).",
-    code: "VALIDATION_ERROR",
-    details: null,
-  });
+  assert.equal(body.code, "VALIDATION_ERROR");
+  assert.equal(typeof body.requestId, "string");
 });
 
 test("tts regenerate handler 会拒绝超限批量", async () => {
+  clearRateLimitStore();
   const response = await handleTtsRegeneratePost(
     createJsonRequest({
       items: Array.from({ length: 13 }, (_, index) => ({ text: `line-${index + 1}` })),
@@ -67,15 +67,14 @@ test("tts regenerate handler 会拒绝超限批量", async () => {
     },
   );
 
+  const body = await response.json();
   assert.equal(response.status, 400);
-  assert.deepEqual(await response.json(), {
-    error: "items must contain at most 12 item(s).",
-    code: "VALIDATION_ERROR",
-    details: null,
-  });
+  assert.equal(body.code, "VALIDATION_ERROR");
+  assert.equal(typeof body.requestId, "string");
 });
 
 test("tts regenerate handler 会透传规范化后的批量请求", async () => {
+  clearRateLimitStore();
   let receivedItems: unknown = null;
   const response = await handleTtsRegeneratePost(
     createJsonRequest({

@@ -1,5 +1,72 @@
 # Dev Log
 
+### [2026-04-14] 落地后端接口治理第一阶段基线
+
+- 类型：修复 / 维护规范 / 测试
+- 状态：已完成
+
+#### 背景
+当前后端接口层虽然已经有基础鉴权、部分参数校验和上游超时控制，但接口治理能力仍然分散在各个 route 和 handler 里：
+- 缺少统一 `requestId`，接口报错后很难把 middleware、route 和 service 串起来排查。
+- 高成本接口缺少统一限流基线，容易被短时间重复请求放大成本。
+- 受保护写接口缺少统一同源来源校验，cookie 鉴权下仍存在基础跨站调用风险。
+- 未知内部错误虽然大多会走 fallback 文案，但响应结构没有统一追踪标识，日志也主要依赖散点 `console`。
+
+这次实现按 OpenSpec `govern-backend-api-guardrails` change 落地第一阶段基线，只改入口治理，不改学习/复习/场景的业务语义。
+
+#### 本次改动
+- 新增 `src/lib/server/request-context.ts`，统一生成、读取和透传 `x-request-id`。
+- 新增 `src/lib/server/logger.ts`，约束接口错误日志至少输出 `requestId`、路径、方法和错误上下文。
+- 新增 `src/lib/server/request-guard.ts`，提供最小同源来源校验 helper。
+- 新增 `src/lib/server/rate-limit.ts`，提供进程内窗口限流 helper。
+- 扩展 `src/lib/server/errors.ts`，新增 `RateLimitError`。
+- 扩展 `src/lib/server/api-error.ts`，让显式应用错误与未知内部错误都返回 `requestId`，并同步写回响应头。
+- 改造 `middleware.ts`，为受保护请求补充 `x-request-id` 透传。
+- 为第一批高风险接口接入入口治理：
+  - `tts`
+  - `tts/regenerate`
+  - `scenes/import`
+  - `scenes/generate`
+  - `practice/generate`
+  - `explain-selection`
+- 为第一批核心写接口接入同源来源校验：
+  - `review/submit`
+  - `learning/scenes/[slug]/start`
+  - `learning/scenes/[slug]/pause`
+  - `learning/scenes/[slug]/progress`
+  - `learning/scenes/[slug]/complete`
+- 补充并更新了 middleware、api-error、限流、来源校验及关键 route 的自动化测试。
+
+#### 影响范围
+- 影响模块：服务端接口入口治理、统一错误响应、请求级追踪
+- 影响页面/接口：AI 生成、TTS、释义、学习进度、复习提交
+- 是否影响主链路：是
+- 是否影响用户可感知行为：是
+现在超限请求、跨站来源请求和未知内部错误的接口响应会更早、更稳定地收口
+- 是否需要同步文档：是
+
+#### 测试 / 验证
+- 已运行测试：
+  - `node --import tsx --test middleware.test.ts src/lib/server/api-error.test.ts src/lib/server/request-guard.test.ts src/lib/server/rate-limit.test.ts src/app/api/tts/regenerate/route.test.ts src/app/api/explain-selection/route.test.ts src/app/api/practice/generate/route.test.ts src/app/api/scenes/import/handlers.test.ts src/app/api/review/handlers.test.ts src/app/api/learning/handlers.test.ts`
+- 导入验证：
+  - `src/app/api/scenes/generate/route.ts`
+  - `src/app/api/tts/route.ts`
+  - `src/app/api/learning/scenes/[slug]/complete/route.ts`
+- 未验证部分：
+  - 未跑全量单测 / 交互测试
+  - 未做多实例环境下的限流验证
+
+#### 风险 / 未完成项
+- 当前限流仍是进程内窗口限流，只适合第一阶段基线，不覆盖多实例一致性。
+- 同源来源校验当前采用最小策略，对 `Origin` 缺失请求默认放行，优先避免误伤现有调用链。
+- 这轮没有处理 `service role` 收紧、数据库权限边界和写接口幂等保护。
+- 这轮没有把所有受保护写接口和所有高成本接口一次性全覆盖，仍保留残余风险。
+
+#### 后续计划
+- 第二阶段继续处理用户态接口的数据访问边界，减少对 `service role` 的直接依赖。
+- 为关键写链路补幂等 / 并发保护。
+- 如有真实流量压力，再把限流从进程内方案升级到共享存储方案。
+
 本文档用于记录开发过程中的实际改动、重构说明、验证情况、影响范围与后续待办。
 它不是正式发布用 CHANGELOG，也不要求只记录用户可感知变化。
 

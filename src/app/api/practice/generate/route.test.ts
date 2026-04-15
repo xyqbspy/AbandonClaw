@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { AuthError } from "@/lib/server/errors";
+import { clearRateLimitStore } from "@/lib/server/rate-limit";
 import { handlePracticeGeneratePost } from "./route";
 
 const sampleScene = {
@@ -44,6 +45,7 @@ const createJsonRequest = (body: unknown) =>
   });
 
 test("practice generate handler 会拒绝未登录请求", async () => {
+  clearRateLimitStore();
   const response = await handlePracticeGeneratePost(createJsonRequest({ scene: sampleScene }), {
     requireCurrentProfile: async () => {
       throw new AuthError();
@@ -52,15 +54,14 @@ test("practice generate handler 会拒绝未登录请求", async () => {
     buildExerciseSpecsFromScene: () => [] as never,
   });
 
+  const body = await response.json();
   assert.equal(response.status, 401);
-  assert.deepEqual(await response.json(), {
-    error: "请先登录后再生成练习题。",
-    code: "AUTH_UNAUTHORIZED",
-    details: null,
-  });
+  assert.equal(body.code, "AUTH_UNAUTHORIZED");
+  assert.equal(typeof body.requestId, "string");
 });
 
 test("practice generate handler 在模型结果不合法时会回退到本地 exercise 构建", async () => {
+  clearRateLimitStore();
   let fallbackArgs: unknown[] = [];
   const response = await handlePracticeGeneratePost(
     createJsonRequest({ scene: sampleScene, exerciseCount: 4 }),
@@ -88,6 +89,7 @@ test("practice generate handler 在模型结果不合法时会回退到本地 ex
 });
 
 test("practice generate handler 会拒绝超大 scene", async () => {
+  clearRateLimitStore();
   const hugeScene = {
     ...sampleScene,
     sections: Array.from({ length: 13 }, (_, index) => ({
@@ -105,15 +107,14 @@ test("practice generate handler 会拒绝超大 scene", async () => {
     },
   );
 
+  const body = await response.json();
   assert.equal(response.status, 400);
-  assert.deepEqual(await response.json(), {
-    error: "场景分段数超过上限 12。",
-    code: "VALIDATION_ERROR",
-    details: null,
-  });
+  assert.equal(body.code, "VALIDATION_ERROR");
+  assert.equal(typeof body.requestId, "string");
 });
 
 test("practice generate handler 在模型请求失败时也会回退到本地 exercise 构建", async () => {
+  clearRateLimitStore();
   const response = await handlePracticeGeneratePost(
     createJsonRequest({ scene: sampleScene, exerciseCount: 4 }),
     {

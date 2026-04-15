@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireCurrentProfile } from "@/lib/server/auth";
 import { toApiErrorResponse } from "@/lib/server/api-error";
+import { assertAllowedOrigin } from "@/lib/server/request-guard";
 import { completeSceneLearning } from "@/lib/server/learning/service";
 import { parseJsonBody, parseOptionalNonNegativeDelta } from "@/lib/server/validation";
 import {
@@ -19,6 +20,7 @@ export async function POST(
   context: { params: Promise<{ slug: string }> },
 ) {
   try {
+    assertAllowedOrigin(request);
     const { user } = await requireCurrentProfile();
     const { slug } = await context.params;
     const payload = await parseJsonBody<CompletePayload>(request);
@@ -51,7 +53,7 @@ export async function POST(
 
     return NextResponse.json(result, { status: 200 });
   } catch (error) {
-    return toApiErrorResponse(error, "Failed to complete scene learning.");
+    return toApiErrorResponse(error, "Failed to complete scene learning.", { request });
   }
 }
 

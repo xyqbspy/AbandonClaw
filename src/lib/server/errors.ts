@@ -45,6 +45,18 @@ export class ValidationError extends AppError {
   }
 }
 
+export class RateLimitError extends AppError {
+  constructor(retryAfterSeconds: number, message = "Too many requests.") {
+    super({
+      message,
+      status: 429,
+      code: "RATE_LIMITED",
+      details: { retryAfterSeconds },
+    });
+    this.name = "RateLimitError";
+  }
+}
+
 export class SceneParseError extends AppError {
   constructor(message: string, details?: Record<string, unknown>) {
     super({ message, status: 422, code: "SCENE_PARSE_ERROR", details });

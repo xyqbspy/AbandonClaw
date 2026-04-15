@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { AuthError } from "@/lib/server/errors";
+import { clearRateLimitStore } from "@/lib/server/rate-limit";
 import { handleExplainSelectionPost } from "./route";
 
 const createJsonRequest = (body: unknown) =>
@@ -11,6 +12,7 @@ const createJsonRequest = (body: unknown) =>
   });
 
 test("explain selection handler 会拒绝未登录请求", async () => {
+  clearRateLimitStore();
   const response = await handleExplainSelectionPost(createJsonRequest({ selectedText: "hi" }), {
     requireCurrentProfile: async () => {
       throw new AuthError();
@@ -18,15 +20,14 @@ test("explain selection handler 会拒绝未登录请求", async () => {
     explainSelection: async () => ({}) as never,
   });
 
+  const body = await response.json();
   assert.equal(response.status, 401);
-  assert.deepEqual(await response.json(), {
-    error: "Unauthorized",
-    code: "AUTH_UNAUTHORIZED",
-    details: null,
-  });
+  assert.equal(body.code, "AUTH_UNAUTHORIZED");
+  assert.equal(typeof body.requestId, "string");
 });
 
 test("explain selection handler 会透传合法 payload", async () => {
+  clearRateLimitStore();
   let receivedPayload: unknown = null;
   const response = await handleExplainSelectionPost(
     createJsonRequest({
@@ -62,6 +63,7 @@ test("explain selection handler 会透传合法 payload", async () => {
 });
 
 test("explain selection handler 会拒绝超长输入", async () => {
+  clearRateLimitStore();
   const response = await handleExplainSelectionPost(
     createJsonRequest({
       selectedText: "x".repeat(241),
@@ -76,10 +78,8 @@ test("explain selection handler 会拒绝超长输入", async () => {
     },
   );
 
+  const body = await response.json();
   assert.equal(response.status, 400);
-  assert.deepEqual(await response.json(), {
-    error: "selectedText must be <= 240 characters.",
-    code: "VALIDATION_ERROR",
-    details: null,
-  });
+  assert.equal(body.code, "VALIDATION_ERROR");
+  assert.equal(typeof body.requestId, "string");
 });

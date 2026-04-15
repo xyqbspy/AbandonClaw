@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { explainSelection } from "@/lib/explain/provider";
 import { toApiErrorResponse } from "@/lib/server/api-error";
 import { requireCurrentProfile } from "@/lib/server/auth";
+import { logApiError } from "@/lib/server/logger";
+import { enforceRateLimit } from "@/lib/server/rate-limit";
+import { assertAllowedOrigin } from "@/lib/server/request-guard";
 import {
   parseJsonBody,
   parseOptionalTrimmedString,
@@ -9,6 +12,9 @@ import {
   parseRequiredTrimmedString,
 } from "@/lib/server/validation";
 import { ExplainSelectionRequest } from "@/lib/types";
+
+const EXPLAIN_SELECTION_RATE_LIMIT = 5;
+const RATE_LIMIT_WINDOW_MS = 60_000;
 
 const parseExplainSelectionPayload = (
   payload: Partial<ExplainSelectionRequest>,
@@ -51,12 +57,22 @@ export async function handleExplainSelectionPost(
   dependencies: ExplainSelectionDependencies = defaultDependencies,
 ) {
   try {
-    await dependencies.requireCurrentProfile();
+    assertAllowedOrigin(request);
+    const { user } = await dependencies.requireCurrentProfile();
+    enforceRateLimit({
+      key: user.id,
+      limit: EXPLAIN_SELECTION_RATE_LIMIT,
+      windowMs: RATE_LIMIT_WINDOW_MS,
+      scope: "api-explain-selection",
+    });
     const payload = await parseJsonBody<Partial<ExplainSelectionRequest>>(request);
     const result = await dependencies.explainSelection(parseExplainSelectionPayload(payload));
     return NextResponse.json(result, { status: 200 });
   } catch (error) {
-    return toApiErrorResponse(error, "释义服务暂时不可用。");
+    logApiError("api/explain-selection", error, {
+      request,
+    });
+    return toApiErrorResponse(error, "释义服务暂时不可用。", { request });
   }
 }
 

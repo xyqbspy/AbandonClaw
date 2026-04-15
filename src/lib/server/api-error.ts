@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
 import { isAppError } from "@/lib/server/errors";
+import {
+  attachRequestIdToResponse,
+  getOrCreateRequestId,
+} from "@/lib/server/request-context";
 
 const mapLegacyMessageToStatus = (message: string) => {
   if (message === "Unauthorized") return 401;
@@ -10,40 +14,61 @@ const mapLegacyMessageToStatus = (message: string) => {
 export const toApiErrorResponse = (
   error: unknown,
   fallbackMessage: string,
+  options?: {
+    request?: Request | Headers | null;
+    requestId?: string;
+  },
 ) => {
+  const requestId = options?.requestId ?? getOrCreateRequestId(options?.request);
+
   if (isAppError(error)) {
-    return NextResponse.json(
-      {
-        error: error.message,
-        code: error.code,
-        details: error.details ?? null,
-      },
-      { status: error.status },
+    return attachRequestIdToResponse(
+      NextResponse.json(
+        {
+          error: error.message,
+          code: error.code,
+          details: error.details ?? null,
+          requestId,
+        },
+        { status: error.status },
+      ),
+      requestId,
     );
   }
 
   if (error instanceof Error) {
     const status = mapLegacyMessageToStatus(error.message);
     if (status !== 500) {
-      return NextResponse.json({ error: error.message }, { status });
+      return attachRequestIdToResponse(
+        NextResponse.json({ error: error.message, requestId }, { status }),
+        requestId,
+      );
     }
 
-    return NextResponse.json(
+    return attachRequestIdToResponse(
+      NextResponse.json(
+        {
+          error: fallbackMessage,
+          code: "INTERNAL_ERROR",
+          details: null,
+          requestId,
+        },
+        { status: 500 },
+      ),
+      requestId,
+    );
+  }
+
+  return attachRequestIdToResponse(
+    NextResponse.json(
       {
         error: fallbackMessage,
         code: "INTERNAL_ERROR",
         details: null,
+        requestId,
       },
       { status: 500 },
-    );
-  }
-
-  return NextResponse.json(
-    {
-      error: fallbackMessage,
-      code: "INTERNAL_ERROR",
-      details: null,
-    },
-    { status: 500 },
+    ),
+    requestId,
   );
 };

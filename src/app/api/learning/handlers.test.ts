@@ -34,12 +34,10 @@ test("learning continue handler 会透传鉴权错误响应", async () => {
     getContinueLearningScene: async () => null as never,
   });
 
+  const body = await response.json();
   assert.equal(response.status, 401);
-  assert.deepEqual(await response.json(), {
-    error: "Unauthorized",
-    code: "AUTH_UNAUTHORIZED",
-    details: null,
-  });
+  assert.equal(body.code, "AUTH_UNAUTHORIZED");
+  assert.equal(typeof body.requestId, "string");
 });
 
 test("learning progress handler 会解析状态与分页参数", async () => {
@@ -68,7 +66,7 @@ test("learning progress handler 会解析状态与分页参数", async () => {
   });
 });
 
-test("learning progress handler 在 status 非法时返回 400", async () => {
+test("learning progress handler 在 status 非法时返回 400 与 requestId", async () => {
   const response = await handleLearningProgressGet(
     createRequest("http://localhost/api/learning/progress?status=done"),
     {
@@ -77,12 +75,10 @@ test("learning progress handler 在 status 非法时返回 400", async () => {
     },
   );
 
+  const body = await response.json();
   assert.equal(response.status, 400);
-  assert.deepEqual(await response.json(), {
-    error: "status must be one of not_started/in_progress/completed/paused.",
-    code: "VALIDATION_ERROR",
-    details: null,
-  });
+  assert.equal(body.code, "VALIDATION_ERROR");
+  assert.equal(typeof body.requestId, "string");
 });
 
 test("scene learning start handler 会透传 userId 与 slug", async () => {
@@ -104,7 +100,7 @@ test("scene learning start handler 会透传 userId 与 slug", async () => {
   assert.deepEqual(received, { userId: "user-1", slug: "scene-1" });
 });
 
-test("scene learning pause handler 会透传 service 的 ValidationError", async () => {
+test("scene learning pause handler 会透传 ValidationError 并附带 requestId", async () => {
   const response = await handleSceneLearningPausePost(
     { params: Promise.resolve({ slug: "scene-1" }) },
     {
@@ -116,10 +112,8 @@ test("scene learning pause handler 会透传 service 的 ValidationError", async
     },
   );
 
+  const body = await response.json();
   assert.equal(response.status, 400);
-  assert.deepEqual(await response.json(), {
-    error: "pauseSceneLearning is not allowed.",
-    code: "VALIDATION_ERROR",
-    details: null,
-  });
+  assert.equal(body.code, "VALIDATION_ERROR");
+  assert.equal(typeof body.requestId, "string");
 });

@@ -1,5 +1,33 @@
 # Changelog
 
+## 2026-04-14
+### 后端接口治理第一阶段基线
+- 后端受保护接口现在会统一生成并透传 `requestId`，未知内部错误的接口响应也会返回可追踪标识，方便定位请求链路问题。
+- 第一批高成本接口已补上最小限流基线，优先保护场景导入、场景生成、练习生成、释义解释和 TTS 相关接口，避免短时间重复触发高消耗处理。
+- 第一批受保护写接口已补上最小同源来源校验，跨站来源不能再直接调用复习提交和学习进度这类核心写接口。
+- 服务端错误日志开始统一收口到结构化字段，至少包含 `requestId`、路径、方法和错误上下文，减少散点 `console.error` 难以串联的问题。
+影响范围：
+- `middleware.ts`
+- `src/lib/server/api-error.ts`
+- `src/lib/server/errors.ts`
+- `src/lib/server/request-context.ts`
+- `src/lib/server/logger.ts`
+- `src/lib/server/request-guard.ts`
+- `src/lib/server/rate-limit.ts`
+- `src/app/api/tts/*`
+- `src/app/api/scenes/import/*`
+- `src/app/api/scenes/generate/*`
+- `src/app/api/practice/generate/*`
+- `src/app/api/explain-selection/*`
+- `src/app/api/review/*`
+- `src/app/api/learning/scenes/[slug]/*`
+验证情况：
+- `node --import tsx --test middleware.test.ts src/lib/server/api-error.test.ts src/lib/server/request-guard.test.ts src/lib/server/rate-limit.test.ts src/app/api/tts/regenerate/route.test.ts src/app/api/explain-selection/route.test.ts src/app/api/practice/generate/route.test.ts src/app/api/scenes/import/handlers.test.ts src/app/api/review/handlers.test.ts src/app/api/learning/handlers.test.ts`
+- `node --import tsx -` 导入检查：
+  - `src/app/api/scenes/generate/route.ts`
+  - `src/app/api/tts/route.ts`
+  - `src/app/api/learning/scenes/[slug]/complete/route.ts`
+
 ## 2026-04-07
 ### 公共生成中动效组件与练习重生加载反馈
 - 共享 loading 组件新增了可复用的动态省略号文案能力，现在可以统一显示类似“正在生成中.”、“正在生成中..”、“正在生成中...”的轮流反馈。

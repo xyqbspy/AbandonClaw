@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { Lesson } from "@/lib/types";
 import { SceneParseError } from "@/lib/server/errors";
+import { clearRateLimitStore } from "@/lib/server/rate-limit";
 import { handleSceneImportPost } from "./handlers";
 
 const createJsonRequest = (body: unknown) =>
@@ -35,7 +36,8 @@ const createLesson = (slug: string, title: string): Lesson => ({
   explanations: [],
 });
 
-test("scene import handler 在解析失败时返回 422 和中文友好错误", async () => {
+test("scene import handler 在解析失败时返回 422 并带 requestId", async () => {
+  clearRateLimitStore();
   const logs: unknown[] = [];
   const response = await handleSceneImportPost(
     createJsonRequest({
@@ -44,7 +46,7 @@ test("scene import handler 在解析失败时返回 422 和中文友好错误", 
     {
       requireCurrentProfile: async () => ({ user: { id: "user-1" } as never, profile: {} as never }),
       parseImportedSceneWithCache: async () => {
-        throw new SceneParseError("场景解析失败，请稍后重试，或稍微简化/整理原文后再导入。", {
+        throw new SceneParseError("场景解析失败，请稍后重试。", {
           stage: "scene_import_retry_failed",
         });
       },
@@ -57,18 +59,18 @@ test("scene import handler 在解析失败时返回 422 和中文友好错误", 
     },
   );
 
+  const body = await response.json();
   assert.equal(response.status, 422);
-  assert.deepEqual(await response.json(), {
-    error: "场景解析失败，请稍后重试，或稍微简化/整理原文后再导入。",
-    code: "SCENE_PARSE_ERROR",
-    details: {
-      stage: "scene_import_retry_failed",
-    },
+  assert.equal(body.code, "SCENE_PARSE_ERROR");
+  assert.deepEqual(body.details, {
+    stage: "scene_import_retry_failed",
   });
+  assert.equal(typeof body.requestId, "string");
   assert.equal(logs.length, 1);
 });
 
 test("scene import handler 会裁剪 title/theme 并把 userId 传给服务层", async () => {
+  clearRateLimitStore();
   let parseReceived: Record<string, unknown> | null = null;
   let createReceived: Record<string, unknown> | null = null;
   const parsedScene = {

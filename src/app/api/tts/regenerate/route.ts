@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/server/auth";
 import { toApiErrorResponse } from "@/lib/server/api-error";
 import { ForbiddenError } from "@/lib/server/errors";
+import { logApiError } from "@/lib/server/logger";
+import { enforceRateLimit } from "@/lib/server/rate-limit";
+import { assertAllowedOrigin } from "@/lib/server/request-guard";
 import {
   parseJsonBody,
   parseRequiredObjectArray,
@@ -17,6 +20,8 @@ type RegenerateTtsPayload = {
 };
 
 const MAX_REGENERATE_ITEMS = 12;
+const REGENERATE_RATE_LIMIT = 6;
+const RATE_LIMIT_WINDOW_MS = 60_000;
 
 interface RegenerateTtsDependencies {
   requireAdmin: typeof requireAdmin;
@@ -48,7 +53,14 @@ export async function handleTtsRegeneratePost(
   dependencies: RegenerateTtsDependencies = defaultDependencies,
 ) {
   try {
-    await dependencies.requireAdmin();
+    assertAllowedOrigin(request);
+    const admin = await dependencies.requireAdmin();
+    enforceRateLimit({
+      key: admin.id,
+      limit: REGENERATE_RATE_LIMIT,
+      windowMs: RATE_LIMIT_WINDOW_MS,
+      scope: "api-tts-regenerate",
+    });
     const payload = await parseJsonBody<RegenerateTtsPayload>(request);
     const result = await dependencies.regenerateChunkTtsAudioBatch(parseRegenerateItems(payload));
 
@@ -59,17 +71,17 @@ export async function handleTtsRegeneratePost(
       },
     });
   } catch (error) {
-    console.error("[api/tts/regenerate] failed", {
-      error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
+    logApiError("api/tts/regenerate", error, {
+      request,
     });
     if (error instanceof ForbiddenError && error.message === "Forbidden") {
       return toApiErrorResponse(
         new ForbiddenError("Only admins can regenerate tts audio."),
         "Failed to regenerate tts audio.",
+        { request },
       );
     }
-    return toApiErrorResponse(error, "Failed to regenerate tts audio.");
+    return toApiErrorResponse(error, "Failed to regenerate tts audio.", { request });
   }
 }
 

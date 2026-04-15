@@ -47,12 +47,10 @@ test("review due handler 在 limit 非法时返回 400", async () => {
     },
   );
 
+  const body = await response.json();
   assert.equal(response.status, 400);
-  assert.deepEqual(await response.json(), {
-    error: "limit must be a positive number.",
-    code: "VALIDATION_ERROR",
-    details: null,
-  });
+  assert.equal(body.code, "VALIDATION_ERROR");
+  assert.equal(typeof body.requestId, "string");
 });
 
 test("review submit handler 会裁剪 payload 并返回 item 与 summary", async () => {
@@ -97,7 +95,7 @@ test("review submit handler 会裁剪 payload 并返回 item 与 summary", async
   assert.equal(summaryUserId, "user-1");
 });
 
-test("review submit handler 在 reviewResult 非法时返回 400", async () => {
+test("review submit handler 在 reviewResult 非法时返回 400 与 requestId", async () => {
   const response = await handleReviewSubmitPost(
     createJsonRequest("http://localhost/api/review/submit", {
       userPhraseId: "phrase-1",
@@ -110,10 +108,8 @@ test("review submit handler 在 reviewResult 非法时返回 400", async () => {
     },
   );
 
+  const body = await response.json();
   assert.equal(response.status, 400);
-  assert.deepEqual(await response.json(), {
-    error: "reviewResult must be one of again/hard/good.",
-    code: "VALIDATION_ERROR",
-    details: null,
-  });
+  assert.equal(body.code, "VALIDATION_ERROR");
+  assert.equal(typeof body.requestId, "string");
 });

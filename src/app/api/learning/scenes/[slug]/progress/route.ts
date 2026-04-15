@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireCurrentProfile } from "@/lib/server/auth";
 import { toApiErrorResponse } from "@/lib/server/api-error";
+import { assertAllowedOrigin } from "@/lib/server/request-guard";
 import { updateSceneProgress } from "@/lib/server/learning/service";
 import {
   parseJsonBody,
@@ -22,6 +23,7 @@ export async function POST(
   context: { params: Promise<{ slug: string }> },
 ) {
   try {
+    assertAllowedOrigin(request);
     const { user } = await requireCurrentProfile();
     const { slug } = await context.params;
     const payload = await parseJsonBody<UpdateProgressPayload>(request);
@@ -51,7 +53,7 @@ export async function POST(
 
     return NextResponse.json(result, { status: 200 });
   } catch (error) {
-    return toApiErrorResponse(error, "Failed to update scene progress.");
+    return toApiErrorResponse(error, "Failed to update scene progress.", { request });
   }
 }
 
