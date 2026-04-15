@@ -1,4 +1,4 @@
-import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
   ScenePracticeAssessmentLevel,
   ScenePracticeMode,
@@ -10,6 +10,10 @@ import { NotFoundError } from "@/lib/server/errors";
 import { recordSceneTrainingEvent, startSceneLearning } from "./service";
 
 const nowIso = () => new Date().toISOString();
+
+async function createUserScopedPracticeClient() {
+  return createSupabaseServerClient();
+}
 
 const toScenePracticeSchemaErrorMessage = (context: string, originalMessage: string) =>
   `Scene practice schema is not up to date (${context}): ${originalMessage}. Run supabase/sql/20260324_phase17_scene_practice_runs_mvp.sql after phase16 learning migrations.`;
@@ -188,8 +192,8 @@ async function resolveVisibleSceneBySlug(userId: string, sceneSlug: string) {
 }
 
 async function getLatestActiveRunBySet(userId: string, sceneId: string, practiceSetId: string) {
-  const admin = createSupabaseAdminClient();
-  const { data, error } = await admin
+  const client = await createUserScopedPracticeClient();
+  const { data, error } = await client
     .from("user_scene_practice_runs")
     .select("*")
     .eq("user_id", userId)
@@ -207,8 +211,8 @@ async function getLatestActiveRunBySet(userId: string, sceneId: string, practice
 }
 
 async function getLatestRunBySet(userId: string, sceneId: string, practiceSetId?: string) {
-  const admin = createSupabaseAdminClient();
-  let query = admin
+  const client = await createUserScopedPracticeClient();
+  let query = client
     .from("user_scene_practice_runs")
     .select("*")
     .eq("user_id", userId)
@@ -232,8 +236,8 @@ async function hasCompletedSentenceAttempt(
   sceneId: string,
   input: SentenceCompletionKeyInput,
 ) {
-  const admin = createSupabaseAdminClient();
-  let query = admin
+  const client = await createUserScopedPracticeClient();
+  let query = client
     .from("user_scene_practice_attempts")
     .select("id")
     .eq("user_id", userId)
@@ -257,8 +261,8 @@ async function hasCompletedSentenceAttempt(
 export async function getLatestRepeatPracticeRun(
   userId: string,
 ): Promise<RepeatPracticeContinueView | null> {
-  const admin = createSupabaseAdminClient();
-  const { data, error } = await admin
+  const client = await createUserScopedPracticeClient();
+  const { data, error } = await client
     .from("user_scene_practice_runs")
     .select("*")
     .eq("user_id", userId)
@@ -290,7 +294,7 @@ async function upsertPracticeRun(
     current_mode: ScenePracticeMode;
   },
 ) {
-  const admin = createSupabaseAdminClient();
+  const client = await createUserScopedPracticeClient();
   const timestamp = nowIso();
   const next = {
     completed_modes: [],
@@ -300,7 +304,7 @@ async function upsertPracticeRun(
     ...patch,
   };
 
-  const { data, error } = await admin
+  const { data, error } = await client
     .from("user_scene_practice_runs")
     .upsert(next as never, { onConflict: "id" })
     .select("*")
@@ -316,8 +320,8 @@ async function upsertPracticeRun(
 }
 
 async function getNextAttemptIndex(runId: string, exerciseId: string) {
-  const admin = createSupabaseAdminClient();
-  const { data, error } = await admin
+  const client = await createUserScopedPracticeClient();
+  const { data, error } = await client
     .from("user_scene_practice_attempts")
     .select("attempt_index")
     .eq("run_id", runId)
@@ -337,8 +341,8 @@ async function insertPracticeAttempt(
     attempt_index: number;
   },
 ) {
-  const admin = createSupabaseAdminClient();
-  const { data, error } = await admin
+  const client = await createUserScopedPracticeClient();
+  const { data, error } = await client
     .from("user_scene_practice_attempts")
     .insert(row as never)
     .select("*")
@@ -354,8 +358,8 @@ async function insertPracticeAttempt(
 }
 
 async function getAttemptSummaryByRun(runId: string) {
-  const admin = createSupabaseAdminClient();
-  const { data, error } = await admin
+  const client = await createUserScopedPracticeClient();
+  const { data, error } = await client
     .from("user_scene_practice_attempts")
     .select("*")
     .eq("run_id", runId)

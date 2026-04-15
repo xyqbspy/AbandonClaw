@@ -1,4 +1,4 @@
-import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
   LearningStatus,
   SceneMasteryStage,
@@ -15,6 +15,10 @@ import { NotFoundError } from "@/lib/server/errors";
 
 const nowIso = () => new Date().toISOString();
 const todayDate = () => new Date().toISOString().slice(0, 10);
+
+async function createUserScopedLearningClient() {
+  return createSupabaseServerClient();
+}
 
 const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value));
@@ -234,8 +238,8 @@ async function resolveVisibleSceneBySlug(userId: string, sceneSlug: string) {
 }
 
 async function getProgressByUserAndScene(userId: string, sceneId: string) {
-  const admin = createSupabaseAdminClient();
-  const { data, error } = await admin
+  const client = await createUserScopedLearningClient();
+  const { data, error } = await client
     .from("user_scene_progress")
     .select("*")
     .eq("user_id", userId)
@@ -248,8 +252,8 @@ async function getProgressByUserAndScene(userId: string, sceneId: string) {
 }
 
 async function getLatestSessionByUserAndScene(userId: string, sceneId: string) {
-  const admin = createSupabaseAdminClient();
-  const { data, error } = await admin
+  const client = await createUserScopedLearningClient();
+  const { data, error } = await client
     .from("user_scene_sessions")
     .select("*")
     .eq("user_id", userId)
@@ -264,8 +268,8 @@ async function getLatestSessionByUserAndScene(userId: string, sceneId: string) {
 }
 
 async function countCompletedSentencesByUserAndScene(userId: string, sceneId: string) {
-  const admin = createSupabaseAdminClient();
-  const { data, error } = await admin
+  const client = await createUserScopedLearningClient();
+  const { data, error } = await client
     .from("user_scene_practice_attempts")
     .select("sentence_id,exercise_id,assessment_level")
     .eq("user_id", userId)
@@ -297,10 +301,10 @@ async function upsertDailyStats(params: {
   scenesCompletedDelta?: number;
   phrasesSavedDelta?: number;
 }) {
-  const admin = createSupabaseAdminClient();
+  const client = await createUserScopedLearningClient();
   const date = params.date ?? todayDate();
 
-  const { data: existing, error: readError } = await admin
+  const { data: existing, error: readError } = await client
     .from("user_daily_learning_stats")
     .select("*")
     .eq("user_id", params.userId)
@@ -321,7 +325,7 @@ async function upsertDailyStats(params: {
     phrases_saved: (existing?.phrases_saved ?? 0) + (params.phrasesSavedDelta ?? 0),
   };
 
-  const { error: upsertError } = await admin
+  const { error: upsertError } = await client
     .from("user_daily_learning_stats")
     .upsert(next as never, { onConflict: "user_id,date" });
 
@@ -335,7 +339,7 @@ async function upsertProgress(
   sceneId: string,
   patch: Partial<UserSceneProgressRow>,
 ) {
-  const admin = createSupabaseAdminClient();
+  const client = await createUserScopedLearningClient();
   const existing = await getProgressByUserAndScene(userId, sceneId);
   const next = {
     user_id: userId,
@@ -361,7 +365,7 @@ async function upsertProgress(
     ...patch,
   };
 
-  const { data, error } = await admin
+  const { data, error } = await client
     .from("user_scene_progress")
     .upsert(next as never, { onConflict: "user_id,scene_id" })
     .select("*")
@@ -382,7 +386,7 @@ async function upsertSession(
   patch: Partial<UserSceneSessionRow>,
   existing?: UserSceneSessionRow | null,
 ) {
-  const admin = createSupabaseAdminClient();
+  const client = await createUserScopedLearningClient();
   const current = existing ?? (await getLatestSessionByUserAndScene(userId, sceneId));
   const timestamp = nowIso();
   const next = {
@@ -403,7 +407,7 @@ async function upsertSession(
     ...patch,
   };
 
-  const { data, error } = await admin
+  const { data, error } = await client
     .from("user_scene_sessions")
     .upsert(next as never, { onConflict: "id" })
     .select("*")
@@ -499,8 +503,8 @@ const toContinueItem = (
 });
 
 async function getLatestRepeatPracticeRun(userId: string) {
-  const admin = createSupabaseAdminClient();
-  const { data, error } = await admin
+  const client = await createUserScopedLearningClient();
+  const { data, error } = await client
     .from("user_scene_practice_runs")
     .select("scene_id,practice_set_id,source_type,source_variant_id,last_active_at")
     .eq("user_id", userId)
@@ -530,8 +534,8 @@ async function getLatestRepeatPracticeRun(userId: string) {
 }
 
 async function getLatestRepeatVariantRun(userId: string) {
-  const admin = createSupabaseAdminClient();
-  const { data, error } = await admin
+  const client = await createUserScopedLearningClient();
+  const { data, error } = await client
     .from("user_scene_variant_runs")
     .select("scene_id,variant_set_id,active_variant_id,last_active_at")
     .eq("user_id", userId)
@@ -951,8 +955,8 @@ export async function pauseSceneLearning(userId: string, sceneSlug: string) {
 }
 
 export async function getContinueLearningScene(userId: string) {
-  const admin = createSupabaseAdminClient();
-  const { data, error } = await admin
+  const client = await createUserScopedLearningClient();
+  const { data, error } = await client
     .from("user_scene_progress")
     .select("*, scenes!inner(id,slug,title,translation,scene_json)")
     .eq("user_id", userId)
@@ -1005,14 +1009,14 @@ async function getRepeatPracticeContinueScene(userId: string) {
   const repeatRun = await getLatestRepeatPracticeRun(userId);
   if (!repeatRun) return null;
 
-  const admin = createSupabaseAdminClient();
+  const client = await createUserScopedLearningClient();
   const [sceneRes, progressRes] = await Promise.all([
-    admin
+    client
       .from("scenes")
       .select("id,slug,title,translation,scene_json")
       .eq("id", repeatRun.sceneId)
       .maybeSingle<Pick<SceneRow, "id" | "slug" | "title" | "translation" | "scene_json">>(),
-    admin
+    client
       .from("user_scene_progress")
       .select("*")
       .eq("user_id", userId)
@@ -1039,14 +1043,14 @@ async function getRepeatVariantContinueScene(userId: string) {
   const repeatRun = await getLatestRepeatVariantRun(userId);
   if (!repeatRun) return null;
 
-  const admin = createSupabaseAdminClient();
+  const client = await createUserScopedLearningClient();
   const [sceneRes, progressRes] = await Promise.all([
-    admin
+    client
       .from("scenes")
       .select("id,slug,title,translation,scene_json")
       .eq("id", repeatRun.sceneId)
       .maybeSingle<Pick<SceneRow, "id" | "slug" | "title" | "translation" | "scene_json">>(),
-    admin
+    client
       .from("user_scene_progress")
       .select("*")
       .eq("user_id", userId)
@@ -1070,7 +1074,7 @@ async function getRepeatVariantContinueScene(userId: string) {
 }
 
 export async function getTodayLearningTasks(userId: string): Promise<TodayLearningTasks> {
-  const admin = createSupabaseAdminClient();
+  const client = await createUserScopedLearningClient();
   const [directContinueScene, repeatPracticeContinue, repeatVariantContinue] = await Promise.all([
     getContinueLearningScene(userId),
     getRepeatPracticeContinueScene(userId),
@@ -1083,7 +1087,7 @@ export async function getTodayLearningTasks(userId: string): Promise<TodayLearni
   ]);
   const [reviewSummary, statsQuery] = await Promise.all([
     getReviewSummary(userId),
-    admin
+    client
       .from("user_daily_learning_stats")
       .select("*")
       .eq("user_id", userId)
@@ -1139,28 +1143,28 @@ const calculateStreakDays = (dates: string[]) => {
 };
 
 export async function getLearningOverview(userId: string): Promise<LearningOverview> {
-  const admin = createSupabaseAdminClient();
+  const client = await createUserScopedLearningClient();
 
   const [completedRes, inProgressRes, phraseSummary, recentStatsRes, streakRes, reviewSummary] =
     await Promise.all([
-      admin
+      client
         .from("user_scene_progress")
         .select("*", { count: "exact", head: true })
         .eq("user_id", userId)
         .eq("status", "completed"),
-      admin
+      client
         .from("user_scene_progress")
         .select("*", { count: "exact", head: true })
         .eq("user_id", userId)
         .in("status", ["in_progress", "paused"]),
       getUserPhraseSummary(userId),
-      admin
+      client
         .from("user_daily_learning_stats")
         .select("study_seconds,date")
         .eq("user_id", userId)
         .order("date", { ascending: false })
         .limit(7),
-      admin
+      client
         .from("user_daily_learning_stats")
         .select("date")
         .eq("user_id", userId)
@@ -1229,13 +1233,13 @@ export async function listLearningProgress(params: {
   page?: number;
   limit?: number;
 }) {
-  const admin = createSupabaseAdminClient();
+  const client = await createUserScopedLearningClient();
   const page = Math.max(1, Math.floor(params.page ?? 1));
   const limit = Math.min(100, Math.max(1, Math.floor(params.limit ?? 20)));
   const from = (page - 1) * limit;
   const to = from + limit - 1;
 
-  let query = admin
+  let query = client
     .from("user_scene_progress")
     .select("*, scenes!inner(slug,title,translation)", { count: "exact" })
     .eq("user_id", params.userId)

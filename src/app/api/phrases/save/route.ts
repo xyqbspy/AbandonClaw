@@ -3,127 +3,40 @@ import { requireCurrentProfile } from "@/lib/server/auth";
 import { toApiErrorResponse } from "@/lib/server/api-error";
 import { savePhraseForUser } from "@/lib/server/phrases/service";
 import { trackChunksForUser } from "@/lib/server/chunks/service";
+import { assertAllowedOrigin } from "@/lib/server/request-guard";
 import {
-  parseJsonBody,
-  parseOptionalNonNegativeInt,
-  parseOptionalTrimmedString,
-} from "@/lib/server/validation";
-
-interface SavePhrasePayload extends Record<string, unknown> {
-  text?: unknown;
-  learningItemType?: unknown;
-  sentenceText?: unknown;
-  translation?: unknown;
-  usageNote?: unknown;
-  difficulty?: unknown;
-  tags?: unknown;
-  sourceSceneSlug?: unknown;
-  sourceType?: unknown;
-  sourceNote?: unknown;
-  sourceSentenceIndex?: unknown;
-  sourceSentenceText?: unknown;
-  sourceChunkText?: unknown;
-  expressionClusterId?: unknown;
-  relationSourceUserPhraseId?: unknown;
-  relationType?: unknown;
-}
+  normalizeSavePhrasePayload,
+  parseSavePhraseRequest,
+} from "@/lib/server/request-schemas";
+import {
+  buildDeterministicIdempotencyKey,
+  getRequestIdempotencyKey,
+  runIdempotentMutation,
+} from "@/lib/server/idempotency";
 
 export async function POST(request: Request) {
   try {
+    assertAllowedOrigin(request);
     const { user } = await requireCurrentProfile();
-    const payload = await parseJsonBody<SavePhrasePayload>(request);
-    const sourceSceneSlug = parseOptionalTrimmedString(
-      payload.sourceSceneSlug,
-      "sourceSceneSlug",
-      200,
+    const payload = await parseSavePhraseRequest(request);
+    const normalizedPayload = normalizeSavePhrasePayload(payload);
+    const idempotencyKey = getRequestIdempotencyKey(
+      request,
+      buildDeterministicIdempotencyKey("phrases-save", user.id, normalizedPayload),
     );
-    const learningItemTypeRaw = parseOptionalTrimmedString(
-      payload.learningItemType,
-      "learningItemType",
-      20,
-    );
-    const learningItemType =
-      learningItemTypeRaw === "sentence"
-        ? "sentence"
-        : learningItemTypeRaw === "expression"
-          ? "expression"
-          : "expression";
-    const sentenceText = parseOptionalTrimmedString(payload.sentenceText, "sentenceText", 3000);
-    const expressionText = parseOptionalTrimmedString(payload.text, "text", 200);
-    const sourceTypeRaw = parseOptionalTrimmedString(payload.sourceType, "sourceType", 20);
-
-    const result = await savePhraseForUser(user.id, {
-      text: expressionText ?? undefined,
-      learningItemType,
-      sentenceText: sentenceText ?? undefined,
-      translation: parseOptionalTrimmedString(payload.translation, "translation", 500),
-      usageNote: parseOptionalTrimmedString(payload.usageNote, "usageNote", 1000),
-      difficulty: parseOptionalTrimmedString(payload.difficulty, "difficulty", 64),
-      tags: Array.isArray(payload.tags)
-        ? payload.tags.filter((item): item is string => typeof item === "string")
-        : [],
-      sourceSceneSlug,
-      sourceType:
-        sourceTypeRaw === "manual"
-          ? "manual"
-          : sourceTypeRaw === "scene"
-            ? "scene"
-            : sourceSceneSlug
-              ? "scene"
-              : "manual",
-      sourceNote: parseOptionalTrimmedString(payload.sourceNote, "sourceNote", 300),
-      sourceSentenceIndex: parseOptionalNonNegativeInt(
-        payload.sourceSentenceIndex,
-        "sourceSentenceIndex",
-      ),
-      sourceSentenceText: parseOptionalTrimmedString(
-        payload.sourceSentenceText,
-        "sourceSentenceText",
-        3000,
-      ),
-      sourceChunkText: parseOptionalTrimmedString(
-        payload.sourceChunkText,
-        "sourceChunkText",
-        500,
-      ),
-      expressionClusterId: parseOptionalTrimmedString(
-        payload.expressionClusterId,
-        "expressionClusterId",
-        120,
-      ),
-      relationSourceUserPhraseId: parseOptionalTrimmedString(
-        payload.relationSourceUserPhraseId,
-        "relationSourceUserPhraseId",
-        120,
-      ),
-      relationType:
-        parseOptionalTrimmedString(payload.relationType, "relationType", 20) === "contrast"
-          ? "contrast"
-          : parseOptionalTrimmedString(payload.relationType, "relationType", 20) === "similar"
-            ? "similar"
-            : undefined,
+    const result = await runIdempotentMutation({
+      scope: "phrases-save",
+      key: idempotencyKey,
+      execute: () => savePhraseForUser(user.id, normalizedPayload),
     });
 
-    const favoriteChunkText =
-      parseOptionalTrimmedString(payload.sourceChunkText, "sourceChunkText", 500) ??
-      expressionText;
+    const favoriteChunkText = normalizedPayload.sourceChunkText ?? normalizedPayload.text;
     if (favoriteChunkText) {
       try {
         await trackChunksForUser(user.id, {
-          sceneSlug: parseOptionalTrimmedString(
-            payload.sourceSceneSlug,
-            "sourceSceneSlug",
-            200,
-          ),
-          sentenceIndex: parseOptionalNonNegativeInt(
-            payload.sourceSentenceIndex,
-            "sourceSentenceIndex",
-          ),
-          sentenceText: parseOptionalTrimmedString(
-            payload.sourceSentenceText,
-            "sourceSentenceText",
-            3000,
-          ),
+          sceneSlug: normalizedPayload.sourceSceneSlug,
+          sentenceIndex: normalizedPayload.sourceSentenceIndex,
+          sentenceText: normalizedPayload.sourceSentenceText,
           chunks: [favoriteChunkText],
           interactionType: "favorite",
         });
@@ -134,6 +47,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json(result, { status: 200 });
   } catch (error) {
-    return toApiErrorResponse(error, "Failed to save phrase.");
+    return toApiErrorResponse(error, "Failed to save phrase.", { request });
   }
 }

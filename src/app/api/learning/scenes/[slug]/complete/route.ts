@@ -3,17 +3,20 @@ import { requireCurrentProfile } from "@/lib/server/auth";
 import { toApiErrorResponse } from "@/lib/server/api-error";
 import { assertAllowedOrigin } from "@/lib/server/request-guard";
 import { completeSceneLearning } from "@/lib/server/learning/service";
-import { parseJsonBody, parseOptionalNonNegativeDelta } from "@/lib/server/validation";
+import {
+  buildDeterministicIdempotencyKey,
+  getRequestIdempotencyKey,
+  runIdempotentMutation,
+} from "@/lib/server/idempotency";
+import {
+  normalizeLearningCompletePayload,
+  parseLearningCompleteRequest,
+} from "@/lib/server/request-schemas";
 import {
   extractChunkTextsFromParsedScene,
   trackChunksForUser,
 } from "@/lib/server/chunks/service";
 import { ParsedScene } from "@/lib/types/scene-parser";
-
-interface CompletePayload extends Record<string, unknown> {
-  studySecondsDelta?: unknown;
-  savedPhraseDelta?: unknown;
-}
 
 export async function POST(
   request: Request,
@@ -23,17 +26,16 @@ export async function POST(
     assertAllowedOrigin(request);
     const { user } = await requireCurrentProfile();
     const { slug } = await context.params;
-    const payload = await parseJsonBody<CompletePayload>(request);
-
-    const result = await completeSceneLearning(user.id, slug, {
-      studySecondsDelta: parseOptionalNonNegativeDelta(
-        payload.studySecondsDelta,
-        "studySecondsDelta",
+    const payload = await parseLearningCompleteRequest(request);
+    const normalizedPayload = normalizeLearningCompletePayload(payload);
+    const result = await runIdempotentMutation({
+      scope: "learning-complete",
+      key: getRequestIdempotencyKey(
+        request,
+        buildDeterministicIdempotencyKey("learning-complete", user.id, slug, normalizedPayload),
       ),
-      savedPhraseDelta: parseOptionalNonNegativeDelta(
-        payload.savedPhraseDelta,
-        "savedPhraseDelta",
-      ),
+      ttlMs: 8_000,
+      execute: () => completeSceneLearning(user.id, slug, normalizedPayload),
     });
 
     const parsedScene = result.scene.scene_json as ParsedScene;

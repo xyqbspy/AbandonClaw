@@ -12,31 +12,19 @@ import {
 } from "@/lib/server/prompts/practice-generate-prompt";
 import {
   parseJsonWithFallback,
-  isValidParsedScene,
 } from "@/lib/server/scene-json";
-import { parseJsonBody } from "@/lib/server/validation";
+import {
+  normalizePracticeGeneratePayload,
+  parsePracticeGenerateRequest,
+} from "@/lib/server/request-schemas";
 import {
   PracticeExerciseType,
   PracticeGenerateRequest,
   PracticeGenerateResponse,
 } from "@/lib/types/scene-parser";
 import { buildExerciseSpecsFromScene } from "@/lib/server/exercises/spec-builder";
-
-const clamp = (value: number, min: number, max: number) =>
-  Math.min(max, Math.max(min, value));
-
-const PRACTICE_MAX_SECTIONS = 12;
-const PRACTICE_MAX_BLOCKS = 80;
-const PRACTICE_MAX_SENTENCES = 400;
-const PRACTICE_MAX_CHUNKS = 1200;
-const PRACTICE_MAX_TEXT_LENGTH = 40000;
 const PRACTICE_GENERATE_RATE_LIMIT = 5;
 const RATE_LIMIT_WINDOW_MS = 60_000;
-
-const sanitizeExerciseCount = (value: unknown) => {
-  if (typeof value !== "number" || Number.isNaN(value)) return 6;
-  return clamp(Math.round(value), 3, 12);
-};
 
 const PRACTICE_GENERATE_FALLBACK_MESSAGE = "生成练习题失败，请稍后重试。";
 
@@ -351,20 +339,14 @@ export async function handlePracticeGeneratePost(
   try {
     assertAllowedOrigin(request);
     const { user } = await dependencies.requireCurrentProfile();
-    enforceRateLimit({
+    await enforceRateLimit({
       key: user.id,
       limit: PRACTICE_GENERATE_RATE_LIMIT,
       windowMs: RATE_LIMIT_WINDOW_MS,
       scope: "api-practice-generate",
     });
-    const payload = await parseJsonBody<Partial<PracticeGenerateRequest>>(request);
-    const normalized = toValidPayload(payload);
-
-    if (!normalized.ok) {
-      throw new ValidationError(normalized.error);
-    }
-
-    const { scene, exerciseCount } = normalized.value;
+    const payload = await parsePracticeGenerateRequest(request);
+    const { scene, exerciseCount } = normalizePracticeGeneratePayload(payload);
 
     const fallbackExercises = dependencies.buildExerciseSpecsFromScene(scene, exerciseCount);
 

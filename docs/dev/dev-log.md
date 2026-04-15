@@ -1,5 +1,216 @@
 # Dev Log
 
+### [2026-04-15] 收口 phrases 剩余后台权限入口
+
+- 类型：修复 / 接口治理 / 文档
+- 状态：已完成
+#### 背景
+第二阶段收紧到后面，`phrases` 模块只剩共享 `phrases` 表和 AI enrich 还在业务 service 里直接创建 `service role` client。虽然权限范围已经很小，但边界还不够显式，不利于后续继续审计和收口。
+#### 本次改动
+- 新增 `src/lib/server/phrases/admin-repo.ts`，集中承接共享 `phrases` 表与 AI enrich 相关的后台白名单读写。
+- `src/lib/server/phrases/service.ts` 改为只调用受限仓储入口，不再直接创建 `service role` client。
+- 清理 `src/lib/server/review/service.ts` 中残留的无用 admin import。
+#### 影响范围
+- 影响模块：`phrases`、`review`
+- 是否影响主链路：否
+- 是否影响用户可感知行为：否
+- 是否需要同步文档：是
+#### 测试 / 验证
+- 待本轮最小测试与导入级 smoke check 一并验证
+#### 风险 / 未完成项
+- 共享 `phrases` 表与 AI enrich 仍保留后台权限，只是已显式隔离到白名单 repo
+- 多实例共享限流、统一参数校验和最小压测仍待后续任务完成
+
+### [2026-04-15] 收口高风险写接口的请求 schema 入口
+
+- 类型：修复 / 接口治理 / 测试
+- 状态：已完成
+#### 背景
+第二阶段的 `3.2` 要求把高风险写接口的参数校验从零散 route 逻辑收口到统一入口。当前 `review submit`、`learning progress/complete`、`phrases save/save-all` 已经有校验，但实现分散，`phrases` 里还存在重复 normalize 逻辑。
+#### 本次改动
+- 新增 `src/lib/server/request-schemas.ts`，集中承接高风险写接口的请求解析与 normalize 逻辑。
+- `review submit`、`learning progress`、`learning complete` 现在统一通过 schema helper 生成规范 payload。
+- `phrases save`、`phrases save-all` 复用同一套请求 normalize 规则，避免两处维护相同字段默认值和裁剪逻辑。
+#### 影响范围
+- 影响模块：`review`、`learning`、`phrases`
+- 是否影响主链路：否
+- 是否影响用户可感知行为：否
+- 是否需要同步文档：是
+#### 测试 / 验证
+- 已运行：
+  - `node --import tsx --test src/lib/server/idempotency.test.ts src/app/api/review/handlers.test.ts src/app/api/learning/handlers.test.ts`
+- 额外导入验证：
+  - `src/lib/server/request-schemas.ts`
+  - `src/app/api/phrases/save/route.ts`
+  - `src/app/api/phrases/save-all/route.ts`
+- 已运行：
+  - `pnpm run text:check-mojibake`
+#### 风险 / 未完成项
+- 当前只收口了 `review / learning / phrases` 的一批高风险写接口，高成本生成接口还未并入统一 schema 入口。
+- 这一步保持旧规则不变，没有顺带收紧字段限制或补新错误码。
+
+### [2026-04-15] 继续收口高成本生成接口的请求 schema
+
+- 类型：修复 / 接口治理 / 测试
+- 状态：已完成
+#### 背景
+在 `review / learning / phrases` 的高风险写接口完成统一 schema 入口后，高成本生成接口里仍有一批分散校验逻辑，主要集中在 `explain-selection`、`scenes/generate`、`scenes/import`。
+#### 本次改动
+- 扩展 `src/lib/server/request-schemas.ts`，新增高成本生成接口的请求解析与 normalize helper。
+- [src/app/api/explain-selection/route.ts](/d:/WorkCode/AbandonClaw/src/app/api/explain-selection/route.ts) 改为复用统一 schema 入口。
+- [src/app/api/scenes/generate/route.ts](/d:/WorkCode/AbandonClaw/src/app/api/scenes/generate/route.ts) 改为复用统一 schema 入口。
+- [src/app/api/scenes/import/handlers.ts](/d:/WorkCode/AbandonClaw/src/app/api/scenes/import/handlers.ts) 改为复用统一 schema 入口。
+#### 影响范围
+- 影响模块：`explain-selection`、`scenes/generate`、`scenes/import`
+- 是否影响主链路：否
+- 是否影响用户可感知行为：否
+- 是否需要同步文档：是
+#### 测试 / 验证
+- 已运行：
+  - `node --import tsx --test src/app/api/explain-selection/route.test.ts src/app/api/scenes/import/handlers.test.ts`
+- 额外导入验证：
+  - `src/lib/server/request-schemas.ts`
+  - `src/app/api/explain-selection/route.ts`
+  - `src/app/api/scenes/generate/route.ts`
+  - `src/app/api/scenes/import/handlers.ts`
+- 已运行：
+  - `pnpm run text:check-mojibake`
+#### 风险 / 未完成项
+- `practice/generate` 仍保留独立的重量级校验与 payload 体积检查，尚未并入统一 schema 入口。
+- 这一步仍然保持旧规则不变，没有追加更严格的字段限制。
+
+### [2026-04-15] 收口 practice generate 的请求 schema 入口
+
+- 类型：修复 / 接口治理 / 测试
+- 状态：已完成
+#### 背景
+高成本生成接口里最后一个还保留独立请求校验的入口是 `practice/generate`。这条链路有自己的 scene 体积限制和 `exerciseCount` 规范化逻辑，如果不一起收口，`3.2` 仍然不算闭环。
+#### 本次改动
+- 扩展 `src/lib/server/request-schemas.ts`，新增 `practice/generate` 的请求解析、scene 体积限制和 `exerciseCount` 规范化逻辑。
+- [src/app/api/practice/generate/route.ts](/d:/WorkCode/AbandonClaw/src/app/api/practice/generate/route.ts) 的 handler 改为复用统一 schema 入口。
+- 保留模型 fallback 和响应校验逻辑不变，没有改练习题生成语义。
+#### 影响范围
+- 影响模块：`practice/generate`
+- 是否影响主链路：否
+- 是否影响用户可感知行为：否
+- 是否需要同步文档：是
+#### 测试 / 验证
+- 已运行：
+  - `node --import tsx --test src/app/api/practice/generate/route.test.ts`
+- 额外导入验证：
+  - `src/lib/server/request-schemas.ts`
+  - `src/app/api/practice/generate/route.ts`
+- 已运行：
+  - `pnpm run text:check-mojibake`
+#### 风险 / 未完成项
+- `practice/generate` 文件里原有的本地校验 helper 还残留在文件中，但 handler 已经不再使用；后续可以单独做一轮死代码清理。
+- 这一步仍然保持旧规则不变，没有追加更严格的字段限制。
+
+### [2026-04-15] 将高成本接口限流升级为共享存储优先
+
+- 类型：修复 / 接口治理 / 测试 / 文档
+- 状态：已完成
+#### 背景
+第二阶段的 `3.1` 要求高成本接口在多实例部署下也保持一致限流。此前的 `rate-limit.ts` 只使用进程内 `Map`，在多实例环境里会被实例切换绕过。
+#### 本次改动
+- 重写 `src/lib/server/rate-limit.ts`，保持 `enforceRateLimit` 名称和入参不变，但底层升级为：
+  - 优先使用 `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` 提供的共享存储
+  - 共享存储异常时自动回退到进程内内存限流
+- 新增 [src/lib/server/rate-limit.test.ts](/d:/WorkCode/AbandonClaw/src/lib/server/rate-limit.test.ts)，覆盖内存模式、共享模式和共享失败 fallback。
+- 相关高成本路由改为 `await enforceRateLimit(...)`，不改变业务错误契约。
+- 更新 [.env.example](/d:/WorkCode/AbandonClaw/.env.example) 说明共享限流环境变量。
+#### 影响范围
+- 影响模块：`rate-limit`、`tts`、`practice/generate`、`explain-selection`、`scenes/import`、`scenes/generate`
+- 是否影响主链路：是，但只影响超限判定与多实例一致性
+- 是否影响用户可感知行为：是，多实例下的限流会更稳定
+- 是否需要同步文档：是
+#### 测试 / 验证
+- 待本轮最小测试与路由回归一并验证
+#### 风险 / 未完成项
+- 当前共享后端只接了 Upstash REST 约定，没有再抽象更多 provider。
+- 共享后端失败时会退回本地内存限流，保证可用性优先，但这意味着极端故障下会退回单实例行为。
+
+### [2026-04-15] 补最小压测脚本与执行入口
+
+- 类型：工具 / 测试 / 文档
+- 状态：已完成
+#### 背景
+第二阶段的 `4.2` 需要把“最小压测脚本 + 结果记录”补齐。当前仓库没有现成的 load script，也没有统一的执行入口。
+#### 本次改动
+- 新增 [scripts/load-api-baseline.ts](/d:/WorkCode/AbandonClaw/scripts/load-api-baseline.ts)，提供零依赖的最小压测脚本，支持：
+  - `base-url / path / method`
+  - `requests / concurrency`
+  - `body-file`
+  - `cookie / origin`
+  - `idempotency-key-prefix`
+  - `dry-run`
+- 新增 [scripts/load-handler-baseline.ts](/d:/WorkCode/AbandonClaw/scripts/load-handler-baseline.ts)，提供当前环境可执行的 in-process handler baseline，直接压：
+  - `review-submit`
+  - `learning-progress`
+  - `practice-generate`
+- 新增 [scripts/load-samples/practice-generate.sample.json](/d:/WorkCode/AbandonClaw/scripts/load-samples/practice-generate.sample.json) 作为最小样例 payload。
+- 在 [package.json](/d:/WorkCode/AbandonClaw/package.json) 增加 `load:api-baseline` 和 `load:handler-baseline` 脚本入口。
+#### 测试 / 验证
+- 已运行：
+  - `node --import tsx scripts/load-api-baseline.ts --dry-run --path=/api/practice/generate --method=POST --body-file=scripts/load-samples/practice-generate.sample.json --requests=6 --concurrency=2`
+- 已运行：
+  - `node --import tsx scripts/load-handler-baseline.ts --requests=30 --concurrency=5`
+- in-process baseline 结果：
+  - `review-submit`：30 req / 并发 5，状态全 `200`，P50 `0.38ms`，P95 `10.04ms`，平均 `2.1ms`
+  - `learning-progress`：30 req / 并发 5，状态全 `200`，P50 `0.44ms`，P95 `0.65ms`，平均 `0.47ms`
+  - `practice-generate`：30 req / 并发 5，状态全 `200`，P50 `0.64ms`，P95 `2.18ms`，平均 `0.9ms`
+- 已运行：
+  - `node --import tsx --test src/app/api/review/handlers.test.ts src/app/api/learning/handlers.test.ts src/app/api/practice/generate/route.test.ts`
+  - `pnpm run text:check-mojibake`
+#### 风险 / 未完成项
+- 还没有在真实可访问的本地/预览服务上拿到 HTTP 层基线。
+- 当前记录的是 in-process handler baseline，更适合做代码回归对比，不等价于完整网络链路压测。
+
+### [2026-04-15] 第二阶段先补关键写接口幂等与数据边界盘点
+
+- 类型：修复 / 接口治理 / 测试 / 文档
+- 状态：已完成
+#### 背景
+第二阶段原本同时包含数据边界收紧、关键写接口一致性和共享限流升级，但共享限流缺少现成基础设施，数据库边界收紧又会直接触及主链路和 RLS。为了先降低真实线上风险，这一轮优先落了关键写接口幂等去重、`service role` 使用盘点和 `phrases` 写接口来源校验补齐。
+#### 本次改动
+- 新增 `src/lib/server/idempotency.ts`，提供统一的服务端幂等 key 构造、header 读取和进程内去重 helper。
+- `review submit` 现在会对相同幂等 key 或相同请求指纹做短窗口去重，避免 review 结果和 summary 连续写两次。
+- `learning start/pause/progress/complete` 现在会对同一场景、同一请求指纹做短窗口去重，降低重复点击和网络重试带来的重复推进。
+- `phrases save`、`phrases save-all` 接口补上了来源校验，并接入相同的服务端去重能力。
+- `phrases save-all` 开始复用统一对象数组校验 helper，减少局部手写校验。
+- 新增 [server-data-boundary-audit.md](/d:/WorkCode/AbandonClaw/docs/dev/server-data-boundary-audit.md)，记录 `scene / learning / review / phrases` 当前 `service role` 使用点、暂定白名单和后续迁移优先级。
+- 补充把 `scene` 仓储里的用户态读取切到 `createSupabaseServerClient`，优先收紧 `listVisibleScenes*` 和 `listUserSceneProgressBySceneIds` 这批由 RLS 可直接承接的查询。
+- 继续把 `review / phrases` 的第一批纯用户态读取切到 `createSupabaseServerClient`，包括 review summary、due review、短语 mine 列表、关系查询和 cluster 只读查询。
+- 再继续把 `learning` 的第一批用户态读取切到 `createSupabaseServerClient`，覆盖 progress/session 前置读取、continue/today/overview/list 聚合和 repeat run 续接读取。
+- 进一步把 `learning` 的自有写表 helper 切到 `createSupabaseServerClient`，包括 `upsertDailyStats`、`upsertProgress`、`upsertSession`。
+- 继续把 `review / phrases` 的用户自有写表切到 `createSupabaseServerClient`，包括 `submitPhraseReview`、`user_phrases` 写入、`user_phrase_relations`、expression cluster/member、daily stats 和 scene progress 镜像计数。
+- 再继续把 `practice / variant` 运行态读写 helper 切到 `createSupabaseServerClient`，包括 practice run、attempt、repeat continue 和 variant run 相关用户表。
+- 继续把 `expression-clusters` 服务层切到 `createSupabaseServerClient`，让 cluster/member 的用户自有读写与移动/合并链路统一走用户上下文。
+#### 影响范围
+- `src/lib/server/idempotency.ts`
+- `src/app/api/review/handlers.ts`
+- `src/app/api/learning/scenes/[slug]/*`
+- `src/app/api/phrases/save/route.ts`
+- `src/app/api/phrases/save-all/route.ts`
+- `src/lib/server/validation.ts`
+#### 测试 / 验证
+- 已运行：
+  - `node --import tsx --test src/lib/server/idempotency.test.ts src/app/api/review/handlers.test.ts src/app/api/learning/handlers.test.ts`
+- 额外导入验证：
+  - `src/app/api/phrases/save/route.ts`
+  - `src/app/api/phrases/save-all/route.ts`
+  - `src/app/api/learning/scenes/[slug]/progress/route.ts`
+  - `src/app/api/learning/scenes/[slug]/complete/route.ts`
+  - `src/lib/server/scene/repository.ts`
+  - `src/lib/server/scene/service.ts`
+  - `src/lib/server/review/service.ts`
+  - `src/lib/server/phrases/service.ts`
+  - `src/lib/server/learning/service.ts`
+#### 风险 / 未完成项
+- 当前幂等去重仍是进程内存级，无法覆盖多实例部署。
+- 本轮已完成 `scene / review / phrases / expression-clusters / learning / practice / variant` 主要用户自有读写迁移；共享 `phrases` 表和 AI enrich 仍未完全迁移。
+- 共享限流升级和最小压测脚本仍待后续继续完成。
+
 ### [2026-04-14] 落地后端接口治理第一阶段基线
 
 - 类型：修复 / 维护规范 / 测试

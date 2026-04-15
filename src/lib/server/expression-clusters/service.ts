@@ -4,7 +4,7 @@ import {
   UserExpressionClusterMemberRow,
   UserExpressionClusterRow,
 } from "@/lib/server/db/types";
-import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
   resolveMergedClusterMainUserPhraseId,
   resolveMoveExpressionClusterAction,
@@ -12,9 +12,13 @@ import {
   resolveTargetClusterMainUserPhraseId,
 } from "./logic";
 
+async function createUserScopedExpressionClusterClient() {
+  return createSupabaseServerClient();
+}
+
 async function getClusterById(userId: string, clusterId: string) {
-  const admin = createSupabaseAdminClient();
-  const { data, error } = await admin
+  const client = await createUserScopedExpressionClusterClient();
+  const { data, error } = await client
     .from("user_expression_clusters")
     .select("*")
     .eq("id", clusterId)
@@ -31,8 +35,8 @@ async function getClusterById(userId: string, clusterId: string) {
 }
 
 async function getClusterMembers(clusterId: string) {
-  const admin = createSupabaseAdminClient();
-  const { data, error } = await admin
+  const client = await createUserScopedExpressionClusterClient();
+  const { data, error } = await client
     .from("user_expression_cluster_members")
     .select("*")
     .eq("cluster_id", clusterId)
@@ -48,8 +52,8 @@ async function getPhraseClusterMembership(params: {
   userId: string;
   userPhraseId: string;
 }) {
-  const admin = createSupabaseAdminClient();
-  const { data, error } = await admin
+  const client = await createUserScopedExpressionClusterClient();
+  const { data, error } = await client
     .from("user_expression_cluster_members")
     .select("cluster_id,user_phrase_id,role, cluster:user_expression_clusters!inner(id,user_id,main_user_phrase_id)")
     .eq("user_phrase_id", params.userPhraseId)
@@ -91,8 +95,8 @@ async function assertOwnedExpressionPhrase(params: {
   userId: string;
   userPhraseId: string;
 }) {
-  const admin = createSupabaseAdminClient();
-  const { data, error } = await admin
+  const client = await createUserScopedExpressionClusterClient();
+  const { data, error } = await client
     .from("user_phrases")
     .select("id,learning_item_type")
     .eq("id", params.userPhraseId)
@@ -115,8 +119,8 @@ async function createSingletonCluster(params: {
   userPhraseId: string;
   title?: string | null;
 }) {
-  const admin = createSupabaseAdminClient();
-  const { data: clusterRow, error: clusterError } = await admin
+  const client = await createUserScopedExpressionClusterClient();
+  const { data: clusterRow, error: clusterError } = await client
     .from("user_expression_clusters")
     .insert({
       user_id: params.userId,
@@ -129,7 +133,7 @@ async function createSingletonCluster(params: {
     throw new Error(`Failed to create singleton expression cluster: ${clusterError?.message ?? "unknown error"}`);
   }
 
-  const { error: memberError } = await admin
+  const { error: memberError } = await client
     .from("user_expression_cluster_members")
     .insert({
       cluster_id: clusterRow.id,
@@ -183,14 +187,14 @@ async function writeClusterRoles(params: {
   mainUserPhraseId: string;
   userPhraseIds: string[];
 }) {
-  const admin = createSupabaseAdminClient();
+  const client = await createUserScopedExpressionClusterClient();
   const membershipPayload = params.userPhraseIds.map((userPhraseId) => ({
     cluster_id: params.clusterId,
     user_phrase_id: userPhraseId,
     role: (userPhraseId === params.mainUserPhraseId ? "main" : "variant") satisfies UserExpressionClusterMemberRole,
   }));
 
-  const { error: membershipError } = await admin
+  const { error: membershipError } = await client
     .from("user_expression_cluster_members")
     .upsert(membershipPayload as never, { onConflict: "user_phrase_id" });
   if (membershipError) {
@@ -215,8 +219,8 @@ export async function setExpressionClusterMain(params: {
     userPhraseIds: members.map((member) => member.user_phrase_id),
   });
 
-  const admin = createSupabaseAdminClient();
-  const { error } = await admin
+  const client = await createUserScopedExpressionClusterClient();
+  const { error } = await client
     .from("user_expression_clusters")
     .update({ main_user_phrase_id: params.mainUserPhraseId } as never)
     .eq("id", cluster.id)
@@ -275,8 +279,8 @@ export async function mergeExpressionClusters(params: {
     userPhraseIds: mergedMemberIds,
   });
 
-  const admin = createSupabaseAdminClient();
-  const { error: updateTargetError } = await admin
+  const client = await createUserScopedExpressionClusterClient();
+  const { error: updateTargetError } = await client
     .from("user_expression_clusters")
     .update({ main_user_phrase_id: nextMainId } as never)
     .eq("id", targetCluster.id)
@@ -285,7 +289,7 @@ export async function mergeExpressionClusters(params: {
     throw new Error(`Failed to update merged target cluster: ${updateTargetError.message}`);
   }
 
-  const { error: deleteSourceError } = await admin
+  const { error: deleteSourceError } = await client
     .from("user_expression_clusters")
     .delete()
     .eq("id", sourceCluster.id)
@@ -333,8 +337,8 @@ export async function detachExpressionClusterMember(params: {
     userPhraseIds: remainingMemberIds,
   });
 
-  const admin = createSupabaseAdminClient();
-  const { error: updateClusterError } = await admin
+  const client = await createUserScopedExpressionClusterClient();
+  const { error: updateClusterError } = await client
     .from("user_expression_clusters")
     .update({ main_user_phrase_id: nextMainId } as never)
     .eq("id", cluster.id)
@@ -343,7 +347,7 @@ export async function detachExpressionClusterMember(params: {
     throw new Error(`Failed to update cluster after detach: ${updateClusterError.message}`);
   }
 
-  const { error: deleteMemberError } = await admin
+  const { error: deleteMemberError } = await client
     .from("user_expression_cluster_members")
     .delete()
     .eq("cluster_id", cluster.id)
@@ -423,8 +427,8 @@ export async function moveExpressionClusterMember(params: {
       .filter((userPhraseId) => userPhraseId !== params.userPhraseId);
 
     if (remainingMemberIds.length === 0) {
-      const admin = createSupabaseAdminClient();
-      const { error: deleteSourceError } = await admin
+      const client = await createUserScopedExpressionClusterClient();
+      const { error: deleteSourceError } = await client
         .from("user_expression_clusters")
         .delete()
         .eq("id", sourceCluster.id)
@@ -444,8 +448,8 @@ export async function moveExpressionClusterMember(params: {
         userPhraseIds: remainingMemberIds,
       });
 
-      const admin = createSupabaseAdminClient();
-      const { error: updateSourceError } = await admin
+      const client = await createUserScopedExpressionClusterClient();
+      const { error: updateSourceError } = await client
         .from("user_expression_clusters")
         .update({ main_user_phrase_id: nextSourceMainId } as never)
         .eq("id", sourceCluster.id)
@@ -463,8 +467,8 @@ export async function moveExpressionClusterMember(params: {
     userPhraseIds: nextTargetMemberIds,
   });
 
-  const admin = createSupabaseAdminClient();
-  const { error: updateTargetError } = await admin
+  const client = await createUserScopedExpressionClusterClient();
+  const { error: updateTargetError } = await client
     .from("user_expression_clusters")
     .update({ main_user_phrase_id: targetMainUserPhraseId } as never)
     .eq("id", targetCluster.id)

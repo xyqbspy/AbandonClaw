@@ -14,7 +14,7 @@ export async function POST(request: Request) {
   try {
     assertAllowedOrigin(request);
     const { user } = await requireCurrentProfile();
-    enforceRateLimit({
+    await enforceRateLimit({
       key: user.id,
       limit: TTS_RATE_LIMIT,
       windowMs: RATE_LIMIT_WINDOW_MS,

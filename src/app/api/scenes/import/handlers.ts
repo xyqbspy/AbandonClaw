@@ -1,30 +1,18 @@
 import { NextResponse } from "next/server";
 import { toApiErrorResponse } from "@/lib/server/api-error";
-import { isAppError, ValidationError } from "@/lib/server/errors";
+import { isAppError } from "@/lib/server/errors";
 import { enforceRateLimit } from "@/lib/server/rate-limit";
 import { assertAllowedOrigin } from "@/lib/server/request-guard";
 import {
-  parseJsonBody,
-  parseOptionalTrimmedString,
-  parseRequiredTrimmedString,
-} from "@/lib/server/validation";
-import { SceneSourceLanguage } from "@/lib/types/scene-parser";
+  normalizeImportScenePayload,
+  parseImportSceneRequest,
+} from "@/lib/server/request-schemas";
 import { parseImportedSceneWithCache } from "@/lib/server/scene/import";
 import { createImportedScene } from "@/lib/server/scene/service";
 import { requireCurrentProfile } from "@/lib/server/auth";
 
 const SCENE_IMPORT_RATE_LIMIT = 5;
 const RATE_LIMIT_WINDOW_MS = 60_000;
-
-interface ImportScenePayload extends Record<string, unknown> {
-  sourceText?: unknown;
-  title?: unknown;
-  theme?: unknown;
-  sourceLanguage?: unknown;
-}
-
-const isSourceLanguage = (value: unknown): value is SceneSourceLanguage =>
-  value === "en" || value === "zh" || value === "mixed";
 
 interface SceneImportHandlerDependencies {
   requireCurrentProfile: typeof requireCurrentProfile;
@@ -47,34 +35,27 @@ export async function handleSceneImportPost(
   try {
     assertAllowedOrigin(request);
     const { user } = await dependencies.requireCurrentProfile();
-    enforceRateLimit({
+    await enforceRateLimit({
       key: user.id,
       limit: SCENE_IMPORT_RATE_LIMIT,
       windowMs: RATE_LIMIT_WINDOW_MS,
       scope: "api-scenes-import",
     });
 
-    const payload = await parseJsonBody<ImportScenePayload>(request);
-    const sourceText = parseRequiredTrimmedString(payload.sourceText, "sourceText", 8000);
-    if (sourceText.length < 10) {
-      throw new ValidationError("sourceText is too short.");
-    }
-
-    const sourceLanguage = isSourceLanguage(payload.sourceLanguage)
-      ? payload.sourceLanguage
-      : "en";
+    const payload = await parseImportSceneRequest(request);
+    const normalizedPayload = normalizeImportScenePayload(payload);
 
     const parsed = await dependencies.parseImportedSceneWithCache({
-      sourceText,
-      sourceLanguage,
+      sourceText: normalizedPayload.sourceText,
+      sourceLanguage: normalizedPayload.sourceLanguage,
       userId: user.id,
     });
 
     const lesson = await dependencies.createImportedScene({
       userId: user.id,
-      sourceText,
-      title: parseOptionalTrimmedString(payload.title, "title", 120),
-      theme: parseOptionalTrimmedString(payload.theme, "theme", 80),
+      sourceText: normalizedPayload.sourceText,
+      title: normalizedPayload.title,
+      theme: normalizedPayload.theme,
       parsedScene: parsed.parsedScene,
       model: process.env.GLM_MODEL ?? "glm-4.6",
     });

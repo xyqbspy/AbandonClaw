@@ -1,6 +1,14 @@
-import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { ensureExpressionClusterForPhrase } from "@/lib/server/expression-clusters/service";
 import { resolveDeleteExpressionClusterResult } from "@/lib/server/phrases/logic";
+import {
+  completeUserPhraseAiEnrichment,
+  ensureSharedPhraseEntity,
+  failUserPhraseAiEnrichment,
+  getUserPhraseForAiEnrichment,
+  markUserPhraseAiEnrichmentPending,
+  updateSharedPhraseLearningInfo,
+} from "@/lib/server/phrases/admin-repo";
 import {
   PhraseRow,
   UserPhraseAiEnrichmentStatus,
@@ -24,6 +32,10 @@ import {
 
 const nowIso = () => new Date().toISOString();
 const todayDate = () => new Date().toISOString().slice(0, 10);
+
+async function createUserScopedPhraseClient() {
+  return createSupabaseServerClient();
+}
 
 export interface SavePhraseInput {
   text?: string;
@@ -208,8 +220,8 @@ async function loadExpressionClusterContextMap(
   const uniqueIds = Array.from(new Set(userPhraseIds.map((item) => item.trim()).filter(Boolean)));
   if (uniqueIds.length === 0) return new Map<string, ExpressionClusterContext>();
 
-  const admin = createSupabaseAdminClient();
-  const { data, error } = await admin
+  const client = await createUserScopedPhraseClient();
+  const { data, error } = await client
     .from("user_expression_cluster_members")
     .select("user_phrase_id,role, cluster:user_expression_clusters!inner(id,user_id,main_user_phrase_id)")
     .in("user_phrase_id", uniqueIds);
@@ -248,8 +260,8 @@ async function loadExpressionClusterContextMap(
 }
 
 async function findExpressionClusterById(userId: string, clusterId: string) {
-  const admin = createSupabaseAdminClient();
-  const { data, error } = await admin
+  const client = await createUserScopedPhraseClient();
+  const { data, error } = await client
     .from("user_expression_clusters")
     .select("*")
     .eq("id", clusterId)
@@ -274,13 +286,13 @@ async function createExpressionCluster(params: {
   mainUserPhraseId: string;
   title?: string | null;
 }) {
-  const admin = createSupabaseAdminClient();
+  const client = await createUserScopedPhraseClient();
   const payload = {
     user_id: params.userId,
     main_user_phrase_id: params.mainUserPhraseId,
     title: parseOptionalTrimmed(params.title, 120),
   };
-  const { data, error } = await admin
+  const { data, error } = await client
     .from("user_expression_clusters")
     .insert(payload as never)
     .select("*")
@@ -298,8 +310,8 @@ async function assignPhraseToExpressionCluster(params: {
   userPhraseId: string;
   role: "main" | "variant";
 }) {
-  const admin = createSupabaseAdminClient();
-  const { error: membershipError } = await admin
+  const client = await createUserScopedPhraseClient();
+  const { error: membershipError } = await client
     .from("user_expression_cluster_members")
     .upsert(
       {
@@ -315,7 +327,7 @@ async function assignPhraseToExpressionCluster(params: {
   }
 
   if (params.role === "main") {
-    const { error: clusterError } = await admin
+    const { error: clusterError } = await client
       .from("user_expression_clusters")
       .update({ main_user_phrase_id: params.userPhraseId } as never)
       .eq("id", params.clusterId)
@@ -334,8 +346,8 @@ async function mergeExpressionClusters(params: {
 }) {
   if (params.targetClusterId === params.sourceClusterId) return;
 
-  const admin = createSupabaseAdminClient();
-  const { data: sourceMembers, error: sourceMembersError } = await admin
+  const client = await createUserScopedPhraseClient();
+  const { data: sourceMembers, error: sourceMembersError } = await client
     .from("user_expression_cluster_members")
     .select("user_phrase_id")
     .eq("cluster_id", params.sourceClusterId);
@@ -349,7 +361,7 @@ async function mergeExpressionClusters(params: {
     role: row.user_phrase_id === params.mainUserPhraseId ? ("main" as const) : ("variant" as const),
   }));
   if (membershipPayload.length > 0) {
-    const { error: upsertError } = await admin
+    const { error: upsertError } = await client
       .from("user_expression_cluster_members")
       .upsert(membershipPayload as never, { onConflict: "user_phrase_id" });
     if (upsertError) {
@@ -357,7 +369,7 @@ async function mergeExpressionClusters(params: {
     }
   }
 
-  const { error: updateTargetError } = await admin
+  const { error: updateTargetError } = await client
     .from("user_expression_clusters")
     .update({ main_user_phrase_id: params.mainUserPhraseId } as never)
     .eq("id", params.targetClusterId)
@@ -366,7 +378,7 @@ async function mergeExpressionClusters(params: {
     throw new Error(`Failed to update merged expression cluster main item: ${updateTargetError.message}`);
   }
 
-  const { error: deleteSourceError } = await admin
+  const { error: deleteSourceError } = await client
     .from("user_expression_clusters")
     .delete()
     .eq("id", params.sourceClusterId)
@@ -480,14 +492,14 @@ async function writeClusterMembershipState(params: {
   mainUserPhraseId: string;
   userPhraseIds: string[];
 }) {
-  const admin = createSupabaseAdminClient();
+  const client = await createUserScopedPhraseClient();
   const membershipPayload = params.userPhraseIds.map((userPhraseId) => ({
     cluster_id: params.clusterId,
     user_phrase_id: userPhraseId,
     role: userPhraseId === params.mainUserPhraseId ? "main" : "variant",
   }));
 
-  const { error: membershipError } = await admin
+  const { error: membershipError } = await client
     .from("user_expression_cluster_members")
     .upsert(membershipPayload as never, { onConflict: "user_phrase_id" });
   if (membershipError) {
@@ -496,8 +508,8 @@ async function writeClusterMembershipState(params: {
 }
 
 async function getOwnedUserPhraseForDelete(userId: string, userPhraseId: string) {
-  const admin = createSupabaseAdminClient();
-  const { data, error } = await admin
+  const client = await createUserScopedPhraseClient();
+  const { data, error } = await client
     .from("user_phrases")
     .select("id,learning_item_type")
     .eq("id", userPhraseId)
@@ -588,9 +600,9 @@ async function upsertUserPhraseRelation(params: {
   relationType: UserPhraseRelationType;
 }) {
   if (params.sourceUserPhraseId === params.targetUserPhraseId) return;
-  const admin = createSupabaseAdminClient();
+  const client = await createUserScopedPhraseClient();
 
-  const { data: ownedRows, error: ownershipError } = await admin
+  const { data: ownedRows, error: ownershipError } = await client
     .from("user_phrases")
     .select("id")
     .eq("user_id", params.userId)
@@ -621,7 +633,7 @@ async function upsertUserPhraseRelation(params: {
   ];
 
   const oppositeRelationType = getOppositeRelationType(params.relationType);
-  const { error: deleteOppositeError } = await admin
+  const { error: deleteOppositeError } = await client
     .from("user_phrase_relations")
     .delete()
     .eq("user_id", params.userId)
@@ -634,7 +646,7 @@ async function upsertUserPhraseRelation(params: {
     throw new Error(`Failed to normalize opposite phrase relation: ${deleteOppositeError.message}`);
   }
 
-  const { error } = await admin
+  const { error } = await client
     .from("user_phrase_relations")
     .upsert(payload as never, {
       onConflict: "user_id,source_user_phrase_id,target_user_phrase_id,relation_type",
@@ -645,65 +657,10 @@ async function upsertUserPhraseRelation(params: {
   }
 }
 
-async function ensurePhraseEntity(input: {
-  normalizedText: string;
-  displayText: string;
-  translation: string | null;
-  usageNote: string | null;
-  difficulty: string | null;
-  tags: string[];
-}) {
-  const admin = createSupabaseAdminClient();
-  const { data: existing, error: findError } = await admin
-    .from("phrases")
-    .select("*")
-    .eq("normalized_text", input.normalizedText)
-    .maybeSingle<PhraseRow>();
-
-  if (findError) {
-    throw new Error(`Failed to find phrase: ${findError.message}`);
-  }
-  if (existing) return existing;
-
-  const insertPayload = {
-    normalized_text: input.normalizedText,
-    display_text: input.displayText,
-    translation: input.translation,
-    usage_note: input.usageNote,
-    difficulty: input.difficulty,
-    tags: input.tags,
-  };
-
-  const { data: inserted, error: insertError } = await admin
-    .from("phrases")
-    .insert(insertPayload as never)
-    .select("*")
-    .single<PhraseRow>();
-
-  if (insertError) {
-    if (insertError.code === "23505") {
-      const { data: raceWinner, error: raceReadError } = await admin
-        .from("phrases")
-        .select("*")
-        .eq("normalized_text", input.normalizedText)
-        .single<PhraseRow>();
-      if (raceReadError || !raceWinner) {
-        throw new Error(
-          `Failed to resolve phrase upsert race: ${raceReadError?.message ?? "unknown error"}`,
-        );
-      }
-      return raceWinner;
-    }
-    throw new Error(`Failed to create phrase: ${insertError.message}`);
-  }
-
-  return inserted;
-}
-
 async function addDailyPhraseSaved(userId: string) {
-  const admin = createSupabaseAdminClient();
+  const client = await createUserScopedPhraseClient();
   const today = todayDate();
-  const { data: existing, error: readError } = await admin
+  const { data: existing, error: readError } = await client
     .from("user_daily_learning_stats")
     .select("*")
     .eq("user_id", userId)
@@ -724,7 +681,7 @@ async function addDailyPhraseSaved(userId: string) {
     phrases_saved: (existing?.phrases_saved ?? 0) + 1,
   };
 
-  const { error: upsertError } = await admin
+  const { error: upsertError } = await client
     .from("user_daily_learning_stats")
     .upsert(next as never, { onConflict: "user_id,date" });
   if (upsertError) {
@@ -733,8 +690,8 @@ async function addDailyPhraseSaved(userId: string) {
 }
 
 async function incrementSceneSavedPhraseCount(userId: string, sceneId: string) {
-  const admin = createSupabaseAdminClient();
-  const { data: existing, error: readError } = await admin
+  const client = await createUserScopedPhraseClient();
+  const { data: existing, error: readError } = await client
     .from("user_scene_progress")
     .select("*")
     .eq("user_id", userId)
@@ -761,7 +718,7 @@ async function incrementSceneSavedPhraseCount(userId: string, sceneId: string) {
     saved_phrase_count: (existing?.saved_phrase_count ?? 0) + 1,
   };
 
-  const { error: upsertError } = await admin
+  const { error: upsertError } = await client
     .from("user_scene_progress")
     .upsert(next as never, { onConflict: "user_id,scene_id" });
 
@@ -796,7 +753,7 @@ export async function savePhraseForUser(userId: string, input: SavePhraseInput) 
       ? expressionText || toStableSentenceSyntheticText(sentenceText ?? "")
       : expressionText;
   const normalizedText = normalizePhraseText(phraseDisplayText);
-  const phrase = await ensurePhraseEntity({
+  const phrase = await ensureSharedPhraseEntity({
     normalizedText,
     displayText: phraseDisplayText,
     translation: parseOptionalTrimmed(input.translation, 500),
@@ -812,8 +769,8 @@ export async function savePhraseForUser(userId: string, input: SavePhraseInput) 
     if (scene) sourceSceneId = scene.row.id;
   }
 
-  const admin = createSupabaseAdminClient();
-  const { data: existing, error: existingError } = await admin
+  const client = await createUserScopedPhraseClient();
+  const { data: existing, error: existingError } = await client
     .from("user_phrases")
     .select("*")
     .eq("user_id", userId)
@@ -889,7 +846,7 @@ export async function savePhraseForUser(userId: string, input: SavePhraseInput) 
     last_seen_at: now,
   };
 
-  const { data: savedRow, error: upsertError } = await admin
+  const { data: savedRow, error: upsertError } = await client
     .from("user_phrases")
     .upsert(nextPayload as never, { onConflict: "user_id,phrase_id" })
     .select("*")
@@ -908,7 +865,7 @@ export async function savePhraseForUser(userId: string, input: SavePhraseInput) 
       delete (fallbackPayload as Record<string, unknown>).source_type;
       delete (fallbackPayload as Record<string, unknown>).source_note;
       delete (fallbackPayload as Record<string, unknown>).learning_item_type;
-      const { data: fallbackRow, error: fallbackError } = await admin
+      const { data: fallbackRow, error: fallbackError } = await client
         .from("user_phrases")
         .upsert(fallbackPayload as never, { onConflict: "user_id,phrase_id" })
         .select("*")
@@ -988,7 +945,7 @@ export async function deleteUserPhraseForUser(
   userPhraseId: string,
 ): Promise<DeleteUserPhraseResult> {
   const ownedPhrase = await getOwnedUserPhraseForDelete(userId, userPhraseId);
-  const admin = createSupabaseAdminClient();
+  const client = await createUserScopedPhraseClient();
 
   let deletedClusterId: string | null = null;
   let clusterDeleted = false;
@@ -1001,7 +958,7 @@ export async function deleteUserPhraseForUser(
     if (clusterContext?.clusterId) {
       deletedClusterId = clusterContext.clusterId;
       const cluster = await findExpressionClusterById(userId, clusterContext.clusterId);
-      const { data: memberRows, error: memberError } = await admin
+      const { data: memberRows, error: memberError } = await client
         .from("user_expression_cluster_members")
         .select("user_phrase_id")
         .eq("cluster_id", clusterContext.clusterId)
@@ -1022,7 +979,7 @@ export async function deleteUserPhraseForUser(
 
       if (deleteClusterResult.clusterDeleted) {
         if (cluster) {
-          const { error: deleteClusterError } = await admin
+          const { error: deleteClusterError } = await client
             .from("user_expression_clusters")
             .delete()
             .eq("id", cluster.id)
@@ -1044,7 +1001,7 @@ export async function deleteUserPhraseForUser(
           userPhraseIds: remainingMemberIds,
         });
 
-        const { error: updateClusterError } = await admin
+        const { error: updateClusterError } = await client
           .from("user_expression_clusters")
           .update({ main_user_phrase_id: nextMainUserPhraseId } as never)
           .eq("id", cluster.id)
@@ -1056,7 +1013,7 @@ export async function deleteUserPhraseForUser(
     }
   }
 
-  const { error: deletePhraseError } = await admin
+  const { error: deletePhraseError } = await client
     .from("user_phrases")
     .delete()
     .eq("id", userPhraseId)
@@ -1080,17 +1037,7 @@ export async function enrichAiExpressionLearningInfo(params: {
   baseExpression?: string;
   differenceLabel?: string;
 }) {
-  const admin = createSupabaseAdminClient();
-  const { data: userPhrase, error: readError } = await admin
-    .from("user_phrases")
-    .select("*, phrase:phrases(*)")
-    .eq("id", params.userPhraseId)
-    .eq("user_id", params.userId)
-    .maybeSingle<UserPhraseRow & { phrase: PhraseRow | null }>();
-
-  if (readError) {
-    throw new Error(`Failed to read user phrase for enrichment: ${readError.message}`);
-  }
+  const userPhrase = await getUserPhraseForAiEnrichment(params);
   if (!userPhrase) {
     throw new ValidationError("Expression not found.");
   }
@@ -1103,19 +1050,11 @@ export async function enrichAiExpressionLearningInfo(params: {
     throw new ValidationError("Expression text is missing.");
   }
 
-  const markPendingPayload = {
-    ai_enrichment_status: "pending" as const,
-    ai_enrichment_error: null,
-    last_seen_at: nowIso(),
-  };
-  const { error: pendingError } = await admin
-    .from("user_phrases")
-    .update(markPendingPayload as never)
-    .eq("id", params.userPhraseId)
-    .eq("user_id", params.userId);
-  if (pendingError) {
-    throw new Error(`Failed to mark enrichment pending: ${pendingError.message}`);
-  }
+  await markUserPhraseAiEnrichmentPending({
+    userId: params.userId,
+    userPhraseId: params.userPhraseId,
+    lastSeenAt: nowIso(),
+  });
 
   try {
     const rawModelText = await callGlmChatCompletion({
@@ -1155,48 +1094,21 @@ export async function enrichAiExpressionLearningInfo(params: {
       existingTypicalScenario ?? typicalScenario,
     );
 
-    const nextPhrasePayload = {
+    await updateSharedPhraseLearningInfo({
+      phraseId: userPhrase.phrase_id,
       translation: zhTranslation,
-      usage_note: zhUsageNote,
-    };
+      usageNote: zhUsageNote,
+    });
 
-    const { error: phraseUpdateError } = await admin
-      .from("phrases")
-      .update(nextPhrasePayload as never)
-      .eq("id", userPhrase.phrase_id);
-    if (phraseUpdateError) {
-      throw new Error(`Failed to update phrase learning info: ${phraseUpdateError.message}`);
-    }
-
-    const nextUserPhrasePayload = {
-      source_sentence_text:
-        existingSentenceText ??
-        examples[0]?.en ??
-        null,
-      ai_example_sentences:
-        existingExamples.length > 0
-          ? existingExamples
-          : examples,
-      ai_semantic_focus:
-        existingSemanticFocus ??
-        zhSemanticFocus ??
-        null,
-      ai_typical_scenario:
-        existingTypicalScenario ??
-        zhTypicalScenario ??
-        null,
-      ai_enrichment_status: "done" as const,
-      ai_enrichment_error: null,
-      last_seen_at: nowIso(),
-    };
-    const { error: doneError } = await admin
-      .from("user_phrases")
-      .update(nextUserPhrasePayload as never)
-      .eq("id", params.userPhraseId)
-      .eq("user_id", params.userId);
-    if (doneError) {
-      throw new Error(`Failed to write enrichment result: ${doneError.message}`);
-    }
+    await completeUserPhraseAiEnrichment({
+      userId: params.userId,
+      userPhraseId: params.userPhraseId,
+      sourceSentenceText: existingSentenceText ?? examples[0]?.en ?? null,
+      exampleSentences: existingExamples.length > 0 ? existingExamples : examples,
+      semanticFocus: existingSemanticFocus ?? zhSemanticFocus ?? null,
+      typicalScenario: existingTypicalScenario ?? zhTypicalScenario ?? null,
+      lastSeenAt: nowIso(),
+    });
 
     return {
       userPhraseId: params.userPhraseId,
@@ -1204,20 +1116,12 @@ export async function enrichAiExpressionLearningInfo(params: {
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown enrichment error";
-    const { error: failedError } = await admin
-      .from("user_phrases")
-      .update({
-        ai_enrichment_status: "failed",
-        ai_enrichment_error: message.slice(0, 300),
-        last_seen_at: nowIso(),
-      } as never)
-      .eq("id", params.userPhraseId)
-      .eq("user_id", params.userId);
-    if (failedError) {
-      throw new Error(
-        `Enrichment failed and failed status could not be saved: ${failedError.message}`,
-      );
-    }
+    await failUserPhraseAiEnrichment({
+      userId: params.userId,
+      userPhraseId: params.userPhraseId,
+      message,
+      lastSeenAt: nowIso(),
+    });
     throw error;
   }
 }
@@ -1232,7 +1136,7 @@ export async function listUserSavedPhrases(params: {
   page?: number;
   limit?: number;
 }) {
-  const admin = createSupabaseAdminClient();
+  const client = await createUserScopedPhraseClient();
   const page = Math.max(1, Math.floor(params.page ?? 1));
   const limit = Math.min(100, Math.max(1, Math.floor(params.limit ?? 20)));
   const from = (page - 1) * limit;
@@ -1241,7 +1145,7 @@ export async function listUserSavedPhrases(params: {
   let clusterMemberIds: string[] | null = null;
 
   if (params.expressionClusterId) {
-    const { data: membershipRows, error: membershipError } = await admin
+    const { data: membershipRows, error: membershipError } = await client
       .from("user_expression_cluster_members")
       .select("user_phrase_id, cluster:user_expression_clusters!inner(id,user_id)")
       .eq("cluster_id", params.expressionClusterId);
@@ -1277,7 +1181,7 @@ export async function listUserSavedPhrases(params: {
     }
   }
 
-  let query = admin
+  let query = client
     .from("user_phrases")
     .select("*, phrase:phrases(*)", { count: "exact" })
     .eq("user_id", params.userId)
@@ -1341,8 +1245,8 @@ export async function listUserSavedPhraseTextsByNormalized(
   ).slice(0, 120);
   if (uniqueTexts.length === 0) return [];
 
-  const admin = createSupabaseAdminClient();
-  const { data: phraseRows, error: phraseError } = await admin
+  const client = await createUserScopedPhraseClient();
+  const { data: phraseRows, error: phraseError } = await client
     .from("phrases")
     .select("id,normalized_text")
     .in("normalized_text", uniqueTexts);
@@ -1357,7 +1261,7 @@ export async function listUserSavedPhraseTextsByNormalized(
   const phraseIds = Array.from(phraseIdByText.values());
   if (phraseIds.length === 0) return [];
 
-  const { data: userRows, error: userError } = await admin
+  const { data: userRows, error: userError } = await client
     .from("user_phrases")
     .select("phrase_id")
     .eq("user_id", userId)
@@ -1391,11 +1295,11 @@ export async function listUserPhraseRelationsBatch(params: {
   userId: string;
   userPhraseIds: string[];
 }) {
-  const admin = createSupabaseAdminClient();
+  const client = await createUserScopedPhraseClient();
   const userPhraseIds = Array.from(new Set(params.userPhraseIds.map((item) => item.trim()).filter(Boolean))).slice(0, 100);
   if (userPhraseIds.length === 0) return [] as UserSavedPhraseRelationItem[];
 
-  const { data: relationRows, error: relationError } = await admin
+  const { data: relationRows, error: relationError } = await client
     .from("user_phrase_relations")
     .select("*")
     .eq("user_id", params.userId)
@@ -1409,7 +1313,7 @@ export async function listUserPhraseRelationsBatch(params: {
   const targetIds = Array.from(new Set(rows.map((row) => row.target_user_phrase_id))).slice(0, 100);
   if (targetIds.length === 0) return [] as UserSavedPhraseRelationItem[];
 
-  const { data: targetRows, error: targetError } = await admin
+  const { data: targetRows, error: targetError } = await client
     .from("user_phrases")
     .select("*, phrase:phrases(*)")
     .eq("user_id", params.userId)
@@ -1441,16 +1345,16 @@ export async function listUserPhraseRelationsBatch(params: {
 }
 
 export async function getUserPhraseSummary(userId: string) {
-  const admin = createSupabaseAdminClient();
+  const client = await createUserScopedPhraseClient();
 
   const [{ count: totalSavedPhrases, error: totalError }, { data: dailyStats, error: dailyError }] =
     await Promise.all([
-      admin
+      client
         .from("user_phrases")
         .select("*", { count: "exact", head: true })
         .eq("user_id", userId)
         .eq("status", "saved"),
-      admin
+      client
         .from("user_daily_learning_stats")
         .select("phrases_saved")
         .eq("user_id", userId)

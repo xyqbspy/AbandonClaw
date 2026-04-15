@@ -1,13 +1,18 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { AuthError, ValidationError } from "@/lib/server/errors";
+import { clearIdempotencyStore } from "@/lib/server/idempotency";
 import { handleContinueLearningGet, handleLearningProgressGet } from "./handlers";
 import {
   handleSceneLearningPausePost,
   handleSceneLearningStartPost,
 } from "./scenes/[slug]/handlers";
 
-const createRequest = (url: string) => new Request(url);
+const createRequest = (url: string, init?: RequestInit) => new Request(url, init);
+
+test.beforeEach(() => {
+  clearIdempotencyStore();
+});
 
 test("learning continue handler 会透传 userId 并返回 continueLearning", async () => {
   let receivedUserId: string | null = null;
@@ -79,6 +84,41 @@ test("learning progress handler 在 status 非法时返回 400 与 requestId", a
   assert.equal(response.status, 400);
   assert.equal(body.code, "VALIDATION_ERROR");
   assert.equal(typeof body.requestId, "string");
+});
+
+test("scene learning start handler 对相同幂等 key 只执行一次", async () => {
+  let startCount = 0;
+  const request = createRequest("http://localhost/api/learning/scenes/scene-1/start", {
+    method: "POST",
+    headers: {
+      "x-idempotency-key": "same-learning-start-key",
+    },
+  });
+
+  const dependencies = {
+    requireCurrentProfile: async () => ({ user: { id: "user-1" } } as never),
+    startSceneLearning: async () => {
+      startCount += 1;
+      return { started: true, count: startCount } as never;
+    },
+    pauseSceneLearning: async () => ({ paused: true }) as never,
+  };
+
+  const first = await handleSceneLearningStartPost(
+    { params: Promise.resolve({ slug: "scene-1" }) },
+    dependencies,
+    request.clone(),
+  );
+  const second = await handleSceneLearningStartPost(
+    { params: Promise.resolve({ slug: "scene-1" }) },
+    dependencies,
+    request.clone(),
+  );
+
+  assert.equal(first.status, 200);
+  assert.equal(second.status, 200);
+  assert.equal(startCount, 1);
+  assert.deepEqual(await first.json(), await second.json());
 });
 
 test("scene learning start handler 会透传 userId 与 slug", async () => {

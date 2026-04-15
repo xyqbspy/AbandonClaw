@@ -1,5 +1,10 @@
 import { SceneRow, UserSceneProgressRow } from "@/lib/server/db/types";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+
+async function createUserScopedSceneClient() {
+  return createSupabaseServerClient();
+}
 
 export async function upsertSceneBySlug(row: Partial<SceneRow> & { slug: string }) {
   const admin = createSupabaseAdminClient();
@@ -12,8 +17,8 @@ export async function upsertSceneBySlug(row: Partial<SceneRow> & { slug: string 
 }
 
 export async function listVisibleScenesByUserId(userId: string) {
-  const admin = createSupabaseAdminClient();
-  const { data, error } = await admin
+  const client = await createUserScopedSceneClient();
+  const { data, error } = await client
     .from("scenes")
     .select("*")
     .or(`is_public.eq.true,created_by.eq.${userId}`)
@@ -25,8 +30,8 @@ export async function listVisibleScenesByUserId(userId: string) {
 }
 
 export async function getVisibleSceneBySlug(params: { slug: string; userId: string }) {
-  const admin = createSupabaseAdminClient();
-  const { data, error } = await admin
+  const client = await createUserScopedSceneClient();
+  const { data, error } = await client
     .from("scenes")
     .select("*")
     .eq("slug", params.slug)
@@ -42,8 +47,8 @@ export async function listVisibleScenesBySlugs(params: { userId: string; slugs: 
   const uniqueSlugs = Array.from(new Set(params.slugs.map((item) => item.trim()).filter(Boolean)));
   if (uniqueSlugs.length === 0) return [] as Array<Pick<SceneRow, "slug" | "title">>;
 
-  const admin = createSupabaseAdminClient();
-  const { data, error } = await admin
+  const client = await createUserScopedSceneClient();
+  const { data, error } = await client
     .from("scenes")
     .select("slug,title")
     .in("slug", uniqueSlugs)
@@ -55,8 +60,8 @@ export async function listVisibleScenesBySlugs(params: { userId: string; slugs: 
 }
 
 export async function getVisibleSceneById(params: { sceneId: string; userId: string }) {
-  const admin = createSupabaseAdminClient();
-  const { data, error } = await admin
+  const client = await createUserScopedSceneClient();
+  const { data, error } = await client
     .from("scenes")
     .select("*")
     .eq("id", params.sceneId)
@@ -133,8 +138,8 @@ export async function listUserSceneProgressBySceneIds(params: {
 }) {
   if (params.sceneIds.length === 0) return [] as UserSceneProgressRow[];
 
-  const admin = createSupabaseAdminClient();
-  const { data, error } = await admin
+  const client = await createUserScopedSceneClient();
+  const { data, error } = await client
     .from("user_scene_progress")
     .select("*")
     .eq("user_id", params.userId)

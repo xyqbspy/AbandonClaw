@@ -1,4 +1,4 @@
-import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
   PhraseReviewFullOutputStatus,
   PhraseReviewOutputConfidence,
@@ -27,6 +27,10 @@ const addDays = (days: number) => {
   const timestamp = Date.now() + days * 24 * 60 * 60 * 1000;
   return new Date(timestamp).toISOString();
 };
+
+async function createUserScopedReviewClient() {
+  return createSupabaseServerClient();
+}
 
 export type ReviewSchedulingFocus =
   | "low_output_confidence"
@@ -121,8 +125,8 @@ async function loadClusterIdByUserPhraseId(userId: string, userPhraseIds: string
   const uniqueIds = Array.from(new Set(userPhraseIds.map((item) => item.trim()).filter(Boolean)));
   if (uniqueIds.length === 0) return new Map<string, string>();
 
-  const admin = createSupabaseAdminClient();
-  const { data, error } = await admin
+  const client = await createUserScopedReviewClient();
+  const { data, error } = await client
     .from("user_expression_cluster_members")
     .select("user_phrase_id, cluster:user_expression_clusters!inner(id,user_id)")
     .in("user_phrase_id", uniqueIds);
@@ -177,9 +181,9 @@ const isReviewableStatus = (status: UserPhraseReviewStatus) =>
   status === "saved" || status === "reviewing";
 
 async function addDailyReviewCompleted(userId: string) {
-  const admin = createSupabaseAdminClient();
+  const client = await createUserScopedReviewClient();
   const today = todayDate();
-  const { data: existing, error: readError } = await admin
+  const { data: existing, error: readError } = await client
     .from("user_daily_learning_stats")
     .select("*")
     .eq("user_id", userId)
@@ -200,7 +204,7 @@ async function addDailyReviewCompleted(userId: string) {
     phrases_saved: existing?.phrases_saved ?? 0,
   };
 
-  const { error: upsertError } = await admin
+  const { error: upsertError } = await client
     .from("user_daily_learning_stats")
     .upsert(next as never, { onConflict: "user_id,date" });
   if (upsertError) {
@@ -209,12 +213,12 @@ async function addDailyReviewCompleted(userId: string) {
 }
 
 export async function getDueReviewItems(userId: string, params?: { limit?: number }) {
-  const admin = createSupabaseAdminClient();
+  const client = await createUserScopedReviewClient();
   const limit = Math.min(100, Math.max(1, Math.floor(params?.limit ?? 20)));
   const fetchLimit = Math.min(400, Math.max(limit * 4, limit));
   const now = nowIso();
 
-  const { data, error } = await admin
+  const { data, error } = await client
     .from("user_phrases")
     .select("*, phrase:phrases(*)")
     .eq("user_id", userId)
@@ -340,8 +344,8 @@ async function loadLatestReviewSignalsByUserPhraseId(userId: string, userPhraseI
   const uniqueIds = Array.from(new Set(userPhraseIds.map((item) => item.trim()).filter(Boolean)));
   if (uniqueIds.length === 0) return new Map<string, ReviewLatestSignals>();
 
-  const admin = createSupabaseAdminClient();
-  const { data, error } = await admin
+  const client = await createUserScopedReviewClient();
+  const { data, error } = await client
     .from("phrase_review_logs")
     .select("user_phrase_id, recognition_state, output_confidence, full_output_status, reviewed_at")
     .eq("user_id", userId)
@@ -382,9 +386,9 @@ export async function getDueScenePracticeReviewItems(
   userId: string,
   params?: { limit?: number },
 ) {
-  const admin = createSupabaseAdminClient();
+  const client = await createUserScopedReviewClient();
   const limit = Math.min(20, Math.max(1, Math.floor(params?.limit ?? 6)));
-  const { data, error } = await admin
+  const { data, error } = await client
     .from("user_scene_practice_attempts")
     .select("*, scene:scenes!inner(slug,title)")
     .eq("user_id", userId)
@@ -452,26 +456,26 @@ export async function getDueScenePracticeReviewItems(
 }
 
 export async function getUserPhraseReviewBuckets(userId: string) {
-  const admin = createSupabaseAdminClient();
+  const client = await createUserScopedReviewClient();
   const now = nowIso();
 
   const [savedRes, reviewingRes, masteredRes, dueRes] = await Promise.all([
-    admin
+    client
       .from("user_phrases")
       .select("*", { count: "exact", head: true })
       .eq("user_id", userId)
       .eq("review_status", "saved"),
-    admin
+    client
       .from("user_phrases")
       .select("*", { count: "exact", head: true })
       .eq("user_id", userId)
       .eq("review_status", "reviewing"),
-    admin
+    client
       .from("user_phrases")
       .select("*", { count: "exact", head: true })
       .eq("user_id", userId)
       .eq("review_status", "mastered"),
-    admin
+    client
       .from("user_phrases")
       .select("*", { count: "exact", head: true })
       .eq("user_id", userId)
@@ -502,8 +506,8 @@ const toReviewSchemaErrorMessage = (context: string, originalMessage: string) =>
   `Review schema is not up to date (${context}): ${originalMessage}. Run supabase/sql/20260317_phase6_review_loop_mvp.sql and supabase/sql/20260331_phase20_review_practice_signals.sql after earlier review migrations.`;
 
 export async function submitPhraseReview(userId: string, input: SubmitPhraseReviewInput) {
-  const admin = createSupabaseAdminClient();
-  const { data: existing, error: existingError } = await admin
+  const client = await createUserScopedReviewClient();
+  const { data: existing, error: existingError } = await client
     .from("user_phrases")
     .select("*")
     .eq("id", input.userPhraseId)
@@ -567,7 +571,7 @@ export async function submitPhraseReview(userId: string, input: SubmitPhraseRevi
     mastered_at: masteredAt,
   };
 
-  const { data: updated, error: updateError } = await admin
+  const { data: updated, error: updateError } = await client
     .from("user_phrases")
     .update(updatePayload as never)
     .eq("id", existing.id)
@@ -579,7 +583,7 @@ export async function submitPhraseReview(userId: string, input: SubmitPhraseRevi
     throw new Error(`Failed to update review phrase: ${updateError?.message ?? "unknown error"}`);
   }
 
-  const { error: logError } = await admin.from("phrase_review_logs").insert({
+  const { error: logError } = await client.from("phrase_review_logs").insert({
     user_id: userId,
     phrase_id: existing.phrase_id,
     user_phrase_id: existing.id,
@@ -613,35 +617,35 @@ export async function submitPhraseReview(userId: string, input: SubmitPhraseRevi
 }
 
 export async function getReviewSummary(userId: string): Promise<ReviewSummary> {
-  const admin = createSupabaseAdminClient();
+  const client = await createUserScopedReviewClient();
   const now = nowIso();
   const today = todayDate();
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
   const [dueRes, todayStatsRes, accuracyRes, masteredRes, todaySignalsRes] = await Promise.all([
-    admin
+    client
       .from("user_phrases")
       .select("*", { count: "exact", head: true })
       .eq("user_id", userId)
       .in("review_status", ["saved", "reviewing"])
       .or(`next_review_at.is.null,next_review_at.lte.${now}`),
-    admin
+    client
       .from("user_daily_learning_stats")
       .select("review_items_completed")
       .eq("user_id", userId)
       .eq("date", today)
       .maybeSingle<{ review_items_completed: number }>(),
-    admin
+    client
       .from("phrase_review_logs")
       .select("was_correct")
       .eq("user_id", userId)
       .gte("reviewed_at", thirtyDaysAgo),
-    admin
+    client
       .from("user_phrases")
       .select("*", { count: "exact", head: true })
       .eq("user_id", userId)
       .eq("review_status", "mastered"),
-    admin
+    client
       .from("phrase_review_logs")
       .select("output_confidence,full_output_status")
       .eq("user_id", userId)

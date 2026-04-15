@@ -8,16 +8,16 @@ import {
   submitPhraseReview,
 } from "@/lib/server/review/service";
 import {
-  parseJsonBody,
-  parseOptionalReviewFullOutputStatus,
-  parseOptionalReviewOutputConfidence,
-  parseOptionalReviewRecognitionState,
-  parseOptionalTrimmedString,
-  parseRequiredTrimmedString,
-  parseReviewResult,
-} from "@/lib/server/validation";
+  normalizeReviewSubmitPayload,
+  parseReviewSubmitRequest,
+} from "@/lib/server/request-schemas";
 import { ValidationError } from "@/lib/server/errors";
 import { assertAllowedOrigin } from "@/lib/server/request-guard";
+import {
+  buildDeterministicIdempotencyKey,
+  getRequestIdempotencyKey,
+  runIdempotentMutation,
+} from "@/lib/server/idempotency";
 
 const parseLimit = (raw: string | null) => {
   if (!raw) return 20;
@@ -58,15 +58,6 @@ export async function handleReviewDueGet(
   }
 }
 
-interface SubmitReviewPayload extends Record<string, unknown> {
-  userPhraseId?: unknown;
-  reviewResult?: unknown;
-  source?: unknown;
-  recognitionState?: unknown;
-  outputConfidence?: unknown;
-  fullOutputStatus?: unknown;
-}
-
 interface ReviewSubmitHandlerDependencies {
   requireCurrentProfile: typeof requireCurrentProfile;
   submitPhraseReview: typeof submitPhraseReview;
@@ -86,16 +77,21 @@ export async function handleReviewSubmitPost(
   try {
     assertAllowedOrigin(request);
     const { user } = await dependencies.requireCurrentProfile();
-    const payload = await parseJsonBody<SubmitReviewPayload>(request);
-    const item = await dependencies.submitPhraseReview(user.id, {
-      userPhraseId: parseRequiredTrimmedString(payload.userPhraseId, "userPhraseId", 64),
-      reviewResult: parseReviewResult(payload.reviewResult),
-      source: parseOptionalTrimmedString(payload.source, "source", 80),
-      recognitionState: parseOptionalReviewRecognitionState(payload.recognitionState),
-      outputConfidence: parseOptionalReviewOutputConfidence(payload.outputConfidence),
-      fullOutputStatus: parseOptionalReviewFullOutputStatus(payload.fullOutputStatus),
+    const payload = await parseReviewSubmitRequest(request);
+    const normalizedPayload = normalizeReviewSubmitPayload(payload);
+    const idempotencyKey = getRequestIdempotencyKey(
+      request,
+      buildDeterministicIdempotencyKey("review-submit", user.id, normalizedPayload),
+    );
+    const { item, summary } = await runIdempotentMutation({
+      scope: "review-submit",
+      key: idempotencyKey,
+      execute: async () => {
+        const item = await dependencies.submitPhraseReview(user.id, normalizedPayload);
+        const summary = await dependencies.getReviewSummary(user.id);
+        return { item, summary };
+      },
     });
-    const summary = await dependencies.getReviewSummary(user.id);
     return NextResponse.json({ item, summary }, { status: 200 });
   } catch (error) {
     return toApiErrorResponse(error, "Failed to submit review.", { request });

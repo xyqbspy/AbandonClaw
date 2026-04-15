@@ -1,4 +1,4 @@
-import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { NotFoundError } from "@/lib/server/errors";
 import { getSceneRecordBySlug } from "@/lib/server/scene/service";
 import { UserSceneVariantRunRow } from "@/lib/server/db/types";
@@ -6,6 +6,10 @@ import { UserSceneVariantRunRow } from "@/lib/server/db/types";
 import { startSceneLearning } from "./service";
 
 const nowIso = () => new Date().toISOString();
+
+async function createUserScopedVariantClient() {
+  return createSupabaseServerClient();
+}
 
 const toSceneVariantSchemaErrorMessage = (context: string, originalMessage: string) =>
   `Scene variant schema is not up to date (${context}): ${originalMessage}. Run supabase/sql/20260325_phase18_scene_variant_runs_mvp.sql after phase17 learning migrations.`;
@@ -63,8 +67,8 @@ async function resolveVisibleSceneBySlug(userId: string, sceneSlug: string) {
 }
 
 async function getLatestActiveRunBySet(userId: string, sceneId: string, variantSetId: string) {
-  const admin = createSupabaseAdminClient();
-  const { data, error } = await admin
+  const client = await createUserScopedVariantClient();
+  const { data, error } = await client
     .from("user_scene_variant_runs")
     .select("*")
     .eq("user_id", userId)
@@ -82,8 +86,8 @@ async function getLatestActiveRunBySet(userId: string, sceneId: string, variantS
 }
 
 async function getLatestRunBySet(userId: string, sceneId: string, variantSetId: string) {
-  const admin = createSupabaseAdminClient();
-  const { data, error } = await admin
+  const client = await createUserScopedVariantClient();
+  const { data, error } = await client
     .from("user_scene_variant_runs")
     .select("*")
     .eq("user_id", userId)
@@ -106,7 +110,7 @@ async function upsertVariantRun(
     variant_set_id: string;
   },
 ) {
-  const admin = createSupabaseAdminClient();
+  const client = await createUserScopedVariantClient();
   const timestamp = nowIso();
   const next = {
     viewed_variant_ids: [],
@@ -116,7 +120,7 @@ async function upsertVariantRun(
     ...patch,
   };
 
-  const { data, error } = await admin
+  const { data, error } = await client
     .from("user_scene_variant_runs")
     .upsert(next as never, { onConflict: "id" })
     .select("*")

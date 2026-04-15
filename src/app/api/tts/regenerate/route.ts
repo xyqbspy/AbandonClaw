@@ -55,7 +55,7 @@ export async function handleTtsRegeneratePost(
   try {
     assertAllowedOrigin(request);
     const admin = await dependencies.requireAdmin();
-    enforceRateLimit({
+    await enforceRateLimit({
       key: admin.id,
       limit: REGENERATE_RATE_LIMIT,
       windowMs: RATE_LIMIT_WINDOW_MS,
