@@ -178,7 +178,6 @@ async function main() {
     console.log(
       JSON.stringify(
         {
-          dryRun: true,
           ...config,
           bodyPreview: config.body ? `${config.body.slice(0, 120)}${config.body.length > 120 ? "..." : ""}` : null,
         },

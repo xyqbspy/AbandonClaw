@@ -1,4 +1,5 @@
 import { SavePhraseInput } from "@/lib/server/phrases/service";
+import type { GeneratePersonalizedSceneInput } from "@/lib/server/scene/generation";
 import { isValidParsedScene } from "@/lib/server/scene-json";
 import { SceneSourceLanguage, PracticeGenerateRequest } from "@/lib/types/scene-parser";
 import { ExplainSelectionRequest } from "@/lib/types";
@@ -323,7 +324,9 @@ export const normalizeExplainSelectionPayload = (
 export const parseExplainSelectionRequest = (request: Request) =>
   parseJsonBody<ExplainSelectionPayload>(request);
 
-export const normalizeGenerateScenePayload = (payload: GenerateScenePayload) => ({
+export const normalizeGenerateScenePayload = (
+  payload: GenerateScenePayload,
+): GeneratePersonalizedSceneInput => ({
   promptText: parseRequiredTrimmedString(payload.promptText, "promptText", 800),
   tone: typeof payload.tone === "string" ? payload.tone : undefined,
   difficulty:

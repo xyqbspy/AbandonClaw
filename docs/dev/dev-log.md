@@ -1,5 +1,112 @@
 # Dev Log
 
+### [2026-04-15] 第三阶段：真实 HTTP baseline 与上线清单
+
+- 类型：压测 / 验证 / 文档
+- 状态：进行中
+#### 背景
+第三阶段要求把第二阶段已有的 in-process baseline 扩展到真实 HTTP 入口，并补一份可执行的上线前检查清单。真实入口下除了业务处理本身，还会经过 middleware、Origin 校验、cookie 鉴权和限流逻辑，结果更接近实际部署。
+#### 本次改动
+- 通过 `preview` 启动真实 HTTP 服务，并修复了两个直接阻塞构建的历史问题：
+  - `scripts/load-api-baseline.ts` 的重复 `dryRun` 字段
+  - `src/lib/server/request-schemas.ts` 的类型收窄不足
+  - `src/app/api/practice/generate/route.ts` 缺失的校验常量与引用
+- 用 service role 创建临时已确认用户和最小测试数据，拿到真实登录 cookie。
+- 新增 [docs/dev/backend-release-readiness-checklist.md](/d:/WorkCode/AbandonClaw/docs/dev/backend-release-readiness-checklist.md)。
+#### HTTP baseline 结果
+- `review submit`
+  - 20 req / 并发 5
+  - `200 x20`
+  - P50 `743.25ms`
+  - P95 `6089.40ms`
+  - 平均 `2102.61ms`
+- `learning progress`
+  - 20 req / 并发 5
+  - `200 x20`
+  - P50 `713.69ms`
+  - P95 `10120.13ms`
+  - 平均 `3165.54ms`
+- `practice generate`
+  - 10 req / 并发 3
+  - `200 x5`, `429 x5`
+  - P50 `1399.83ms`
+  - P95 `3244.33ms`
+  - 平均 `1798.58ms`
+  - 说明：当前结果验证了共享限流在真实 HTTP 入口下会按预期触发
+- `tts`
+  - 10 req / 并发 2
+  - `200 x9`, `500 x1`
+  - P50 `861.42ms`
+  - P95 `7868.17ms`
+  - 平均 `2237.09ms`
+  - 说明：预览日志出现一次 `Connect Error: {}`，当前先按已知异常记录
+#### 额外发现
+- 第一轮 baseline 使用 `Origin: http://127.0.0.1:3000` 时，所有受保护写接口都返回 `403`
+- 原因不是鉴权，而是 preview 环境内部识别的允许来源是 `http://localhost:3000`
+- 将 `Origin` 改为 `http://localhost:3000` 后，真实 HTTP baseline 可正常进入业务链路
+#### 测试 / 验证
+- `pnpm preview:up`
+- `node --import tsx scripts/load-api-baseline.ts ...`
+- `node --import tsx --test src/app/api/review/handlers.test.ts src/app/api/learning/handlers.test.ts src/app/api/practice/generate/route.test.ts src/lib/server/rate-limit.test.ts`
+- `pnpm run text:check-mojibake`
+#### 风险 / 未完成项
+- 数据库侧独立冒烟验证 `4.2` 还没完成
+- `tts` 的单次 `500` 还需要后续结合上游连接稳定性再看
+
+### [2026-04-15] 第三阶段：数据库策略脚本验证
+
+- 类型：验证 / 脚本 / 文档
+- 状态：已完成
+#### 背景
+第三阶段最后一个缺口是 `4.2`：需要给数据库侧最小权限补一轮可重复执行的冒烟验证。但当前不计划直接改数据库，也没有额外的独立 SQL 执行环境，所以最稳妥的方式是补一个脚本验证当前仓库里的 `supabase/sql` 是否确实声明了审计中依赖的 RLS / policy。
+#### 本次改动
+- 新增 [scripts/validate-db-guardrails.ts](/d:/WorkCode/AbandonClaw/scripts/validate-db-guardrails.ts)
+- 在 [package.json](/d:/WorkCode/AbandonClaw/package.json) 增加 `validate:db-guardrails`
+- 脚本覆盖 11 张关键用户态表的最小策略声明检查：
+  - `user_scene_progress`
+  - `user_daily_learning_stats`
+  - `user_scene_sessions`
+  - `user_phrases`
+  - `phrase_review_logs`
+  - `user_phrase_relations`
+  - `user_expression_clusters`
+  - `user_expression_cluster_members`
+  - `user_scene_practice_runs`
+  - `user_scene_practice_attempts`
+  - `user_scene_variant_runs`
+#### 验证结果
+- `pnpm run validate:db-guardrails`
+- 结果：`11/11` 通过，未发现缺失的 RLS / policy 声明
+- `pnpm run text:check-mojibake` 通过
+#### 影响范围
+- 影响模块：`scripts`、`package.json`、`docs/dev`
+- 是否影响主链路：否
+- 是否影响用户可感知行为：否
+#### 风险 / 未完成项
+- 该脚本验证的是仓库 migration 声明，不是目标数据库实例的实时状态
+- 若后续要做更强校验，仍建议在独立数据库环境里补一次真实 SQL 冒烟
+
+### [2026-04-15] 第三阶段：数据库侧最小权限盘点
+
+- 类型：审计 / 文档 / OpenSpec 实施
+- 状态：已完成
+#### 背景
+第三阶段的首要任务是确认第二阶段切回用户上下文后的用户态表，数据库侧是否已有足够的 RLS / SQL 承接。如果没有，需要补 migration；如果已有，就要把现状和边界正式写清楚。
+#### 本次改动
+- 审计了 `supabase/sql` 下与 `learning / review / phrases / practice / variant` 相关的 migration。
+- 确认 `user_scene_progress`、`user_daily_learning_stats`、`user_scene_sessions`、`user_phrases`、`phrase_review_logs`、`user_phrase_relations`、`user_expression_clusters`、`user_expression_cluster_members`、`user_scene_practice_runs`、`user_scene_practice_attempts`、`user_scene_variant_runs` 已有现存 RLS 或等效 SQL 约束承接当前用户态读写。
+- 在 [docs/dev/server-data-boundary-audit.md](/d:/WorkCode/AbandonClaw/docs/dev/server-data-boundary-audit.md) 补充了表级策略映射、后台白名单入口和回滚说明。
+#### 影响范围
+- 影响模块：`supabase/sql`、`docs/dev`
+- 是否影响主链路：否
+- 是否影响用户可感知行为：否
+- 是否需要同步文档：是
+#### 测试 / 验证
+- 本轮以策略盘点和 migration 审计为主，暂未新增自动化测试。
+#### 风险 / 未完成项
+- 当前仍未验证真实数据库环境下的策略冒烟，需要留到 `4.2` 配合可用环境再执行。
+- 本轮没有新增 SQL migration，因此不会引入新的数据库权限回归风险。
+
 ### [2026-04-15] 收口 phrases 剩余后台权限入口
 
 - 类型：修复 / 接口治理 / 文档

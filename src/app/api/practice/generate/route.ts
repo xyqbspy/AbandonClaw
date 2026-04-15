@@ -12,6 +12,7 @@ import {
 } from "@/lib/server/prompts/practice-generate-prompt";
 import {
   parseJsonWithFallback,
+  isValidParsedScene,
 } from "@/lib/server/scene-json";
 import {
   normalizePracticeGeneratePayload,
@@ -25,6 +26,16 @@ import {
 import { buildExerciseSpecsFromScene } from "@/lib/server/exercises/spec-builder";
 const PRACTICE_GENERATE_RATE_LIMIT = 5;
 const RATE_LIMIT_WINDOW_MS = 60_000;
+const PRACTICE_MAX_SECTIONS = 12;
+const PRACTICE_MAX_BLOCKS = 80;
+const PRACTICE_MAX_SENTENCES = 400;
+const PRACTICE_MAX_CHUNKS = 1200;
+const PRACTICE_MAX_TEXT_LENGTH = 40000;
+
+const sanitizeExerciseCount = (value: unknown) => {
+  if (typeof value !== "number" || Number.isNaN(value)) return 6;
+  return Math.min(12, Math.max(3, Math.round(value)));
+};
 
 const PRACTICE_GENERATE_FALLBACK_MESSAGE = "生成练习题失败，请稍后重试。";
 
