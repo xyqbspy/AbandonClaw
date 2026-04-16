@@ -25,6 +25,15 @@ export type TodayLearningSnapshot = {
   effectiveProgressPercent: number;
 };
 
+export type TodayPrimaryTaskKind = "scene" | "output" | "review";
+
+export type TodayPrimaryTaskExplanation = {
+  taskKind: TodayPrimaryTaskKind;
+  title: string;
+  reason: string;
+  source: NonNullable<DailyTask["explanationSource"]>;
+};
+
 const buildFallbackContinueLearning = (
   sceneList: SceneListItemResponse[],
 ): ResolvedContinueLearningItem | null => {
@@ -331,6 +340,17 @@ export const buildTodayTasks = ({
     actionHref: getContinueLearningHref(continueLearning),
     status: sceneDone ? "done" : "up_next",
     actionLabel: sceneDone ? "已完成" : `继续：${continueStepLabel}`,
+    priorityRank: 1,
+    shortReason: continueLearning
+      ? isRepeatContinue
+        ? "当前存在回炉训练入口，优先接着做完这轮巩固。"
+        : "当前有进行中的场景学习，优先延续上下文。"
+      : "还没有进行中的学习内容，先开始今天的输入。",
+    explanationSource: continueLearning
+      ? isRepeatContinue
+        ? "repeat-continue"
+        : "continue-learning"
+      : "static-fallback",
   };
 
   const outputTask: DailyTask = {
@@ -346,6 +366,15 @@ export const buildTodayTasks = ({
     actionHref: "/chunks",
     status: outputDone ? "done" : sceneReadyForDownstream ? "up_next" : "locked",
     actionLabel: outputDone ? "已完成" : sceneReadyForDownstream ? "去带走表达" : "先完成场景输入",
+    priorityRank: 2,
+    shortReason: outputDone
+      ? "今天已经完成了表达沉淀。"
+      : sceneReadyForDownstream
+        ? "主场景已经推进到可沉淀表达的阶段。"
+        : "需要先完成当前场景输入，再做表达沉淀。",
+    explanationSource: outputDone || sceneReadyForDownstream
+      ? "output-summary"
+      : "scene-task",
   };
 
   const reviewTask: DailyTask = {
@@ -375,9 +404,56 @@ export const buildTodayTasks = ({
           : "available"
         : "locked",
     actionLabel: reviewDone ? "已完成" : sceneReadyForDownstream ? "去做回忆" : "先完成前两步",
+    priorityRank: 3,
+    shortReason: reviewDone
+      ? "今天的回忆训练已经有正式完成信号。"
+      : sceneReadyForDownstream
+        ? dashboard.todayTasks.reviewTask.dueReviewCount > 0
+          ? "当前已有待回忆内容，适合进入主动提取。"
+          : "主场景已经推进完成，可以做一轮短回忆巩固。"
+        : "回忆训练依赖先完成场景输入和表达沉淀。",
+    explanationSource: "review-summary",
   };
 
   return [sceneTask, outputTask, reviewTask];
+};
+
+export const resolveTodayPrimaryTaskExplanation = ({
+  tasks,
+}: {
+  tasks: DailyTask[];
+}): TodayPrimaryTaskExplanation => {
+  const [primaryTask] = [...tasks].sort(
+    (left, right) => (left.priorityRank ?? Number.MAX_SAFE_INTEGER) - (right.priorityRank ?? Number.MAX_SAFE_INTEGER),
+  );
+
+  if (!primaryTask || primaryTask.id === "task-scene") {
+    return {
+      taskKind: "scene",
+      title: "先推进当前场景输入",
+      reason:
+        primaryTask?.shortReason ?? "today 的首要入口始终优先承接当前场景学习，避免打断主链路。",
+      source: primaryTask?.explanationSource ?? "scene-task",
+    };
+  }
+
+  if (primaryTask.id === "task-output") {
+    return {
+      taskKind: "output",
+      title: "先沉淀今天的表达",
+      reason:
+        primaryTask.shortReason ?? "主场景已经推进到可沉淀表达的阶段，可以先把今天值得带走的表达留住。",
+      source: primaryTask.explanationSource ?? "output-summary",
+    };
+  }
+
+  return {
+    taskKind: "review",
+    title: "先做一轮主动回忆",
+    reason:
+      primaryTask.shortReason ?? "当前已有可回忆内容，先把输入拉回主动提取链路。",
+    source: primaryTask.explanationSource ?? "review-summary",
+  };
 };
 
 export const getRecommendedScenes = (sceneList: SceneListItemResponse[], limit = 3) =>

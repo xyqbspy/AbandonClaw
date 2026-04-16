@@ -79,6 +79,8 @@ test("TodayLearningPathSection 会处理点击和 locked 状态", async () => {
 
   render(
     <TodayLearningPathSection
+      primaryTaskTitle="先推进当前场景输入"
+      primaryTaskReason="当前有进行中的场景学习，优先延续上下文。"
       tasks={[
         {
           id: "task-scene",
@@ -106,6 +108,8 @@ test("TodayLearningPathSection 会处理点击和 locked 状态", async () => {
     />,
   );
 
+  screen.getByText("先推进当前场景输入");
+  screen.getByText("当前有进行中的场景学习，优先延续上下文。");
   fireEvent.click(screen.getByRole("button", { name: /场景输入/ }));
   assert.deepEqual(clickedIds, ["task-scene"]);
 

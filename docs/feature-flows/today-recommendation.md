@@ -202,3 +202,38 @@
 - `sceneTask` 步骤优先于 `continueLearning` 步骤
 - repeat continue 不误判今日场景已完成
 - output / review 在 repeat continue 场景下不被重新锁住
+## 8. 第四阶段补充
+
+### 8.1 首要任务解释的稳定来源
+
+- `buildTodayTasks(...)` 现在会给每个任务补齐 `priorityRank`、`shortReason` 和 `explanationSource`。
+- `explanationSource` 当前只允许这些稳定来源：
+  - `scene-task`
+  - `review-summary`
+  - `output-summary`
+  - `repeat-continue`
+  - `continue-learning`
+  - `static-fallback`
+- 前端显示层只消费这套稳定元数据，不再自行拼接一套新的首要任务解释语义。
+
+### 8.2 首要任务解释的展示约定
+
+- `today-page-client.tsx` 会先从 `buildTodayTasks(...)` 的结果里解析首要任务解释。
+- `today-learning-path-section.tsx` 会把首要任务标题和原因显示在学习路径区块顶部。
+- 当前约定是：
+  - scene 优先级最高
+  - output 次之
+  - review 最后
+- repeat continue 和普通 continue 会展示不同原因文案，避免把回炉训练误说成新场景推进。
+
+### 8.3 这次改动需要保护的行为
+
+- `todayTasks.sceneTask.currentStep` 仍然优先于 `continueLearning.currentStep`
+- dashboard continue 仍然优先于本地 repeat fallback
+- repeat continue 不得被误判为“今日场景已完成”
+- 页面展示的首要任务解释必须和任务排序结果一致，不能出现“排序是 A，解释却在说 B”
+
+### 8.4 本轮建议回归
+
+- `node --import tsx --test "src/features/today/components/today-page-selectors.test.ts"`
+- `node --import tsx --import ./src/test/setup-dom.ts --test "src/features/today/components/today-sections.test.tsx" "src/features/today/components/today-page-client.test.tsx"`

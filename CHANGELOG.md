@@ -1,5 +1,46 @@
 # Changelog
 
+## 2026-04-16
+### 第四阶段：today 推荐解释、TTS 可靠性与最小安全头
+- today 页面现在会在学习路径顶部显示“为什么当前先做这一步”的解释，并把 continue、repeat、review 的推荐原因与任务排序统一起来，减少用户对今日主任务的理解成本。
+- 完整场景音频播放失败时会返回更稳定的中文提示，不再把上游原始错误直接暴露给页面；批量重生成音频也改成有界并发执行，并会汇总失败项后统一报错。
+- 应用补上了最小安全头基线，包括 `X-Frame-Options`、`X-Content-Type-Options`、`Referrer-Policy`、`Permissions-Policy` 和 `Strict-Transport-Security`，用于上线前的基础浏览器安全防护。
+影响范围：
+- `src/features/today/components/*`
+- `src/lib/utils/tts-api.ts`
+- `src/lib/server/tts/service.ts`
+- `next.config.ts`
+- `docs/dev/backend-release-readiness-checklist.md`
+
+验证情况：
+- `node --import tsx --test src/features/today/components/today-page-selectors.test.ts`
+- `node --import tsx --import ./src/test/setup-dom.ts --test src/features/today/components/today-sections.test.tsx src/features/today/components/today-page-client.test.tsx`
+- `node --import tsx --test src/lib/utils/tts-api.test.ts src/lib/utils/tts-api.scene-loop.test.ts src/lib/server/tts/service.test.ts src/app/api/tts/regenerate/route.test.ts`
+- `node --import tsx -e "const mod = await import('./next.config.ts'); const config = mod.default?.default ?? mod.default; console.log(typeof config.headers)"`
+- `pnpm run text:check-mojibake`
+
+## 2026-04-15
+### 第二阶段先补关键写接口幂等去重
+- `review submit`、`learning` 场景学习推进、`phrases save/save-all` 现在会对同一短窗口内的重复提交做服务端去重，降低重复点击和网络重试造成的重复写入。
+- `phrases save` 和 `phrases save-all` 补上了受保护写接口的来源校验，不再继续作为第一阶段遗漏的写接口空洞。
+- 仓库新增了服务端数据边界审计记录，明确了 `scene / learning / review / phrases` 当前 `service role` 使用点和后续优先迁移范围。
+
+影响范围：
+- `src/lib/server/idempotency.ts`
+- `src/app/api/review/handlers.ts`
+- `src/app/api/learning/scenes/[slug]/*`
+- `src/app/api/phrases/save/route.ts`
+- `src/app/api/phrases/save-all/route.ts`
+- `docs/dev/server-data-boundary-audit.md`
+
+验证情况：
+- `node --import tsx --test src/lib/server/idempotency.test.ts src/app/api/review/handlers.test.ts src/app/api/learning/handlers.test.ts`
+- `node --import tsx -` 导入检查：
+  - `src/app/api/phrases/save/route.ts`
+  - `src/app/api/phrases/save-all/route.ts`
+  - `src/app/api/learning/scenes/[slug]/progress/route.ts`
+  - `src/app/api/learning/scenes/[slug]/complete/route.ts`
+
 ## 2026-04-14
 ### 后端接口治理第一阶段基线
 - 后端受保护接口现在会统一生成并透传 `requestId`，未知内部错误的接口响应也会返回可追踪标识，方便定位请求链路问题。

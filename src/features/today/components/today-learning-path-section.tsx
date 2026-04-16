@@ -16,6 +16,7 @@ const getTaskStepVariant = (task: DailyTask) => {
 };
 
 const getTaskStepDescription = (task: DailyTask, index: number) => {
+  if (task.shortReason) return task.shortReason;
   if (task.done) return "已完成";
   if (task.status === "locked") return index === 0 ? STEP_FALLBACK_DESCS[index] : "等待解锁";
   return task.actionLabel?.replace(/^继续：/, "") ?? STEP_FALLBACK_DESCS[index];
@@ -23,9 +24,13 @@ const getTaskStepDescription = (task: DailyTask, index: number) => {
 
 export function TodayLearningPathSection({
   tasks,
+  primaryTaskTitle,
+  primaryTaskReason,
   onOpenTask,
 }: {
   tasks: DailyTask[];
+  primaryTaskTitle: string;
+  primaryTaskReason: string;
   onOpenTask: (task: DailyTask) => void;
 }) {
   return (
@@ -33,6 +38,14 @@ export function TodayLearningPathSection({
       <div className={`mb-[var(--mobile-space-lg)] ${TODAY_SECTION_TITLE_CLASSNAME} text-[#334155]`}>
         <span className={TODAY_SECTION_EMOJI_CLASSNAME}>🪄</span>
         <span>今日学习路径</span>
+      </div>
+      <div className="mb-[var(--mobile-space-md)] rounded-[var(--app-radius-card)] border border-[#DBEAFE] bg-[#F8FBFF] px-[var(--mobile-space-md)] py-[var(--mobile-space-sm)] text-left">
+        <div className="text-[length:var(--mobile-font-body-sm)] font-semibold text-[#1E3A8A]">
+          {primaryTaskTitle}
+        </div>
+        <div className="mt-[var(--mobile-space-2xs)] text-[length:var(--mobile-font-caption)] leading-[1.45] text-[#5B6B85]">
+          {primaryTaskReason}
+        </div>
       </div>
       <div className="flex gap-[var(--mobile-space-sm)]">
         {tasks.map((task, index) => {

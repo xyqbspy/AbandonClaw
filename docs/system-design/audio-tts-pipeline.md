@@ -488,3 +488,26 @@ chunk 音频重生成前也会主动清：
 如果改到场景预取或 scene 详情加载，再加：
 
 - `node --import tsx --test "src/app/(app)/scene/[slug]/scene-detail-load-orchestrator.test.ts" "src/lib/cache/scene-prefetch.test.ts"`
+## 11. 第四阶段补充
+
+### 11.1 scene full 失败后的受控提示
+
+- `playSceneLoopAudio()` 现在不再把上游原始错误直接透给页面。
+- 当完整场景音频不可用时，会统一抛出“完整场景音频暂时不可用，你可以先逐句跟读或稍后重试。”
+- 这次没有把 scene full 退化成逐句串播，只先做了最小可维护方案：稳定提示 + 保留逐句播放入口。
+
+### 11.2 批量重生成的并发边界
+
+- `regenerateChunkTtsAudioBatch()` 已从串行执行改成有界并发。
+- 当前并发上限固定为 `3`，目的是缩短批量重生成耗时，同时避免把上游 TTS 和存储写入瞬间打满。
+- 每个失败项都会记录结构化日志，日志里带 `chunkKey` 与错误上下文，方便按 `requestId` 或模块名追踪。
+
+### 11.3 批量失败的汇总约定
+
+- 批量任务不会在首个失败时立刻中断剩余项。
+- 本轮可执行项会继续跑完，最后统一汇总失败数并抛出摘要错误。
+- 摘要错误至少包含失败数量和首个失败的 `chunkKey`，便于管理端快速定位。
+
+### 11.4 本轮建议回归
+
+- `node --import tsx --test "src/lib/utils/tts-api.test.ts" "src/lib/utils/tts-api.scene-loop.test.ts" "src/lib/server/tts/service.test.ts" "src/app/api/tts/regenerate/route.test.ts"`

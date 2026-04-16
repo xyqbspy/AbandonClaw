@@ -28,13 +28,22 @@
 ## 真实 HTTP 验证
 
 - [ ] preview 或目标环境已启动
-- [ ] 基线脚本使用的 `Origin` 与服务端允许域一致
+- [ ] baseline 脚本使用的 `Origin` 与服务端允许域一致
 - [ ] 认证 cookie 已通过真实登录流程获取
-- [ ] `review submit` 基线已执行
-- [ ] `learning progress` 基线已执行
-- [ ] `practice generate` 基线已执行
-- [ ] `tts` 基线已执行
+- [ ] `review submit` baseline 已执行
+- [ ] `learning progress` baseline 已执行
+- [ ] `practice generate` baseline 已执行
+- [ ] `tts` baseline 已执行
 - [ ] 限流命中与异常结果已记录，不只保留终端输出
+
+## 第四阶段补充
+
+- [ ] 响应头已包含 `X-Frame-Options`、`X-Content-Type-Options`、`Referrer-Policy`、`Permissions-Policy` 与 `Strict-Transport-Security`
+- [ ] `today` 首要任务解释已在页面显示，并确认 continue / repeat / review 三类来源文案正确
+- [ ] `scene full` 播放失败时已返回受控提示，不再直接暴露原始错误
+- [ ] `tts/regenerate` 批量重生成失败会记录结构化日志，并汇总失败项
+- [ ] 已复核当前仍保留后台白名单的入口只剩共享 `phrases` 和 AI enrich
+- [ ] 若真实环境再出现 `Connect Error: {}`，已具备 `requestId` 与 TTS 服务端日志可追踪链路
 
 ## 最小验证命令
 
@@ -42,6 +51,8 @@
 pnpm preview:status
 pnpm run validate:db-guardrails
 node --import tsx --test src/app/api/review/handlers.test.ts src/app/api/learning/handlers.test.ts src/app/api/practice/generate/route.test.ts src/lib/server/rate-limit.test.ts
+node --import tsx --test src/features/today/components/today-page-selectors.test.ts src/lib/utils/tts-api.test.ts src/lib/utils/tts-api.scene-loop.test.ts src/lib/server/tts/service.test.ts src/app/api/tts/regenerate/route.test.ts
+node --import tsx -e "const mod = await import('./next.config.ts'); const config = mod.default?.default ?? mod.default; console.log(typeof config.headers)"
 pnpm run text:check-mojibake
 pnpm load:api-baseline --dry-run --path=/api/practice/generate --method=POST --body-file=scripts/load-samples/practice-generate.sample.json
 ```

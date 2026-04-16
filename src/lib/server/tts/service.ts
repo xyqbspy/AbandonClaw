@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { MsEdgeTTS, OUTPUT_FORMAT } from "msedge-tts";
 import { ValidationError } from "@/lib/server/errors";
+import { logServerEvent } from "@/lib/server/logger";
 import {
   createTtsStorageSignedUrl,
   getTtsStorageSignedUrlIfExists,
@@ -52,6 +53,7 @@ const signedUrlTtlSeconds = 60 * 60;
 const signedUrlCacheTtlMs = Math.max(60, signedUrlTtlSeconds - 60) * 1000;
 const signedUrlCache = new Map<string, SignedUrlCacheEntry>();
 const pendingSignedUrlRequests = new Map<string, Promise<string>>();
+const REGENERATE_CONCURRENCY = 3;
 
 const parseTtsKind = (value: unknown): TtsKind => {
   if (value === "sentence" || value === "chunk" || value === "scene_full") return value;
@@ -188,6 +190,25 @@ const uploadAudioToStorage = async (storagePath: string, buffer: Buffer) => {
 const clearSignedUrlCache = (storagePath: string) => {
   signedUrlCache.delete(storagePath);
   pendingSignedUrlRequests.delete(storagePath);
+};
+
+const runWithConcurrency = async <TItem>(
+  items: TItem[],
+  concurrency: number,
+  worker: (item: TItem, index: number) => Promise<void>,
+) => {
+  const size = Math.max(1, Math.min(concurrency, items.length || 1));
+  let cursor = 0;
+
+  await Promise.all(
+    Array.from({ length: size }, async () => {
+      while (cursor < items.length) {
+        const currentIndex = cursor;
+        cursor += 1;
+        await worker(items[currentIndex] as TItem, currentIndex);
+      }
+    }),
+  );
 };
 
 const synthesizeToBuffer = async (text: string, voice: string, mode: TtsMode) => {
@@ -378,10 +399,13 @@ export async function generateTtsAudio(payload: TtsRequestPayload) {
         return url;
       })
       .catch((error) => {
-        console.error("[tts] upload fallback", {
-          kind,
-          storagePath: target.storagePath,
-          error: error instanceof Error ? error.message : String(error),
+        logServerEvent("error", "[tts] upload fallback", {
+          module: "tts/service",
+          details: {
+            kind,
+            storagePath: target.storagePath,
+          },
+          error,
         });
         source = "inline-fallback";
         return toInlineAudioUrl(buffer);
@@ -396,9 +420,32 @@ export async function generateTtsAudio(payload: TtsRequestPayload) {
   };
 }
 
+type RegenerateChunkTtsDependencies = {
+  concurrency: number;
+  removeLocalFile: (absolutePath: string) => Promise<void>;
+  removeStorageFiles: (storagePaths: string[]) => Promise<void>;
+  generateTtsAudio: typeof generateTtsAudio;
+};
+
+const defaultRegenerateChunkTtsDependencies: RegenerateChunkTtsDependencies = {
+  concurrency: REGENERATE_CONCURRENCY,
+  removeLocalFile: async (absolutePath) => {
+    await rm(absolutePath, { force: true });
+  },
+  removeStorageFiles: async (storagePaths) => {
+    await removeTtsStorageFiles(storagePaths);
+  },
+  generateTtsAudio,
+};
+
 export async function regenerateChunkTtsAudioBatch(
   items: Array<{ text: string; chunkKey?: string }>,
+  dependencies: Partial<RegenerateChunkTtsDependencies> = {},
 ) {
+  const resolvedDependencies = {
+    ...defaultRegenerateChunkTtsDependencies,
+    ...dependencies,
+  } satisfies RegenerateChunkTtsDependencies;
   const normalizedItems = Array.from(
     new Map(
       items
@@ -414,25 +461,50 @@ export async function regenerateChunkTtsAudioBatch(
     ).values(),
   );
 
-  for (const item of normalizedItems) {
+  const failures: Array<{ chunkKey: string; message: string }> = [];
+
+  await runWithConcurrency(normalizedItems, resolvedDependencies.concurrency, async (item) => {
     const target = resolveAudioTarget({
       kind: "chunk",
       mode: "normal",
       text: item.text,
       chunkKey: item.chunkKey,
     });
-    clearSignedUrlCache(target.storagePath);
-    await rm(target.absolutePath, { force: true }).catch(() => {
-      // Non-blocking local cleanup.
-    });
-    await removeTtsStorageFiles([target.storagePath]).catch(() => {
-      // Storage may not have existing file yet.
-    });
-    await generateTtsAudio({
-      kind: "chunk",
-      text: item.text,
-      chunkKey: item.chunkKey,
-    });
+
+    try {
+      clearSignedUrlCache(target.storagePath);
+      await resolvedDependencies.removeLocalFile(target.absolutePath).catch(() => {
+        // Non-blocking local cleanup.
+      });
+      await resolvedDependencies.removeStorageFiles([target.storagePath]).catch(() => {
+        // Storage may not have existing file yet.
+      });
+      await resolvedDependencies.generateTtsAudio({
+        kind: "chunk",
+        text: item.text,
+        chunkKey: item.chunkKey,
+      });
+    } catch (error) {
+      failures.push({
+        chunkKey: item.chunkKey,
+        message: error instanceof Error ? error.message : String(error),
+      });
+      logServerEvent("error", "[tts] regenerate chunk failed", {
+        module: "tts/service",
+        details: {
+          chunkKey: item.chunkKey,
+          storagePath: target.storagePath,
+        },
+        error,
+      });
+    }
+  });
+
+  if (failures.length > 0) {
+    const firstFailure = failures[0];
+    throw new Error(
+      `Failed to regenerate ${failures.length}/${normalizedItems.length} chunk audios. First failed chunk: ${firstFailure?.chunkKey}.`,
+    );
   }
 
   return {

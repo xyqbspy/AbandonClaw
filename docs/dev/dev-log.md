@@ -1,5 +1,35 @@
 # Dev Log
 
+### [2026-04-16] 第四阶段：today 编排解释、TTS 可靠性与最小安全头
+
+- 类型：实现 / 测试 / 文档
+- 状态：已完成
+#### 背景
+第四阶段的目标是把前三阶段已经建立的接口治理基线继续往“体验稳定”和“可上线”推进一小步，重点不再是新增平台层，而是收口 `today` 的任务解释一致性、TTS 批量重生成与 scene full 播放的稳定性，以及补上最小安全头基线。
+#### 本次改动
+- `today` 任务构建逻辑现在会为任务补齐稳定元数据：`priorityRank`、`shortReason`、`explanationSource`。
+- `today` 页面在学习路径区块顶部新增首要任务解释，能够明确说明当前为什么先推荐 continue / repeat / review。
+- `playSceneLoopAudio()` 在 scene full 失败时改为抛出受控中文提示，不再直接暴露原始错误。
+- `regenerateChunkTtsAudioBatch()` 改成有界并发执行，当前并发上限为 `3`，并对失败项做结构化日志记录与最终汇总抛错。
+- `next.config.ts` 新增最小安全头：`X-Frame-Options`、`X-Content-Type-Options`、`Referrer-Policy`、`Permissions-Policy`、`Strict-Transport-Security`。
+- 同步更新了音频链路文档、today 推荐文档、发布检查清单与本阶段 OpenSpec tasks。
+#### 影响范围
+- 影响模块：`today`、`tts`、`next.config.ts`、`docs/dev`、`docs/system-design`、`docs/feature-flows`
+- 是否影响主链路：是，但属于低风险收口，不改变学习主语义
+- 是否影响用户可感知行为：是，today 页面会显示更明确的推荐原因，scene full 错误提示更稳定
+- 是否需要同步文档：是
+#### 测试 / 验证
+- 已运行：
+  - `node --import tsx --test src/features/today/components/today-page-selectors.test.ts`
+  - `node --import tsx --import ./src/test/setup-dom.ts --test src/features/today/components/today-sections.test.tsx src/features/today/components/today-page-client.test.tsx`
+  - `node --import tsx --test src/lib/utils/tts-api.test.ts src/lib/utils/tts-api.scene-loop.test.ts src/lib/server/tts/service.test.ts src/app/api/tts/regenerate/route.test.ts`
+  - `node --import tsx -e "const mod = await import('./next.config.ts'); const config = mod.default?.default ?? mod.default; console.log(typeof config.headers)"`
+  - `pnpm run text:check-mojibake`
+#### 风险 / 未完成项
+- 这次只补了最小安全头，没有引入 CSP，避免误伤现有前端资源加载。
+- `tts` 的上游 `Connect Error: {}` 仍然是已知异常，这次只是把错误收口和日志链路补得更清楚。
+- 本轮没有改动 today 的服务端推荐排序，只是把现有优先级与解释来源显式化。
+
 ### [2026-04-15] 第三阶段：真实 HTTP baseline 与上线清单
 
 - 类型：压测 / 验证 / 文档

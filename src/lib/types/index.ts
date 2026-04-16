@@ -116,6 +116,15 @@ export interface DailyTask {
   actionHref: string;
   status?: "up_next" | "available" | "locked" | "done";
   actionLabel?: string;
+  priorityRank?: number;
+  shortReason?: string;
+  explanationSource?:
+    | "scene-task"
+    | "review-summary"
+    | "output-summary"
+    | "repeat-continue"
+    | "continue-learning"
+    | "static-fallback";
 }
 
 export interface ReviewItem {

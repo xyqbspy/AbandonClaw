@@ -10,6 +10,7 @@ import {
   buildTodayTasks,
   getContinueLearningCardState,
   getRecommendedScenes,
+  resolveTodayPrimaryTaskExplanation,
   resolveTodayLearningSnapshot,
 } from "@/features/today/components/today-page-selectors";
 import { TodayRecommendedScenesSection } from "@/features/today/components/today-recommended-scenes-section";
@@ -252,6 +253,13 @@ export function TodayPageClient({ displayName }: { displayName: string }) {
       }),
     [continueLearning, dashboard],
   );
+  const primaryTaskExplanation = useMemo(
+    () =>
+      resolveTodayPrimaryTaskExplanation({
+        tasks: dailyTasks,
+      }),
+    [dailyTasks],
+  );
 
   const recommendedScenes = useMemo(() => getRecommendedScenes(sceneList), [sceneList]);
   const finalDisplayName = displayName || zh.userFallback;
@@ -341,6 +349,8 @@ export function TodayPageClient({ displayName }: { displayName: string }) {
 
       <TodayLearningPathSection
         tasks={dailyTasks}
+        primaryTaskTitle={primaryTaskExplanation.title}
+        primaryTaskReason={primaryTaskExplanation.reason}
         onOpenTask={(task) => {
           if (task.id === "task-review") {
             startReviewSession({ router, source: "today-task" });

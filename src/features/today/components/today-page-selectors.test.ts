@@ -12,6 +12,7 @@ import {
   getContinueLearningHref,
   getContinueLearningStepLabel,
   getRecommendedScenes,
+  resolveTodayPrimaryTaskExplanation,
   resolveContinueLearning,
   resolveContinueLearningState,
   resolveTodayLearningSnapshot,
@@ -443,6 +444,25 @@ test("buildTodayTasks 会把 review 正式信号摘要写进说明文案", () =>
   });
 
   assert.match(tasks[2]?.description ?? "", /其中 1 条进入完整输出/);
+});
+
+test("resolveTodayPrimaryTaskExplanation 会稳定解释 today 首要任务来源", () => {
+  const continueLearning = resolveContinueLearning(dashboard, scenes);
+  const tasks = buildTodayTasks({
+    dashboard,
+    continueLearning,
+    labels: {
+      taskSceneTitle: "先完成一个场景输入",
+      taskSceneDesc: "进入一个真实语境，先听懂、看懂，再开始训练。",
+      taskReviewTitle: "最后做一轮回忆",
+      taskOutputTitle: "带走 1 到 2 条表达",
+    },
+  });
+
+  const explanation = resolveTodayPrimaryTaskExplanation({ tasks });
+  assert.equal(explanation.taskKind, "scene");
+  assert.equal(explanation.source, "continue-learning");
+  assert.match(explanation.reason, /进行中的场景学习|优先延续上下文/);
 });
 
 test("resolveContinueLearningState 会返回 continue learning 的来源", () => {

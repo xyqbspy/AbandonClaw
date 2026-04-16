@@ -943,7 +943,7 @@ export async function playSceneLoopAudio(params: {
       text: undefined,
       requestId: undefined,
     });
-    throw error;
+    throw new Error("完整场景音频暂时不可用，你可以先逐句跟读或稍后重试。");
   }
 }
 
