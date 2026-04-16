@@ -8,8 +8,20 @@ import {
   TrainingStepKey,
 } from "./scene-detail-messages";
 
-export const notifySceneSessionCompleted = () => {
-  toast.success(sceneDetailMessages.sessionCompleted);
+export const notifySceneSessionCompleted = (payload?: {
+  savedPhraseCount?: number;
+  nextStepHint?: string | null;
+}) => {
+  const savedPhraseCount = payload?.savedPhraseCount ?? 0;
+  const nextStepHint = payload?.nextStepHint?.trim();
+  const descriptionParts = [
+    savedPhraseCount > 0 ? `今天已沉淀 ${savedPhraseCount} 条表达。` : null,
+    nextStepHint ? nextStepHint : null,
+  ].filter(Boolean);
+
+  toast.success(sceneDetailMessages.sessionCompleted, {
+    description: descriptionParts.length > 0 ? descriptionParts.join(" ") : undefined,
+  });
 };
 
 export const notifySceneMilestone = (step: TrainingStepKey, sceneTitle: string) => {

@@ -6,6 +6,10 @@ import { useTtsPlaybackController } from "@/hooks/use-tts-playback-controller";
 import { buildChunkAudioKey } from "@/lib/shared/tts";
 import type { Lesson, LessonBlock, LessonSentence } from "@/lib/types";
 import { getSentenceSpeakText } from "@/lib/utils/audio-warmup";
+import {
+  recordClientEvent,
+  recordClientFailureSummary,
+} from "@/lib/utils/client-events";
 import { scheduleLessonAudioWarmup } from "@/lib/utils/resource-actions";
 
 export function useLessonReaderPlayback({
@@ -47,6 +51,22 @@ export function useLessonReaderPlayback({
   const isChunkLoading = useCallback(
     (text: string) => playbackController.isChunkLoading(text),
     [playbackController],
+  );
+  const playFallbackSentence = useCallback(
+    (sentence: LessonSentence | null) => {
+      if (!sentence) return;
+      void playbackController.toggleSentencePlayback({
+        sceneSlug: lesson.slug,
+        sentenceId: sentence.id,
+        text: getSentenceSpeakText(sentence),
+        mode: "normal",
+        speaker: sentence.speaker,
+        onError: (error) => {
+          toast.error(error instanceof Error ? error.message : "发音失败，请稍后重试");
+        },
+      });
+    },
+    [lesson.slug, playbackController],
   );
 
   const stopAudio = useCallback(() => {
@@ -223,10 +243,46 @@ export function useLessonReaderPlayback({
         onSceneLoopPlayback?.({ lesson });
       },
       onError: (error) => {
-        toast.error(error instanceof Error ? error.message : "完整场景音频暂不可用");
+        const fallbackSentence =
+          (activeSentenceId
+            ? sentenceOrder.find((sentence) => sentence.id === activeSentenceId) ?? null
+            : null) ?? firstSentence;
+        const message = error instanceof Error ? error.message : "完整场景音频暂不可用";
+        recordClientFailureSummary("tts_scene_loop_failed", {
+          sceneSlug: lesson.slug,
+          activeSentenceId,
+          fallbackSentenceId: fallbackSentence?.id ?? null,
+          message,
+        });
+        toast.error(message, {
+          description: fallbackSentence ? "可先切回逐句跟读，保持当前训练节奏。" : undefined,
+          action: fallbackSentence
+            ? {
+                label: "改为逐句跟读",
+                onClick: () => {
+                  recordClientEvent("tts_scene_loop_fallback_clicked", {
+                    sceneSlug: lesson.slug,
+                    sentenceId: fallbackSentence.id,
+                  });
+                  playFallbackSentence(fallbackSentence);
+                },
+              }
+            : undefined,
+        });
       },
     });
-  }, [blockOrder, isSceneLooping, lesson, onSceneLoopPlayback, playbackController, stopAudio]);
+  }, [
+    activeSentenceId,
+    blockOrder,
+    firstSentence,
+    isSceneLooping,
+    lesson,
+    onSceneLoopPlayback,
+    playbackController,
+    playFallbackSentence,
+    sentenceOrder,
+    stopAudio,
+  ]);
 
   return {
     playbackState,

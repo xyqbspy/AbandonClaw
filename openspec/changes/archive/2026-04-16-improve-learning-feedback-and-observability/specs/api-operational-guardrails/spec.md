@@ -1,21 +1,5 @@
 ## ADDED Requirements
 
-### Requirement: 生产入口必须具备最小安全头基线
-系统 MUST 为生产入口提供最小安全头基线，至少覆盖点击劫持、防止 MIME 嗅探、来源策略和 HSTS 等基础项，并以统一配置方式收口。
-
-#### Scenario: 维护者准备发布生产环境
-- **WHEN** 维护者检查生产配置
-- **THEN** 系统 MUST 能确认基础安全头已经启用
-- **AND** 配置不得依赖分散在多个页面或路由中的临时实现
-
-### Requirement: 音频与高成本入口异常必须可在发布前复核
-系统 MUST 让维护者能够在发布前复核高成本音频与生成入口的异常记录和保护配置，避免仅凭成功请求样本判断系统可发布。
-
-#### Scenario: 发布前复核 TTS 与生成类接口
-- **WHEN** 维护者在发布前复核 `tts`、`practice generate` 或其他高成本入口
-- **THEN** 系统 MUST 提供对异常状态、限流命中或失败样本的复核入口
-- **AND** 维护者 MUST 能区分上游异常、限流命中与业务错误
-
 ### Requirement: 关键学习动作必须具备最小业务级可观测性
 系统 MUST 为关键学习动作提供最小业务级事件或失败摘要记录，至少覆盖 `today` 首要任务点击、continue learning 启动、review submit、lesson complete、practice generate fail 和 tts fail，以便维护者能从业务层判断用户在哪一步掉线或失败。
 

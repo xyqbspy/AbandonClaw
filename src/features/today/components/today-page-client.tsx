@@ -20,6 +20,7 @@ import { TodayWelcomeCard } from "@/features/today/components/today-welcome-card
 import { getLearningDashboardCache, setLearningDashboardCache } from "@/lib/cache/learning-dashboard-cache";
 import { getPhraseListCache, setPhraseListCache } from "@/lib/cache/phrase-list-cache";
 import { getSceneListCache, setSceneListCache } from "@/lib/cache/scene-list-cache";
+import { recordClientEvent } from "@/lib/utils/client-events";
 import { getLearningDashboardFromApi, LearningDashboardResponse } from "@/lib/utils/learning-api";
 import { getMyPhrasesFromApi, UserPhraseItemResponse } from "@/lib/utils/phrases-api";
 import { startReviewSession } from "@/lib/utils/review-session";
@@ -283,6 +284,39 @@ export function TodayPageClient({ displayName }: { displayName: string }) {
   const progressPercent = Math.round(
     todayLearningSnapshot.effectiveProgressPercent,
   );
+  const continueResultSummary = useMemo(() => {
+    const todaySaved = dashboard.todayTasks.outputTask.phrasesSavedToday;
+    const sceneSaved = continueLearning?.savedPhraseCount ?? 0;
+    const dueReview = dashboard.todayTasks.reviewTask.dueReviewCount;
+
+    if (continueLearning?.isRepeat) {
+      return dueReview > 0
+        ? `这轮回炉结束后，还有 ${dueReview} 条待回忆可以继续收口。`
+        : "这轮回炉完成后，今天的输入闭环会更稳。";
+    }
+
+    if (sceneSaved > 0 && dueReview > 0) {
+      return `当前场景已沉淀 ${sceneSaved} 条表达，完成这一步后还有 ${dueReview} 条待回忆。`;
+    }
+    if (todaySaved > 0 && dueReview > 0) {
+      return `今天已带走 ${todaySaved} 条表达，完成当前推进后还有 ${dueReview} 条待回忆。`;
+    }
+    if (sceneSaved > 0) {
+      return `当前场景已沉淀 ${sceneSaved} 条表达，适合这一轮结束后马上做回忆。`;
+    }
+    if (todaySaved > 0) {
+      return `今天已带走 ${todaySaved} 条表达，继续推进会更容易把它们留住。`;
+    }
+    if (dueReview > 0) {
+      return `完成当前推进后，还有 ${dueReview} 条待回忆在等你主动提取。`;
+    }
+    return "先把这一步做完，今天这轮输入才会真正沉下来。";
+  }, [
+    continueLearning?.isRepeat,
+    continueLearning?.savedPhraseCount,
+    dashboard.todayTasks.outputTask.phrasesSavedToday,
+    dashboard.todayTasks.reviewTask.dueReviewCount,
+  ]);
 
   const expressionSummary = useMemo(() => {
     const todaySaved = dashboard.todayTasks.outputTask.phrasesSavedToday;
@@ -366,11 +400,17 @@ export function TodayPageClient({ displayName }: { displayName: string }) {
         stepLabel={continueCardState.stepLabel}
         stepIcon={continueStepIcon}
         helperText={continueCardState.helperText}
+        resultSummary={continueResultSummary}
         progressPercent={progressPercent}
         isPending={continueCardState.isPending}
         ctaLabel={continueCardState.ctaLabel}
         onContinue={() => {
           if (continueCardState.isPending) return;
+          recordClientEvent("today_continue_clicked", {
+            sceneSlug: continueLearning?.sceneSlug ?? null,
+            currentStep: todayLearningSnapshot.effectiveCurrentStep,
+            progressPercent,
+          });
           router.push(continueCardState.href);
         }}
       />
@@ -384,6 +424,10 @@ export function TodayPageClient({ displayName }: { displayName: string }) {
         reviewAccuracy={dashboard.overview.reviewAccuracy}
         dueReviewCount={dashboard.todayTasks.reviewTask.dueReviewCount}
         onClick={() => {
+          recordClientEvent("today_review_opened", {
+            dueReviewCount: dashboard.todayTasks.reviewTask.dueReviewCount,
+            reviewedTodayCount: dashboard.todayTasks.reviewTask.reviewItemsCompleted,
+          });
           startReviewSession({ router, source: "today-task" });
         }}
       />

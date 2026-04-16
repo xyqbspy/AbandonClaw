@@ -42,3 +42,25 @@
 - scene practice 回补提交不会误走普通表达提交流程
 - 提交失败时不会误清当前队列或误前进到下一项
 - 来源场景不可访问时仍能稳定降级
+
+## 8. 第五阶段补充
+
+### 8.1 提交成功后的最小结果反馈
+
+- 普通表达 review 提交成功后，不再只提示“提交成功”。
+- 页面现在会复用 `submitPhraseReviewFromApi()` 返回的 `summary`：
+  - 若仍有待复习项，提示剩余数量
+  - 若当前队列已清空，提示本轮回忆可以先收住
+- 这层只消费现有 `summary`，不新增新的回写结果字段。
+
+### 8.2 review 提交的最小业务事件
+
+- 普通表达 review 提交成功后，会记录 `review_submitted`
+- 当前事件摘要包含：
+  - `reviewResult`
+  - `dueReviewCount`
+  - `reviewedTodayCount`
+  - `recognitionState`
+  - `outputConfidence`
+  - `fullOutputStatus`
+- 作用是让“页面提交成功但用户不知道还剩多少、当时做了什么判断”这类排查更直接

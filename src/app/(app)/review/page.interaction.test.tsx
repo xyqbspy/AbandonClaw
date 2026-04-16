@@ -10,6 +10,8 @@ const nodeModule = localRequire("node:module") as typeof import("node:module");
 let dueRequestCount = 0;
 let summaryRequestCount = 0;
 let clearReviewPageCacheCalls = 0;
+const toastSuccessCalls: Array<{ message?: string; description?: string }> = [];
+const clientEventCalls: Array<{ name: string; payload: Record<string, unknown> }> = [];
 const setReviewPageCacheCalls: Array<{
   payload: {
     rows: Array<{ userPhraseId: string }>;
@@ -92,7 +94,14 @@ const mockedModules = {
   sonner: {
     toast: {
       error: () => undefined,
-      success: () => undefined,
+      success: (message?: string, options?: { description?: string }) => {
+        toastSuccessCalls.push({ message, description: options?.description });
+      },
+    },
+  },
+  "@/lib/utils/client-events": {
+    recordClientEvent: (name: string, payload: Record<string, unknown>) => {
+      clientEventCalls.push({ name, payload });
     },
   },
   "@/lib/cache/review-page-cache": {
@@ -207,6 +216,8 @@ afterEach(() => {
   dueRequestCount = 0;
   summaryRequestCount = 0;
   clearReviewPageCacheCalls = 0;
+  toastSuccessCalls.length = 0;
+  clientEventCalls.length = 0;
   setReviewPageCacheCalls.length = 0;
   submitPhraseReviewPayloads.length = 0;
   startScenePracticeRunCalls = 0;
@@ -371,6 +382,10 @@ test("ReviewPage 普通表达复习会按微回忆 -> 熟悉度 -> 改写 -> 输
     assert.equal(submitPhraseReviewPayloads[0]?.recognitionState, "recognized");
     assert.equal(submitPhraseReviewPayloads[0]?.outputConfidence, "high");
     assert.equal(submitPhraseReviewPayloads[0]?.fullOutputStatus, "completed");
+    assert.equal(toastSuccessCalls.at(-1)?.message, "已记录这次复习结果。 今天这轮回忆先收住了。");
+    assert.equal(toastSuccessCalls.at(-1)?.description, "已完成 1 条，可以回到 today 继续推进场景。");
+    assert.equal(clientEventCalls.at(-1)?.name, "review_submitted");
+    assert.equal(clientEventCalls.at(-1)?.payload.reviewResult, "good");
   });
 });
 

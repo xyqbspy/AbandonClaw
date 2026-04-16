@@ -5,6 +5,7 @@ import { clearAllReviewPageCache, setReviewPageCache } from "@/lib/cache/review-
 import { LoadingButton, LoadingContent } from "@/components/shared/action-loading";
 import { PageHeader } from "@/components/shared/page-header";
 import { buttonVariants } from "@/components/ui/button";
+import { recordClientEvent } from "@/lib/utils/client-events";
 import { APPLE_BODY_TEXT, APPLE_META_TEXT } from "@/lib/ui/apple-style";
 import {
   buildAcceptedPracticeAnswers,
@@ -205,7 +206,16 @@ export default function ReviewPage() {
         },
         20,
       );
-      notifyPhraseReviewSubmitted(zh);
+      recordClientEvent("review_submitted", {
+        userPhraseId: currentPhraseItem.userPhraseId,
+        reviewResult: result,
+        dueReviewCount: response.summary.dueReviewCount,
+        reviewedTodayCount: response.summary.reviewedTodayCount,
+        recognitionState: phraseRecognition,
+        outputConfidence: phraseOutputConfidence,
+        fullOutputStatus: phraseDraft.trim() ? "completed" : "not_started",
+      });
+      notifyPhraseReviewSubmitted(zh, response.summary);
     } catch (error) {
       notifyReviewSubmitFailed(error instanceof Error ? error.message : zh.submitFailed);
     } finally {

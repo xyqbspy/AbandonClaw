@@ -511,3 +511,29 @@ chunk 音频重生成前也会主动清：
 ### 11.4 本轮建议回归
 
 - `node --import tsx --test "src/lib/utils/tts-api.test.ts" "src/lib/utils/tts-api.scene-loop.test.ts" "src/lib/server/tts/service.test.ts" "src/app/api/tts/regenerate/route.test.ts"`
+
+## 12. 第五阶段补充
+
+### 12.1 scene full 失败后的替代 CTA
+
+- `use-lesson-reader-playback.ts` 现在在 scene full 播放失败时，不只弹错误提示。
+- 若当前能定位到激活句或首句，会额外给出“改为逐句跟读”的 CTA。
+- 点击 CTA 后会直接走现有 `toggleSentencePlayback(...)`，不额外引入新的串播状态机。
+
+### 12.2 最小失败摘要
+
+- scene full 失败时，会记录 `tts_scene_loop_failed`
+- 摘要至少包含：
+  - `sceneSlug`
+  - `activeSentenceId`
+  - `fallbackSentenceId`
+  - `message`
+- 用户点击替代 CTA 时，还会记录 `tts_scene_loop_fallback_clicked`
+
+### 12.3 这一轮刻意没做的事
+
+- 没把 scene full 自动降级为逐句串播
+- 没引入新的音频错误上报服务
+- 没改变 `tts-api.ts` 的底层生成/缓存策略
+
+当前仍然保持最小可维护方案：受控错误 + 显式替代入口。

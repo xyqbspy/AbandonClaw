@@ -19,6 +19,7 @@ export function TodayContinueCard({
   stepLabel,
   stepIcon,
   helperText,
+  resultSummary,
   progressPercent,
   isPending,
   ctaLabel,
@@ -29,6 +30,7 @@ export function TodayContinueCard({
   stepLabel: string;
   stepIcon: string;
   helperText: string;
+  resultSummary?: string;
   progressPercent: number;
   isPending: boolean;
   ctaLabel: string;
@@ -99,6 +101,11 @@ export function TodayContinueCard({
               <p className={`mt-[var(--mobile-space-sm)] ${APPLE_META_TEXT} leading-[1.5]`}>
                 <span className={TODAY_CONTINUE_HELPER_ICON_CLASSNAME}>{stepIcon}</span> {helperText}
               </p>
+              {resultSummary ? (
+                <p className={`mt-[var(--mobile-space-sm)] ${APPLE_META_TEXT} leading-[1.5] text-[#425466]`}>
+                  {resultSummary}
+                </p>
+              ) : null}
             </>
           )}
         </div>

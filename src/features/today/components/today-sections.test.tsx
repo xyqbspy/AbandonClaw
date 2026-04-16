@@ -45,6 +45,7 @@ test("TodayContinueCard 在 pending 时展示骨架并禁用按钮", async () =>
       stepLabel="正在加载"
       stepIcon="🎧"
       helperText="正在恢复继续学习入口"
+      resultSummary="pending"
       progressPercent={0}
       isPending
       ctaLabel="正在恢复进度..."
@@ -228,4 +229,25 @@ test("TodayRecommendedScenesSection 会处理 loading 和列表点击", async ()
 
   fireEvent.click(screen.getByRole("button", { name: /Coffee Chat/ }));
   assert.deepEqual(openCalls, ["coffee-chat"]);
+});
+
+test("TodayContinueCard 会展示结果摘要", async () => {
+  const { TodayContinueCard } = localRequire("./today-continue-card") as typeof import("./today-continue-card");
+
+  render(
+    <TodayContinueCard
+      title="继续这一轮"
+      subtitle="把今天这轮输入接着推完"
+      stepLabel="句子练习"
+      stepIcon="📝"
+      helperText="当前先把这一句推进到完整复现。"
+      resultSummary="今天已带走 2 条表达，完成当前推进后还有 3 条待回忆。"
+      progressPercent={48}
+      isPending={false}
+      ctaLabel="继续学习"
+      onContinue={() => undefined}
+    />,
+  );
+
+  screen.getByText("今天已带走 2 条表达，完成当前推进后还有 3 条待回忆。");
 });

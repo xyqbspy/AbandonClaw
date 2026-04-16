@@ -19,6 +19,7 @@ import { SceneVariantsView } from "@/features/scene/components/scene-variants-vi
 import { sceneViewLabels } from "@/features/scene/components/scene-view-labels";
 import { normalizePhraseText } from "@/lib/shared/phrases";
 import { Lesson } from "@/lib/types";
+import { recordClientEvent } from "@/lib/utils/client-events";
 import { savePhraseFromApi } from "@/lib/utils/phrases-api";
 import { hydrateVariantSetFromRun } from "@/lib/utils/scene-learning-flow-storage";
 import {
@@ -148,7 +149,21 @@ export default function SceneDetailClientPage({
   const handleLearningStateChange = useCallback((nextState: SceneLearningProgressResponse) => {
     const nextDone = Boolean(nextState.session?.isDone);
     if (nextDone && !sessionDoneRef.current) {
-      notifySceneSessionCompleted();
+      const nextStepHint = nextState.progress.variantUnlockedAt
+        ? "下一步可以直接打开变体训练。"
+        : "下一步可以回到 today 做一轮主动回忆。";
+      notifySceneSessionCompleted({
+        savedPhraseCount: nextState.progress.savedPhraseCount,
+        nextStepHint,
+      });
+      recordClientEvent("scene_learning_completed", {
+        sceneSlug,
+        sceneId: nextState.progress.sceneId,
+        savedPhraseCount: nextState.progress.savedPhraseCount,
+        completedSentenceCount: nextState.progress.completedSentenceCount,
+        scenePracticeCount: nextState.progress.scenePracticeCount,
+        variantUnlocked: Boolean(nextState.progress.variantUnlockedAt),
+      });
     }
     sessionDoneRef.current = nextDone;
     if ((nextState.session?.openedExpressionCount ?? 0) > 0) {

@@ -237,3 +237,20 @@
 
 - `node --import tsx --test "src/features/today/components/today-page-selectors.test.ts"`
 - `node --import tsx --import ./src/test/setup-dom.ts --test "src/features/today/components/today-sections.test.tsx" "src/features/today/components/today-page-client.test.tsx"`
+
+## 9. 第五阶段补充
+
+### 9.1 continue 卡片的结果摘要约定
+
+- `today-page-client.tsx` 现在会在 continue 卡片里额外展示一条结果摘要。
+- 这条摘要只允许复用现有稳定字段：
+  - `todayTasks.outputTask.phrasesSavedToday`
+  - `continueLearning.savedPhraseCount`
+  - `todayTasks.reviewTask.dueReviewCount`
+- 页面层不引入新的“学习成果”聚合字段，只做最小展示拼接。
+
+### 9.2 continue 动作的最小业务事件
+
+- 用户从 continue 卡片进入场景时，会记录 `today_continue_clicked`
+- 用户从 today 打开 review 时，会记录 `today_review_opened`
+- 这层事件只做最小结构化输出，当前不引入新的埋点平台或服务端上报链路

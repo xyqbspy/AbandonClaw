@@ -1,5 +1,33 @@
 # Dev Log
 
+### [2026-04-16] 第五阶段：学习结果反馈与最小业务级可观测性
+
+- 类型：实现 / 测试 / 文档
+- 状态：已完成
+#### 背景
+第四阶段已经把 `today` 编排和音频可靠性收口到了可上线基线，但页面里的“我刚完成了什么、下一步为什么是这个”反馈仍偏弱。同时，当前已有 `requestId` 和服务端结构化日志，客户端关键学习动作还缺最小业务级事件摘要，排查用户在哪一步掉线仍不够直接。
+#### 本次改动
+- 新增 `src/lib/utils/client-events.ts`，提供最小 `recordClientEvent()` / `recordClientFailureSummary()`。
+- `today` continue 卡片补充结果摘要，复用 `phrasesSavedToday / savedPhraseCount / dueReviewCount` 展示当前成果与下一步。
+- `today` 打开 continue 场景与 review 时，分别记录 `today_continue_clicked`、`today_review_opened`。
+- review 提交成功后，复用 `submitPhraseReviewFromApi()` 的 `summary` 给出“还剩多少”或“本轮先收住”的差异化提示，并记录 `review_submitted`。
+- scene 学习 session 首次完成时，toast 会附带“已沉淀多少表达 / 下一步建议”，并记录 `scene_learning_completed`。
+- scene full 播放失败时，记录 `tts_scene_loop_failed`；若能定位到当前句或首句，则提供“改为逐句跟读” CTA，点击后记录 `tts_scene_loop_fallback_clicked`。
+- 同步更新 `today`、`review`、`audio` 相关文档与本阶段 OpenSpec tasks。
+#### 影响范围
+- 影响模块：`today`、`review`、`scene detail`、`lesson audio`、`docs/feature-flows`、`docs/system-design`
+- 是否影响主链路：是
+- 是否影响用户可感知行为：是
+- 是否需要同步文档：是
+#### 测试 / 验证
+- `node --import tsx --test src/lib/utils/client-events.test.ts "src/app/(app)/scene/[slug]/scene-detail-notify.test.ts"`
+- `node --import tsx --import ./src/test/setup-dom.ts --test src/features/lesson/audio/use-lesson-reader-playback.test.tsx src/features/today/components/today-sections.test.tsx`
+- `node --import tsx --import ./src/test/setup-dom.ts --test "src/app/(app)/review/page.interaction.test.tsx" "src/features/today/components/today-page-client.test.tsx" "src/features/lesson/components/lesson-reader.interaction.test.tsx"`
+- `pnpm run text:check-mojibake`
+#### 风险 / 未完成项
+- 当前业务事件仍只输出到客户端 console，还没进入正式埋点链路。
+- 正式 `CHANGELOG.md` 继续按仓库规则留待合并 `main` 后更新；本轮已在 `openspec/changes/improve-learning-feedback-and-observability/changelog.md` 准备草案。
+
 ### [2026-04-16] 第四阶段：today 编排解释、TTS 可靠性与最小安全头
 
 - 类型：实现 / 测试 / 文档
