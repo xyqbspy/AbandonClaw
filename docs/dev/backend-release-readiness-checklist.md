@@ -35,6 +35,7 @@
 - [ ] `practice generate` baseline 已执行
 - [ ] `tts` baseline 已执行
 - [ ] 限流命中与异常结果已记录，不只保留终端输出
+- [ ] 已按 [real-learning-loop-acceptance-checklist.md](/d:/WorkCode/AbandonClaw/docs/dev/real-learning-loop-acceptance-checklist.md) 走完一轮真实学习闭环
 
 ## 第四阶段补充
 
@@ -44,6 +45,7 @@
 - [ ] `tts/regenerate` 批量重生成失败会记录结构化日志，并汇总失败项
 - [ ] 已复核当前仍保留后台白名单的入口只剩共享 `phrases` 和 AI enrich
 - [ ] 若真实环境再出现 `Connect Error: {}`，已具备 `requestId` 与 TTS 服务端日志可追踪链路
+- [ ] `/admin/observability` 能看到最近关键学习动作与失败摘要
 
 ## 最小验证命令
 

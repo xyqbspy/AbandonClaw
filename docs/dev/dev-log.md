@@ -1,5 +1,29 @@
-# Dev Log
+﻿# Dev Log
 
+### [2026-04-16] 第六阶段：真实学习闭环验收与最小可回看化
+- 类型：实现 / 测试 / 文档
+- 状态：已完成
+#### 背景
+前五阶段已经把后端接口治理、数据边界、上线准备、today 编排、音频可靠性和学习反馈补到一条可上线主链路，但客户端业务事件仍然只停留在 console，缺少最小可回看能力；同时，`review` 在队列清空后还缺少更自然的“这轮先收住了”收束反馈，真实学习闭环也缺一份可执行验收清单。
+#### 本次改动
+- 扩展 `src/lib/utils/client-events.ts`，为客户端业务事件与失败摘要增加本地持久化、读取、清理和订阅能力，默认保留最近 `120` 条记录。
+- 新增 `/admin/observability` 页面与 `ClientEventsPanel`，支持查看最近业务事件、关键字筛选、按 `event / failure` 分类过滤与一键清空。
+- `review` 队列清空时，阶段面板会展示“这轮回忆先收住了”的结果摘要，并提供返回 `today` 的 CTA。
+- 新增 [real-learning-loop-acceptance-checklist.md](/d:/WorkCode/AbandonClaw/docs/dev/real-learning-loop-acceptance-checklist.md)，把 `today -> scene -> save phrase -> review -> return today` 的真实链路验收步骤收成文档。
+- 更新 [backend-release-readiness-checklist.md](/d:/WorkCode/AbandonClaw/docs/dev/backend-release-readiness-checklist.md)，补上 `/admin/observability` 可见性和真实学习闭环验收要求。
+#### 影响范围
+- 影响模块：`client-events`、`admin`、`review`、`docs/dev`
+- 是否影响主链路：是，但属于低风险体验收口
+- 是否影响用户可感知行为：是，`review` 队列清空反馈更自然，管理端可以本地回看最近业务事件
+- 是否需要同步文档：是
+#### 测试 / 验证
+- `node --import tsx --test src/lib/utils/client-events.test.ts`
+- `node --import tsx --import ./src/test/setup-dom.ts --test src/components/admin/client-events-panel.test.tsx`
+- `node --import tsx --import ./src/test/setup-dom.ts --test "src/app/(app)/review/page.interaction.test.tsx"`
+- `pnpm run text:check-mojibake`
+#### 风险 / 未完成项
+- 当前业务事件仅保存在本地浏览器，不是正式埋点或跨设备日志链路。
+- 正式 `CHANGELOG.md` 仍按仓库规则留待合并 `main` 后再更新。
 ### [2026-04-16] 第五阶段：学习结果反馈与最小业务级可观测性
 
 - 类型：实现 / 测试 / 文档

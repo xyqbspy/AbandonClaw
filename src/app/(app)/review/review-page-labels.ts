@@ -104,6 +104,9 @@ export type ReviewPageLabels = {
   practiceInlineCompleted: string;
   practiceInlineRecorded: string;
   practiceInlineFailed: string;
+  queueDoneTitle: string;
+  queueDoneBody: string;
+  queueDoneReturnCta: string;
 };
 
 export const reviewPageLabels: ReviewPageLabels = {
@@ -212,4 +215,7 @@ export const reviewPageLabels: ReviewPageLabels = {
   practiceInlineCompleted: "这句已经接住了，已从待复习里移除。",
   practiceInlineRecorded: "已记录这次回补结果。",
   practiceInlineFailed: "提交场景回补失败。",
+  queueDoneTitle: "这轮回忆先收住了",
+  queueDoneBody: "当前没有新的复习任务了，可以回到 today 继续推进场景或表达沉淀。",
+  queueDoneReturnCta: "返回 today",
 };

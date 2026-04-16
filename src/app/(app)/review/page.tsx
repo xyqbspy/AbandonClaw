@@ -352,6 +352,7 @@ export default function ReviewPage() {
         loading={loading}
         activeTaskKind={activeTaskKind}
         stageMeta={stageMeta}
+        summary={summary}
         trainingHintSubtle={trainingHintSubtle}
         currentScenePracticeItem={currentScenePracticeItem}
         currentPhraseItem={currentPhraseItem}
@@ -376,6 +377,7 @@ export default function ReviewPage() {
         setPhraseRewriteDraft={setPhraseRewriteDraft}
         setPhraseDraft={setPhraseDraft}
         setScenePracticeAnswer={setScenePracticeAnswer}
+        onOpenToday={() => router.push("/today")}
       />
 
       {activeTaskKind === "scene_practice" && currentScenePracticeItem ? (

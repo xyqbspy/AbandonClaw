@@ -1,4 +1,4 @@
-import assert from "node:assert/strict";
+﻿import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import test, { afterEach } from "node:test";
 import React from "react";
@@ -89,6 +89,14 @@ let currentScenePracticeRows: Array<{
   latestAnswer: string;
   reviewedAt: string;
 }> = [];
+let currentSummary = {
+  dueReviewCount: 1,
+  reviewedTodayCount: 0,
+  reviewAccuracy: null as number | null,
+  masteredPhraseCount: 0,
+  confidentOutputCountToday: 0,
+  fullOutputCountToday: 0,
+};
 
 const mockedModules = {
   sonner: {
@@ -138,14 +146,7 @@ const mockedModules = {
     },
     getReviewSummaryFromApi: async () => {
       summaryRequestCount += 1;
-      return {
-        dueReviewCount: 1,
-        reviewedTodayCount: 0,
-        reviewAccuracy: null,
-        masteredPhraseCount: 0,
-        confidentOutputCountToday: 0,
-        fullOutputCountToday: 0,
-      };
+      return currentSummary;
     },
     submitPhraseReviewFromApi: async (payload: Record<string, unknown>) => {
       submitPhraseReviewPayloads.push(payload);
@@ -248,6 +249,14 @@ afterEach(() => {
     },
   ];
   currentScenePracticeRows = [];
+  currentSummary = {
+    dueReviewCount: 1,
+    reviewedTodayCount: 0,
+    reviewAccuracy: null,
+    masteredPhraseCount: 0,
+    confidentOutputCountToday: 0,
+    fullOutputCountToday: 0,
+  };
   ReviewPageModule = null;
 });
 
@@ -511,4 +520,24 @@ test("ReviewPage 场景回补提交失败时不会误刷新列表", async () => 
     assert.equal(dueRequestCount, 1);
     assert.equal(summaryRequestCount, 1);
   });
+});
+
+test("ReviewPage 队列清空后会展示收束反馈并提供返回 today 入口", async () => {
+  currentDueRows = [];
+  currentScenePracticeRows = [];
+  currentSummary = {
+    dueReviewCount: 0,
+    reviewedTodayCount: 2,
+    reviewAccuracy: 100,
+    masteredPhraseCount: 0,
+    confidentOutputCountToday: 1,
+    fullOutputCountToday: 1,
+  };
+
+  const ReviewPage = getReviewPage();
+  render(<ReviewPage />);
+
+  await screen.findByText("这轮回忆先收住了");
+  screen.getByText(/今天已完成\s*2\s*条回忆/);
+  screen.getByRole("button", { name: "返回 today" });
 });

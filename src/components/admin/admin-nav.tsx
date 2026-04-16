@@ -13,6 +13,7 @@ const adminNavItems = [
   { label: "变体", href: "/admin/variants" },
   { label: "AI 缓存", href: "/admin/cache" },
   { label: "TTS 缓存", href: "/admin/tts" },
+  { label: "可观测性", href: "/admin/observability" },
 ];
 
 export function AdminNav() {

@@ -28,6 +28,7 @@ export function ReviewPageStagePanel({
   loading,
   activeTaskKind,
   stageMeta,
+  summary,
   trainingHintSubtle,
   currentScenePracticeItem,
   currentPhraseItem,
@@ -52,10 +53,14 @@ export function ReviewPageStagePanel({
   setPhraseRewriteDraft,
   setPhraseDraft,
   setScenePracticeAnswer,
+  onOpenToday,
 }: {
   loading: boolean;
   activeTaskKind: "scene_practice" | "phrase_review" | null;
   stageMeta: StageMeta;
+  summary: {
+    reviewedTodayCount: number;
+  } | null;
   trainingHintSubtle: string;
   currentScenePracticeItem: DueScenePracticeReviewItemResponse | null;
   currentPhraseItem: DueReviewItemResponse | null;
@@ -80,6 +85,7 @@ export function ReviewPageStagePanel({
   setPhraseRewriteDraft: (value: string) => void;
   setPhraseDraft: (value: string) => void;
   setScenePracticeAnswer: (value: string) => void;
+  onOpenToday?: () => void;
 }) {
   if (loading) {
     return (
@@ -92,8 +98,24 @@ export function ReviewPageStagePanel({
   if (activeTaskKind == null || stageMeta == null) {
     return (
       <Card className={APPLE_PANEL_RAISED}>
-        <CardContent className="py-10">
-          <p className={`text-center ${APPLE_META_TEXT}`}>{labels.queueEmpty}</p>
+        <CardContent className="space-y-4 py-10">
+          <div className="space-y-2 text-center">
+            <p className="text-lg font-semibold text-slate-950">
+              {summary?.reviewedTodayCount ? labels.queueDoneTitle : labels.queueEmpty}
+            </p>
+            <p className={APPLE_META_TEXT}>
+              {summary?.reviewedTodayCount
+                ? `今天已完成 ${summary.reviewedTodayCount} 条回忆。${labels.queueDoneBody}`
+                : labels.queueEmpty}
+            </p>
+          </div>
+          {summary?.reviewedTodayCount && onOpenToday ? (
+            <div className="flex justify-center">
+              <Button type="button" onClick={onOpenToday}>
+                {labels.queueDoneReturnCta}
+              </Button>
+            </div>
+          ) : null}
         </CardContent>
       </Card>
     );
