@@ -20,6 +20,7 @@ export function SceneVariantStudyView({
   savedPhraseTexts,
   onSavePhrase,
   onReviewPhrase,
+  onSentencePlayback,
 }: {
   lesson: Lesson;
   topRightTool: ReactNode;
@@ -27,6 +28,7 @@ export function SceneVariantStudyView({
   savedPhraseTexts: string[];
   onSavePhrase: (payload: SavePhrasePayload) => Promise<{ created: boolean }>;
   onReviewPhrase: (payload: SavePhrasePayload) => Promise<{ created: boolean }>;
+  onSentencePlayback?: (payload: { lesson: Lesson; sentence: import("@/lib/types").LessonSentence }) => void;
 }) {
   return (
     <div className="space-y-[var(--mobile-adapt-space-xl)]">
@@ -38,6 +40,7 @@ export function SceneVariantStudyView({
         savedPhraseTexts={savedPhraseTexts}
         onSavePhrase={onSavePhrase}
         onReviewPhrase={onReviewPhrase}
+        onSentencePlayback={onSentencePlayback}
       />
     </div>
   );

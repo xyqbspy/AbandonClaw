@@ -5,9 +5,13 @@ export type ClientEventName =
   | "today_review_opened"
   | "review_submitted"
   | "scene_learning_completed"
+  | "sentence_audio_play_hit_cache"
+  | "sentence_audio_play_miss_cache"
+  | "scene_full_play_ready"
+  | "scene_full_play_wait_fetch"
   | "tts_scene_loop_fallback_clicked";
 
-export type ClientFailureName = "tts_scene_loop_failed";
+export type ClientFailureName = "tts_scene_loop_failed" | "scene_full_play_fallback";
 
 type ClientEventPayload = Record<string, unknown>;
 export type ClientEventRecord = {

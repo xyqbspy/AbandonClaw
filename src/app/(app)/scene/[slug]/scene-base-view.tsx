@@ -26,6 +26,7 @@ export function SceneBaseView({
   onSavePhrase,
   onReviewPhrase,
   onSceneLoopPlayback,
+  onSentencePlayback,
   onChunkEncounter,
   onSentencePracticeComplete,
   chunkDetailSheet,
@@ -42,6 +43,7 @@ export function SceneBaseView({
   onSavePhrase: (payload: SavePhrasePayload) => Promise<{ created: boolean }>;
   onReviewPhrase: (payload: SavePhrasePayload) => Promise<{ created: boolean }>;
   onSceneLoopPlayback?: (payload: { lesson: Lesson }) => void;
+  onSentencePlayback?: (payload: { lesson: Lesson; sentence: import("@/lib/types").LessonSentence }) => void;
   onChunkEncounter?: (payload: {
     lesson: Lesson;
     sentence: import("@/lib/types").LessonSentence;
@@ -73,6 +75,7 @@ export function SceneBaseView({
           onSavePhrase={onSavePhrase}
           onReviewPhrase={onReviewPhrase}
           onSceneLoopPlayback={onSceneLoopPlayback}
+          onSentencePlayback={onSentencePlayback}
           onChunkEncounter={onChunkEncounter}
           onSentencePracticeComplete={onSentencePracticeComplete}
         />

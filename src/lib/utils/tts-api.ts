@@ -4,6 +4,10 @@ import {
   buildSentenceAudioKey,
   mergeSceneFullSegments,
 } from "@/lib/shared/tts";
+import {
+  recordClientEvent,
+  recordClientFailureSummary,
+} from "@/lib/utils/client-events";
 
 type SentenceTtsPayload = {
   kind: "sentence";
@@ -58,6 +62,8 @@ type TtsCacheLimits = {
   browserEntries: number;
   browserBytes: number;
 };
+
+type TtsAudioReadiness = "cache" | "pending" | "miss";
 
 export type TtsPlaybackState = {
   kind: "sentence" | "chunk" | "scene" | null;
@@ -122,6 +128,36 @@ export const subscribeTtsPlaybackState = (listener: (state: TtsPlaybackState) =>
   return () => {
     playbackListeners.delete(listener);
   };
+};
+
+const buildSentenceTtsCacheKey = (params: {
+  sceneSlug: string;
+  sentenceId: string;
+  text: string;
+  speaker?: string;
+  mode?: "normal" | "slow";
+}) => {
+  const mode = params.mode ?? "normal";
+  const sentenceAudioKey = buildSentenceAudioKey({
+    sentenceId: params.sentenceId,
+    text: params.text,
+    speaker: params.speaker,
+    mode,
+  });
+  return `sentence:${params.sceneSlug}:${sentenceAudioKey}`;
+};
+
+const buildSceneFullTtsCacheKey = (params: {
+  sceneSlug: string;
+  sceneType?: "dialogue" | "monologue";
+  segments: Array<{ text: string; speaker?: string }>;
+}) => {
+  const sceneType = params.sceneType ?? "monologue";
+  const sceneFullKey = buildSceneFullAudioKey(
+    mergeSceneFullSegments(params.segments, sceneType),
+    sceneType,
+  );
+  return `scene:${params.sceneSlug}:${sceneFullKey}`;
 };
 
 export const setTtsLooping = (isLooping: boolean) => {
@@ -220,6 +256,25 @@ const getCachedTtsUrl = (cacheKey: string) => {
   }
   touchMapEntry(ttsUrlCache, cacheKey, entry);
   return entry.url;
+};
+
+const hasPersistentAudioCache = async (cacheKey: string) => {
+  if (persistentAudioObjectUrls.has(cacheKey)) return true;
+  if (!canUseBrowserAudioCache()) return false;
+  try {
+    const cache = await getBrowserAudioCache();
+    if (!cache) return false;
+    return Boolean(await cache.match(buildBrowserAudioCacheRequest(cacheKey)));
+  } catch {
+    return false;
+  }
+};
+
+const getTtsAudioReadiness = async (cacheKey: string): Promise<TtsAudioReadiness> => {
+  if (getCachedTtsUrl(cacheKey)) return "cache";
+  if (await hasPersistentAudioCache(cacheKey)) return "cache";
+  if (pendingTtsUrlRequests.has(cacheKey)) return "pending";
+  return "miss";
 };
 
 const cacheTtsUrl = (cacheKey: string, url: string) => {
@@ -691,14 +746,8 @@ export async function ensureSentenceAudio(params: {
   mode?: "normal" | "slow";
 }) {
   const mode = params.mode ?? "normal";
-  const sentenceAudioKey = buildSentenceAudioKey({
-    sentenceId: params.sentenceId,
-    text: params.text,
-    speaker: params.speaker,
-    mode,
-  });
   return requestTtsUrl(
-    `sentence:${params.sceneSlug}:${sentenceAudioKey}`,
+    buildSentenceTtsCacheKey(params),
     {
       kind: "sentence",
       sceneSlug: params.sceneSlug,
@@ -733,12 +782,8 @@ export async function ensureSceneFullAudio(params: {
   segments: Array<{ text: string; speaker?: string }>;
 }) {
   const sceneType = params.sceneType ?? "monologue";
-  const sceneFullKey = buildSceneFullAudioKey(
-    mergeSceneFullSegments(params.segments, sceneType),
-    sceneType,
-  );
   return requestTtsUrl(
-    `scene:${params.sceneSlug}:${sceneFullKey}`,
+    buildSceneFullTtsCacheKey(params),
     {
       kind: "scene_full",
       sceneSlug: params.sceneSlug,
@@ -786,6 +831,44 @@ export const prefetchSceneFullAudio = async (params: {
   }
 };
 
+const recordSentenceAudioPlayEvent = (
+  params: {
+    sceneSlug: string;
+    sentenceId: string;
+    mode?: "normal" | "slow";
+  },
+  readiness: TtsAudioReadiness,
+) => {
+  recordClientEvent(
+    readiness === "cache" ? "sentence_audio_play_hit_cache" : "sentence_audio_play_miss_cache",
+    {
+      sceneSlug: params.sceneSlug,
+      sentenceId: params.sentenceId,
+      mode: params.mode ?? "normal",
+      readiness,
+    },
+  );
+};
+
+const recordSceneFullPlayEvent = (
+  params: {
+    sceneSlug: string;
+    sceneType?: "dialogue" | "monologue";
+    segments: Array<{ text: string; speaker?: string }>;
+  },
+  readiness: TtsAudioReadiness,
+) => {
+  recordClientEvent(
+    readiness === "cache" ? "scene_full_play_ready" : "scene_full_play_wait_fetch",
+    {
+      sceneSlug: params.sceneSlug,
+      sceneType: params.sceneType ?? "monologue",
+      segmentCount: params.segments.length,
+      readiness,
+    },
+  );
+};
+
 export async function playSentenceAudio(params: {
   sceneSlug: string;
   sentenceId: string;
@@ -794,6 +877,8 @@ export async function playSentenceAudio(params: {
   mode?: "normal" | "slow";
 }) {
   const requestId = nextPlaybackRequestId();
+  const readiness = await getTtsAudioReadiness(buildSentenceTtsCacheKey(params));
+  recordSentenceAudioPlayEvent(params, readiness);
   setPlaybackState({
     kind: "sentence",
     status: "loading",
@@ -896,6 +981,8 @@ export async function playSceneLoopAudio(params: {
   const generation = playbackGeneration;
 
   try {
+    const readiness = await getTtsAudioReadiness(buildSceneFullTtsCacheKey(params));
+    recordSceneFullPlayEvent(params, readiness);
     const url = await ensureSceneFullAudio(params);
     if (
       playbackGeneration !== generation ||
@@ -936,6 +1023,12 @@ export async function playSceneLoopAudio(params: {
     await audio.play();
     return { ok: true as const, url, stopped: false as const };
   } catch (error) {
+    recordClientFailureSummary("scene_full_play_fallback", {
+      sceneSlug: params.sceneSlug,
+      sceneType: params.sceneType ?? "monologue",
+      segmentCount: params.segments.length,
+      message: error instanceof Error ? error.message : "Scene full playback failed.",
+    });
     setPlaybackState({
       kind: null,
       status: "idle",

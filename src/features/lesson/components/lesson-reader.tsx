@@ -65,6 +65,7 @@ export function LessonReader({
   onSavePhrase,
   onReviewPhrase,
   onSceneLoopPlayback,
+  onSentencePlayback,
   onChunkEncounter,
   onSentencePracticeComplete,
 }: {
@@ -95,6 +96,7 @@ export function LessonReader({
     sourceChunkText?: string;
   }) => Promise<{ created?: boolean } | void> | { created?: boolean } | void;
   onSceneLoopPlayback?: (payload: { lesson: Lesson }) => void;
+  onSentencePlayback?: (payload: { lesson: Lesson; sentence: LessonSentence }) => void;
   onChunkEncounter?: (payload: {
     lesson: Lesson;
     sentence: LessonSentence;
@@ -272,6 +274,7 @@ export function LessonReader({
     firstSentence,
     activeSentenceId: state.activeSentenceId,
     onSceneLoopPlayback,
+    onSentencePlayback,
   });
   const {
     mobileActiveGroup,

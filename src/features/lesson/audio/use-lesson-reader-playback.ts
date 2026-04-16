@@ -19,6 +19,7 @@ export function useLessonReaderPlayback({
   firstSentence,
   activeSentenceId,
   onSceneLoopPlayback,
+  onSentencePlayback,
 }: {
   lesson: Lesson;
   blockOrder: LessonBlock[];
@@ -26,6 +27,7 @@ export function useLessonReaderPlayback({
   firstSentence: LessonSentence | null;
   activeSentenceId: string | null;
   onSceneLoopPlayback?: (payload: { lesson: Lesson }) => void;
+  onSentencePlayback?: (payload: { lesson: Lesson; sentence: LessonSentence }) => void;
 }) {
   const sentenceLoopRef = useRef<string | null>(null);
   const playbackController = useTtsPlaybackController();
@@ -167,6 +169,7 @@ export function useLessonReaderPlayback({
       }
       const sentence = sentenceOrder.find((item) => item.text.trim() === clean);
       if (sentence) {
+        onSentencePlayback?.({ lesson, sentence });
         void playbackController.toggleSentencePlayback({
           sceneSlug: lesson.slug,
           sentenceId: sentence.id,
@@ -188,7 +191,7 @@ export function useLessonReaderPlayback({
         },
       });
     },
-    [lesson.slug, playbackController, sentenceOrder, speakingText, stopAudio],
+    [lesson, lesson.slug, onSentencePlayback, playbackController, sentenceOrder, speakingText, stopAudio],
   );
 
   const handleLoopSentence = useCallback(

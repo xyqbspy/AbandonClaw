@@ -85,3 +85,40 @@ test("client-events 会把最近记录写入 localStorage 并支持清空", () =
   clearClientEventRecords();
   assert.deepEqual(listClientEventRecords(), []);
 });
+
+test("client-events 支持音频预热与播放观测事件", () => {
+  const localStorage = createLocalStorageMock();
+  globalThis.window = {
+    localStorage,
+    dispatchEvent: () => true,
+  } as unknown as Window & typeof globalThis;
+
+  recordClientEvent("sentence_audio_play_hit_cache", {
+    sceneSlug: "demo-scene",
+    sentenceId: "s-1",
+  });
+  recordClientEvent("sentence_audio_play_miss_cache", {
+    sceneSlug: "demo-scene",
+    sentenceId: "s-2",
+  });
+  recordClientEvent("scene_full_play_ready", {
+    sceneSlug: "demo-scene",
+  });
+  recordClientEvent("scene_full_play_wait_fetch", {
+    sceneSlug: "demo-scene",
+  });
+  recordClientFailureSummary("scene_full_play_fallback", {
+    sceneSlug: "demo-scene",
+  });
+
+  assert.deepEqual(
+    listClientEventRecords().map((record) => record.name),
+    [
+      "scene_full_play_fallback",
+      "scene_full_play_wait_fetch",
+      "scene_full_play_ready",
+      "sentence_audio_play_miss_cache",
+      "sentence_audio_play_hit_cache",
+    ],
+  );
+});

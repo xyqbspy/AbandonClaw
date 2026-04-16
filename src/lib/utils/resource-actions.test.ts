@@ -12,6 +12,12 @@ const lessonWarmupCalls: Array<{
   options?: { sentenceLimit?: number; chunkLimit?: number; includeSceneFull?: boolean };
 }> = [];
 const chunkWarmupCalls: Array<{ chunkTexts: string[]; limit: number }> = [];
+const idleSentenceWarmupCalls: Array<{
+  lesson: Lesson;
+  options?: { startIndex?: number; batchSize?: number };
+}> = [];
+let playbackStatus: "idle" | "loading" | "playing" = "idle";
+let idleWarmupDone = false;
 
 const mockedModules = {
   "@/lib/utils/audio-warmup": {
@@ -24,6 +30,24 @@ const mockedModules = {
     warmupChunkTextsAudio: (chunkTexts: string[], limit = 2) => {
       chunkWarmupCalls.push({ chunkTexts, limit });
     },
+    enqueueLessonIdleSentenceWarmups: (
+      lesson: Lesson,
+      options?: { startIndex?: number; batchSize?: number },
+    ) => {
+      idleSentenceWarmupCalls.push({ lesson, options });
+      return {
+        enqueuedCount: options?.batchSize ?? 2,
+        nextIndex: (options?.startIndex ?? 0) + (options?.batchSize ?? 2),
+        total: 6,
+        done: idleWarmupDone,
+      };
+    },
+  },
+  "@/lib/utils/tts-api": {
+    getTtsPlaybackState: () => ({
+      kind: null,
+      status: playbackStatus,
+    }),
   },
 } satisfies Record<string, unknown>;
 
@@ -64,6 +88,11 @@ const getResourceActions = () => {
 
 const setupWindow = () => {
   const idleCallbacks: Array<() => void> = [];
+  const timeoutCallbacks: Array<() => void> = [];
+  const windowListeners = new Map<string, Array<() => void>>();
+  let visibilityState: DocumentVisibilityState = "visible";
+  let connection: { effectiveType?: string; saveData?: boolean } | undefined;
+
   Object.defineProperty(globalThis, "window", {
     value: {
       requestIdleCallback: ((callback: () => void) => {
@@ -71,19 +100,53 @@ const setupWindow = () => {
         return idleCallbacks.length;
       }) as unknown as (typeof globalThis & Window)["requestIdleCallback"],
       cancelIdleCallback: (() => undefined) as unknown as (typeof globalThis & Window)["cancelIdleCallback"],
-      setTimeout,
-      clearTimeout,
+      setTimeout: ((callback: () => void) => {
+        timeoutCallbacks.push(callback);
+        return timeoutCallbacks.length;
+      }) as unknown as typeof window.setTimeout,
+      clearTimeout: (() => undefined) as unknown as typeof window.clearTimeout,
+      addEventListener: ((type: string, listener: () => void) => {
+        windowListeners.set(type, [...(windowListeners.get(type) ?? []), listener]);
+      }) as unknown as typeof window.addEventListener,
     },
     configurable: true,
   });
   Object.defineProperty(globalThis, "navigator", {
-    value: {},
+    value: {
+      get connection() {
+        return connection;
+      },
+    },
     configurable: true,
   });
+  Object.defineProperty(globalThis, "document", {
+    value: {
+      get visibilityState() {
+        return visibilityState;
+      },
+    },
+    configurable: true,
+  });
+
   return {
     runNextIdle() {
       const callback = idleCallbacks.shift();
       callback?.();
+    },
+    runNextTimer() {
+      const callback = timeoutCallbacks.shift();
+      callback?.();
+    },
+    setConnection(next: { effectiveType?: string; saveData?: boolean } | undefined) {
+      connection = next;
+    },
+    setHidden(hidden: boolean) {
+      visibilityState = hidden ? "hidden" : "visible";
+    },
+    dispatchWindowEvent(type: string) {
+      for (const listener of windowListeners.get(type) ?? []) {
+        listener();
+      }
     },
   };
 };
@@ -91,12 +154,16 @@ const setupWindow = () => {
 afterEach(() => {
   lessonWarmupCalls.length = 0;
   chunkWarmupCalls.length = 0;
+  idleSentenceWarmupCalls.length = 0;
   resourceActionsModule = null;
+  playbackStatus = "idle";
+  idleWarmupDone = false;
   Reflect.deleteProperty(globalThis, "window");
   Reflect.deleteProperty(globalThis, "navigator");
+  Reflect.deleteProperty(globalThis, "document");
 });
 
-test("buildLessonAudioWarmupKey 会为等价 lesson 级预热生成同一 key", () => {
+test("buildLessonAudioWarmupKey 会为等价 lesson 级预热生成同一个 key", () => {
   const { buildLessonAudioWarmupKey } = getResourceActions();
 
   const first = buildLessonAudioWarmupKey(lesson, {
@@ -163,4 +230,106 @@ test("scheduleChunkAudioWarmup 会按归一化后的 chunk key 去重", () => {
     chunkTexts: [" Hang in there ", "Call it a day"],
     limit: 2,
   });
+});
+
+test("scheduleSceneIdleAudioWarmup 会在页面稳定后小批量入队后续句子", () => {
+  const idle = setupWindow();
+  const { scheduleSceneIdleAudioWarmup } = getResourceActions();
+  idleWarmupDone = true;
+
+  const key = scheduleSceneIdleAudioWarmup(lesson, {
+    initialDelayMs: 1000,
+    initialSentenceOffset: 2,
+    batchSize: 2,
+  });
+
+  assert.equal(typeof key, "string");
+  idle.runNextTimer();
+  idle.runNextTimer();
+  idle.runNextIdle();
+
+  assert.equal(idleSentenceWarmupCalls.length, 1);
+  assert.deepEqual(idleSentenceWarmupCalls[0]?.options, {
+    startIndex: 2,
+    batchSize: 2,
+  });
+});
+
+test("scheduleSceneIdleAudioWarmup 在页面 hidden 或播放 loading 时暂停低优先级预热", () => {
+  const idle = setupWindow();
+  const { scheduleSceneIdleAudioWarmup } = getResourceActions();
+  idleWarmupDone = true;
+
+  scheduleSceneIdleAudioWarmup(lesson, {
+    initialDelayMs: 1000,
+    initialSentenceOffset: 2,
+    batchSize: 2,
+  });
+
+  idle.setHidden(true);
+  idle.runNextTimer();
+  idle.runNextTimer();
+  idle.runNextIdle();
+  assert.equal(idleSentenceWarmupCalls.length, 0);
+
+  idle.setHidden(false);
+  playbackStatus = "loading";
+  idle.runNextTimer();
+  idle.runNextIdle();
+  assert.equal(idleSentenceWarmupCalls.length, 0);
+
+  playbackStatus = "idle";
+  idle.runNextTimer();
+  idle.runNextIdle();
+  assert.equal(idleSentenceWarmupCalls.length, 1);
+});
+
+test("scheduleSceneIdleAudioWarmup 在普通播放中不暂停低优先级预热", () => {
+  const idle = setupWindow();
+  const { scheduleSceneIdleAudioWarmup } = getResourceActions();
+  idleWarmupDone = true;
+  playbackStatus = "playing";
+
+  scheduleSceneIdleAudioWarmup(lesson, {
+    initialDelayMs: 1000,
+    initialSentenceOffset: 2,
+    batchSize: 2,
+  });
+
+  idle.runNextTimer();
+  idle.runNextTimer();
+  idle.runNextIdle();
+
+  assert.equal(idleSentenceWarmupCalls.length, 1);
+});
+
+test("scheduleSceneIdleAudioWarmup 在近期高频交互后暂停一轮低优先级预热", () => {
+  const idle = setupWindow();
+  const { scheduleSceneIdleAudioWarmup } = getResourceActions();
+  idleWarmupDone = true;
+
+  scheduleSceneIdleAudioWarmup(lesson, {
+    initialDelayMs: 1000,
+    initialSentenceOffset: 2,
+    batchSize: 2,
+    interactionQuietWindowMs: 1000,
+  });
+
+  idle.dispatchWindowEvent("scroll");
+  idle.runNextTimer();
+  idle.runNextTimer();
+  idle.runNextIdle();
+
+  assert.equal(idleSentenceWarmupCalls.length, 0);
+});
+
+test("scheduleSceneIdleAudioWarmup 在 save-data 场景下不启动", () => {
+  const idle = setupWindow();
+  const { scheduleSceneIdleAudioWarmup } = getResourceActions();
+  idle.setConnection({ saveData: true });
+
+  const result = scheduleSceneIdleAudioWarmup(lesson);
+
+  assert.equal(result, false);
+  assert.equal(idleSentenceWarmupCalls.length, 0);
 });

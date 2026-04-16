@@ -12,6 +12,7 @@ const eventCalls: Array<{ name: string; payload: Record<string, unknown> }> = []
 const failureCalls: Array<{ name: string; payload: Record<string, unknown> }> = [];
 const sentenceCalls: Array<{ sentenceId: string; text: string }> = [];
 const sceneLoopCalls: Array<{ sceneSlug: string }> = [];
+const sentencePlaybackWarmupCalls: Array<{ lessonSlug: string; sentenceId: string }> = [];
 const toastErrorCalls: Array<{
   message?: string;
   actionLabel?: string;
@@ -102,6 +103,7 @@ afterEach(() => {
   failureCalls.length = 0;
   sentenceCalls.length = 0;
   sceneLoopCalls.length = 0;
+  sentencePlaybackWarmupCalls.length = 0;
   toastErrorCalls.length = 0;
   toast.error = originalToastError;
   useLessonReaderPlaybackModule = null;
@@ -113,7 +115,7 @@ test("useLessonReaderPlayback 在 scene full 失败时会提供逐句跟读 CTA"
     toastErrorCalls.push({
       message: String(message),
       actionLabel: typeof options?.action?.label === "string" ? options.action.label : undefined,
-      onAction: options?.action ? () => options.action?.onClick({} as never) : null,
+      onAction: options?.action ? () => options.action?.onClick() : null,
     });
     return "";
   }) as typeof toast.error;
@@ -168,4 +170,56 @@ test("useLessonReaderPlayback 在 scene full 失败时会提供逐句跟读 CTA"
     },
   ]);
   assert.equal(eventCalls.at(-1)?.name, "tts_scene_loop_fallback_clicked");
+});
+
+test("useLessonReaderPlayback 播放句子时会触发可选预热提权回调", async () => {
+  const useLessonReaderPlayback = getUseLessonReaderPlayback();
+  const lesson = {
+    id: "lesson-1",
+    slug: "coffee-chat",
+    title: "Coffee Chat",
+    difficulty: "Intermediate",
+    estimatedMinutes: 3,
+    completionRate: 0,
+    tags: [],
+    sceneType: "dialogue",
+    sections: [],
+    explanations: [],
+  } as never;
+  const sentence = {
+    id: "sentence-1",
+    text: "Let's call it a day.",
+    translation: null,
+    chunks: [],
+  } as never;
+  const { result } = renderHook(() =>
+    useLessonReaderPlayback({
+      lesson,
+      blockOrder: [],
+      sentenceOrder: [sentence],
+      firstSentence: sentence,
+      activeSentenceId: "sentence-1",
+      onSentencePlayback: ({ lesson, sentence }) => {
+        sentencePlaybackWarmupCalls.push({
+          lessonSlug: lesson.slug,
+          sentenceId: sentence.id,
+        });
+      },
+    }),
+  );
+
+  await act(async () => {
+    result.current.handlePronounce("Let's call it a day.");
+  });
+
+  assert.deepEqual(sentencePlaybackWarmupCalls, [
+    {
+      lessonSlug: "coffee-chat",
+      sentenceId: "sentence-1",
+    },
+  ]);
+  assert.deepEqual(sentenceCalls.at(-1), {
+    sentenceId: "sentence-1",
+    text: "Let's call it a day.",
+  });
 });

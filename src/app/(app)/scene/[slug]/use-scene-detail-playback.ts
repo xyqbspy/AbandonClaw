@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useTtsPlaybackController } from "@/hooks/use-tts-playback-controller";
 import { getChunkLayerFromLesson } from "@/lib/data/mock-lessons";
@@ -7,8 +7,17 @@ import { getLessonSentences } from "@/lib/shared/lesson-content";
 import { Lesson, LessonSentence, SelectionChunkLayer } from "@/lib/types";
 import { VariantSet } from "@/lib/types/learning-flow";
 import { trackChunksFromApi } from "@/lib/utils/chunks-api";
-import { getSentenceSpeakText } from "@/lib/utils/audio-warmup";
-import { scheduleChunkAudioWarmup, scheduleLessonAudioWarmup } from "@/lib/utils/resource-actions";
+import {
+  getSentenceSpeakText,
+  promoteLessonPlaybackAudioWarmups,
+} from "@/lib/utils/audio-warmup";
+import {
+  SCENE_IDLE_WARMUP_BATCH_SIZE,
+  cancelSceneIdleAudioWarmup,
+  scheduleChunkAudioWarmup,
+  scheduleLessonAudioWarmup,
+  scheduleSceneIdleAudioWarmup,
+} from "@/lib/utils/resource-actions";
 
 import { findChunkContext } from "./scene-detail-logic";
 
@@ -35,6 +44,15 @@ export function useSceneDetailPlayback({
   const [variantChunkRelatedChunks, setVariantChunkRelatedChunks] = useState<string[]>([]);
   const [variantChunkHoveredKey, setVariantChunkHoveredKey] = useState<string | null>(null);
   const [trackedChunkKeys, setTrackedChunkKeys] = useState<Record<string, true>>({});
+  const playbackWarmupRef = useRef<{
+    lessonSlug: string | null;
+    lastSentenceIndex: number | null;
+    consecutiveCount: number;
+  }>({
+    lessonSlug: null,
+    lastSentenceIndex: null,
+    consecutiveCount: 0,
+  });
   const playbackController = useTtsPlaybackController();
   const { playbackState, speakingText: effectiveSpeakingText, stop } = playbackController;
 
@@ -49,20 +67,52 @@ export function useSceneDetailPlayback({
     [stopGeneratedAudio],
   );
 
+  const handleSentencePlaybackWarmup = useCallback(
+    ({ lesson, sentence }: { lesson: Lesson; sentence: LessonSentence }) => {
+      const sentences = getLessonSentences(lesson);
+      const sentenceIndex = sentences.findIndex((item) => item.id === sentence.id);
+      const previous = playbackWarmupRef.current;
+      const isSameLesson = previous.lessonSlug === lesson.slug;
+      const isConsecutive =
+        isSameLesson &&
+        previous.lastSentenceIndex !== null &&
+        sentenceIndex === previous.lastSentenceIndex + 1;
+      const consecutiveCount = isConsecutive ? previous.consecutiveCount + 1 : 1;
+      playbackWarmupRef.current = {
+        lessonSlug: lesson.slug,
+        lastSentenceIndex: sentenceIndex >= 0 ? sentenceIndex : null,
+        consecutiveCount,
+      };
+
+      promoteLessonPlaybackAudioWarmups(lesson, sentence.id, {
+        lookaheadCount: 3,
+        includeSceneFull: consecutiveCount >= 2,
+      });
+    },
+    [],
+  );
+
   useEffect(() => {
     const warmupLesson = viewMode === "variant-study" ? activeVariantLesson : baseLesson;
     if (!warmupLesson) return;
 
+    const initialSentenceWarmupLimit = 2;
+    let idleWarmupKey: string | false = false;
     const timer = window.setTimeout(() => {
       scheduleLessonAudioWarmup(warmupLesson, {
-        sentenceLimit: 2,
+        sentenceLimit: initialSentenceWarmupLimit,
         chunkLimit: 2,
         includeSceneFull: true,
+      });
+      idleWarmupKey = scheduleSceneIdleAudioWarmup(warmupLesson, {
+        initialSentenceOffset: initialSentenceWarmupLimit,
+        batchSize: SCENE_IDLE_WARMUP_BATCH_SIZE,
       });
     }, 120);
 
     return () => {
       window.clearTimeout(timer);
+      cancelSceneIdleAudioWarmup(idleWarmupKey);
     };
   }, [activeVariantLesson, baseLesson, viewMode]);
 
@@ -141,6 +191,32 @@ export function useSceneDetailPlayback({
             toast.error(error instanceof Error ? error.message : "播放失败，请稍后重试");
           },
         });
+        const playbackWarmupLesson: Lesson = baseLesson ?? {
+          id: `warmup-${sentence.id}`,
+          slug: sceneSlug.trim() || "scene",
+          title: "warmup",
+          difficulty: "Beginner",
+          estimatedMinutes: 1,
+          completionRate: 0,
+          tags: [],
+          sections: [
+            {
+              id: "warmup-section",
+              blocks: [
+                {
+                  id: "warmup-block",
+                  speaker: sentence.speaker,
+                  sentences: [sentence],
+                },
+              ],
+            },
+          ],
+          explanations: [],
+        };
+        handleSentencePlaybackWarmup({
+          lesson: playbackWarmupLesson,
+          sentence,
+        });
         return;
       }
 
@@ -155,6 +231,7 @@ export function useSceneDetailPlayback({
     [
       baseLesson,
       effectiveSpeakingText,
+      handleSentencePlaybackWarmup,
       playbackController,
       sceneSlug,
       stopGeneratedAudio,
@@ -252,6 +329,7 @@ export function useSceneDetailPlayback({
     handleLoopSentence,
     handleOpenVariantChunk,
     handleOpenExpressionDetail,
+    handleSentencePlaybackWarmup,
     resetChunkDetailState,
   };
 }

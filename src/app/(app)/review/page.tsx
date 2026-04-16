@@ -116,9 +116,9 @@ export default function ReviewPage() {
     activeTaskKind == null
       ? null
       : buildReviewTaskStageMeta({
-          taskKind: activeTaskKind,
-          stage: taskStage,
-        });
+        taskKind: activeTaskKind,
+        stage: taskStage,
+      });
   const sourceLabel = resolveReviewSourceLabel({
     isSessionReview,
     sessionSource,
@@ -142,7 +142,7 @@ export default function ReviewPage() {
   });
   const currentPhraseExampleSentence = currentPhraseItem
     ? currentPhraseItem.sourceSentenceText?.trim() ||
-      buildFallbackExampleSentence(currentPhraseItem.text)
+    buildFallbackExampleSentence(currentPhraseItem.text)
     : "";
   const currentRewritePrompt =
     phraseRewritePrompts.find((prompt) => prompt.id === phraseRewritePromptId) ??
@@ -377,9 +377,9 @@ export default function ReviewPage() {
         setPhraseRewriteDraft={setPhraseRewriteDraft}
         setPhraseDraft={setPhraseDraft}
         setScenePracticeAnswer={setScenePracticeAnswer}
-        onOpenToday={() => router.push("/today")}
-      />
 
+      />
+      {/* onOpenToday={() => router.push("/today")} todu 报错了需要修复 */}
       {activeTaskKind === "scene_practice" && currentScenePracticeItem ? (
         <div className="flex flex-wrap gap-3">
           <LoadingButton

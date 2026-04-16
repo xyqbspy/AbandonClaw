@@ -2,6 +2,10 @@ import assert from "node:assert/strict";
 import test, { afterEach, beforeEach } from "node:test";
 
 import {
+  clearClientEventRecords,
+  listClientEventRecords,
+} from "./client-events";
+import {
   __resetTtsTestState,
   __setTtsCacheLimitsForTests,
   clearBrowserTtsCacheEntries,
@@ -11,6 +15,7 @@ import {
   getTtsPlaybackState,
   listBrowserTtsCacheEntries,
   playChunkAudio,
+  playSentenceAudio,
   subscribeTtsPlaybackState,
   stopTtsPlayback,
 } from "./tts-api";
@@ -28,8 +33,22 @@ const getRequestUrl = (request: RequestInfo | URL) => {
   return request.url;
 };
 
+const createLocalStorageMock = () => {
+  const store = new Map<string, string>();
+  return {
+    getItem: (key: string) => store.get(key) ?? null,
+    setItem: (key: string, value: string) => {
+      store.set(key, value);
+    },
+    removeItem: (key: string) => {
+      store.delete(key);
+    },
+  };
+};
+
 beforeEach(async () => {
   await __resetTtsTestState();
+  clearClientEventRecords();
 });
 
 afterEach(async () => {
@@ -41,6 +60,7 @@ afterEach(async () => {
   globalThis.caches = originalCaches;
   globalThis.URL.createObjectURL = originalCreateObjectURL;
   globalThis.URL.revokeObjectURL = originalRevokeObjectURL;
+  clearClientEventRecords();
 });
 
 test("ensureSentenceAudio 会对同一音频请求做并发去重", async () => {
@@ -503,4 +523,56 @@ test("playChunkAudio 会依次发出 loading、playing 和 idle 状态", async (
   assert.ok(states.some((state) => state.status === "playing" && state.text === "status test"));
   assert.equal(getTtsPlaybackState().status, "idle");
   assert.equal(getTtsPlaybackState().kind, null);
+});
+
+test("playSentenceAudio 会记录 sentence cache hit / miss 事件", async () => {
+  let requestCount = 0;
+  globalThis.window = {
+    localStorage: createLocalStorageMock(),
+    dispatchEvent: () => true,
+  } as unknown as Window & typeof globalThis;
+
+  class FakeAudio {
+    preload = "auto";
+    src = "";
+    currentTime = 0;
+    loop = false;
+    onended: null | (() => void) = null;
+    onerror: null | (() => void) = null;
+
+    load() {}
+    play() {
+      queueMicrotask(() => {
+        this.onended?.();
+      });
+      return Promise.resolve();
+    }
+    pause() {}
+  }
+
+  globalThis.Audio = FakeAudio as unknown as typeof Audio;
+  globalThis.fetch = (async () => {
+    requestCount += 1;
+    return new Response(JSON.stringify({ url: "https://cdn.test/sentence-observe.mp3" }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }) as typeof fetch;
+
+  const payload = {
+    sceneSlug: "observe-scene",
+    sentenceId: "s-1",
+    text: "Observe this sentence.",
+    speaker: "A",
+    mode: "normal" as const,
+  };
+
+  await playSentenceAudio(payload);
+  await playSentenceAudio(payload);
+
+  assert.equal(requestCount, 1);
+  assert.deepEqual(
+    listClientEventRecords().map((record) => record.name).reverse(),
+    ["sentence_audio_play_miss_cache", "sentence_audio_play_hit_cache"],
+  );
 });

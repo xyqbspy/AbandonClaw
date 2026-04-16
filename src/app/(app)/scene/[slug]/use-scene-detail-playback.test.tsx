@@ -71,6 +71,11 @@ const loopCalls: boolean[] = [];
 const prefetchSentenceCalls: Array<{ sceneSlug: string; sentenceId: string; text: string }> = [];
 const prefetchChunkCalls: Array<{ chunkText: string; chunkKey: string }> = [];
 const chunkLayerCalls: string[] = [];
+const promoteWarmupCalls: Array<{
+  lessonSlug: string;
+  currentSentenceId: string;
+  includeSceneFull?: boolean;
+}> = [];
 
 let playbackState = {
   text: null as string | null,
@@ -79,6 +84,7 @@ let playbackState = {
   sentenceId: null as string | null,
   mode: null as "normal" | null,
 };
+let currentLessonSentences: LessonSentence[] = [sentence];
 
 const mockedModules = {
   "sonner": {
@@ -99,7 +105,7 @@ const mockedModules = {
     },
   },
   "@/lib/shared/lesson-content": {
-    getLessonSentences: () => [sentence],
+    getLessonSentences: () => currentLessonSentences,
   },
   "@/lib/shared/tts": {
     buildChunkAudioKey: (text: string) => text.trim().toLowerCase().replace(/\s+/g, "-"),
@@ -123,6 +129,27 @@ const mockedModules = {
     stopTtsPlayback: () => {
       stopCalls.push("stop");
     },
+  },
+  "@/lib/utils/audio-warmup": {
+    getSentenceSpeakText: (sentence: LessonSentence) => sentence.tts?.trim() || sentence.audioText?.trim() || sentence.text,
+    promoteLessonPlaybackAudioWarmups: (
+      lesson: Lesson,
+      currentSentenceId: string,
+      options?: { includeSceneFull?: boolean },
+    ) => {
+      promoteWarmupCalls.push({
+        lessonSlug: lesson.slug,
+        currentSentenceId,
+        includeSceneFull: options?.includeSceneFull,
+      });
+    },
+  },
+  "@/lib/utils/resource-actions": {
+    SCENE_IDLE_WARMUP_BATCH_SIZE: 2,
+    cancelSceneIdleAudioWarmup: () => false,
+    scheduleChunkAudioWarmup: () => false,
+    scheduleLessonAudioWarmup: () => false,
+    scheduleSceneIdleAudioWarmup: () => false,
   },
   "./scene-detail-logic": {
     findChunkContext: () => ({
@@ -163,6 +190,8 @@ afterEach(() => {
   prefetchSentenceCalls.length = 0;
   prefetchChunkCalls.length = 0;
   chunkLayerCalls.length = 0;
+  promoteWarmupCalls.length = 0;
+  currentLessonSentences = [sentence];
   playbackState = {
     text: null,
     kind: null,
@@ -322,4 +351,48 @@ test("useSceneDetailPlayback 会在有本轮相关短语时默认选中第一个
   });
 
   assert.deepEqual(chunkLayerCalls, ["burn out"]);
+});
+
+test("useSceneDetailPlayback 会在连续播放句子时触发播放驱动提权", () => {
+  const useSceneDetailPlayback = getUseSceneDetailPlayback();
+  const nextSentence: LessonSentence = {
+    ...sentence,
+    id: "sentence-2",
+    text: "Let's keep going.",
+  };
+  currentLessonSentences = [sentence, nextSentence];
+
+  const { result } = renderHook(() =>
+    useSceneDetailPlayback({
+      sceneSlug: "scene-1",
+      viewMode: "scene",
+      baseLesson: lesson,
+      activeVariantLesson: null,
+      latestVariantSet: variantSet,
+    }),
+  );
+
+  act(() => {
+    result.current.handleSentencePlaybackWarmup({
+      lesson,
+      sentence,
+    });
+    result.current.handleSentencePlaybackWarmup({
+      lesson,
+      sentence: nextSentence,
+    });
+  });
+
+  assert.deepEqual(promoteWarmupCalls, [
+    {
+      lessonSlug: "scene-1",
+      currentSentenceId: "sentence-1",
+      includeSceneFull: false,
+    },
+    {
+      lessonSlug: "scene-1",
+      currentSentenceId: "sentence-2",
+      includeSceneFull: true,
+    },
+  ]);
 });
