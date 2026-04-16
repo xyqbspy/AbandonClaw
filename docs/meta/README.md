@@ -8,6 +8,8 @@
 
 - [product-overview.md](/d:/WorkCode/AbandonClaw/docs/meta/product-overview.md)
   - 产品说明总览，适合对外或对内快速说明产品结构与价值
+- [technical-overview.md](/d:/WorkCode/AbandonClaw/docs/meta/technical-overview.md)
+  - 技术方案总览，适合快速说明技术栈、架构、优化点与治理现状
 - [project-learning-guide.md](/d:/WorkCode/AbandonClaw/docs/meta/project-learning-guide.md)
   - 讲解主入口，适合第一次系统性理解项目
 - [project-tree-map.md](/d:/WorkCode/AbandonClaw/docs/meta/project-tree-map.md)
@@ -21,6 +23,8 @@
 
 - 需要一份产品总览说明
   - 先看 `product-overview.md`
+- 需要一份技术总览说明
+  - 先看 `technical-overview.md`
 - 第一次读项目
   - 先看 `project-learning-guide.md`
 - 想快速讲清结构
@@ -32,6 +36,8 @@
 
 - `product-overview.md`
   - 作为产品定位、用户价值和闭环说明的总览文档
+- `technical-overview.md`
+  - 作为技术栈、架构与优化策略的总览文档
 - `project-learning-guide.md`
   - 作为叙述式主入口，负责讲清项目主线和阅读路径
 - `project-tree-map.md`
