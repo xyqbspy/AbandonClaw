@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test, { afterEach } from "node:test";
 import {
+  buildTtsWarmupEffectivenessSummary,
   clearClientEventRecords,
   listClientEventRecords,
   recordClientEvent,
@@ -101,6 +102,12 @@ test("client-events 支持音频预热与播放观测事件", () => {
     sceneSlug: "demo-scene",
     sentenceId: "s-2",
   });
+  recordClientEvent("chunk_audio_play_hit_cache", {
+    chunkKey: "chunk-1",
+  });
+  recordClientEvent("chunk_audio_play_miss_cache", {
+    chunkKey: "chunk-2",
+  });
   recordClientEvent("scene_full_play_ready", {
     sceneSlug: "demo-scene",
   });
@@ -121,8 +128,55 @@ test("client-events 支持音频预热与播放观测事件", () => {
       "scene_full_play_cooling_down",
       "scene_full_play_wait_fetch",
       "scene_full_play_ready",
+      "chunk_audio_play_miss_cache",
+      "chunk_audio_play_hit_cache",
       "sentence_audio_play_miss_cache",
       "sentence_audio_play_hit_cache",
     ],
   );
+});
+
+test("buildTtsWarmupEffectivenessSummary 会计算 block 和 scene full 的 warm/cold 指标", () => {
+  const records = [
+    {
+      id: "1",
+      kind: "event" as const,
+      name: "sentence_audio_play_hit_cache" as const,
+      at: "2026-04-17T00:00:00.000Z",
+      payload: { audioUnit: "block", wasWarmed: true, warmupSource: "initial" },
+    },
+    {
+      id: "2",
+      kind: "event" as const,
+      name: "sentence_audio_play_miss_cache" as const,
+      at: "2026-04-17T00:00:01.000Z",
+      payload: { audioUnit: "block", wasWarmed: false },
+    },
+    {
+      id: "3",
+      kind: "event" as const,
+      name: "scene_full_play_ready" as const,
+      at: "2026-04-17T00:00:02.000Z",
+      payload: { audioUnit: "scene_full", wasWarmed: true, warmupSource: "playback" },
+    },
+    {
+      id: "4",
+      kind: "failure" as const,
+      name: "scene_full_play_fallback" as const,
+      at: "2026-04-17T00:00:03.000Z",
+      payload: { audioUnit: "scene_full", wasWarmed: false },
+    },
+  ];
+
+  const summary = buildTtsWarmupEffectivenessSummary(records);
+
+  assert.equal(summary.block.warmTotal, 1);
+  assert.equal(summary.block.coldTotal, 1);
+  assert.equal(summary.block.warmHitRate, 1);
+  assert.equal(summary.block.coldHitRate, 0);
+  assert.equal(summary.block.warmupGain, 1);
+  assert.equal(summary.sceneFull.warmReadyRate, 1);
+  assert.equal(summary.sceneFull.coldFallbackRate, 1);
+  assert.equal(summary.sources.initial.hitRate, 1);
+  assert.equal(summary.sources.playback.hitRate, 1);
 });

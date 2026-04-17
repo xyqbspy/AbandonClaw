@@ -6,7 +6,8 @@ import {
   enqueueSceneFullWarmup,
   enqueueSceneSentenceWarmup,
 } from "@/lib/utils/scene-audio-warmup-scheduler";
-import { prefetchChunkAudio } from "@/lib/utils/tts-api";
+import { buildChunkTtsCacheKey, prefetchChunkAudio } from "@/lib/utils/tts-api";
+import { markAudioWarmed, type WarmupSource } from "@/lib/utils/tts-warmup-registry";
 
 export const getSentenceSpeakText = (sentence: LessonSentence) =>
   (sentence.tts?.trim() || sentence.audioText?.trim() || sentence.text).trim();
@@ -31,14 +32,17 @@ const toBlockWarmupPayload = (lesson: Lesson, block: LessonBlock) => ({
   mode: "normal" as const,
 });
 
-export const warmupChunkTextsAudio = (chunkTexts: string[], limit = 2) => {
+export const warmupChunkTextsAudio = (
+  chunkTexts: string[],
+  limit = 2,
+  source: WarmupSource = "initial",
+) => {
   for (const chunkText of chunkTexts.slice(0, limit)) {
     const clean = chunkText.trim();
     if (!clean) continue;
-    void prefetchChunkAudio({
-      chunkText: clean,
-      chunkKey: buildChunkAudioKey(clean),
-    });
+    const chunkKey = buildChunkAudioKey(clean);
+    markAudioWarmed(buildChunkTtsCacheKey({ chunkText: clean, chunkKey }), source);
+    void prefetchChunkAudio({ chunkText: clean, chunkKey });
   }
 };
 

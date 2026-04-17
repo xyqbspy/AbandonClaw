@@ -7,6 +7,7 @@ const nodeModule = localRequire("node:module") as typeof import("node:module");
 
 const ensureSentenceAudioCalls: Array<Record<string, unknown>> = [];
 const ensureSceneFullAudioCalls: Array<Record<string, unknown>> = [];
+const markAudioWarmedCalls: Array<{ cacheKey: string; source: string }> = [];
 const pendingResolvers: Array<() => void> = [];
 let failNextSentenceRequest = false;
 let sceneFullCoolingDown = false;
@@ -20,6 +21,10 @@ const createPendingPromise = () =>
 
 const mockedModules = {
   "@/lib/utils/tts-api": {
+    buildSentenceTtsCacheKey: (payload: Record<string, unknown>) =>
+      `sentence:${String(payload.sceneSlug)}:${String(payload.sentenceId)}`,
+    buildSceneFullTtsCacheKey: (payload: Record<string, unknown>) =>
+      `scene:${String(payload.sceneSlug)}`,
     ensureSentenceAudio: async (payload: Record<string, unknown>) => {
       ensureSentenceAudioCalls.push(payload);
       if (failNextSentenceRequest) {
@@ -43,6 +48,11 @@ const mockedModules = {
             remainingMs: 45_000,
           }
         : null,
+  },
+  "@/lib/utils/tts-warmup-registry": {
+    markAudioWarmed: (cacheKey: string, source: string) => {
+      markAudioWarmedCalls.push({ cacheKey, source });
+    },
   },
 } satisfies Record<string, unknown>;
 
@@ -69,6 +79,7 @@ afterEach(() => {
   for (const resolve of pendingResolvers.splice(0)) resolve();
   ensureSentenceAudioCalls.length = 0;
   ensureSceneFullAudioCalls.length = 0;
+  markAudioWarmedCalls.length = 0;
   failNextSentenceRequest = false;
   sceneFullCoolingDown = false;
 });
@@ -95,6 +106,10 @@ test("同一 sentence 任务重复入队只会执行一次", async () => {
   await waitForQueueTurn();
 
   assert.equal(ensureSentenceAudioCalls.length, 1);
+  assert.deepEqual(markAudioWarmedCalls[0], {
+    cacheKey: "sentence:scene-a:s-1",
+    source: "initial",
+  });
   assert.equal(scheduler.listSceneAudioWarmupTasks()[0]?.status, "loaded");
 });
 

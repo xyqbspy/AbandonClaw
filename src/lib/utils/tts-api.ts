@@ -13,6 +13,10 @@ import {
   recordClientEvent,
   recordClientFailureSummary,
 } from "@/lib/utils/client-events";
+import {
+  __resetTtsWarmupRegistryForTests,
+  getWarmupInfo,
+} from "@/lib/utils/tts-warmup-registry";
 
 type SentenceTtsPayload = {
   kind: "sentence";
@@ -167,7 +171,7 @@ export const subscribeTtsPlaybackState = (listener: (state: TtsPlaybackState) =>
   };
 };
 
-const buildSentenceTtsCacheKey = (params: {
+export const buildSentenceTtsCacheKey = (params: {
   sceneSlug: string;
   sentenceId: string;
   text: string;
@@ -184,10 +188,15 @@ const buildSentenceTtsCacheKey = (params: {
   return `sentence:${params.sceneSlug}:${sentenceAudioKey}`;
 };
 
+export const buildChunkTtsCacheKey = (params: { chunkText: string; chunkKey?: string }) => {
+  const key = params.chunkKey ?? buildChunkAudioKey(params.chunkText);
+  return `chunk:${key}`;
+};
+
 const resolveSentenceAudioUnit = (sentenceId: string): SentenceAudioUnit =>
   sentenceId.startsWith("block-") ? "block" : "sentence";
 
-const buildSceneFullTtsCacheKey = (params: {
+export const buildSceneFullTtsCacheKey = (params: {
   sceneSlug: string;
   sceneType?: "dialogue" | "monologue";
   segments: Array<{ text: string; speaker?: string }>;
@@ -874,7 +883,7 @@ export async function ensureChunkAudio(params: {
 }) {
   const key = params.chunkKey ?? buildChunkAudioKey(params.chunkText);
   return requestTtsUrl(
-    `chunk:${key}`,
+    buildChunkTtsCacheKey({ chunkText: params.chunkText, chunkKey: key }),
     {
       kind: "chunk",
       chunkKey: key,
@@ -946,8 +955,10 @@ const recordSentenceAudioPlayEvent = (
     mode?: "normal" | "slow";
   },
   readiness: TtsAudioReadiness,
+  cacheKey: string,
 ) => {
   const audioUnit = resolveSentenceAudioUnit(params.sentenceId);
+  const warmupInfo = getWarmupInfo(cacheKey);
   recordClientEvent(
     readiness === "cache" ? "sentence_audio_play_hit_cache" : "sentence_audio_play_miss_cache",
     {
@@ -956,6 +967,29 @@ const recordSentenceAudioPlayEvent = (
       sentenceId: params.sentenceId,
       mode: params.mode ?? "normal",
       readiness,
+      wasWarmed: warmupInfo.wasWarmed,
+      ...(warmupInfo.source ? { warmupSource: warmupInfo.source } : {}),
+    },
+  );
+};
+
+const recordChunkAudioPlayEvent = (
+  params: {
+    chunkText: string;
+    chunkKey?: string;
+  },
+  readiness: TtsAudioReadiness,
+  cacheKey: string,
+) => {
+  const warmupInfo = getWarmupInfo(cacheKey);
+  recordClientEvent(
+    readiness === "cache" ? "chunk_audio_play_hit_cache" : "chunk_audio_play_miss_cache",
+    {
+      audioUnit: "chunk",
+      chunkKey: params.chunkKey ?? buildChunkAudioKey(params.chunkText),
+      readiness,
+      wasWarmed: warmupInfo.wasWarmed,
+      ...(warmupInfo.source ? { warmupSource: warmupInfo.source } : {}),
     },
   );
 };
@@ -969,14 +1003,18 @@ const recordSceneFullPlayEvent = (
   readiness: SceneFullPlaybackReadiness,
   sceneFullKey: string,
 ) => {
+  const warmupInfo = getWarmupInfo(sceneFullKey);
   recordClientEvent(
     readiness === "ready" ? "scene_full_play_ready" : "scene_full_play_wait_fetch",
     {
       sceneSlug: params.sceneSlug,
+      audioUnit: "scene_full",
       sceneType: params.sceneType ?? "monologue",
       segmentCount: params.segments.length,
       sceneFullKey,
       readiness,
+      wasWarmed: warmupInfo.wasWarmed,
+      ...(warmupInfo.source ? { warmupSource: warmupInfo.source } : {}),
     },
   );
 };
@@ -990,8 +1028,10 @@ const recordSceneFullCoolingDownEvent = (
   sceneFullKey: string,
   cooldown: NonNullable<ReturnType<typeof getSceneFullCooldown>>,
 ) => {
+  const warmupInfo = getWarmupInfo(sceneFullKey);
   recordClientEvent("scene_full_play_cooling_down", {
     sceneSlug: params.sceneSlug,
+    audioUnit: "scene_full",
     sceneType: params.sceneType ?? "monologue",
     segmentCount: params.segments.length,
     sceneFullKey,
@@ -999,6 +1039,8 @@ const recordSceneFullCoolingDownEvent = (
     failureReason: "cooling_down",
     previousFailureReason: cooldown.failureReason,
     cooldownMs: cooldown.remainingMs,
+    wasWarmed: warmupInfo.wasWarmed,
+    ...(warmupInfo.source ? { warmupSource: warmupInfo.source } : {}),
   });
 };
 
@@ -1026,8 +1068,9 @@ export async function playSentenceAudio(params: {
 }) {
   const requestId = nextPlaybackRequestId();
   const audioUnit = resolveSentenceAudioUnit(params.sentenceId);
-  const readiness = await getTtsAudioReadiness(buildSentenceTtsCacheKey(params));
-  recordSentenceAudioPlayEvent(params, readiness);
+  const cacheKey = buildSentenceTtsCacheKey(params);
+  const readiness = await getTtsAudioReadiness(cacheKey);
+  recordSentenceAudioPlayEvent(params, readiness, cacheKey);
   setPlaybackState({
     kind: "sentence",
     status: "loading",
@@ -1068,6 +1111,9 @@ export async function playSentenceAudio(params: {
 
 export async function playChunkAudio(params: { chunkText: string; chunkKey?: string }) {
   const chunkKey = params.chunkKey ?? buildChunkAudioKey(params.chunkText);
+  const cacheKey = buildChunkTtsCacheKey({ chunkText: params.chunkText, chunkKey });
+  const readiness = await getTtsAudioReadiness(cacheKey);
+  recordChunkAudioPlayEvent({ ...params, chunkKey }, readiness, cacheKey);
   const requestId = nextPlaybackRequestId();
   setPlaybackState({
     kind: "chunk",
@@ -1123,8 +1169,10 @@ export async function playSceneLoopAudio(params: {
   const existingCooldown = getSceneFullCooldown(sceneFullKey);
   if (existingCooldown) {
     recordSceneFullCoolingDownEvent(params, sceneFullKey, existingCooldown);
+    const warmupInfo = getWarmupInfo(sceneFullKey);
     recordClientFailureSummary("scene_full_play_fallback", {
       sceneSlug: params.sceneSlug,
+      audioUnit: "scene_full",
       sceneType: params.sceneType ?? "monologue",
       segmentCount: params.segments.length,
       sceneFullKey,
@@ -1133,6 +1181,8 @@ export async function playSceneLoopAudio(params: {
       previousFailureReason: existingCooldown.failureReason,
       cooldownMs: existingCooldown.remainingMs,
       message: "Scene full playback is cooling down after a recent failure.",
+      wasWarmed: warmupInfo.wasWarmed,
+      ...(warmupInfo.source ? { warmupSource: warmupInfo.source } : {}),
     });
     throw toControlledSceneFullPlaybackError("cooling_down", {
       sceneFullKey,
@@ -1216,8 +1266,10 @@ export async function playSceneLoopAudio(params: {
       markSceneFullFailureCooldown(sceneFullKey, failureReason);
     }
     const cooldown = getSceneFullCooldown(sceneFullKey);
+    const warmupInfo = getWarmupInfo(sceneFullKey);
     recordClientFailureSummary("scene_full_play_fallback", {
       sceneSlug: params.sceneSlug,
+      audioUnit: "scene_full",
       sceneType: params.sceneType ?? "monologue",
       segmentCount: params.segments.length,
       sceneFullKey,
@@ -1225,6 +1277,8 @@ export async function playSceneLoopAudio(params: {
       failureReason,
       cooldownMs: cooldown?.remainingMs ?? 0,
       message: error instanceof Error ? error.message : "Scene full playback failed.",
+      wasWarmed: warmupInfo.wasWarmed,
+      ...(warmupInfo.source ? { warmupSource: warmupInfo.source } : {}),
     });
     setPlaybackState({
       kind: null,
@@ -1252,6 +1306,7 @@ export const __resetTtsTestState = async (options?: { preservePersistentCache?: 
   pendingTtsUrlRequests.clear();
   sceneFullFailureCooldowns.clear();
   sceneFullFailureCooldownMs = defaultSceneFullFailureCooldownMs;
+  __resetTtsWarmupRegistryForTests();
   preloadedAudioUrls.clear();
   for (const cacheKey of persistentAudioObjectUrls.keys()) {
     revokePersistentAudioObjectUrl(cacheKey);

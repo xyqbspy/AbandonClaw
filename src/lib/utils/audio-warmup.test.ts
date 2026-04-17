@@ -14,9 +14,12 @@ const enqueueSceneFullWarmupCalls: Array<{
   payload: Record<string, unknown>;
   options?: Record<string, unknown>;
 }> = [];
+const markAudioWarmedCalls: Array<{ cacheKey: string; source: string }> = [];
 
 const mockedModules = {
   "@/lib/utils/tts-api": {
+    buildChunkTtsCacheKey: (payload: Record<string, unknown>) =>
+      `chunk:${String(payload.chunkKey ?? payload.chunkText)}`,
     prefetchChunkAudio: async (payload: Record<string, unknown>) => {
       prefetchChunkAudioCalls.push(payload);
     },
@@ -35,6 +38,11 @@ const mockedModules = {
     ) => {
       enqueueSceneFullWarmupCalls.push({ payload, options });
       return `scene:${String(payload.sceneSlug)}`;
+    },
+  },
+  "@/lib/utils/tts-warmup-registry": {
+    markAudioWarmed: (cacheKey: string, source: string) => {
+      markAudioWarmedCalls.push({ cacheKey, source });
     },
   },
 } satisfies Record<string, unknown>;
@@ -150,6 +158,7 @@ afterEach(() => {
   prefetchChunkAudioCalls.length = 0;
   enqueueSceneSentenceWarmupCalls.length = 0;
   enqueueSceneFullWarmupCalls.length = 0;
+  markAudioWarmedCalls.length = 0;
   warmupLessonAudio = undefined as unknown as typeof import("./audio-warmup").warmupLessonAudio;
   enqueueLessonIdleBlockWarmups =
     undefined as unknown as typeof import("./audio-warmup").enqueueLessonIdleBlockWarmups;
@@ -180,6 +189,12 @@ test("warmupLessonAudio 会通过 scene 调度器预热首屏 block", () => {
     },
   });
   assert.equal(prefetchChunkAudioCalls.length, 1);
+  assert.deepEqual(markAudioWarmedCalls, [
+    {
+      cacheKey: "chunk:hello-there",
+      source: "initial",
+    },
+  ]);
 });
 
 test("warmupLessonAudio 在 includeSceneFull 开启时会通过调度器预热完整场景音频", () => {

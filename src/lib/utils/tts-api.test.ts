@@ -9,6 +9,8 @@ import {
   __resetTtsTestState,
   __setTtsCacheLimitsForTests,
   clearBrowserTtsCacheEntries,
+  buildChunkTtsCacheKey,
+  buildSentenceTtsCacheKey,
   ensureChunkAudio,
   ensureSentenceAudio,
   getBrowserTtsCacheSummary,
@@ -19,6 +21,7 @@ import {
   subscribeTtsPlaybackState,
   stopTtsPlayback,
 } from "./tts-api";
+import { markAudioWarmed } from "./tts-warmup-registry";
 
 const originalFetch = globalThis.fetch;
 const originalAudio = globalThis.Audio;
@@ -532,6 +535,53 @@ test("playChunkAudio 会依次发出 loading、playing 和 idle 状态", async (
   assert.equal(getTtsPlaybackState().kind, null);
 });
 
+test("playChunkAudio 会记录 chunk hit/miss 与 warmup 字段", async () => {
+  globalThis.window = {
+    localStorage: createLocalStorageMock(),
+    dispatchEvent: () => true,
+  } as unknown as Window & typeof globalThis;
+
+  class FakeAudio {
+    preload = "auto";
+    src = "";
+    currentTime = 0;
+    loop = false;
+    onended: null | (() => void) = null;
+    onerror: null | (() => void) = null;
+
+    load() {}
+    play() {
+      queueMicrotask(() => {
+        this.onended?.();
+      });
+      return Promise.resolve();
+    }
+    pause() {}
+  }
+
+  globalThis.Audio = FakeAudio as unknown as typeof Audio;
+  globalThis.fetch = (async () =>
+    new Response(JSON.stringify({ url: "https://cdn.test/chunk-warm.mp3" }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    })) as typeof fetch;
+
+  markAudioWarmed(
+    buildChunkTtsCacheKey({ chunkText: "warm chunk", chunkKey: "warm-chunk" }),
+    "initial",
+  );
+  await playChunkAudio({
+    chunkText: "warm chunk",
+    chunkKey: "warm-chunk",
+  });
+
+  const [record] = listClientEventRecords();
+  assert.equal(record?.name, "chunk_audio_play_miss_cache");
+  assert.equal(record?.payload.audioUnit, "chunk");
+  assert.equal(record?.payload.wasWarmed, true);
+  assert.equal(record?.payload.warmupSource, "initial");
+});
+
 test("playSentenceAudio 会记录 sentence cache hit / miss 事件", async () => {
   let requestCount = 0;
   globalThis.window = {
@@ -588,6 +638,12 @@ test("playSentenceAudio 会记录 sentence cache hit / miss 事件", async () =>
       .reverse(),
     ["sentence", "sentence"],
   );
+  assert.deepEqual(
+    listClientEventRecords()
+      .map((record) => record.payload.wasWarmed)
+      .reverse(),
+    [false, false],
+  );
 });
 
 test("playSentenceAudio 复用 block id 时会在观测 payload 中标记 audioUnit=block", async () => {
@@ -632,4 +688,51 @@ test("playSentenceAudio 复用 block id 时会在观测 payload 中标记 audioU
   assert.equal(record?.name, "sentence_audio_play_miss_cache");
   assert.equal(record?.payload.audioUnit, "block");
   assert.equal(record?.payload.sentenceId, "block-blk-1");
+});
+
+test("playSentenceAudio 会把 warmup registry 信息写入播放事件", async () => {
+  globalThis.window = {
+    localStorage: createLocalStorageMock(),
+    dispatchEvent: () => true,
+  } as unknown as Window & typeof globalThis;
+
+  class FakeAudio {
+    preload = "auto";
+    src = "";
+    currentTime = 0;
+    loop = false;
+    onended: null | (() => void) = null;
+    onerror: null | (() => void) = null;
+
+    load() {}
+    play() {
+      queueMicrotask(() => {
+        this.onended?.();
+      });
+      return Promise.resolve();
+    }
+    pause() {}
+  }
+
+  globalThis.Audio = FakeAudio as unknown as typeof Audio;
+  globalThis.fetch = (async () =>
+    new Response(JSON.stringify({ url: "https://cdn.test/warmed-block.mp3" }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    })) as typeof fetch;
+
+  const payload = {
+    sceneSlug: "observe-scene",
+    sentenceId: "block-blk-2",
+    text: "A warmed block.",
+    speaker: "A",
+  };
+  markAudioWarmed(buildSentenceTtsCacheKey(payload), "playback");
+
+  await playSentenceAudio(payload);
+
+  const [record] = listClientEventRecords();
+  assert.equal(record?.payload.audioUnit, "block");
+  assert.equal(record?.payload.wasWarmed, true);
+  assert.equal(record?.payload.warmupSource, "playback");
 });

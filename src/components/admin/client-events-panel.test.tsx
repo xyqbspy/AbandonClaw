@@ -25,9 +25,16 @@ test("ClientEventsPanel 会展示最近业务事件并支持筛选和清空", ()
     sceneSlug: "coffee-chat",
     failureReason: "cooling_down",
   });
+  recordClientEvent("sentence_audio_play_hit_cache", {
+    audioUnit: "block",
+    wasWarmed: true,
+    warmupSource: "initial",
+  });
 
   render(<ClientEventsPanel />);
 
+  screen.getByText("Block warm hit");
+  screen.getByText("Warmup source");
   screen.getByText("today_continue_clicked");
   screen.getByText("tts_scene_loop_failed");
   screen.getByText("scene_full_play_cooling_down");

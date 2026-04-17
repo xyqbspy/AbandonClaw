@@ -1,12 +1,11 @@
 import {
-  buildSceneFullAudioKey,
-  buildSentenceAudioKey,
-} from "@/lib/shared/tts";
-import {
+  buildSceneFullTtsCacheKey,
+  buildSentenceTtsCacheKey,
   ensureSceneFullAudio,
   ensureSentenceAudio,
   getSceneFullAudioCooldown,
 } from "@/lib/utils/tts-api";
+import { markAudioWarmed, type WarmupSource } from "@/lib/utils/tts-warmup-registry";
 
 export type SceneAudioWarmupTaskKind = "sentence" | "scene_full";
 export type SceneAudioWarmupTaskStatus = "queued" | "loading" | "loaded" | "failed" | "skipped";
@@ -69,19 +68,11 @@ const cloneTask = (task: InternalSceneAudioWarmupTask): SceneAudioWarmupTask => 
 });
 
 export const buildSceneSentenceWarmupTaskKey = (payload: SceneSentenceWarmupPayload) => {
-  const sentenceAudioKey = buildSentenceAudioKey({
-    sentenceId: payload.sentenceId,
-    text: payload.text,
-    speaker: payload.speaker,
-    mode: payload.mode ?? "normal",
-  });
-  return `sentence:${payload.sceneSlug}:${sentenceAudioKey}`;
+  return buildSentenceTtsCacheKey(payload);
 };
 
 export const buildSceneFullWarmupTaskKey = (payload: SceneFullWarmupPayload) => {
-  const sceneType = payload.sceneType ?? "monologue";
-  const sceneFullAudioKey = buildSceneFullAudioKey(payload.segments, sceneType);
-  return `scene:${payload.sceneSlug}:${sceneFullAudioKey}`;
+  return buildSceneFullTtsCacheKey(payload);
 };
 
 const shouldPromotePriority = (
@@ -145,6 +136,9 @@ const enqueueSceneAudioWarmupTask = (
 ) => {
   const priority = options?.priority ?? "idle-warm";
   const source = options?.source ?? "initial";
+  if (source !== "user-click") {
+    markAudioWarmed(key, source as WarmupSource);
+  }
   const existing = sceneAudioWarmupTasks.get(key);
 
   if (existing) {

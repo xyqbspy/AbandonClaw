@@ -7,9 +7,11 @@ import {
 import {
   __resetTtsTestState,
   __setSceneFullFailureCooldownMsForTests,
+  buildSceneFullTtsCacheKey,
   playSceneLoopAudio,
   stopTtsPlayback,
 } from "./tts-api";
+import { markAudioWarmed } from "./tts-warmup-registry";
 
 const originalFetch = globalThis.fetch;
 const originalAudio = globalThis.Audio;
@@ -112,6 +114,7 @@ test("playSceneLoopAudio 会记录 ready / wait_fetch / fallback 事件", async 
     sceneType: "dialogue" as const,
     segments: [{ text: "Hello there", speaker: "A" }],
   };
+  markAudioWarmed(buildSceneFullTtsCacheKey(payload), "idle");
 
   await playSceneLoopAudio(payload);
   stopTtsPlayback();
@@ -129,6 +132,18 @@ test("playSceneLoopAudio 会记录 ready / wait_fetch / fallback 事件", async 
       .reverse(),
     ["cold", "ready"],
   );
+  assert.deepEqual(
+    listClientEventRecords()
+      .map((record) => record.payload.wasWarmed)
+      .reverse(),
+    [true, true],
+  );
+  assert.deepEqual(
+    listClientEventRecords()
+      .map((record) => record.payload.warmupSource)
+      .reverse(),
+    ["idle", "idle"],
+  );
 
   globalThis.fetch = (async () =>
     new Response(JSON.stringify({ error: "upstream failed" }), {
@@ -136,11 +151,14 @@ test("playSceneLoopAudio 会记录 ready / wait_fetch / fallback 事件", async 
       headers: { "Content-Type": "application/json" },
     })) as typeof fetch;
   await __resetTtsTestState();
+  markAudioWarmed(buildSceneFullTtsCacheKey(payload), "playback");
 
   await assert.rejects(() => playSceneLoopAudio(payload), /完整场景音频暂时不可用/);
 
   assert.equal(listClientEventRecords()[0]?.name, "scene_full_play_fallback");
   assert.equal(listClientEventRecords()[0]?.payload.failureReason, "provider_error");
+  assert.equal(listClientEventRecords()[0]?.payload.wasWarmed, true);
+  assert.equal(listClientEventRecords()[0]?.payload.warmupSource, "playback");
 });
 
 test("playSceneLoopAudio 会对同一个 scene full 失败做短时冷却", async () => {

@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
+  buildTtsWarmupEffectivenessSummary,
   clearClientEventRecords,
   listClientEventRecords,
   subscribeClientEventRecords,
@@ -31,6 +32,14 @@ const formatPayload = (payload: Record<string, unknown>) =>
     .slice(0, 4)
     .map(([key, value]) => `${key}: ${String(value)}`)
     .join(" | ");
+
+const formatRate = (rate: number | null) => (rate == null ? "-" : `${Math.round(rate * 100)}%`);
+
+const formatGain = (rate: number | null) => {
+  if (rate == null) return "-";
+  const value = Math.round(rate * 100);
+  return `${value > 0 ? "+" : ""}${value}pp`;
+};
 
 export function ClientEventsPanel() {
   const [records, setRecords] = useState<ClientEventRecord[]>([]);
@@ -61,6 +70,10 @@ export function ClientEventsPanel() {
 
   const eventCount = records.filter((record) => record.kind === "event").length;
   const failureCount = records.filter((record) => record.kind === "failure").length;
+  const ttsWarmupSummary = useMemo(
+    () => buildTtsWarmupEffectivenessSummary(records),
+    [records],
+  );
 
   return (
     <div className="space-y-4">
@@ -78,6 +91,29 @@ export function ClientEventsPanel() {
             <StatCard title="总记录" value={records.length} />
             <StatCard title="业务动作" value={eventCount} />
             <StatCard title="失败摘要" value={failureCount} />
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <StatCard
+              title="Block warm hit"
+              value={formatRate(ttsWarmupSummary.block.warmHitRate)}
+              hint={`cold ${formatRate(ttsWarmupSummary.block.coldHitRate)} / ${formatGain(ttsWarmupSummary.block.warmupGain)}`}
+            />
+            <StatCard
+              title="Full warm ready"
+              value={formatRate(ttsWarmupSummary.sceneFull.warmReadyRate)}
+              hint={`cold ${formatRate(ttsWarmupSummary.sceneFull.coldReadyRate)} / ${formatGain(ttsWarmupSummary.sceneFull.readyGain)}`}
+            />
+            <StatCard
+              title="Full fallback"
+              value={formatRate(ttsWarmupSummary.sceneFull.warmFallbackRate)}
+              hint={`cold ${formatRate(ttsWarmupSummary.sceneFull.coldFallbackRate)}`}
+            />
+            <StatCard
+              title="Warmup source"
+              value={`I ${formatRate(ttsWarmupSummary.sources.initial.hitRate)}`}
+              hint={`D ${formatRate(ttsWarmupSummary.sources.idle.hitRate)} / P ${formatRate(ttsWarmupSummary.sources.playback.hitRate)}`}
+            />
           </div>
 
           <div className="space-y-2">

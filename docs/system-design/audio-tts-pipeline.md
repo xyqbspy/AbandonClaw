@@ -32,6 +32,7 @@
 
 - `src/lib/utils/tts-api.ts`
 - `src/lib/utils/audio-warmup.ts`
+- `src/lib/utils/tts-warmup-registry.ts`
 - `src/lib/utils/resource-actions.ts`
 - `src/hooks/use-tts-playback-state.ts`
 - `src/hooks/use-tts-playback-controller.ts`
@@ -623,3 +624,70 @@ scene full 播放回看事件现在会携带更明确的状态：
 - `scene_full_play_fallback`：进入 fallback，payload 包含 `failureReason`、`sceneFullKey`、`readiness` 和 `cooldownMs`。
 
 产品承接上，scene full 失败后优先回到 block-first 路径：如果能定位当前 block，CTA 会继续当前段落；不能定位时才回退到 active sentence 或首句。
+
+## 15. TTS 预热收益指标补充
+
+TTS 预热现在有一层轻量运行时 registry，用来把“预热入队”与“后续播放事件”按稳定 cache key 关联起来：
+
+- 文件：`src/lib/utils/tts-warmup-registry.ts`
+- key：与浏览器 Cache Storage 一致
+  - block / sentence：`sentence:<sceneSlug>:<sentenceAudioKey>`
+  - chunk：`chunk:<chunkKey>`
+  - scene full：`scene:<sceneSlug>:<sceneFullKey>`
+- TTL：默认 20 分钟
+- 容量：默认最多 240 条
+- 来源：`initial` / `idle` / `playback`
+
+### 15.1 预热来源
+
+- `initial`：首屏或入口级预热，例如 scene detail 首批 block、首批 chunk 和可选 scene full。
+- `idle`：页面稳定后的增量预热，例如 scene detail 空闲时补齐后续 block。
+- `playback`：用户播放后触发的后续资源提权，例如播放当前 block 后提权后续 block 或 scene full。
+
+`user-click` 不算 warmup source。当前点击播放是用户 demand，不应被统计成预热收益。
+
+### 15.2 播放事件字段
+
+以下事件会携带预热关联字段：
+
+- `sentence_audio_play_hit_cache`
+- `sentence_audio_play_miss_cache`
+- `chunk_audio_play_hit_cache`
+- `chunk_audio_play_miss_cache`
+- `scene_full_play_ready`
+- `scene_full_play_wait_fetch`
+- `scene_full_play_cooling_down`
+- `scene_full_play_fallback`
+
+新增字段：
+
+- `wasWarmed: boolean`
+- `warmupSource?: "initial" | "idle" | "playback"`
+
+scene full 事件还会统一带：
+
+- `audioUnit = "scene_full"`
+
+block 音频继续复用 sentence TTS 通道，但事件中仍保持：
+
+- `audioUnit = "block"`
+
+### 15.3 Admin summary 口径
+
+`/admin/observability` 会基于当前浏览器最近本地事件计算 TTS 预热收益摘要，不写数据库，也不代表全量用户数据。
+
+当前 summary 口径：
+
+- block warm hit rate：`audioUnit = block` 且 `wasWarmed = true` 的 hit / total
+- block cold hit rate：`audioUnit = block` 且 `wasWarmed != true` 的 hit / total
+- block warmup gain：warm hit rate - cold hit rate
+- scene full warm ready rate：`wasWarmed = true` 的 ready / total
+- scene full cold ready rate：`wasWarmed != true` 的 ready / total
+- scene full fallback rate：warm / cold 各自的 fallback / total
+- source breakdown：按 `initial` / `idle` / `playback` 展示最小命中率
+
+注意：
+
+- 样本少时 gain 可能为负，这是调度诊断信号，不是自动失败条件。
+- 老事件没有 `wasWarmed` 时按 cold 处理。
+- registry 是内存态，刷新页面后 registry 会重置；事件记录仍按 `client-events` 的本地存储保留。
