@@ -352,6 +352,12 @@ const getSceneFullCooldown = (sceneFullKey: string, now = Date.now()) => {
   };
 };
 
+export const getSceneFullAudioCooldown = (params: {
+  sceneSlug: string;
+  sceneType?: "dialogue" | "monologue";
+  segments: Array<{ text: string; speaker?: string }>;
+}) => getSceneFullCooldown(buildSceneFullTtsCacheKey(params));
+
 const markSceneFullFailureCooldown = (
   sceneFullKey: string,
   failureReason: SceneFullFailureReason,

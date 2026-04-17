@@ -182,6 +182,8 @@
 2. 不新增重复语义文档
 3. 主链路变更必须更新文档
 4. 不允许同一逻辑散落多个文件
+5. OpenSpec 变更在 implementation / archive 完成前，必须同步检查并补全对应文档
+6. 功能链路优化或新增能力必须同步更新对应分类文档；例如音频/TTS 链路改动要更新 `docs/system-design/audio-tts-pipeline.md`
 
 ---
 
@@ -215,6 +217,8 @@ Proposal → Approval → Implementation → Archive → Specs → CHANGELOG
 - 必须有 change-id
 - 必须有 proposal / tasks
 - 行为变更必须写 spec delta
+- 实现完成后必须对照 proposal / design / spec delta 回查对应 feature-flow / domain-rules / system-design 文档是否已同步
+- archive 前不得只归档 OpenSpec 而遗漏实际维护文档；若无文档更新，必须说明原因
 
 详见：
 docs/dev/openspec-workflow.md

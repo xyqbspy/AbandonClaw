@@ -5,10 +5,11 @@ import {
 import {
   ensureSceneFullAudio,
   ensureSentenceAudio,
+  getSceneFullAudioCooldown,
 } from "@/lib/utils/tts-api";
 
 export type SceneAudioWarmupTaskKind = "sentence" | "scene_full";
-export type SceneAudioWarmupTaskStatus = "queued" | "loading" | "loaded" | "failed";
+export type SceneAudioWarmupTaskStatus = "queued" | "loading" | "loaded" | "failed" | "skipped";
 export type SceneAudioWarmupTaskPriority =
   | "immediate"
   | "next-up"
@@ -91,9 +92,12 @@ const shouldPromotePriority = (
 const runTask = async (task: InternalSceneAudioWarmupTask) => {
   if (task.kind === "sentence") {
     await ensureSentenceAudio(task.payload);
-    return;
+    return "loaded" as const;
   }
+  const cooldown = getSceneFullAudioCooldown(task.payload);
+  if (cooldown) return "skipped" as const;
   await ensureSceneFullAudio(task.payload);
+  return "loaded" as const;
 };
 
 const getNextQueuedTask = () =>
@@ -115,8 +119,10 @@ const pumpSceneAudioWarmupQueue = () => {
     task.errorMessage = undefined;
 
     void runTask(task)
-      .then(() => {
-        task.status = "loaded";
+      .then((status) => {
+        task.status = status;
+        task.errorMessage =
+          status === "skipped" ? "Scene full warmup skipped during cooldown." : undefined;
       })
       .catch((error: unknown) => {
         task.status = "failed";
@@ -146,7 +152,7 @@ const enqueueSceneAudioWarmupTask = (
       existing.priority = priority;
       existing.source = source;
     }
-    if (existing.status === "failed") {
+    if (existing.status === "failed" || existing.status === "skipped") {
       existing.status = "queued";
       existing.errorMessage = undefined;
       existing.sequence = sequence;

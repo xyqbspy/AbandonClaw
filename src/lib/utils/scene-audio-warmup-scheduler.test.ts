@@ -9,6 +9,7 @@ const ensureSentenceAudioCalls: Array<Record<string, unknown>> = [];
 const ensureSceneFullAudioCalls: Array<Record<string, unknown>> = [];
 const pendingResolvers: Array<() => void> = [];
 let failNextSentenceRequest = false;
+let sceneFullCoolingDown = false;
 
 const waitForQueueTurn = () => new Promise((resolve) => setTimeout(resolve, 0));
 
@@ -34,6 +35,14 @@ const mockedModules = {
       ensureSceneFullAudioCalls.push(payload);
       return `scene-url:${String(payload.sceneSlug)}`;
     },
+    getSceneFullAudioCooldown: () =>
+      sceneFullCoolingDown
+        ? {
+            failureReason: "provider_error",
+            failedAt: Date.now(),
+            remainingMs: 45_000,
+          }
+        : null,
   },
 } satisfies Record<string, unknown>;
 
@@ -61,6 +70,7 @@ afterEach(() => {
   ensureSentenceAudioCalls.length = 0;
   ensureSceneFullAudioCalls.length = 0;
   failNextSentenceRequest = false;
+  sceneFullCoolingDown = false;
 });
 
 test("同一 sentence 任务重复入队只会执行一次", async () => {
@@ -207,4 +217,33 @@ test("已 loaded 的任务再次提权时不会重复请求", async () => {
 
   assert.equal(ensureSentenceAudioCalls.length, 1);
   assert.equal(scheduler.listSceneAudioWarmupTasks()[0]?.status, "loaded");
+});
+
+test("scene full 预热命中冷却时会跳过网络请求，后续可重新入队", async () => {
+  const scheduler = loadScheduler();
+  const payload = {
+    sceneSlug: "scene-a",
+    sceneType: "dialogue" as const,
+    segments: [{ text: "Hello there.", speaker: "A" }],
+  };
+
+  sceneFullCoolingDown = true;
+  scheduler.enqueueSceneFullWarmup(payload);
+  await waitForQueueTurn();
+  await waitForQueueTurn();
+
+  let task = scheduler.listSceneAudioWarmupTasks()[0];
+  assert.equal(ensureSceneFullAudioCalls.length, 0);
+  assert.equal(task?.status, "skipped");
+  assert.equal(task?.errorMessage, "Scene full warmup skipped during cooldown.");
+
+  sceneFullCoolingDown = false;
+  scheduler.enqueueSceneFullWarmup(payload, { priority: "next-up", source: "playback" });
+  await waitForQueueTurn();
+  await waitForQueueTurn();
+
+  task = scheduler.listSceneAudioWarmupTasks()[0];
+  assert.equal(ensureSceneFullAudioCalls.length, 1);
+  assert.equal(task?.status, "loaded");
+  assert.equal(task?.errorMessage, undefined);
 });
