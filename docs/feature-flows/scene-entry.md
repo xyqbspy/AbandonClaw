@@ -106,6 +106,8 @@
 
 - 前端校验输入
 - 调 `importSceneFromApi`
+- 后端通过 `parseImportedSceneWithCache()` 调用场景解析模型；首次输出不符合 `SceneParserResponse` 时，会用 repair prompt 再修复一次
+- `A:/B:/C:` 逐行对话应优先按一行一个 dialogue block 解析；每个 block 最多 2 个 sentence；sentence 必须有 `chunks` 数组，但允许 `chunks: []`
 - 成功后 `clearSceneListCache()`
 - 再强制网络刷新列表
 - 顶部 `topTask` 切成完成态

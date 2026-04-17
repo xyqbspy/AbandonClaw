@@ -75,7 +75,9 @@ IMPORTANT:
 - scene.sections must be non-empty.
 - Every section must have blocks.
 - Every block must have at least 1 sentence.
-- Every sentence must have chunks.
+- Every block must have no more than 2 sentences.
+- For A:/B:/C: line-based input, prefer one dialogue block per line.
+- Every sentence must have a chunks array. It may be [] when there is no clear high-value chunk.
 - Every chunk must include id, key, text, start, end.
 - Do not add explanation before or after JSON.`;
 
