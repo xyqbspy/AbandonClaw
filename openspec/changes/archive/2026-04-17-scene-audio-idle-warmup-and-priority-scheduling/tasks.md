@@ -1,7 +1,11 @@
 # 任务清单
 
 ## Status
-step-4-complete
+step-5-complete
+
+## Archive note
+
+本 change 的早期 delta spec 仍使用 sentence-first 预热口径；后续 `scene-block-first-audio-priority` 已将主口径更新为 block-first，并已同步到主 spec。归档时不再把本 change 的旧 delta 同步进主 spec，避免覆盖当前 block-first 规范。
 
 ## Step 1: 浏览器侧预热任务模型
 - [x] 1.1 新增 scene 音频预热任务结构，覆盖 `sentence` 和 `scene_full`
@@ -22,5 +26,5 @@ step-4-complete
 - [x] 4.2 记录 scene full ready / wait / fallback
 
 ## Step 5: 验收与文档
-- [ ] 5.1 补真实 scene 页验收清单
-- [ ] 5.2 更新音频链路文档和 dev-log
+- [x] 5.1 补真实 scene 页验收清单
+- [x] 5.2 更新音频链路文档和 dev-log

@@ -8,7 +8,7 @@
 
 - [x] 2.1 为 detail 组件复用边界创建 OpenSpec change
 - [x] 2.2 补齐 proposal、design、tasks 和 delta specs
-- [ ] 2.3 后续如触发真实重构，再基于本 change 拆分实现任务
+- [x] 2.3 后续如触发真实重构，再基于本 change 拆分实现任务
 
 ## 3. 校验与记录
 
