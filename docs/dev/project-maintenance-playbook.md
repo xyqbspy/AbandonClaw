@@ -309,7 +309,10 @@ node_modules\.bin\openspec.CMD archive <change-name>
 
 如果是 detail 体系收敛或跨模块复用调整，可额外参考：
 
-- `openspec/changes/consolidate-detail-composition/implementation-intake-template.md`
+- `openspec/specs/detail-composition-boundaries/spec.md`
+- `openspec/changes/archive/2026-04-17-consolidate-detail-composition/implementation-intake-template.md`
+
+归档模板只作为实施前检查参考；新的结构性改动仍应按当前需求重新建立 OpenSpec change。
 
 ### 改动后
 

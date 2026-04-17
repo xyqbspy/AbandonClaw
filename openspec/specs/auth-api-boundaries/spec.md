@@ -1,6 +1,8 @@
-# 规范文档：auth-api-boundaries
+## Purpose
 
-## MODIFIED Requirements
+定义用户态 API、高权限后台入口与数据库权限边界，确保高成本或私有数据接口具备可审计的服务层和数据库层访问约束。
+
+## Requirements
 
 ### Requirement: 高成本接口必须有显式访问边界
 对已切换到用户上下文的用户态读写链路，系统 MUST 同时具备服务层访问边界与数据库层最小权限边界。若服务端通过 `createSupabaseServerClient` 或等效用户上下文访问学习进度、复习结果、短语保存、practice run 或 variant run 等用户私有数据，则对应数据库表 MUST 具备可说明、可审计的最小 RLS / SQL 配套，而不能只依赖服务层参数过滤。

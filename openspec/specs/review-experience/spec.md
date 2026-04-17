@@ -1,4 +1,8 @@
-## MODIFIED Requirements
+## Purpose
+
+定义 Review 页面在复习队列、阶段式工作台和完成反馈上的用户体验要求，确保复习结束时仍有明确收束和下一步承接。
+
+## Requirements
 
 ### Requirement: Review 页面必须提供阶段式复习工作台后的结果反馈
 系统 MUST 在 review 队列清空时继续给出受控的收束反馈，而不是只显示“没有内容”。该反馈必须基于正式 `summary`，并给出明确的下一步去向。
