@@ -12,7 +12,7 @@ const lessonWarmupCalls: Array<{
   options?: { sentenceLimit?: number; chunkLimit?: number; includeSceneFull?: boolean };
 }> = [];
 const chunkWarmupCalls: Array<{ chunkTexts: string[]; limit: number }> = [];
-const idleSentenceWarmupCalls: Array<{
+const idleBlockWarmupCalls: Array<{
   lesson: Lesson;
   options?: { startIndex?: number; batchSize?: number };
 }> = [];
@@ -30,11 +30,11 @@ const mockedModules = {
     warmupChunkTextsAudio: (chunkTexts: string[], limit = 2) => {
       chunkWarmupCalls.push({ chunkTexts, limit });
     },
-    enqueueLessonIdleSentenceWarmups: (
+    enqueueLessonIdleBlockWarmups: (
       lesson: Lesson,
       options?: { startIndex?: number; batchSize?: number },
     ) => {
-      idleSentenceWarmupCalls.push({ lesson, options });
+      idleBlockWarmupCalls.push({ lesson, options });
       return {
         enqueuedCount: options?.batchSize ?? 2,
         nextIndex: (options?.startIndex ?? 0) + (options?.batchSize ?? 2),
@@ -154,7 +154,7 @@ const setupWindow = () => {
 afterEach(() => {
   lessonWarmupCalls.length = 0;
   chunkWarmupCalls.length = 0;
-  idleSentenceWarmupCalls.length = 0;
+  idleBlockWarmupCalls.length = 0;
   resourceActionsModule = null;
   playbackStatus = "idle";
   idleWarmupDone = false;
@@ -248,8 +248,8 @@ test("scheduleSceneIdleAudioWarmup 会在页面稳定后小批量入队后续句
   idle.runNextTimer();
   idle.runNextIdle();
 
-  assert.equal(idleSentenceWarmupCalls.length, 1);
-  assert.deepEqual(idleSentenceWarmupCalls[0]?.options, {
+  assert.equal(idleBlockWarmupCalls.length, 1);
+  assert.deepEqual(idleBlockWarmupCalls[0]?.options, {
     startIndex: 2,
     batchSize: 2,
   });
@@ -270,18 +270,18 @@ test("scheduleSceneIdleAudioWarmup 在页面 hidden 或播放 loading 时暂停�
   idle.runNextTimer();
   idle.runNextTimer();
   idle.runNextIdle();
-  assert.equal(idleSentenceWarmupCalls.length, 0);
+  assert.equal(idleBlockWarmupCalls.length, 0);
 
   idle.setHidden(false);
   playbackStatus = "loading";
   idle.runNextTimer();
   idle.runNextIdle();
-  assert.equal(idleSentenceWarmupCalls.length, 0);
+  assert.equal(idleBlockWarmupCalls.length, 0);
 
   playbackStatus = "idle";
   idle.runNextTimer();
   idle.runNextIdle();
-  assert.equal(idleSentenceWarmupCalls.length, 1);
+  assert.equal(idleBlockWarmupCalls.length, 1);
 });
 
 test("scheduleSceneIdleAudioWarmup 在普通播放中不暂停低优先级预热", () => {
@@ -300,7 +300,7 @@ test("scheduleSceneIdleAudioWarmup 在普通播放中不暂停低优先级预热
   idle.runNextTimer();
   idle.runNextIdle();
 
-  assert.equal(idleSentenceWarmupCalls.length, 1);
+  assert.equal(idleBlockWarmupCalls.length, 1);
 });
 
 test("scheduleSceneIdleAudioWarmup 在近期高频交互后暂停一轮低优先级预热", () => {
@@ -320,7 +320,7 @@ test("scheduleSceneIdleAudioWarmup 在近期高频交互后暂停一轮低优先
   idle.runNextTimer();
   idle.runNextIdle();
 
-  assert.equal(idleSentenceWarmupCalls.length, 0);
+  assert.equal(idleBlockWarmupCalls.length, 0);
 });
 
 test("scheduleSceneIdleAudioWarmup 在 save-data 场景下不启动", () => {
@@ -331,5 +331,5 @@ test("scheduleSceneIdleAudioWarmup 在 save-data 场景下不启动", () => {
   const result = scheduleSceneIdleAudioWarmup(lesson);
 
   assert.equal(result, false);
-  assert.equal(idleSentenceWarmupCalls.length, 0);
+  assert.equal(idleBlockWarmupCalls.length, 0);
 });

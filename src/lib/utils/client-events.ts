@@ -9,6 +9,7 @@ export type ClientEventName =
   | "sentence_audio_play_miss_cache"
   | "scene_full_play_ready"
   | "scene_full_play_wait_fetch"
+  | "scene_full_play_cooling_down"
   | "tts_scene_loop_fallback_clicked";
 
 export type ClientFailureName = "tts_scene_loop_failed" | "scene_full_play_fallback";

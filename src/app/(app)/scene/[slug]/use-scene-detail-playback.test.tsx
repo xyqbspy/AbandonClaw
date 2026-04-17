@@ -131,6 +131,12 @@ const mockedModules = {
     },
   },
   "@/lib/utils/audio-warmup": {
+    getBlockSpeakText: (block: { tts?: string; sentences: LessonSentence[] }) =>
+      block.tts?.trim() ||
+      block.sentences
+        .map((item) => item.tts?.trim() || item.audioText?.trim() || item.text)
+        .filter(Boolean)
+        .join(" "),
     getSentenceSpeakText: (sentence: LessonSentence) => sentence.tts?.trim() || sentence.audioText?.trim() || sentence.text,
     promoteLessonPlaybackAudioWarmups: (
       lesson: Lesson,

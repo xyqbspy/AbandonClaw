@@ -107,6 +107,9 @@ test("client-events 支持音频预热与播放观测事件", () => {
   recordClientEvent("scene_full_play_wait_fetch", {
     sceneSlug: "demo-scene",
   });
+  recordClientEvent("scene_full_play_cooling_down", {
+    sceneSlug: "demo-scene",
+  });
   recordClientFailureSummary("scene_full_play_fallback", {
     sceneSlug: "demo-scene",
   });
@@ -115,6 +118,7 @@ test("client-events 支持音频预热与播放观测事件", () => {
     listClientEventRecords().map((record) => record.name),
     [
       "scene_full_play_fallback",
+      "scene_full_play_cooling_down",
       "scene_full_play_wait_fetch",
       "scene_full_play_ready",
       "sentence_audio_play_miss_cache",

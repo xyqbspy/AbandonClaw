@@ -3,7 +3,7 @@ import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { MsEdgeTTS, OUTPUT_FORMAT } from "msedge-tts";
-import { ValidationError } from "@/lib/server/errors";
+import { TtsGenerationError, ValidationError } from "@/lib/server/errors";
 import { logServerEvent } from "@/lib/server/logger";
 import {
   createTtsStorageSignedUrl,
@@ -18,6 +18,10 @@ import {
   mergeSceneFullSegments,
   sanitizeAudioPathSegment,
 } from "@/lib/shared/tts";
+import {
+  inferSceneFullFailureReason,
+  type SceneFullFailureReason,
+} from "@/lib/shared/tts-failure";
 
 type TtsKind = "sentence" | "chunk" | "scene_full";
 type TtsMode = "normal" | "slow";
@@ -84,7 +88,9 @@ const parseRequiredText = (value: unknown) => {
 
 const parseSceneFullSegments = (value: unknown): SceneFullSegment[] => {
   if (!Array.isArray(value) || value.length === 0) {
-    throw new ValidationError("segments is required for scene_full.");
+    throw new ValidationError("segments is required for scene_full.", {
+      failureReason: "segment_assembly_failed",
+    });
   }
   const segments: SceneFullSegment[] = [];
   for (const item of value) {
@@ -102,9 +108,24 @@ const parseSceneFullSegments = (value: unknown): SceneFullSegment[] => {
     });
   }
   if (segments.length === 0) {
-    throw new ValidationError("segments is required for scene_full.");
+    throw new ValidationError("segments is required for scene_full.", {
+      failureReason: "segment_assembly_failed",
+    });
   }
   return segments.slice(0, 400);
+};
+
+const toSceneFullGenerationError = (
+  error: unknown,
+  fallbackReason?: SceneFullFailureReason,
+  details?: Record<string, unknown>,
+) => {
+  if (error instanceof TtsGenerationError) return error;
+  const failureReason = fallbackReason ?? inferSceneFullFailureReason(error);
+  return new TtsGenerationError("Failed to generate full scene audio.", {
+    failureReason,
+    ...details,
+  });
 };
 
 const parseRequiredString = (value: unknown, field: string) => {
@@ -278,14 +299,20 @@ const synthesizeSceneFullBuffer = async (
         audioStream.on("error", reject);
       });
       if (chunkBuffers.length === 0) {
-        throw new Error("No audio data received");
+        throw new TtsGenerationError("No audio data received.", {
+          failureReason: "empty_audio_result",
+        });
       }
       buffers.push(Buffer.concat(chunkBuffers));
     }
     if (buffers.length === 0) {
-      throw new Error("No audio data received");
+      throw new TtsGenerationError("No audio data received.", {
+        failureReason: "empty_audio_result",
+      });
     }
     return Buffer.concat(buffers);
+  } catch (error) {
+    throw toSceneFullGenerationError(error, undefined, { sceneType });
   } finally {
     tts.close();
   }
@@ -382,7 +409,17 @@ export async function generateTtsAudio(payload: TtsRequestPayload) {
     text,
   });
 
-  let responseUrl = await getStorageSignedUrlIfExists(target.storagePath);
+  let responseUrl: string | null;
+  try {
+    responseUrl = await getStorageSignedUrlIfExists(target.storagePath);
+  } catch (error) {
+    if (kind === "scene_full") {
+      throw toSceneFullGenerationError(error, "signed_url_failed", {
+        storagePath: target.storagePath,
+      });
+    }
+    throw error;
+  }
   let cached = Boolean(responseUrl);
   let source: TtsResponseSource = responseUrl ? "storage-hit" : "inline-fallback";
 
@@ -404,6 +441,7 @@ export async function generateTtsAudio(payload: TtsRequestPayload) {
           details: {
             kind,
             storagePath: target.storagePath,
+            failureReason: kind === "scene_full" ? "storage_upload_failed" : undefined,
           },
           error,
         });

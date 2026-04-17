@@ -1,7 +1,7 @@
 import { Lesson } from "@/lib/types";
 
 import {
-  enqueueLessonIdleSentenceWarmups,
+  enqueueLessonIdleBlockWarmups,
   warmupChunkTextsAudio,
   warmupLessonAudio,
 } from "@/lib/utils/audio-warmup";
@@ -269,7 +269,7 @@ export const scheduleSceneIdleAudioWarmup = (
         return;
       }
 
-      const result = enqueueLessonIdleSentenceWarmups(lesson, {
+      const result = enqueueLessonIdleBlockWarmups(lesson, {
         startIndex: nextIndex,
         batchSize,
       });

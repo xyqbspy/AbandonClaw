@@ -1,6 +1,6 @@
-import { getLessonSentences } from "@/lib/shared/lesson-content";
+import { getLessonBlocks, getLessonSentences } from "@/lib/shared/lesson-content";
 import { buildChunkAudioKey } from "@/lib/shared/tts";
-import { Lesson, LessonSentence } from "@/lib/types";
+import { Lesson, LessonBlock, LessonSentence } from "@/lib/types";
 
 import {
   enqueueSceneFullWarmup,
@@ -10,6 +10,26 @@ import { prefetchChunkAudio } from "@/lib/utils/tts-api";
 
 export const getSentenceSpeakText = (sentence: LessonSentence) =>
   (sentence.tts?.trim() || sentence.audioText?.trim() || sentence.text).trim();
+
+export const getBlockSpeakText = (block: LessonBlock) =>
+  (
+    block.tts?.trim() ||
+    block.sentences
+      .map((sentence) => getSentenceSpeakText(sentence))
+      .filter(Boolean)
+      .join(" ")
+  ).trim();
+
+const getPlayableBlocks = (lesson: Lesson) =>
+  getLessonBlocks(lesson).filter((block) => Boolean(getBlockSpeakText(block)));
+
+const toBlockWarmupPayload = (lesson: Lesson, block: LessonBlock) => ({
+  sceneSlug: lesson.slug,
+  sentenceId: `block-${block.id}`,
+  text: getBlockSpeakText(block),
+  speaker: block.speaker ?? block.sentences[0]?.speaker,
+  mode: "normal" as const,
+});
 
 export const warmupChunkTextsAudio = (chunkTexts: string[], limit = 2) => {
   for (const chunkText of chunkTexts.slice(0, limit)) {
@@ -36,19 +56,11 @@ export const warmupLessonAudio = (
 ) => {
   const sentenceLimit = options?.sentenceLimit ?? 2;
   const chunkLimit = options?.chunkLimit ?? 2;
-  const sentences = getLessonSentences(lesson).slice(0, sentenceLimit);
+  const blocks = getPlayableBlocks(lesson).slice(0, sentenceLimit);
 
-  for (const sentence of sentences) {
-    const text = getSentenceSpeakText(sentence);
-    if (!text) continue;
+  for (const block of blocks) {
     enqueueSceneSentenceWarmup(
-      {
-        sceneSlug: lesson.slug,
-        sentenceId: sentence.id,
-        text,
-        speaker: sentence.speaker,
-        mode: "normal",
-      },
+      toBlockWarmupPayload(lesson, block),
       {
         priority: "next-up",
         source: "initial",
@@ -56,7 +68,7 @@ export const warmupLessonAudio = (
     );
   }
 
-  warmupChunkTextsAudio(sentences[0]?.chunks ?? [], chunkLimit);
+  warmupChunkTextsAudio(blocks[0]?.sentences.flatMap((sentence) => sentence.chunks) ?? [], chunkLimit);
 
   if (options?.includeSceneFull) {
     const segments = buildSceneFullSegmentsFromLesson(lesson);
@@ -76,31 +88,22 @@ export const warmupLessonAudio = (
   }
 };
 
-export const enqueueLessonIdleSentenceWarmups = (
+export const enqueueLessonIdleBlockWarmups = (
   lesson: Lesson,
   options?: { startIndex?: number; batchSize?: number },
 ) => {
-  const sentences = getLessonSentences(lesson);
+  const blocks = getPlayableBlocks(lesson);
   const batchSize = Math.max(1, options?.batchSize ?? 2);
   let nextIndex = Math.max(0, options?.startIndex ?? 0);
   let enqueuedCount = 0;
 
-  while (nextIndex < sentences.length && enqueuedCount < batchSize) {
-    const sentence = sentences[nextIndex];
+  while (nextIndex < blocks.length && enqueuedCount < batchSize) {
+    const block = blocks[nextIndex];
     nextIndex += 1;
-    if (!sentence) continue;
-
-    const text = getSentenceSpeakText(sentence);
-    if (!text) continue;
+    if (!block) continue;
 
     enqueueSceneSentenceWarmup(
-      {
-        sceneSlug: lesson.slug,
-        sentenceId: sentence.id,
-        text,
-        speaker: sentence.speaker,
-        mode: "normal",
-      },
+      toBlockWarmupPayload(lesson, block),
       {
         priority: "idle-warm",
         source: "idle",
@@ -112,10 +115,12 @@ export const enqueueLessonIdleSentenceWarmups = (
   return {
     enqueuedCount,
     nextIndex,
-    total: sentences.length,
-    done: nextIndex >= sentences.length,
+    total: blocks.length,
+    done: nextIndex >= blocks.length,
   };
 };
+
+export const enqueueLessonIdleSentenceWarmups = enqueueLessonIdleBlockWarmups;
 
 export const promoteLessonPlaybackAudioWarmups = (
   lesson: Lesson,
@@ -125,8 +130,12 @@ export const promoteLessonPlaybackAudioWarmups = (
     includeSceneFull?: boolean;
   },
 ) => {
-  const sentences = getLessonSentences(lesson);
-  const currentIndex = sentences.findIndex((sentence) => sentence.id === currentSentenceId);
+  const blocks = getPlayableBlocks(lesson);
+  const currentIndex = blocks.findIndex(
+    (block) =>
+      `block-${block.id}` === currentSentenceId ||
+      block.sentences.some((sentence) => sentence.id === currentSentenceId),
+  );
   if (currentIndex < 0) {
     return {
       promotedSentenceCount: 0,
@@ -136,17 +145,9 @@ export const promoteLessonPlaybackAudioWarmups = (
 
   const lookaheadCount = Math.max(1, options?.lookaheadCount ?? 3);
   let promotedSentenceCount = 0;
-  for (const sentence of sentences.slice(currentIndex + 1, currentIndex + 1 + lookaheadCount)) {
-    const text = getSentenceSpeakText(sentence);
-    if (!text) continue;
+  for (const block of blocks.slice(currentIndex + 1, currentIndex + 1 + lookaheadCount)) {
     enqueueSceneSentenceWarmup(
-      {
-        sceneSlug: lesson.slug,
-        sentenceId: sentence.id,
-        text,
-        speaker: sentence.speaker,
-        mode: "normal",
-      },
+      toBlockWarmupPayload(lesson, block),
       {
         priority: "next-up",
         source: "playback",

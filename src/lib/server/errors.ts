@@ -64,6 +64,13 @@ export class SceneParseError extends AppError {
   }
 }
 
+export class TtsGenerationError extends AppError {
+  constructor(message: string, details?: Record<string, unknown>) {
+    super({ message, status: 502, code: "TTS_GENERATION_FAILED", details });
+    this.name = "TtsGenerationError";
+  }
+}
+
 export const isAppError = (error: unknown): error is AppError =>
   error instanceof AppError;
 

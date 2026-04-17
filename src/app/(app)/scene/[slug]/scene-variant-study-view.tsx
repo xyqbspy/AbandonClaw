@@ -20,6 +20,7 @@ export function SceneVariantStudyView({
   savedPhraseTexts,
   onSavePhrase,
   onReviewPhrase,
+  onBlockPlayback,
   onSentencePlayback,
 }: {
   lesson: Lesson;
@@ -28,6 +29,7 @@ export function SceneVariantStudyView({
   savedPhraseTexts: string[];
   onSavePhrase: (payload: SavePhrasePayload) => Promise<{ created: boolean }>;
   onReviewPhrase: (payload: SavePhrasePayload) => Promise<{ created: boolean }>;
+  onBlockPlayback?: (payload: { lesson: Lesson; block: import("@/lib/types").LessonBlock }) => void;
   onSentencePlayback?: (payload: { lesson: Lesson; sentence: import("@/lib/types").LessonSentence }) => void;
 }) {
   return (
@@ -40,6 +42,7 @@ export function SceneVariantStudyView({
         savedPhraseTexts={savedPhraseTexts}
         onSavePhrase={onSavePhrase}
         onReviewPhrase={onReviewPhrase}
+        onBlockPlayback={onBlockPlayback}
         onSentencePlayback={onSentencePlayback}
       />
     </div>

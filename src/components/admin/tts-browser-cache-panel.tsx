@@ -105,6 +105,7 @@ export function TtsBrowserCachePanel() {
   const groupedSummary = useMemo(() => {
     const base: Record<BrowserTtsCacheEntry["kind"], { count: number; bytes: number }> = {
       sentence: { count: 0, bytes: 0 },
+      block: { count: 0, bytes: 0 },
       chunk: { count: 0, bytes: 0 },
       scene: { count: 0, bytes: 0 },
       unknown: { count: 0, bytes: 0 },
@@ -206,7 +207,7 @@ export function TtsBrowserCachePanel() {
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                {(["sentence", "chunk", "scene", "unknown"] as const).map((kind) => (
+                {(["sentence", "block", "chunk", "scene", "unknown"] as const).map((kind) => (
                   <StatCard
                     key={kind}
                     title={kind}
@@ -233,6 +234,7 @@ export function TtsBrowserCachePanel() {
                   >
                     <option value="all">全部类型</option>
                     <option value="sentence">sentence</option>
+                    <option value="block">block</option>
                     <option value="chunk">chunk</option>
                     <option value="scene">scene</option>
                     <option value="unknown">unknown</option>

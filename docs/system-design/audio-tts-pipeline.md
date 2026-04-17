@@ -537,3 +537,64 @@ chunk 音频重生成前也会主动清：
 - 没改变 `tts-api.ts` 的底层生成/缓存策略
 
 当前仍然保持最小可维护方案：受控错误 + 显式替代入口。
+
+## 13. scene block-first 音频预热补充
+
+### 13.1 主消费单元
+
+scene detail 页的主播放单元已经从“单句 sentence”调整为“可播放 block”：
+
+- dialogue 气泡的朗读按钮会播放整个 block。
+- block 音频仍复用现有 `sentence` TTS kind，不新增 `/api/tts` 协议。
+- block 的 `sentenceId` 统一使用 `block-${block.id}`。
+- block 的朗读文本来自 `block.tts`，没有时拼接 block 内句子的 `tts / audioText / text`。
+
+### 13.2 预热优先级
+
+- 首屏预热优先入队前几个 block。
+- idle 增量预热小批量补齐后续 block。
+- 用户播放某个 block 后，提权后续 block。
+- scene full 继续后台准备，但不得压制当前点击播放。
+- sentence 音频保留为明确单句消费、chunk detail 或 fallback CTA 的按需资源。
+
+### 13.3 observability 说明
+
+由于 block 音频复用现有 sentence TTS 通道，`sentence_audio_play_hit_cache` / `sentence_audio_play_miss_cache` 事件中可能出现 `sentenceId = block-*`。这代表当前播放的是 block 级音频，不是独立 sentence。
+
+为避免兼容层污染业务语义，事件 payload 必须同时带 `audioUnit`：
+
+- `audioUnit = block`：scene detail 的 block 音频，当前只是复用 sentence TTS kind。
+- `audioUnit = sentence`：真实单句音频，通常来自明确单句消费、fallback 或其他按需入口。
+
+浏览器 TTS 缓存面板也会把 `sentence:...:sentence-block-*` 展示为 `block` 类型，避免调试时误以为系统仍在主预热真实 sentence。
+
+当前统一口径：
+
+- scene detail Primary：block。
+- scene detail Secondary：scene full。
+- scene detail Fallback：sentence。
+- chunk / phrase 工作台 Primary：chunk / phrase audio。
+
+## 14. scene full 失败诊断与冷却补充
+
+scene full 现在不再只记录泛化的 `Failed to generate tts audio.`。失败链路会尽量归一到稳定原因：
+
+- `provider_error`
+- `timeout`
+- `segment_assembly_failed`
+- `storage_upload_failed`
+- `signed_url_failed`
+- `empty_audio_result`
+- `cooling_down`
+- `unknown`
+
+前端 `playSceneLoopAudio()` 会用 scene full 稳定 cache key 维护短时失败冷却。默认冷却窗口是 45 秒；同一个 scene full 最近失败后，冷却期内再次点击不会重新触发生成，而是直接记录 `scene_full_play_cooling_down`，并走受控 fallback 提示。
+
+scene full 播放回看事件现在会携带更明确的状态：
+
+- `scene_full_play_ready`：资源已 ready。
+- `scene_full_play_wait_fetch`：资源处于 `cold` 或 `pending`。
+- `scene_full_play_cooling_down`：最近失败，当前不再重复请求。
+- `scene_full_play_fallback`：进入 fallback，payload 包含 `failureReason`、`sceneFullKey`、`readiness` 和 `cooldownMs`。
+
+产品承接上，scene full 失败后优先回到 block-first 路径：如果能定位当前 block，CTA 会继续当前段落；不能定位时才回退到 active sentence 或首句。

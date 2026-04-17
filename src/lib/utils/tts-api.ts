@@ -5,6 +5,11 @@ import {
   mergeSceneFullSegments,
 } from "@/lib/shared/tts";
 import {
+  inferSceneFullFailureReason,
+  normalizeSceneFullFailureReason,
+  type SceneFullFailureReason,
+} from "@/lib/shared/tts-failure";
+import {
   recordClientEvent,
   recordClientFailureSummary,
 } from "@/lib/utils/client-events";
@@ -43,6 +48,8 @@ interface TtsResponse {
   cached?: boolean;
   source?: "storage-hit" | "fresh-upload" | "inline-fallback";
   error?: string;
+  code?: string;
+  details?: Record<string, unknown> | null;
 }
 
 type RegenerateTtsResponse = {
@@ -64,10 +71,18 @@ type TtsCacheLimits = {
 };
 
 type TtsAudioReadiness = "cache" | "pending" | "miss";
+type SentenceAudioUnit = "sentence" | "block";
+type SceneFullPlaybackReadiness =
+  | "ready"
+  | "cold"
+  | "pending"
+  | "failed_recently"
+  | "cooling_down";
 
 export type TtsPlaybackState = {
   kind: "sentence" | "chunk" | "scene" | null;
   status?: "idle" | "loading" | "playing";
+  audioUnit?: SentenceAudioUnit;
   sentenceId?: string;
   chunkKey?: string;
   sceneSlug?: string;
@@ -79,7 +94,7 @@ export type TtsPlaybackState = {
 
 export type BrowserTtsCacheEntry = {
   cacheKey: string;
-  kind: "sentence" | "chunk" | "scene" | "unknown";
+  kind: "sentence" | "block" | "chunk" | "scene" | "unknown";
   size: number;
   contentType: string | null;
   cachedAt: number | null;
@@ -101,6 +116,7 @@ const preloadedAudioUrls = new Set<string>();
 const persistentAudioObjectUrls = new Map<string, string>();
 const ttsUrlCacheTtlMs = 45 * 60 * 1000;
 const browserTtsCacheName = "tts-audio-v2";
+const defaultSceneFullFailureCooldownMs = 45_000;
 const defaultTtsCacheLimits: TtsCacheLimits = {
   urlEntries: 180,
   preloadedUrls: 180,
@@ -109,6 +125,27 @@ const defaultTtsCacheLimits: TtsCacheLimits = {
   browserBytes: 24 * 1024 * 1024,
 };
 let ttsCacheLimits: TtsCacheLimits = { ...defaultTtsCacheLimits };
+let sceneFullFailureCooldownMs = defaultSceneFullFailureCooldownMs;
+const sceneFullFailureCooldowns = new Map<
+  string,
+  {
+    failureReason: SceneFullFailureReason;
+    failedAt: number;
+    expiresAt: number;
+  }
+>();
+
+class TtsClientError extends Error {
+  failureReason: SceneFullFailureReason;
+  details: Record<string, unknown>;
+
+  constructor(message: string, failureReason: SceneFullFailureReason, details: Record<string, unknown> = {}) {
+    super(message);
+    this.name = "TtsClientError";
+    this.failureReason = failureReason;
+    this.details = details;
+  }
+}
 
 const emitPlaybackState = () => {
   for (const listener of playbackListeners) {
@@ -146,6 +183,9 @@ const buildSentenceTtsCacheKey = (params: {
   });
   return `sentence:${params.sceneSlug}:${sentenceAudioKey}`;
 };
+
+const resolveSentenceAudioUnit = (sentenceId: string): SentenceAudioUnit =>
+  sentenceId.startsWith("block-") ? "block" : "sentence";
 
 const buildSceneFullTtsCacheKey = (params: {
   sceneSlug: string;
@@ -193,6 +233,28 @@ const extractError = async (response: Response, fallback: string) => {
     // ignore
   }
   return fallback;
+};
+
+const extractTtsClientError = async (response: Response, fallback: string) => {
+  try {
+    const body = (await response.json()) as TtsResponse;
+    const details = body.details && typeof body.details === "object" ? body.details : {};
+    const detailReason = normalizeSceneFullFailureReason(details.failureReason);
+    const failureReason =
+      detailReason === "unknown"
+        ? inferSceneFullFailureReason(body.error ?? body.code ?? fallback)
+        : detailReason;
+    return new TtsClientError(
+      typeof body.error === "string" && body.error.trim() ? body.error : fallback,
+      failureReason,
+      {
+        ...details,
+        code: body.code,
+      },
+    );
+  } catch {
+    return new TtsClientError(fallback, "unknown");
+  }
 };
 
 const touchMapEntry = <K, V>(map: Map<K, V>, key: K, value: V) => {
@@ -277,6 +339,45 @@ const getTtsAudioReadiness = async (cacheKey: string): Promise<TtsAudioReadiness
   return "miss";
 };
 
+const getSceneFullCooldown = (sceneFullKey: string, now = Date.now()) => {
+  const cooldown = sceneFullFailureCooldowns.get(sceneFullKey);
+  if (!cooldown) return null;
+  if (cooldown.expiresAt <= now) {
+    sceneFullFailureCooldowns.delete(sceneFullKey);
+    return null;
+  }
+  return {
+    ...cooldown,
+    remainingMs: cooldown.expiresAt - now,
+  };
+};
+
+const markSceneFullFailureCooldown = (
+  sceneFullKey: string,
+  failureReason: SceneFullFailureReason,
+  now = Date.now(),
+) => {
+  sceneFullFailureCooldowns.set(sceneFullKey, {
+    failureReason,
+    failedAt: now,
+    expiresAt: now + sceneFullFailureCooldownMs,
+  });
+};
+
+const clearSceneFullFailureCooldown = (sceneFullKey: string) => {
+  sceneFullFailureCooldowns.delete(sceneFullKey);
+};
+
+const resolveSceneFullPlaybackReadiness = async (
+  sceneFullKey: string,
+): Promise<SceneFullPlaybackReadiness> => {
+  if (getSceneFullCooldown(sceneFullKey)) return "cooling_down";
+  const readiness = await getTtsAudioReadiness(sceneFullKey);
+  if (readiness === "cache") return "ready";
+  if (readiness === "pending") return "pending";
+  return "cold";
+};
+
 const cacheTtsUrl = (cacheKey: string, url: string) => {
   const entry = {
     url,
@@ -301,6 +402,7 @@ const getBrowserAudioCache = async () => {
 };
 
 const resolveBrowserTtsCacheKind = (cacheKey: string): BrowserTtsCacheEntry["kind"] => {
+  if (/^sentence:[^:]+:sentence-block-/.test(cacheKey)) return "block";
   if (cacheKey.startsWith("sentence:")) return "sentence";
   if (cacheKey.startsWith("chunk:")) return "chunk";
   if (cacheKey.startsWith("scene:")) return "scene";
@@ -613,7 +715,7 @@ const requestTtsUrl = async (
       body: JSON.stringify(payload),
     });
     if (!response.ok) {
-      throw new Error(await extractError(response, fallbackError));
+      throw await extractTtsClientError(response, fallbackError);
     }
     const data = (await response.json()) as TtsResponse;
     if (!data.url) {
@@ -839,10 +941,12 @@ const recordSentenceAudioPlayEvent = (
   },
   readiness: TtsAudioReadiness,
 ) => {
+  const audioUnit = resolveSentenceAudioUnit(params.sentenceId);
   recordClientEvent(
     readiness === "cache" ? "sentence_audio_play_hit_cache" : "sentence_audio_play_miss_cache",
     {
       sceneSlug: params.sceneSlug,
+      audioUnit,
       sentenceId: params.sentenceId,
       mode: params.mode ?? "normal",
       readiness,
@@ -856,17 +960,55 @@ const recordSceneFullPlayEvent = (
     sceneType?: "dialogue" | "monologue";
     segments: Array<{ text: string; speaker?: string }>;
   },
-  readiness: TtsAudioReadiness,
+  readiness: SceneFullPlaybackReadiness,
+  sceneFullKey: string,
 ) => {
   recordClientEvent(
-    readiness === "cache" ? "scene_full_play_ready" : "scene_full_play_wait_fetch",
+    readiness === "ready" ? "scene_full_play_ready" : "scene_full_play_wait_fetch",
     {
       sceneSlug: params.sceneSlug,
       sceneType: params.sceneType ?? "monologue",
       segmentCount: params.segments.length,
+      sceneFullKey,
       readiness,
     },
   );
+};
+
+const recordSceneFullCoolingDownEvent = (
+  params: {
+    sceneSlug: string;
+    sceneType?: "dialogue" | "monologue";
+    segments: Array<{ text: string; speaker?: string }>;
+  },
+  sceneFullKey: string,
+  cooldown: NonNullable<ReturnType<typeof getSceneFullCooldown>>,
+) => {
+  recordClientEvent("scene_full_play_cooling_down", {
+    sceneSlug: params.sceneSlug,
+    sceneType: params.sceneType ?? "monologue",
+    segmentCount: params.segments.length,
+    sceneFullKey,
+    readiness: "cooling_down",
+    failureReason: "cooling_down",
+    previousFailureReason: cooldown.failureReason,
+    cooldownMs: cooldown.remainingMs,
+  });
+};
+
+const toControlledSceneFullPlaybackError = (
+  failureReason: SceneFullFailureReason,
+  details: Record<string, unknown> = {},
+) =>
+  new TtsClientError(
+    "完整场景音频暂时不可用，你可以先逐段跟读或稍后重试。",
+    failureReason,
+    details,
+  );
+
+export const getSceneFullFailureReasonFromError = (error: unknown): SceneFullFailureReason => {
+  if (error instanceof TtsClientError) return error.failureReason;
+  return inferSceneFullFailureReason(error);
 };
 
 export async function playSentenceAudio(params: {
@@ -877,11 +1019,13 @@ export async function playSentenceAudio(params: {
   mode?: "normal" | "slow";
 }) {
   const requestId = nextPlaybackRequestId();
+  const audioUnit = resolveSentenceAudioUnit(params.sentenceId);
   const readiness = await getTtsAudioReadiness(buildSentenceTtsCacheKey(params));
   recordSentenceAudioPlayEvent(params, readiness);
   setPlaybackState({
     kind: "sentence",
     status: "loading",
+    audioUnit,
     sentenceId: params.sentenceId,
     mode: params.mode ?? "normal",
     isLooping: playbackState.isLooping ?? false,
@@ -896,6 +1040,7 @@ export async function playSentenceAudio(params: {
     setPlaybackState({
       kind: "sentence",
       status: "playing",
+      audioUnit,
       sentenceId: params.sentenceId,
       mode: params.mode ?? "normal",
       isLooping: false,
@@ -959,6 +1104,7 @@ export async function playSceneLoopAudio(params: {
   sceneType?: "dialogue" | "monologue";
   segments: Array<{ text: string; speaker?: string }>;
 }) {
+  const sceneFullKey = buildSceneFullTtsCacheKey(params);
   const activeSceneLoop =
     playbackState.kind === "scene" &&
     playbackState.sceneSlug === params.sceneSlug &&
@@ -966,6 +1112,28 @@ export async function playSceneLoopAudio(params: {
   if (activeSceneLoop) {
     stopTtsPlayback();
     return { ok: true as const, url: null, stopped: true as const };
+  }
+
+  const existingCooldown = getSceneFullCooldown(sceneFullKey);
+  if (existingCooldown) {
+    recordSceneFullCoolingDownEvent(params, sceneFullKey, existingCooldown);
+    recordClientFailureSummary("scene_full_play_fallback", {
+      sceneSlug: params.sceneSlug,
+      sceneType: params.sceneType ?? "monologue",
+      segmentCount: params.segments.length,
+      sceneFullKey,
+      readiness: "cooling_down",
+      failureReason: "cooling_down",
+      previousFailureReason: existingCooldown.failureReason,
+      cooldownMs: existingCooldown.remainingMs,
+      message: "Scene full playback is cooling down after a recent failure.",
+    });
+    throw toControlledSceneFullPlaybackError("cooling_down", {
+      sceneFullKey,
+      readiness: "cooling_down",
+      cooldownMs: existingCooldown.remainingMs,
+      previousFailureReason: existingCooldown.failureReason,
+    });
   }
 
   stopTtsPlayback();
@@ -981,9 +1149,22 @@ export async function playSceneLoopAudio(params: {
   const generation = playbackGeneration;
 
   try {
-    const readiness = await getTtsAudioReadiness(buildSceneFullTtsCacheKey(params));
-    recordSceneFullPlayEvent(params, readiness);
+    const readiness = await resolveSceneFullPlaybackReadiness(sceneFullKey);
+    if (readiness === "cooling_down") {
+      const cooldown = getSceneFullCooldown(sceneFullKey);
+      if (cooldown) {
+        recordSceneFullCoolingDownEvent(params, sceneFullKey, cooldown);
+        throw toControlledSceneFullPlaybackError("cooling_down", {
+          sceneFullKey,
+          readiness,
+          cooldownMs: cooldown.remainingMs,
+          previousFailureReason: cooldown.failureReason,
+        });
+      }
+    }
+    recordSceneFullPlayEvent(params, readiness, sceneFullKey);
     const url = await ensureSceneFullAudio(params);
+    clearSceneFullFailureCooldown(sceneFullKey);
     if (
       playbackGeneration !== generation ||
       playbackState.kind !== "scene" ||
@@ -1021,12 +1202,22 @@ export async function playSceneLoopAudio(params: {
       });
     };
     await audio.play();
+    clearSceneFullFailureCooldown(sceneFullKey);
     return { ok: true as const, url, stopped: false as const };
   } catch (error) {
+    const failureReason = getSceneFullFailureReasonFromError(error);
+    if (failureReason !== "cooling_down") {
+      markSceneFullFailureCooldown(sceneFullKey, failureReason);
+    }
+    const cooldown = getSceneFullCooldown(sceneFullKey);
     recordClientFailureSummary("scene_full_play_fallback", {
       sceneSlug: params.sceneSlug,
       sceneType: params.sceneType ?? "monologue",
       segmentCount: params.segments.length,
+      sceneFullKey,
+      readiness: failureReason === "cooling_down" ? "cooling_down" : "failed_recently",
+      failureReason,
+      cooldownMs: cooldown?.remainingMs ?? 0,
       message: error instanceof Error ? error.message : "Scene full playback failed.",
     });
     setPlaybackState({
@@ -1036,7 +1227,11 @@ export async function playSceneLoopAudio(params: {
       text: undefined,
       requestId: undefined,
     });
-    throw new Error("完整场景音频暂时不可用，你可以先逐句跟读或稍后重试。");
+    throw toControlledSceneFullPlaybackError(failureReason, {
+      sceneFullKey,
+      readiness: failureReason === "cooling_down" ? "cooling_down" : "failed_recently",
+      cooldownMs: cooldown?.remainingMs ?? 0,
+    });
   }
 }
 
@@ -1049,6 +1244,8 @@ export const __resetTtsTestState = async (options?: { preservePersistentCache?: 
   ttsCacheLimits = { ...defaultTtsCacheLimits };
   ttsUrlCache.clear();
   pendingTtsUrlRequests.clear();
+  sceneFullFailureCooldowns.clear();
+  sceneFullFailureCooldownMs = defaultSceneFullFailureCooldownMs;
   preloadedAudioUrls.clear();
   for (const cacheKey of persistentAudioObjectUrls.keys()) {
     revokePersistentAudioObjectUrl(cacheKey);
@@ -1064,4 +1261,8 @@ export const __setTtsCacheLimitsForTests = (overrides: Partial<TtsCacheLimits>) 
     ...ttsCacheLimits,
     ...overrides,
   };
+};
+
+export const __setSceneFullFailureCooldownMsForTests = (cooldownMs: number) => {
+  sceneFullFailureCooldownMs = Math.max(0, cooldownMs);
 };

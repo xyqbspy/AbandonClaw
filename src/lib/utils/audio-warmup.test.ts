@@ -40,10 +40,7 @@ const mockedModules = {
 } satisfies Record<string, unknown>;
 
 const originalRequire = nodeModule.Module.prototype.require;
-nodeModule.Module.prototype.require = function patchedRequire(
-  this: unknown,
-  request: string,
-) {
+nodeModule.Module.prototype.require = function patchedRequire(this: unknown, request: string) {
   if (request in mockedModules) {
     return mockedModules[request as keyof typeof mockedModules];
   }
@@ -51,7 +48,7 @@ nodeModule.Module.prototype.require = function patchedRequire(
 };
 
 let warmupLessonAudio: typeof import("./audio-warmup").warmupLessonAudio;
-let enqueueLessonIdleSentenceWarmups: typeof import("./audio-warmup").enqueueLessonIdleSentenceWarmups;
+let enqueueLessonIdleBlockWarmups: typeof import("./audio-warmup").enqueueLessonIdleBlockWarmups;
 let promoteLessonPlaybackAudioWarmups: typeof import("./audio-warmup").promoteLessonPlaybackAudioWarmups;
 
 const getAudioWarmupModule = () => {
@@ -60,10 +57,10 @@ const getAudioWarmupModule = () => {
     delete localRequire.cache[modulePath];
     const imported = localRequire("./audio-warmup") as typeof import("./audio-warmup");
     warmupLessonAudio = imported.warmupLessonAudio;
-    enqueueLessonIdleSentenceWarmups = imported.enqueueLessonIdleSentenceWarmups;
+    enqueueLessonIdleBlockWarmups = imported.enqueueLessonIdleBlockWarmups;
     promoteLessonPlaybackAudioWarmups = imported.promoteLessonPlaybackAudioWarmups;
   }
-  return { warmupLessonAudio, enqueueLessonIdleSentenceWarmups, promoteLessonPlaybackAudioWarmups };
+  return { warmupLessonAudio, enqueueLessonIdleBlockWarmups, promoteLessonPlaybackAudioWarmups };
 };
 
 const buildLesson = () => ({
@@ -80,7 +77,7 @@ const buildLesson = () => ({
       id: "section-1",
       blocks: [
         {
-          id: "block-1",
+          id: "blk-1",
           speaker: "A",
           sentences: [
             {
@@ -92,6 +89,20 @@ const buildLesson = () => ({
               chunkDetails: [],
             },
             {
+              id: "s-1b",
+              speaker: "A",
+              text: "Long time no see.",
+              translation: "",
+              chunks: ["long time no see"],
+              chunkDetails: [],
+            },
+          ],
+        },
+        {
+          id: "blk-2",
+          speaker: "B",
+          sentences: [
+            {
               id: "s-2",
               speaker: "B",
               text: "Nice to meet you.",
@@ -99,6 +110,12 @@ const buildLesson = () => ({
               chunks: ["nice to meet you"],
               chunkDetails: [],
             },
+          ],
+        },
+        {
+          id: "blk-3",
+          speaker: "A",
+          sentences: [
             {
               id: "s-3",
               speaker: "A",
@@ -107,6 +124,12 @@ const buildLesson = () => ({
               chunks: [],
               chunkDetails: [],
             },
+          ],
+        },
+        {
+          id: "blk-4",
+          speaker: "B",
+          sentences: [
             {
               id: "s-4",
               speaker: "B",
@@ -128,13 +151,13 @@ afterEach(() => {
   enqueueSceneSentenceWarmupCalls.length = 0;
   enqueueSceneFullWarmupCalls.length = 0;
   warmupLessonAudio = undefined as unknown as typeof import("./audio-warmup").warmupLessonAudio;
-  enqueueLessonIdleSentenceWarmups =
-    undefined as unknown as typeof import("./audio-warmup").enqueueLessonIdleSentenceWarmups;
+  enqueueLessonIdleBlockWarmups =
+    undefined as unknown as typeof import("./audio-warmup").enqueueLessonIdleBlockWarmups;
   promoteLessonPlaybackAudioWarmups =
     undefined as unknown as typeof import("./audio-warmup").promoteLessonPlaybackAudioWarmups;
 });
 
-test("warmupLessonAudio 会通过 scene 调度器预热首屏句子", () => {
+test("warmupLessonAudio 会通过 scene 调度器预热首屏 block", () => {
   const { warmupLessonAudio: runWarmupLessonAudio } = getAudioWarmupModule();
   runWarmupLessonAudio(buildLesson(), {
     sentenceLimit: 2,
@@ -146,8 +169,8 @@ test("warmupLessonAudio 会通过 scene 调度器预热首屏句子", () => {
   assert.deepEqual(enqueueSceneSentenceWarmupCalls[0], {
     payload: {
       sceneSlug: "scene-1",
-      sentenceId: "s-1",
-      text: "Hello there.",
+      sentenceId: "block-blk-1",
+      text: "Hello there. Long time no see.",
       speaker: "A",
       mode: "normal",
     },
@@ -159,7 +182,7 @@ test("warmupLessonAudio 会通过 scene 调度器预热首屏句子", () => {
   assert.equal(prefetchChunkAudioCalls.length, 1);
 });
 
-test("warmupLessonAudio 在 includeSceneFull 开启时会通过调度器预热整段场景音频", () => {
+test("warmupLessonAudio 在 includeSceneFull 开启时会通过调度器预热完整场景音频", () => {
   const { warmupLessonAudio: runWarmupLessonAudio } = getAudioWarmupModule();
   runWarmupLessonAudio(buildLesson(), {
     sentenceLimit: 1,
@@ -174,22 +197,11 @@ test("warmupLessonAudio 在 includeSceneFull 开启时会通过调度器预热�
         sceneSlug: "scene-1",
         sceneType: "dialogue",
         segments: [
-          {
-            text: "Hello there.",
-            speaker: "A",
-          },
-          {
-            text: "Nice to meet you.",
-            speaker: "B",
-          },
-          {
-            text: "How is your day?",
-            speaker: "A",
-          },
-          {
-            text: "Pretty good.",
-            speaker: "B",
-          },
+          { text: "Hello there.", speaker: "A" },
+          { text: "Long time no see.", speaker: "A" },
+          { text: "Nice to meet you.", speaker: "B" },
+          { text: "How is your day?", speaker: "A" },
+          { text: "Pretty good.", speaker: "B" },
         ],
       },
       options: {
@@ -200,7 +212,7 @@ test("warmupLessonAudio 在 includeSceneFull 开启时会通过调度器预热�
   ]);
 });
 
-test("warmupLessonAudio 在 includeSceneFull 关闭时不会入队整段场景音频", () => {
+test("warmupLessonAudio 在 includeSceneFull 关闭时不会入队完整场景音频", () => {
   const { warmupLessonAudio: runWarmupLessonAudio } = getAudioWarmupModule();
   runWarmupLessonAudio(buildLesson(), {
     includeSceneFull: false,
@@ -209,8 +221,8 @@ test("warmupLessonAudio 在 includeSceneFull 关闭时不会入队整段场景�
   assert.equal(enqueueSceneFullWarmupCalls.length, 0);
 });
 
-test("enqueueLessonIdleSentenceWarmups 会从指定位置小批量入队后续句子", () => {
-  const { enqueueLessonIdleSentenceWarmups: enqueueIdleWarmups } = getAudioWarmupModule();
+test("enqueueLessonIdleBlockWarmups 会从指定位置小批量入队后续 block", () => {
+  const { enqueueLessonIdleBlockWarmups: enqueueIdleWarmups } = getAudioWarmupModule();
 
   const result = enqueueIdleWarmups(buildLesson(), {
     startIndex: 2,
@@ -228,12 +240,12 @@ test("enqueueLessonIdleSentenceWarmups 会从指定位置小批量入队后续�
     })),
     [
       {
-        sentenceId: "s-3",
+        sentenceId: "block-blk-3",
         priority: "idle-warm",
         source: "idle",
       },
       {
-        sentenceId: "s-4",
+        sentenceId: "block-blk-4",
         priority: "idle-warm",
         source: "idle",
       },
@@ -241,10 +253,10 @@ test("enqueueLessonIdleSentenceWarmups 会从指定位置小批量入队后续�
   );
 });
 
-test("promoteLessonPlaybackAudioWarmups 会提升当前句之后三句并可选提升 scene full", () => {
+test("promoteLessonPlaybackAudioWarmups 会提升当前 block 之后的 block 并可选提升 scene full", () => {
   const { promoteLessonPlaybackAudioWarmups: promoteWarmups } = getAudioWarmupModule();
 
-  const result = promoteWarmups(buildLesson(), "s-1", {
+  const result = promoteWarmups(buildLesson(), "block-blk-1", {
     includeSceneFull: true,
   });
 
@@ -260,17 +272,17 @@ test("promoteLessonPlaybackAudioWarmups 会提升当前句之后三句并可选�
     })),
     [
       {
-        sentenceId: "s-2",
+        sentenceId: "block-blk-2",
         priority: "next-up",
         source: "playback",
       },
       {
-        sentenceId: "s-3",
+        sentenceId: "block-blk-3",
         priority: "next-up",
         source: "playback",
       },
       {
-        sentenceId: "s-4",
+        sentenceId: "block-blk-4",
         priority: "next-up",
         source: "playback",
       },
@@ -279,4 +291,12 @@ test("promoteLessonPlaybackAudioWarmups 会提升当前句之后三句并可选�
   assert.equal(enqueueSceneFullWarmupCalls.length, 1);
   assert.equal(enqueueSceneFullWarmupCalls[0]?.options?.priority, "next-up");
   assert.equal(enqueueSceneFullWarmupCalls[0]?.options?.source, "playback");
+});
+
+test("promoteLessonPlaybackAudioWarmups 在明确单句播放时仍会提权该句所属 block 之后的 block", () => {
+  const { promoteLessonPlaybackAudioWarmups: promoteWarmups } = getAudioWarmupModule();
+
+  promoteWarmups(buildLesson(), "s-1b");
+
+  assert.equal(enqueueSceneSentenceWarmupCalls[0]?.payload.sentenceId, "block-blk-2");
 });

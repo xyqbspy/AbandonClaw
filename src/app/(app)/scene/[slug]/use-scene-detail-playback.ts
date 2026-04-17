@@ -4,7 +4,7 @@ import { useTtsPlaybackController } from "@/hooks/use-tts-playback-controller";
 import { getChunkLayerFromLesson } from "@/lib/data/mock-lessons";
 import { buildChunkAudioKey } from "@/lib/shared/tts";
 import { getLessonSentences } from "@/lib/shared/lesson-content";
-import { Lesson, LessonSentence, SelectionChunkLayer } from "@/lib/types";
+import { Lesson, LessonBlock, LessonSentence, SelectionChunkLayer } from "@/lib/types";
 import { VariantSet } from "@/lib/types/learning-flow";
 import { trackChunksFromApi } from "@/lib/utils/chunks-api";
 import {
@@ -85,6 +85,31 @@ export function useSceneDetailPlayback({
       };
 
       promoteLessonPlaybackAudioWarmups(lesson, sentence.id, {
+        lookaheadCount: 3,
+        includeSceneFull: consecutiveCount >= 2,
+      });
+    },
+    [],
+  );
+
+  const handleBlockPlaybackWarmup = useCallback(
+    ({ lesson, block }: { lesson: Lesson; block: LessonBlock }) => {
+      const previous = playbackWarmupRef.current;
+      const blocks = lesson.sections.flatMap((section) => section.blocks);
+      const blockIndex = blocks.findIndex((item) => item.id === block.id);
+      const isSameLesson = previous.lessonSlug === lesson.slug;
+      const isConsecutive =
+        isSameLesson &&
+        previous.lastSentenceIndex !== null &&
+        blockIndex === previous.lastSentenceIndex + 1;
+      const consecutiveCount = isConsecutive ? previous.consecutiveCount + 1 : 1;
+      playbackWarmupRef.current = {
+        lessonSlug: lesson.slug,
+        lastSentenceIndex: blockIndex >= 0 ? blockIndex : null,
+        consecutiveCount,
+      };
+
+      promoteLessonPlaybackAudioWarmups(lesson, `block-${block.id}`, {
         lookaheadCount: 3,
         includeSceneFull: consecutiveCount >= 2,
       });
@@ -329,6 +354,7 @@ export function useSceneDetailPlayback({
     handleLoopSentence,
     handleOpenVariantChunk,
     handleOpenExpressionDetail,
+    handleBlockPlaybackWarmup,
     handleSentencePlaybackWarmup,
     resetChunkDetailState,
   };

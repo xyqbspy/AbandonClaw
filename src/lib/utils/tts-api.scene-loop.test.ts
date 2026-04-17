@@ -4,7 +4,12 @@ import {
   clearClientEventRecords,
   listClientEventRecords,
 } from "./client-events";
-import { __resetTtsTestState, playSceneLoopAudio, stopTtsPlayback } from "./tts-api";
+import {
+  __resetTtsTestState,
+  __setSceneFullFailureCooldownMsForTests,
+  playSceneLoopAudio,
+  stopTtsPlayback,
+} from "./tts-api";
 
 const originalFetch = globalThis.fetch;
 const originalAudio = globalThis.Audio;
@@ -118,6 +123,12 @@ test("playSceneLoopAudio 会记录 ready / wait_fetch / fallback 事件", async 
     listClientEventRecords().map((record) => record.name).reverse(),
     ["scene_full_play_wait_fetch", "scene_full_play_ready"],
   );
+  assert.deepEqual(
+    listClientEventRecords()
+      .map((record) => record.payload.readiness)
+      .reverse(),
+    ["cold", "ready"],
+  );
 
   globalThis.fetch = (async () =>
     new Response(JSON.stringify({ error: "upstream failed" }), {
@@ -129,4 +140,108 @@ test("playSceneLoopAudio 会记录 ready / wait_fetch / fallback 事件", async 
   await assert.rejects(() => playSceneLoopAudio(payload), /完整场景音频暂时不可用/);
 
   assert.equal(listClientEventRecords()[0]?.name, "scene_full_play_fallback");
+  assert.equal(listClientEventRecords()[0]?.payload.failureReason, "provider_error");
+});
+
+test("playSceneLoopAudio 会对同一个 scene full 失败做短时冷却", async () => {
+  let requestCount = 0;
+  globalThis.window = {
+    localStorage: createLocalStorageMock(),
+    dispatchEvent: () => true,
+  } as unknown as Window & typeof globalThis;
+
+  class FakeAudio {
+    preload = "auto";
+    src = "";
+    currentTime = 0;
+    loop = false;
+    onended: null | (() => void) = null;
+    onerror: null | (() => void) = null;
+
+    load() {}
+    play() {
+      return Promise.resolve();
+    }
+    pause() {}
+  }
+
+  globalThis.Audio = FakeAudio as unknown as typeof Audio;
+  globalThis.fetch = (async () => {
+    requestCount += 1;
+    return new Response(JSON.stringify({ error: "upstream failed" }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
+  }) as typeof fetch;
+
+  const payload = {
+    sceneSlug: "demo-scene",
+    sceneType: "dialogue" as const,
+    segments: [{ text: "Hello there", speaker: "A" }],
+  };
+
+  await assert.rejects(() => playSceneLoopAudio(payload), /完整场景音频暂时不可用/);
+  await assert.rejects(() => playSceneLoopAudio(payload), /完整场景音频暂时不可用/);
+
+  assert.equal(requestCount, 1);
+  assert.equal(listClientEventRecords()[0]?.name, "scene_full_play_fallback");
+  assert.equal(listClientEventRecords()[1]?.name, "scene_full_play_cooling_down");
+  assert.equal(listClientEventRecords()[1]?.payload.failureReason, "cooling_down");
+});
+
+test("playSceneLoopAudio 冷却过期后允许重新尝试，成功后清理冷却", async () => {
+  let requestCount = 0;
+  globalThis.window = {
+    localStorage: createLocalStorageMock(),
+    dispatchEvent: () => true,
+  } as unknown as Window & typeof globalThis;
+
+  class FakeAudio {
+    preload = "auto";
+    src = "";
+    currentTime = 0;
+    loop = false;
+    onended: null | (() => void) = null;
+    onerror: null | (() => void) = null;
+
+    load() {}
+    play() {
+      return Promise.resolve();
+    }
+    pause() {}
+  }
+
+  globalThis.Audio = FakeAudio as unknown as typeof Audio;
+  __setSceneFullFailureCooldownMsForTests(1);
+  globalThis.fetch = (async () => {
+    requestCount += 1;
+    if (requestCount === 1) {
+      return new Response(JSON.stringify({ error: "upstream failed" }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    return new Response(JSON.stringify({ url: "https://cdn.test/scene-full.mp3" }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }) as typeof fetch;
+
+  const payload = {
+    sceneSlug: "demo-scene",
+    sceneType: "dialogue" as const,
+    segments: [{ text: "Hello there", speaker: "A" }],
+  };
+
+  await assert.rejects(() => playSceneLoopAudio(payload), /完整场景音频暂时不可用/);
+  await new Promise((resolve) => setTimeout(resolve, 5));
+  await playSceneLoopAudio(payload);
+  stopTtsPlayback();
+  await playSceneLoopAudio(payload);
+
+  assert.equal(requestCount, 2);
+  assert.equal(
+    listClientEventRecords().some((record) => record.name === "scene_full_play_ready"),
+    true,
+  );
 });

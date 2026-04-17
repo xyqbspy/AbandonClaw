@@ -257,6 +257,7 @@ export default function SceneDetailClientPage({
     handleLoopSentence,
     handleOpenVariantChunk,
     handleOpenExpressionDetail,
+    handleBlockPlaybackWarmup,
     handleSentencePlaybackWarmup,
     resetChunkDetailState,
   } = useSceneDetailPlayback({
@@ -1121,6 +1122,7 @@ export default function SceneDetailClientPage({
           savedPhraseTexts={Array.from(savedPhraseTextSet)}
           onSavePhrase={savePhraseForScene}
           onReviewPhrase={savePhraseForScene}
+          onBlockPlayback={handleBlockPlaybackWarmup}
           onSentencePlayback={handleSentencePlaybackWarmup}
         />
     );
@@ -1140,6 +1142,7 @@ export default function SceneDetailClientPage({
         onSavePhrase={savePhraseForScene}
         onReviewPhrase={savePhraseForScene}
         onSceneLoopPlayback={handleSceneFullPlay}
+        onBlockPlayback={handleBlockPlaybackWarmup}
         onSentencePlayback={handleSentencePlaybackWarmup}
         onChunkEncounter={handleBaseChunkEncounter}
         onSentencePracticeComplete={handleSentenceCompleted}

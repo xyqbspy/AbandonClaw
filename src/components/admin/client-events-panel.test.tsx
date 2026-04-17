@@ -21,11 +21,16 @@ test("ClientEventsPanel 会展示最近业务事件并支持筛选和清空", ()
   recordClientFailureSummary("tts_scene_loop_failed", {
     sceneSlug: "coffee-chat",
   });
+  recordClientEvent("scene_full_play_cooling_down", {
+    sceneSlug: "coffee-chat",
+    failureReason: "cooling_down",
+  });
 
   render(<ClientEventsPanel />);
 
   screen.getByText("today_continue_clicked");
   screen.getByText("tts_scene_loop_failed");
+  screen.getByText("scene_full_play_cooling_down");
 
   fireEvent.change(screen.getByDisplayValue("全部类型"), {
     target: { value: "failure" },

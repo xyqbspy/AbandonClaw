@@ -47,7 +47,7 @@ const mockedModules = {
       }) => {
         sceneLoopCalls.push({ sceneSlug });
         if (shouldSceneLoopFail) {
-          onError?.(new Error("完整场景音频暂不可用"));
+          onError?.(new Error("瀹屾暣鍦烘櫙闊抽鏆備笉鍙敤"));
         }
       },
     }),
@@ -56,6 +56,8 @@ const mockedModules = {
     buildChunkAudioKey: (text: string) => text,
   },
   "@/lib/utils/audio-warmup": {
+    getBlockSpeakText: (block: { tts?: string; sentences: Array<{ text: string }> }) =>
+      block.tts?.trim() || block.sentences.map((sentence) => sentence.text).join(" "),
     getSentenceSpeakText: (sentence: { text: string }) => sentence.text,
   },
   "@/lib/utils/resource-actions": {
@@ -108,8 +110,7 @@ afterEach(() => {
   toast.error = originalToastError;
   useLessonReaderPlaybackModule = null;
 });
-
-test("useLessonReaderPlayback 在 scene full 失败时会提供逐句跟读 CTA", async () => {
+test("useLessonReaderPlayback 鍦?scene full 澶辫触鏃朵細鎻愪緵閫愬彞璺熻 CTA", async () => {
   shouldSceneLoopFail = true;
   toast.error = ((message?: string, options?: { action?: { label: React.ReactNode; onClick: () => void } }) => {
     toastErrorCalls.push({
@@ -159,19 +160,20 @@ test("useLessonReaderPlayback 在 scene full 失败时会提供逐句跟读 CTA"
   });
 
   assert.equal(failureCalls.at(-1)?.name, "tts_scene_loop_failed");
-  assert.equal(toastErrorCalls.at(-1)?.actionLabel, "改为逐句跟读");
+  assert.equal(toastErrorCalls.at(-1)?.actionLabel, "继续当前段落");
+  assert.equal(failureCalls.at(-1)?.payload.fallbackBlockId, "block-1");
 
   toastErrorCalls.at(-1)?.onAction?.();
 
   assert.deepEqual(sentenceCalls, [
     {
-      sentenceId: "sentence-1",
+      sentenceId: "block-block-1",
       text: "Let's call it a day.",
     },
   ]);
   assert.equal(eventCalls.at(-1)?.name, "tts_scene_loop_fallback_clicked");
+  assert.equal(eventCalls.at(-1)?.payload.blockId, "block-1");
 });
-
 test("useLessonReaderPlayback 播放句子时会触发可选预热提权回调", async () => {
   const useLessonReaderPlayback = getUseLessonReaderPlayback();
   const lesson = {

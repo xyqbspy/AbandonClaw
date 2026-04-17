@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { regenerateChunkTtsAudioBatch } from "./service";
+import { AppError } from "@/lib/server/errors";
+import { generateTtsAudio, regenerateChunkTtsAudioBatch } from "./service";
 
 test("regenerateChunkTtsAudioBatch 使用有界并发执行批量任务", async () => {
   let activeCount = 0;
@@ -32,6 +33,23 @@ test("regenerateChunkTtsAudioBatch 使用有界并发执行批量任务", async 
   );
 
   assert.equal(maxActiveCount, 2);
+});
+
+test("generateTtsAudio 会把 scene full 空 segments 标记为 segment_assembly_failed", async () => {
+  await assert.rejects(
+    () =>
+      generateTtsAudio({
+        kind: "scene_full",
+        sceneSlug: "demo-scene",
+        sceneType: "dialogue",
+        segments: [],
+      }),
+    (error) => {
+      assert.equal(error instanceof AppError, true);
+      assert.equal((error as AppError).details?.failureReason, "segment_assembly_failed");
+      return true;
+    },
+  );
 });
 
 test("regenerateChunkTtsAudioBatch 会汇总失败项并在最后统一抛错", async () => {

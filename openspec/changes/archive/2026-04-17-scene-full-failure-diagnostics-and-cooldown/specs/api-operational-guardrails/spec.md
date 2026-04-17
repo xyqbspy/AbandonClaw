@@ -1,15 +1,4 @@
-## Purpose
-定义 API 与关键业务链路的最小可观测、失败回看和运行护栏要求，帮助维护者在不建设完整 BI 平台的前提下排查真实使用问题。
-
-## Requirements
-
-### Requirement: 关键学习动作必须具备最小业务级可观测性
-系统 MUST 让维护者能够回看最近记录的关键学习动作与失败摘要，而不是只能依赖控制台瞬时输出。
-
-#### Scenario: 维护者查看最近业务事件
-- **WHEN** 维护者打开可回看入口
-- **THEN** 系统 MUST 展示最近关键业务事件与失败摘要
-- **AND** 这些记录 MUST 控制在最小字段范围内
+## MODIFIED Requirements
 
 ### Requirement: 音频失败 observability 必须支持最小排障
 系统 MUST 为 scene full 失败提供足以回看的最小结构化事件，不要求建设完整 BI 平台。

@@ -309,24 +309,31 @@ test("浏览器 TTS 缓存 helper 可以列出大小并定向清理", async () =
     new Request("https://local.tts.cache/sentence%3Ascene-a%3As-1"),
     new Response(new Blob(["123456"], { type: "audio/mpeg" })),
   );
+  await cache.put(
+    new Request("https://local.tts.cache/sentence%3Ascene-a%3Asentence-block-blk-1-abc"),
+    new Response(new Blob(["12"], { type: "audio/mpeg" })),
+  );
 
   const entries = await listBrowserTtsCacheEntries();
   const summary = await getBrowserTtsCacheSummary();
 
-  assert.equal(entries.length, 2);
+  assert.equal(entries.length, 3);
   assert.deepEqual(
     entries.map((entry) => entry.kind).sort(),
-    ["chunk", "sentence"],
+    ["block", "chunk", "sentence"],
   );
-  assert.equal(summary.entryCount, 2);
-  assert.equal(summary.totalBytes, 10);
+  assert.equal(summary.entryCount, 3);
+  assert.equal(summary.totalBytes, 12);
 
   const clearResult = await clearBrowserTtsCacheEntries(["chunk:wrap-up"]);
   const nextEntries = await listBrowserTtsCacheEntries();
 
   assert.equal(clearResult.removedCount, 1);
   assert.equal(clearResult.removedBytes, 4);
-  assert.deepEqual(nextEntries.map((entry) => entry.cacheKey), ["sentence:scene-a:s-1"]);
+  assert.deepEqual(
+    nextEntries.map((entry) => entry.cacheKey).sort(),
+    ["sentence:scene-a:s-1", "sentence:scene-a:sentence-block-blk-1-abc"],
+  );
 });
 
 test("浏览器 TTS 缓存在超限后会保留最新写入的音频", async () => {
@@ -575,4 +582,54 @@ test("playSentenceAudio 会记录 sentence cache hit / miss 事件", async () =>
     listClientEventRecords().map((record) => record.name).reverse(),
     ["sentence_audio_play_miss_cache", "sentence_audio_play_hit_cache"],
   );
+  assert.deepEqual(
+    listClientEventRecords()
+      .map((record) => record.payload.audioUnit)
+      .reverse(),
+    ["sentence", "sentence"],
+  );
+});
+
+test("playSentenceAudio 复用 block id 时会在观测 payload 中标记 audioUnit=block", async () => {
+  globalThis.window = {
+    localStorage: createLocalStorageMock(),
+    dispatchEvent: () => true,
+  } as unknown as Window & typeof globalThis;
+
+  class FakeAudio {
+    preload = "auto";
+    src = "";
+    currentTime = 0;
+    loop = false;
+    onended: null | (() => void) = null;
+    onerror: null | (() => void) = null;
+
+    load() {}
+    play() {
+      queueMicrotask(() => {
+        this.onended?.();
+      });
+      return Promise.resolve();
+    }
+    pause() {}
+  }
+
+  globalThis.Audio = FakeAudio as unknown as typeof Audio;
+  globalThis.fetch = (async () =>
+    new Response(JSON.stringify({ url: "https://cdn.test/block-observe.mp3" }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    })) as typeof fetch;
+
+  await playSentenceAudio({
+    sceneSlug: "observe-scene",
+    sentenceId: "block-blk-1",
+    text: "Observe this block.",
+    speaker: "A",
+  });
+
+  const [record] = listClientEventRecords();
+  assert.equal(record?.name, "sentence_audio_play_miss_cache");
+  assert.equal(record?.payload.audioUnit, "block");
+  assert.equal(record?.payload.sentenceId, "block-blk-1");
 });

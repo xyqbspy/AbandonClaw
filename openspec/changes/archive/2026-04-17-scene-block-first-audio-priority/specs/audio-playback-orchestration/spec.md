@@ -1,15 +1,4 @@
-## Purpose
-定义前端音频播放、预热、调度、fallback 与可回看行为，确保 scene detail 的 block-first 主路径、scene full secondary 路径和兼容层语义保持一致。
-
-## Requirements
-
-### Requirement: TTS 上游异常必须留下可追踪记录
-系统 MUST 允许维护者在不依赖浏览器 console 的前提下，回看最近一次真实使用里产生的音频失败摘要，至少覆盖 `scene full` 失败与替代 CTA 点击结果。
-
-#### Scenario: 维护者复核最近一次 scene full 失败
-- **WHEN** 维护者打开本地可回看面板
-- **THEN** 系统 MUST 展示最近一次音频失败摘要
-- **AND** 若用户点击了替代 CTA，也 MUST 能看到对应动作记录
+## ADDED Requirements
 
 ### Requirement: Scene detail 音频预热必须以 block 为主消费单元
 系统 MUST 在 scene detail 页优先预热用户真实点击播放的 block 音频，而不是默认预热独立 sentence 音频。
@@ -39,6 +28,14 @@
 - **THEN** 系统 MAY 按需请求该 sentence 音频
 - **AND** 后台主预热队列仍 SHOULD 优先后续 block
 
+### Requirement: Scene full 必须保持高优先级但不得抢占当前 block 播放
+系统 MUST 继续为 scene full 音频提供后台准备能力，并保证当前用户点击播放优先。
+
+#### Scenario: scene full 后台准备
+- **WHEN** scene detail 页完成首屏音频调度
+- **THEN** 系统 SHOULD 继续入队 scene full 预热
+- **AND** scene full 预热不得压制当前 block 播放请求
+
 ### Requirement: Block 兼容层不得污染 sentence 语义
 系统 MUST 在调试与观测入口区分 block 音频和真实 sentence 音频，即使 block 音频暂时复用 sentence TTS 通道。
 
@@ -52,18 +49,3 @@
 - **WHEN** 管理端查看 `sentence:...:sentence-block-*` 缓存项
 - **THEN** 系统 MUST 将其展示为 `block` 类型
 - **AND** 系统 MUST NOT 将其展示为真实 sentence 缓存
-
-### Requirement: Scene full 后台准备和播放必须不压制 block 主路径
-scene detail 页 MUST 继续以 block 为主播放单元，scene full 作为 secondary 音频资源进行准备和播放。
-
-#### Scenario: scene full 冷却期间
-- **GIVEN** 某个 scene full 最近失败并处于冷却期
-- **WHEN** 页面执行后台预热或用户点击 full
-- **THEN** 系统 MUST NOT 让 full 反复生成挤占 block 播放资源
-- **AND** block 播放、block 预热和 fallback CTA MUST 继续可用
-
-#### Scenario: scene full 可以重试
-- **GIVEN** scene full 未处于冷却期
-- **WHEN** 用户明确点击 full 或后台调度允许
-- **THEN** 系统 MAY 尝试准备 scene full
-- **AND** 当前用户点击的 block 播放仍 MUST 高于 full 后台任务

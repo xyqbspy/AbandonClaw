@@ -5,12 +5,13 @@ import { toast } from "sonner";
 import { useTtsPlaybackController } from "@/hooks/use-tts-playback-controller";
 import { buildChunkAudioKey } from "@/lib/shared/tts";
 import type { Lesson, LessonBlock, LessonSentence } from "@/lib/types";
-import { getSentenceSpeakText } from "@/lib/utils/audio-warmup";
+import { getBlockSpeakText, getSentenceSpeakText } from "@/lib/utils/audio-warmup";
 import {
   recordClientEvent,
   recordClientFailureSummary,
 } from "@/lib/utils/client-events";
 import { scheduleLessonAudioWarmup } from "@/lib/utils/resource-actions";
+import { getSceneFullFailureReasonFromError } from "@/lib/utils/tts-api";
 
 export function useLessonReaderPlayback({
   lesson,
@@ -19,6 +20,7 @@ export function useLessonReaderPlayback({
   firstSentence,
   activeSentenceId,
   onSceneLoopPlayback,
+  onBlockPlayback,
   onSentencePlayback,
 }: {
   lesson: Lesson;
@@ -27,6 +29,7 @@ export function useLessonReaderPlayback({
   firstSentence: LessonSentence | null;
   activeSentenceId: string | null;
   onSceneLoopPlayback?: (payload: { lesson: Lesson }) => void;
+  onBlockPlayback?: (payload: { lesson: Lesson; block: LessonBlock }) => void;
   onSentencePlayback?: (payload: { lesson: Lesson; sentence: LessonSentence }) => void;
 }) {
   const sentenceLoopRef = useRef<string | null>(null);
@@ -78,12 +81,7 @@ export function useLessonReaderPlayback({
 
   const playBlockTts = useCallback(
     async (block: LessonBlock) => {
-      const blockReadText =
-        block.tts?.trim() ||
-        block.sentences
-          .map((sentence) => sentence.tts?.trim() || sentence.audioText?.trim() || sentence.text)
-          .filter(Boolean)
-          .join(" ");
+      const blockReadText = getBlockSpeakText(block);
       if (!blockReadText) return;
 
       const blockPlaybackId = `block-${block.id}`;
@@ -93,6 +91,7 @@ export function useLessonReaderPlayback({
       }
 
       sentenceLoopRef.current = null;
+      onBlockPlayback?.({ lesson, block });
       await playbackController.toggleSentencePlayback({
         sceneSlug: lesson.slug,
         sentenceId: blockPlaybackId,
@@ -104,7 +103,7 @@ export function useLessonReaderPlayback({
         },
       });
     },
-    [lesson.slug, playbackController, stopAudio],
+    [lesson, lesson.slug, onBlockPlayback, playbackController, stopAudio],
   );
 
   useEffect(
@@ -246,26 +245,51 @@ export function useLessonReaderPlayback({
         onSceneLoopPlayback?.({ lesson });
       },
       onError: (error) => {
+        const fallbackBlock =
+          (activeSentenceId
+            ? blockOrder.find((block) =>
+                block.sentences.some((sentence) => sentence.id === activeSentenceId),
+              ) ?? null
+            : null) ?? blockOrder[0] ?? null;
         const fallbackSentence =
           (activeSentenceId
             ? sentenceOrder.find((sentence) => sentence.id === activeSentenceId) ?? null
-            : null) ?? firstSentence;
+            : null) ??
+          fallbackBlock?.sentences[0] ??
+          firstSentence;
         const message = error instanceof Error ? error.message : "完整场景音频暂不可用";
+        const failureReason = getSceneFullFailureReasonFromError(error);
         recordClientFailureSummary("tts_scene_loop_failed", {
           sceneSlug: lesson.slug,
           activeSentenceId,
+          fallbackBlockId: fallbackBlock?.id ?? null,
           fallbackSentenceId: fallbackSentence?.id ?? null,
+          failureReason,
           message,
         });
         toast.error(message, {
           description: fallbackSentence ? "可先切回逐句跟读，保持当前训练节奏。" : undefined,
-          action: fallbackSentence
+          action: fallbackBlock
+            ? {
+                label: "继续当前段落",
+                onClick: () => {
+                  recordClientEvent("tts_scene_loop_fallback_clicked", {
+                    sceneSlug: lesson.slug,
+                    blockId: fallbackBlock.id,
+                    sentenceId: fallbackSentence?.id ?? null,
+                    failureReason,
+                  });
+                  void playBlockTts(fallbackBlock);
+                },
+              }
+            : fallbackSentence
             ? {
                 label: "改为逐句跟读",
                 onClick: () => {
                   recordClientEvent("tts_scene_loop_fallback_clicked", {
                     sceneSlug: lesson.slug,
                     sentenceId: fallbackSentence.id,
+                    failureReason,
                   });
                   playFallbackSentence(fallbackSentence);
                 },
@@ -282,6 +306,7 @@ export function useLessonReaderPlayback({
     lesson,
     onSceneLoopPlayback,
     playbackController,
+    playBlockTts,
     playFallbackSentence,
     sentenceOrder,
     stopAudio,

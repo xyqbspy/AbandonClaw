@@ -871,3 +871,39 @@
 #### 后续计划
 - 后续主链路文档优先落到 `feature-flows/`
 - 后续模块职责说明优先落到 `feature-map/`
+
+### [2026-04-17] scene 音频预热改为 block-first
+- 类型：实现 / 测试 / 文档
+- 状态：已完成
+#### 背景
+scene detail 页的真实主消费单元是 block 和 scene full。此前预热主要按 sentence 入队，可能提前生成 `sentence-s1`，但用户点击 block 播放时仍会请求 `block-*` 音频，导致预热命中和真实点击不一致。
+#### 本次改动
+- 新增 OpenSpec change：`scene-block-first-audio-priority`。
+- `warmupLessonAudio()`、idle 增量预热和播放驱动提权改为优先处理 playable block。
+- block 音频继续复用现有 `sentence` TTS kind，`sentenceId` 使用 `block-${block.id}`，不修改 `/api/tts` 协议。
+- block 播放时新增 `onBlockPlayback` 回调，触发后续 block 提权。
+- scene full 继续保留后台准备，sentence 保留为明确单句消费和 fallback 的按需资源。
+#### 测试 / 验证
+- `node --import tsx --test src/lib/utils/audio-warmup.test.ts src/lib/utils/resource-actions.test.ts src/lib/utils/scene-audio-warmup-scheduler.test.ts`
+- `node --import tsx --import ./src/test/setup-dom.ts --test src/features/lesson/audio/use-lesson-reader-playback.test.tsx "src/app/(app)/scene/[[]slug[]]/use-scene-detail-playback.test.tsx"`
+- `node_modules\.bin\openspec.CMD change validate "scene-block-first-audio-priority" --strict --no-interactive`
+- `pnpm run text:check-mojibake`
+#### 风险 / 未完成项
+- block 音频比单句更长，单个生成耗时和缓存体积可能增加，需要继续观察 `block-*` hit / miss。
+- `sentence_audio_play_*` 事件名暂时沿用，payload 中 `sentenceId = block-*` 代表 block 级音频。
+
+### [2026-04-17] block-first 语义护栏补充
+
+`block-*` 只是复用 sentence TTS 通道的兼容 id，不再让调试和回看入口只靠 `sentenceId` 猜语义。
+
+- `sentence_audio_play_*` payload 增加 `audioUnit = block | sentence`。
+- 浏览器 TTS 缓存面板将 `sentence:...:sentence-block-*` 识别为 `block` 类型。
+- OpenSpec 和音频链路文档明确 scene detail 的音频口径：Primary 是 block，Secondary 是 scene full，Fallback 才是 sentence。
+
+### [2026-04-17] scene full 失败诊断与冷却
+
+- 新增 OpenSpec change：`scene-full-failure-diagnostics-and-cooldown`。
+- scene full 播放失败事件补充 `failureReason`、`sceneFullKey`、`readiness` 和 `cooldownMs`。
+- 同一个 scene full 失败后会进入短时冷却，冷却期内再次点击不再重复触发生成，避免用户连续撞墙和上游重复受压。
+- `scene_full_play_cooling_down` 进入最小业务事件回看。
+- full 失败后的 CTA 优先承接当前 block，无法定位时再回退到 sentence。

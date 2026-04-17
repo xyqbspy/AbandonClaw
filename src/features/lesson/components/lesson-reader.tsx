@@ -19,7 +19,7 @@ import {
   getSentenceById,
 } from "@/lib/data/mock-lessons";
 import { useMobile } from "@/hooks/use-mobile";
-import { Lesson, LessonSentence, SelectionChunkLayer } from "@/lib/types";
+import { Lesson, LessonBlock, LessonSentence, SelectionChunkLayer } from "@/lib/types";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { LessonProgress } from "@/features/lesson/components/lesson-progress";
@@ -65,6 +65,7 @@ export function LessonReader({
   onSavePhrase,
   onReviewPhrase,
   onSceneLoopPlayback,
+  onBlockPlayback,
   onSentencePlayback,
   onChunkEncounter,
   onSentencePracticeComplete,
@@ -96,6 +97,7 @@ export function LessonReader({
     sourceChunkText?: string;
   }) => Promise<{ created?: boolean } | void> | { created?: boolean } | void;
   onSceneLoopPlayback?: (payload: { lesson: Lesson }) => void;
+  onBlockPlayback?: (payload: { lesson: Lesson; block: LessonBlock }) => void;
   onSentencePlayback?: (payload: { lesson: Lesson; sentence: LessonSentence }) => void;
   onChunkEncounter?: (payload: {
     lesson: Lesson;
@@ -274,6 +276,7 @@ export function LessonReader({
     firstSentence,
     activeSentenceId: state.activeSentenceId,
     onSceneLoopPlayback,
+    onBlockPlayback,
     onSentencePlayback,
   });
   const {
