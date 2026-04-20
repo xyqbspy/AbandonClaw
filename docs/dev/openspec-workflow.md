@@ -1,13 +1,26 @@
 # OpenSpec Workflow
 
 本文档用于说明项目在进入 Spec-Driven Change 时的标准流程、文件结构、阶段约束与模板。
-默认情况下，任务分流与日常执行规则以 `AGENTS.md` 为准。
+默认情况下，三层分工如下：
+
+- `AGENTS.md`
+  - 负责任务分流、默认执行顺序、阅读入口和修改前输出要求
+- `openspec/specs/project-maintenance/spec.md`
+  - 负责项目维护流程的长期稳定约束
+- `docs/dev/openspec-workflow.md`
+  - 只负责 Spec-Driven 阶段的流程细化、目录结构和模板
+
+如果出现重复口径：
+- 任务分流与日常执行规则，以 `AGENTS.md` 为准
+- 长期稳定维护约束，以 `openspec/specs/project-maintenance/spec.md` 为准
+- 当前文档不重复定义总纲，只补充 OpenSpec 阶段细节
 
 ---
 
 ## 0. 适用范围
 
-只有满足以下任一条件时，才进入 OpenSpec 流程：
+进入 OpenSpec 的判断口径以 `AGENTS.md` 和 `openspec/specs/project-maintenance/spec.md` 为准。
+当前文档只保留一份便于执行的摘要：
 
 - 改变业务行为或用户能力定义
 - 改变主链路、状态流、数据流
@@ -36,6 +49,8 @@ Proposal -> Approval -> Implementation -> Archive -> Update specs -> Update CHAN
 ---
 
 ## 2. 阶段进入条件
+
+以下内容只补充各阶段允许做什么、不允许做什么，不重复展开 `AGENTS.md` 中的总规则。
 
 ### Proposal
 触发条件：
@@ -174,107 +189,125 @@ openspec/
 │       └── <change-id>/
 └── specs/
     └── <capability>/spec.md
+```
 
 period 推荐格式：
 
 2026-Q1
 2026-Q2
-5. spec 规则
-稳定 spec
+
+---
+
+## 5. stable spec 与 change delta
+
+### stable spec
 
 位置：
 
-openspec/specs/*
+`openspec/specs/*`
 
 用途：
 
-描述当前系统长期有效、可独立阅读的正式规则
-表达当前真实行为，不保留临时增量措辞
-change delta
+- 描述当前系统长期有效、可独立阅读的正式规则
+- 表达当前真实行为，不保留临时增量措辞
+
+### change delta
 
 位置：
 
-openspec/changes/<change-id>/specs/*
+`openspec/changes/<change-id>/specs/*`
 
 用途：
 
-描述本次变更准备新增、修改、移除或重命名的规则
+- 描述本次变更准备新增、修改、移除或重命名的规则
 
 允许的段落：
 
-## ADDED Requirements
-## MODIFIED Requirements
-## REMOVED Requirements
-## RENAMED Requirements
-6. 什么时候必须写 spec delta
+- `## ADDED Requirements`
+- `## MODIFIED Requirements`
+- `## REMOVED Requirements`
+- `## RENAMED Requirements`
 
-以下情况必须写：
+---
 
-新增用户可见功能
-修改现有业务流程或行为
-修改 API 行为
-修改权限、校验、安全策略
-修改跨页面/跨模块一致性规则
-修复会改变实际行为或契约的 Bug
+## 6. 什么时候必须写 spec delta
 
-以下情况通常不写：
+是否必须写 spec delta，判断口径与 `AGENTS.md` 一致。常见必须写的场景：
 
-纯重构（无行为变化）
-性能优化（无行为变化）
-测试补充
-文档、注释、格式调整
-构建脚本或 CI 调整（无用户可感知影响）
-7. CHANGELOG 规则
+- 新增用户可见功能
+- 修改现有业务流程或行为
+- 修改 API 行为
+- 修改权限、校验、安全策略
+- 修改跨页面/跨模块一致性规则
+- 修复会改变实际行为或契约的 Bug
 
-正式 CHANGELOG.md 只记录用户可感知变化：
+通常不写的场景：
 
-Added
-Changed
-Fixed
-Deprecated
-Removed
-Security
+- 纯重构（无行为变化）
+- 性能优化（无行为变化）
+- 测试补充
+- 文档、注释、格式调整
+- 构建脚本或 CI 调整（无用户可感知影响）
 
-通常不记录：
+---
 
-纯重构
-测试补充
-内部文档更新
-无用户可感知变化的实现优化
-纯样式或文案微调（除非用户明确要求）
+## 7. CHANGELOG 与 dev-log
 
-开发中的重构说明、验证情况、范围说明，不写入正式 CHANGELOG，优先写入 `docs/dev/dev-log.md`。
+CHANGELOG 与开发过程记录的分工以 `AGENTS.md` 和 `openspec/specs/project-maintenance/spec.md` 为准。
+当前文档只保留执行摘要：
 
-8. Proposal 阶段最小检查
+- 正式 `CHANGELOG.md` 只记录用户可感知变化
+- 开发中的验证结论、范围说明、风险记录优先写入 `docs/dev/dev-log.md`
+- 未合并 `main` 前，不把过程性说明写进正式 `CHANGELOG.md`
 
-在产出 proposal / design / spec 前，先检查：
+正式 CHANGELOG 常见分类：
 
-这次改动的完整功能链路是什么
-上游入口 / 当前承接 / 下游回写 / 回退路径是什么
-是否会破坏功能连续性
-测试影响是什么
-有哪些潜在未覆盖风险
-这次需求是否同时暴露旧规则漂移、重复语义、缺失测试、缺失文档或边界不清
-哪些不稳定点必须本轮顺手收口，哪些明确不收，以及原因是什么
+- `Added`
+- `Changed`
+- `Fixed`
+- `Deprecated`
+- `Removed`
+- `Security`
+
+---
+
+## 8. Proposal 阶段最小检查
+
+在产出 proposal / design / spec 前，至少先检查：
+
+- 这次改动的完整功能链路是什么
+- 上游入口 / 当前承接 / 下游回写 / 回退路径是什么
+- 是否会破坏功能连续性
+- 测试影响是什么
+- 有哪些潜在未覆盖风险
+- 这次需求是否同时暴露旧规则漂移、重复语义、缺失测试、缺失文档或边界不清
+- 哪些不稳定点必须本轮顺手收口，哪些明确不收，以及原因是什么
 
 若仓库已有功能链路文档或模块说明，优先复用。
 
-9. 输出格式
+---
+
+## 9. 输出格式
 
 默认输出顺序：
 
-当前阶段
-change-id（若未确认则说明建议值）
-要创建/修改的文件
-具体内容或操作步骤
+- 当前阶段
+- change-id（若未确认则说明建议值）
+- 要创建/修改的文件
+- 具体内容或操作步骤
 
 若信息不足，只输出：
 
-当前阶段
-缺少的信息
-一个可直接填写的最小模板
-10. 模板
-proposal.md
+- 当前阶段
+- 缺少的信息
+- 一个可直接填写的最小模板
+
+---
+
+## 10. 模板
+
+### proposal.md
+
 # 变更提案：<标题>
 
 ## Status
@@ -320,7 +353,9 @@ draft
 是否影响测试基线：是 / 否
 兼容性：向后兼容 / 破坏性变更
 风险点：
-design.md
+
+### design.md
+
 # 设计说明：<标题>
 
 ## Status
@@ -361,7 +396,9 @@ draft
 未覆盖风险：
 本轮已收口的不稳定点：
 明确延后的不稳定点：
-tasks.md
+
+### tasks.md
+
 # 任务清单
 
 ## Status
@@ -383,7 +420,9 @@ draft
 - [ ] 更新 `docs/dev/dev-log.md` 或补充验证记录
 - [ ] 在记录中写清本轮收口项 / 明确不收项
 - [ ] 如已合并 main 且存在用户可感知变化，再更新正式 `CHANGELOG.md`
-spec delta
+
+### spec delta
+
 # 规范文档：<capability>
 
 ## ADDED Requirements

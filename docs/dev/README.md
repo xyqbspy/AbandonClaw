@@ -9,12 +9,13 @@
 - 测试和验证该怎么收敛
 - 变更过程记录在哪里
 
-如果你已经理解了模块、链路、规则和实现，但还需要知道“应该按什么流程动手”，再看这里。
+如果你已经通过 `docs/README.md` 理解了模块、链路、规则和实现，但还需要知道“应该按什么流程动手”，再看这里。
 
 使用约定：
 
 - 本文件负责目录导航，不重复展开所有流程细节
-- `project-maintenance-playbook.md` 是日常维护主入口
+- `docs/README.md` 是仓库总入口；`project-maintenance-playbook.md` 是 `dev` 目录下的日常维护主入口
+- `openspec/specs/project-maintenance/spec.md` 是开发流程与维护约定的稳定约束入口
 - `openspec-workflow.md` 是 Spec-Driven 阶段规则的唯一细化说明
 - 开始做需求前，先按维护手册做一次“稳定性收口检查”，不要把已识别的不稳定点留到后续零散修补
 
@@ -38,7 +39,11 @@
 ## 推荐使用方式
 
 - 第一次接手项目
-  - 先看 `project-maintenance-playbook.md`
+  - 先看 `docs/README.md`
+  - 再看 `project-maintenance-playbook.md`
+- 需要确认哪些开发约束属于长期稳定规则
+  - 先看 `openspec/specs/project-maintenance/spec.md`
+  - 再回到 `project-maintenance-playbook.md` 或 `openspec-workflow.md` 看执行细节
 - 判断这次要不要走规范变更
   - 先看 `project-maintenance-playbook.md` 的判断口径
   - 进入 Spec-Driven 后再看 `openspec-workflow.md`
@@ -61,6 +66,17 @@
 - 开发过程记录与正式 CHANGELOG 规则
   - 先看 `openspec/specs/project-maintenance/spec.md`
   - 再看 `openspec-workflow.md` 与 `dev-log.md`
+
+如果你只想记一条最小路径，可以这样理解：
+
+- `docs/README.md`
+  - 负责先定位问题属于系统哪一层
+- `docs/dev/project-maintenance-playbook.md`
+  - 负责日常维护怎么判断、怎么落地
+- `openspec/specs/project-maintenance/spec.md`
+  - 负责哪些维护规则属于长期稳定约束
+- `docs/dev/openspec-workflow.md`
+  - 负责进入 Spec-Driven 后每个阶段具体怎么走
 
 ## 使用原则
 

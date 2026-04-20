@@ -296,8 +296,16 @@ node_modules\.bin\openspec.CMD archive <change-name>
 
 相关文档：
 
+- `openspec/specs/project-maintenance/spec.md`
 - `docs/dev/openspec-workflow.md`
 - `docs/dev/change-intake-template.md`
+
+如果只想记这一段的最小入口顺序：
+
+1. 先看 `docs/README.md`
+2. 再看 `docs/dev/project-maintenance-playbook.md`
+3. 需要确认长期稳定约束时看 `openspec/specs/project-maintenance/spec.md`
+4. 进入 Spec-Driven 后再看 `docs/dev/openspec-workflow.md`
 
 ## 7. 改动前后检查清单
 
@@ -336,16 +344,19 @@ node_modules\.bin\openspec.CMD archive <change-name>
 ## 8. 新维护者推荐阅读顺序
 
 1. `README.md`
-2. `docs/dev/project-maintenance-playbook.md`
-3. `openspec/config.yaml`
-4. `openspec/specs/project-maintenance/spec.md`
-5. `openspec/specs/learning-loop-overview/spec.md`
-6. `src/app/(app)/today/page.tsx`
-7. `src/app/(app)/scene/[slug]/scene-detail-page.tsx`
-8. `src/app/(app)/chunks/page.tsx`
-9. `src/app/(app)/review/page.tsx`
-10. `src/lib/server/learning/service.ts`
-11. `src/lib/server/phrases/service.ts`
+2. `docs/README.md`
+3. `docs/feature-map/README.md`
+4. 对应 `docs/feature-flows/*` 与 `docs/domain-rules/*`
+5. `docs/dev/project-maintenance-playbook.md`
+6. `openspec/specs/project-maintenance/spec.md`
+7. `openspec/specs/learning-loop-overview/spec.md`
+8. 若当前问题已有明确 capability，再补读对应 `openspec/specs/*`
+9. `src/app/(app)/today/page.tsx`
+10. `src/app/(app)/scene/[slug]/scene-detail-page.tsx`
+11. `src/app/(app)/chunks/page.tsx`
+12. `src/app/(app)/review/page.tsx`
+13. `src/lib/server/learning/service.ts`
+14. `src/lib/server/phrases/service.ts`
 
 ## 9. 当前维护建议
 

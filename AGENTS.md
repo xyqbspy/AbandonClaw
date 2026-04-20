@@ -13,7 +13,7 @@
 在开始修改前，必须按以下顺序执行：
 
 1. 判断任务类型（Fast Track / Cleanup / Spec-Driven）
-2. 阅读相关文档（docs/README → feature-map → feature-flows → domain-rules；若涉及字段来源 / 缓存 / fallback / 组件协作，再看 system-design；若涉及流程 / 测试 / OpenSpec，再看 docs/dev）
+2. 阅读相关文档（先看 `docs/README.md` 做入口定位，再按需读对应 `feature-map` / `feature-flows` / `domain-rules`；若涉及稳定规则、正式语义、跨页面契约或已知 capability，必须补读对应 `openspec/specs/*`；若涉及字段来源 / 缓存 / fallback / 组件协作，再看 `system-design`；若涉及流程 / 测试 / OpenSpec，再看 `docs/dev`）
 3. 做一次“稳定性收口检查”，判断这次需求是否同时暴露了旧规则漂移、重复语义、缺失文档、缺失测试或边界不清
 4. 输出问题分析与最小方案
 5. 再开始修改代码
@@ -98,13 +98,14 @@
 
 阅读顺序：
 
-1. docs/README.md
-2. docs/feature-map/*
-3. docs/feature-flows/*
-4. docs/domain-rules/*
-5. 若涉及字段来源、落库、缓存、fallback 或组件协作，再读 docs/system-design/*
-6. 若涉及流程、测试、发布检查或 OpenSpec，再读 docs/dev/*
-7. 再读代码
+1. `docs/README.md`，先定位本次问题属于哪个模块、链路、规则或维护流程
+2. 对应 `docs/feature-map/README.md` 与相关模块文档
+3. 对应 `docs/feature-flows/*` 链路文档
+4. `docs/domain-rules/README.md` 与对应规则文档
+5. 若涉及稳定规则、正式语义、跨页面契约或已知 capability，再读对应 `openspec/specs/*`
+6. 若涉及字段来源、落库、缓存、fallback 或组件协作，再读 `docs/system-design/*`
+7. 若涉及流程、测试、发布检查或 OpenSpec，再读 `docs/dev/README.md` 与对应维护文档
+8. 再读代码
 
 ---
 
@@ -231,7 +232,8 @@ Proposal → Approval → Implementation → Archive → Update specs → Update
 - archive 前不得只归档 OpenSpec 而遗漏实际维护文档；若无文档更新，必须说明原因
 
 详见：
-docs/dev/openspec-workflow.md
+- `openspec/specs/project-maintenance/spec.md`（长期稳定维护约束）
+- `docs/dev/openspec-workflow.md`（Spec-Driven 阶段细化流程）
 
 ---
 
