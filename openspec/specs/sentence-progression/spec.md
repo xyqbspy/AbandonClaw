@@ -1,7 +1,5 @@
-# sentence-progression Specification
-
 ## Purpose
-TBD - created by archiving change clarify-sentence-progression. Update Purpose after archive.
+定义句子推进链路中场景步骤、题型完成度与句子掌握里程碑的独立语义，确保句子完成只由正式里程碑推进决定，而不被单次作答或进入练习误判。该 capability 在学习闭环中承接 `scene` 内部练习状态机与句子推进边界，而不重复定义聚合层如何消费这些结果。
 ## Requirements
 ### Requirement: 句子推进链路必须区分场景步骤、题型完成与句子里程碑
 系统 MUST 将场景工作台当前步骤、练习内部题型完成度和句子掌握里程碑视为三层独立状态，不得使用单一字段同时表达三者。
@@ -49,4 +47,3 @@ TBD - created by archiving change clarify-sentence-progression. Update Purpose a
 - **WHEN** 用户已经完成当前场景练习，且下游 unlock 条件满足
 - **THEN** 系统必须把当前场景标记为 `done`
 - **AND** `today`、场景浮层和继续学习入口必须对这一状态给出一致解释
-

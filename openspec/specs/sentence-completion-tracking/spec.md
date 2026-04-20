@@ -1,7 +1,5 @@
-# sentence-completion-tracking Specification
-
 ## Purpose
-TBD - created by archiving change separate-sentence-completion-tracking. Update Purpose after archive.
+定义句子练习进入、句子完成与场景聚合消费之间的强语义边界，确保服务端能够区分“已进入练习”和“已完成句子”两类学习结果。该 capability 在学习闭环中承接服务端学习状态记录、API 暴露与聚合消费的句子完成语义，而不重复定义 `scene` 内部练习步骤、`scene_practice` / `done` 推进或页面内部练习流程。
 ## Requirements
 ### Requirement: 服务端必须区分句子已进入练习与句子已完成
 系统 MUST 将“用户已进入句子练习”和“句子已达到完成条件”记录为可区分的学习结果，不得继续使用同一个事件或计数字段同时表达二者。
@@ -16,8 +14,8 @@ TBD - created by archiving change separate-sentence-completion-tracking. Update 
 - **THEN** 服务端必须记录该句子已完成
 - **AND** 该完成记录必须能够与“已进入练习”区分消费
 
-### Requirement: 场景聚合必须基于句子完成与场景练习完成的强语义
-系统 MUST 仅在句子完成和场景练习完成等强语义结果满足时，推进场景聚合状态，不得继续把“已进入句子练习”近似当成句子完成或场景接近完成。
+### Requirement: 聚合消费不得把已进入练习近似为句子完成
+系统 MUST 在聚合学习状态时把“已进入句子练习”和“句子完成”视为可区分的强语义结果，不得继续把“已进入句子练习”近似当成句子完成或任何更高一级的学习完成信号。涉及 `scene` 内部练习步骤、`scene_practice` 与 `done` 的推进规则时，MUST 遵守 `sentence-progression` capability，而不是在这里重复定义场景内部状态机。
 
 #### Scenario: 用户只进入句子练习但未完成句子
 - **WHEN** 用户已经进入句子练习，但尚未完成任何句子
@@ -30,11 +28,11 @@ TBD - created by archiving change separate-sentence-completion-tracking. Update 
 - **AND** `today`、`continueLearning` 和 scene 页必须消费同一结果
 
 ### Requirement: 学习状态 API 必须暴露可稳定消费的句子完成语义
-系统 MUST 让学习状态相关 API 返回足以区分“进入句子练习”“句子完成”“场景练习完成”的字段或聚合结果，避免调用方继续自行猜测。
+系统 MUST 让学习状态相关 API 返回足以区分“进入句子练习”和“句子完成”的字段或聚合结果，避免调用方继续自行猜测；如果调用方还需要消费 `scene_practice` 或 `done`，MUST 继续读取由 `sentence-progression` 定义的场景推进结果，而不是反向从句子进入记录自行推断。
 
 #### Scenario: today 或 scene 读取学习状态
 - **WHEN** 前端读取学习 dashboard、continue learning 或 scene learning state
-- **THEN** 返回结果必须能稳定表达句子练习阶段、句子完成情况和场景练习完成情况
+- **THEN** 返回结果必须能稳定表达句子练习阶段和句子完成情况
 - **AND** 前端不应再依赖 `practice_sentence` 的兼容语义自行推断句子完成
 
 ### Requirement: 历史记录兼容不得把已开始误判为已完成
@@ -44,4 +42,3 @@ TBD - created by archiving change separate-sentence-completion-tracking. Update 
 - **WHEN** 系统读取只包含旧字段的历史学习状态
 - **THEN** 可以把其解释为“已进入句子练习”
 - **AND** 除非存在额外完成证据，否则不得把其解释为“句子已完成”
-

@@ -276,10 +276,13 @@ pnpm run spec:validate
 推荐流程：
 
 1. 先判断这次是不是非微小改动
-2. 如果会影响功能行为、数据流、缓存、测试链路、跨页面一致性或维护规范，先建 OpenSpec change
-3. 在 `proposal.md`、`design.md`、`tasks.md`、delta spec 中写清目标、非目标、影响范围、回归点
-4. 实现后更新根目录 `CHANGELOG.md`
-5. 完成后再决定是否 archive，并把稳定规则沉淀进 `openspec/specs/*`
+2. 如果会影响功能行为、用户能力、主链路、状态流、数据流、缓存、测试链路、维护规范、跨页面一致性、详情组件结构边界、权限、安全策略或外部契约，先建 OpenSpec change
+3. 在正式实施前先做一次“稳定性收口检查”：确认这次需求是否同时暴露旧规则漂移、重复语义、缺失测试、缺失文档或边界不清
+4. 在 `proposal.md`、`design.md`、`tasks.md`、delta spec 中写清目标、非目标、影响范围、回归点，以及“本轮顺手收口项 / 明确不收项”
+5. 实施时优先把同一链路里的最小必要收口一次性补齐，不把已经识别的稳定性缺口留到后续零散修补
+6. 实现后先更新 `docs/dev/dev-log.md`，记录验证结果、剩余风险以及本轮明确延后的不稳定点
+7. 如代码已合并 `main` 且存在用户可感知变化，再更新根目录 `CHANGELOG.md`
+8. 完成后再决定是否 archive，并把稳定规则沉淀进 `openspec/specs/*`
 
 常用命令：
 
@@ -303,9 +306,11 @@ node_modules\.bin\openspec.CMD archive <change-name>
 - 先看完整功能链路，不按局部惯性直接下手
 - 确认这次改动是否会影响 `today -> scene -> chunks -> review`
 - 确认是否涉及缓存回填、路由状态、服务端聚合
+- 确认是否已经进入非微小改动范围，需不需要先建 OpenSpec change
+- 确认这次需求是否暴露重复语义、边界漂移、缺失文档、缺失测试或旧兼容语义未收口
+- 若发现稳定性缺口，明确哪些必须本轮一并收口，哪些暂不处理，以及暂不处理的理由
 - 如果只改一处局部，链路会不会在别处断掉
 - 现有测试是否已经覆盖主链路
-- 这次是否值得先写 OpenSpec change
 
 如果是 detail 体系收敛或跨模块复用调整，可额外参考：
 
@@ -321,7 +326,10 @@ node_modules\.bin\openspec.CMD archive <change-name>
 - 是否需要补新的回归测试
 - 空态、失败态、禁用态是否仍然合理
 - 文案、按钮、loading 状态是否保持一致
-- 根目录 `CHANGELOG.md` 是否已更新
+- 本轮识别出的稳定性缺口是否已经完成最小必要收口
+- 若仍保留未收口项，是否已明确记录原因、风险与后续入口
+- `docs/dev/dev-log.md` 是否已补验证结果与剩余风险
+- 若代码已合并 `main`，根目录 `CHANGELOG.md` 是否已更新
 - 是否仍存在未覆盖风险，并且已明确记录
 - 如果 change 已完成，是否满足 OpenSpec archive 前检查条件
 
@@ -341,7 +349,7 @@ node_modules\.bin\openspec.CMD archive <change-name>
 
 ## 9. 当前维护建议
 
-- 新规则优先写进 OpenSpec 或 `CHANGELOG.md`，不要只留在聊天记录里
+- 新规则优先写进 OpenSpec、稳定文档或 `docs/dev/dev-log.md`，不要只留在聊天记录里
 - 新功能先明确它属于 `scene`、`chunks`、`review` 还是聚合层
 - 如果一个页面开始同时承担过多职责，继续按既有模式拆到 `selectors`、`controller`、`components`
 - 如果文档再次出现乱码，直接以 UTF-8 新文档替代

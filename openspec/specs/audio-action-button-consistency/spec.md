@@ -1,7 +1,5 @@
-# audio-action-button-consistency Specification
-
 ## Purpose
-统一前端音频动作按钮的视觉形态、可访问名称，以及句子翻译/播放入口的展示规则，避免阅读层出现多套并行交互。
+统一前端音频动作按钮的视觉形态、可访问名称，以及句子翻译/播放入口的展示规则，避免阅读层出现多套并行交互。该 capability 在学习闭环中承接 `scene`、`lesson`、`chunks` 等页面的音频与翻译动作展示边界，而不负责定义学习链路本身。
 ## Requirements
 ### Requirement: 音频动作按钮必须默认以纯 icon 形式展示
 系统 MUST 将前端音频动作按钮统一为纯 icon 视觉形态，避免在不同页面同时存在 icon-only 与 icon+文本两套并行样式。系统还 MUST 允许页面在不破坏统一组件的前提下，为纯 icon 按钮声明与当前界面一致的尺寸和表面色样式。

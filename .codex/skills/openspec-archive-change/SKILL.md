@@ -50,6 +50,17 @@ Archive a completed change in the experimental workflow.
 
    **If no tasks file exists:** Proceed without task-related warning.
 
+   Also check whether the change artifacts/dev log recorded the repository-required stability-closure decisions:
+   - what this round intentionally closed
+   - what was explicitly deferred
+   - why it was deferred
+   - where the remaining risk was recorded
+
+   **If that record is missing:**
+   - Display warning that the maintenance record is incomplete
+   - Use **AskUserQuestion tool** to confirm user wants to proceed
+   - Proceed if user confirms
+
 4. **Assess delta spec sync state**
 
    Check for delta specs at `openspec/changes/<name>/specs/`. If none exist, proceed without sync prompt.
@@ -112,3 +123,4 @@ All artifacts complete. All tasks complete.
 - Show clear summary of what happened
 - If sync is requested, use openspec-sync-specs approach (agent-driven)
 - If delta specs exist, always run the sync assessment and show the combined summary before prompting
+- Do not treat a change as fully archive-ready if the repository-required stability-closure record is still missing from the artifacts or dev log

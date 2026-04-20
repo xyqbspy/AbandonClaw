@@ -30,6 +30,27 @@
 - 改某个聚合字段、fallback、落库位置或实现锚点
   - 优先找对应实现文档
 
+## 常见 stable spec 对照
+
+- `openspec/specs/chunks-data-contract/spec.md`
+  - 对应 `chunks-data-mapping.md`
+- `openspec/specs/component-library-governance/spec.md`
+  - 对应 `component-library.md`
+- `openspec/specs/review-practice-signals/spec.md`
+  - 对应 `review-practice-signals.md`
+- `openspec/specs/review-progressive-practice/spec.md`
+  - 对应 `review-progressive-practice.md`
+- `openspec/specs/review-source-contract/spec.md`
+  - 对应 `review-source-mapping.md`
+- `openspec/specs/scene-practice-generation/spec.md`
+  - 对应 `scene-practice-generation.md`
+- `openspec/specs/today-learning-contract/spec.md`
+  - 对应 `learning-overview-mapping.md` 与相关 `feature-flows/today-recommendation.md`
+- `openspec/specs/audio-playback-orchestration/spec.md`
+  - 对应 `audio-tts-pipeline.md`
+
+如果某个 capability 同时涉及实现协作和主链路承接，先看这里确认实现归宿，再回到对应 `feature-flows/` 或 `domain-rules/` 补完整语义。
+
 ## 使用原则
 
 出现这些情况时，应优先补或改 `system-design`：

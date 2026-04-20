@@ -18,7 +18,8 @@ context: |
     - 所有说明与输出使用中文
     - 统一使用 UTF-8
     - 优先小而明确、可维护、可测试的实现
-    - 每次实际改动后都要更新根目录 CHANGELOG.md
+    - 开发过程优先记录在 docs/dev/dev-log.md
+    - 根目录 CHANGELOG.md 只在变更合并 main 后更新
   测试约定:
     - *.test.ts 主要覆盖纯逻辑
     - *.test.tsx 主要覆盖交互和 DOM
@@ -36,4 +37,4 @@ rules:
     - 明确数据流、状态流、缓存影响和回归风险。
   tasks:
     - 任务必须包含测试校验。
-    - 任务必须包含 CHANGELOG.md 更新。
+    - 任务必须包含文档同步检查；未合并 main 前优先更新 docs/dev/dev-log.md 而不是根目录 CHANGELOG.md。

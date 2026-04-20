@@ -1,7 +1,5 @@
-# chunks-data-contract Specification
-
 ## Purpose
-TBD - created by archiving change clarify-chunks-data-contract. Update Purpose after archive.
+定义 `chunks` 页面核心动作与后端数据写入的稳定契约，确保表达保存、relation / cluster 维护、AI enrich 与进入复习等副作用可追踪、可校验。该 capability 在学习闭环中承接表达沉淀后的数据语义与副作用边界，而不重复定义 `chunks` 在闭环里的总体角色。
 ## Requirements
 ### Requirement: Chunks 核心动作与后端数据写入必须可追踪
 系统 MUST 为 `chunks` 页面定义稳定的数据契约，明确手动新建表达、句子提取表达、生成同类表达、生成对照表达、快速添加关系、expression cluster 操作和进入复习等动作分别会调用哪些接口、写入哪些后端数据，以及需要触发哪些页面刷新或缓存失效。

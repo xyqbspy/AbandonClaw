@@ -13,6 +13,7 @@
 
 ## 当前目录
 
+- [auth-api-boundaries.md](/d:/WorkCode/AbandonClaw/docs/domain-rules/auth-api-boundaries.md)
 - [learning-evidence.md](/d:/WorkCode/AbandonClaw/docs/domain-rules/learning-evidence.md)
 - [review-scheduling-rules.md](/d:/WorkCode/AbandonClaw/docs/domain-rules/review-scheduling-rules.md)
 
@@ -35,6 +36,17 @@
   - 先确认它是不是稳定证据、正式信号或聚合摘要
 - 如果问题已经变成“这些字段具体落在哪里”
   - 转去 `docs/system-design/`
+
+## 当前 stable spec 承接范围
+
+- `openspec/specs/auth-api-boundaries/spec.md`
+  - 对应 `auth-api-boundaries.md`
+- `openspec/specs/learning-loop-overview/spec.md`
+  - 对应 `learning-evidence.md` 中的完成判定、稳定证据与正式信号边界
+- `openspec/specs/review-scheduling-signals/spec.md`
+  - 对应 `review-scheduling-rules.md`
+
+如果某个 stable spec 更偏“判定标准、正式语义、消费边界”，优先在 `domain-rules/` 找长期规则文档；如果更偏字段来源、缓存或服务协作，再转去 `docs/system-design/`。
 
 ## 使用原则
 

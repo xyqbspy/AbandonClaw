@@ -34,25 +34,23 @@ ADMIN_EMAILS=your-admin@example.com,another-admin@example.com
 这个仓库最省心的本地工作流是：
 
 - 默认不常驻前端服务
-- 只想查看当前结果时，用后台 `preview:up`
-- 只有确实需要热更新时，才用 `pnpm run dev` 或 `pnpm run dev:turbo`
+- 默认只推荐一条预览入口：后台 `preview:up`
+- 只有确实需要热更新排查局部页面时，才临时使用 `pnpm run dev`
 
-推荐命令：
+默认推荐命令：
 
 ```bash
 pnpm run preview:up
 pnpm run preview:down
 pnpm run preview:restart
 pnpm run preview:status
-pnpm run dev
-pnpm run dev:turbo
 ```
 
 推荐习惯：
 
 - 大多数时候让 Codex 改代码，但不要长期挂着 `next dev`
 - 只想看页面结果时，运行 `pnpm run preview:up`
-- 需要实时 HMR 时，再运行 `pnpm run dev`，看完就关掉
+- 需要实时 HMR 时，再临时运行 `pnpm run dev`，看完就关掉
 
 如果你在 Windows 上想要更低操作成本的预览流：
 
@@ -67,6 +65,12 @@ pnpm run dev:turbo
 pnpm run build
 pnpm run start
 ```
+
+说明：
+
+- `pnpm run preview:up` 是仓库级默认推荐入口
+- `pnpm run dev` 只用于确实需要 HMR 的局部排查，不作为并列预览方案
+- `pnpm run dev:turbo` 不再作为默认推荐入口
 
 后台预览管理器会把运行状态写到 `.tmp/preview-server.json`，日志写到 `.tmp/preview-server.log`。
 如果 `preview:up` 已成功启动，默认访问地址也是 `http://localhost:3000/`。
@@ -127,8 +131,8 @@ pnpm run start
 - `openspec/config.yaml`
 - `openspec/specs/`
 - `openspec/changes/`
-- `docs/project-maintenance-playbook.md`
-- `docs/openspec-workflow.md`
+- `docs/dev/project-maintenance-playbook.md`
+- `docs/dev/openspec-workflow.md`
 - `CHANGELOG.md`
 
 推荐流程：
@@ -141,10 +145,14 @@ node_modules\\.bin\\openspec.CMD new change <change-name>
 
 规则：
 
-- 只要改动会影响行为、数据流、缓存、测试或跨页面 UI 一致性，优先先走 OpenSpec。
-- 每次真实代码或文档改动后，都要同步更新 `CHANGELOG.md`。
-- 在动 `scene`、`chunks`、`review` 或 `today` 这些主链路前，优先先看 `docs/project-maintenance-playbook.md`。
-- 归档 change 前，先检查 `docs/openspec-workflow.md`。
+- 默认先按 `AGENTS.md` 判断是 `Fast Track`、`Cleanup` 还是 `Spec-Driven`。
+- 只要改动进入非微小范围，并影响业务行为、主链路、状态流、数据流、缓存、测试链路、维护规范、跨页面一致性、组件结构边界、权限、安全策略或外部契约，就进入 OpenSpec。
+- 开始非微小改动前，先做一次“稳定性收口检查”，判断这次需求是否同时暴露旧规则漂移、重复语义、缺失文档、缺失测试、边界不清或旧兼容语义未收口。
+- `proposal / design / tasks` 至少要写清“本轮收口项 / 明确不收项 / 延后原因 / 风险记录位置”。
+- 开发过程中的实现说明、验证记录和中间态决策优先写入 `docs/dev/dev-log.md`。
+- 正式 `CHANGELOG.md` 仅在代码已合并 `main` 后更新，且只记录用户可感知变化。
+- 在动 `scene`、`chunks`、`review` 或 `today` 这些主链路前，优先先看 `docs/dev/project-maintenance-playbook.md`。
+- 进入 Spec-Driven 后，阶段规则以 `docs/dev/openspec-workflow.md` 为准。
 
 ## 5.2）测试
 

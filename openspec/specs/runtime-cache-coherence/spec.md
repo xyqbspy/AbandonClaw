@@ -1,7 +1,5 @@
-# runtime-cache-coherence Specification
-
 ## Purpose
-TBD - created by archiving change stabilize-runtime-caching. Update Purpose after archive.
+定义运行时缓存的一致性边界，确保 `scenes` 列表和 `scene detail` 在命中本地缓存时仍会进行受控后台校验，而不会长期遮蔽服务端最新状态。
 ## Requirements
 ### Requirement: Scene 列表缓存不得长期遮蔽服务端最新状态
 系统 MUST 允许 `scenes` 列表在命中本地缓存时立即渲染缓存内容，但不得因为缓存仍在本地 TTL 内就停止对服务端最新列表的后台刷新。

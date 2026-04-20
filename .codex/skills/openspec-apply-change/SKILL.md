@@ -70,6 +70,7 @@ Implement tasks from an OpenSpec change.
    - Show which task is being worked on
    - Make the code changes required
    - Keep changes minimal and focused
+   - If the task or current implementation context exposes an already-known stability gap in the same chain, complete the minimum required closure that the proposal/tasks called for instead of leaving it for a later cleanup pass
    - Mark task complete in the tasks file: `- [ ]` → `- [x]`
    - Continue to next task
 
@@ -147,6 +148,7 @@ What would you like to do?
 - Update task checkbox immediately after completing each task
 - Pause on errors, blockers, or unclear requirements - don't guess
 - Use contextFiles from CLI output, don't assume specific file names
+- Do not silently defer stability-closure work that is already listed in proposal/tasks for the current round
 
 **Fluid Workflow Integration**
 

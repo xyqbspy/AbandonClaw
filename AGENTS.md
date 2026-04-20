@@ -13,10 +13,11 @@
 在开始修改前，必须按以下顺序执行：
 
 1. 判断任务类型（Fast Track / Cleanup / Spec-Driven）
-2. 阅读相关文档（docs/README → feature-map → feature-flows → domain-rules）
-3. 输出问题分析与最小方案
-4. 再开始修改代码
-5. 必要时同步更新测试与文档
+2. 阅读相关文档（docs/README → feature-map → feature-flows → domain-rules；若涉及字段来源 / 缓存 / fallback / 组件协作，再看 system-design；若涉及流程 / 测试 / OpenSpec，再看 docs/dev）
+3. 做一次“稳定性收口检查”，判断这次需求是否同时暴露了旧规则漂移、重复语义、缺失文档、缺失测试或边界不清
+4. 输出问题分析与最小方案
+5. 再开始修改代码
+6. 必要时同步更新测试与文档
 
 禁止：
 - 直接从局部代码开始修改
@@ -41,6 +42,7 @@
 - 只读最少上下文
 - 只跑最小测试
 - 不做无关改动
+- 但若在处理中发现同一链路里存在会直接导致后续返工的稳定性缺口，必须在同一轮一并补齐最小必要收口，而不是留到后面再补文档或规则
 
 ---
 
@@ -64,6 +66,8 @@
 - 改变业务行为 / 用户能力
 - 改变主链路 / 状态流转 / 数据流
 - 修改 API / 数据模型 / 权限 / 缓存
+- 修改测试链路 / 维护规范 / 跨页面 UI 一致性
+- 详情组件结构性复用边界或跨模块结构收敛
 - 跨模块影响
 - 用户明确要求走 proposal
 
@@ -71,13 +75,14 @@
 - 必须先 proposal / tasks
 - 未 approved 前不实施
 - 必须写 spec delta
+- proposal / tasks 里必须明确“本轮顺手收口哪些既有不稳定点，哪些明确不收”
 
 ---
 
 ## 默认原则
 
-默认优先按 Fast Track 判断。  
-只有明确触发条件，才进入 Spec-Driven。
+默认先判断这次是不是“微小改动”。  
+只有明确属于微小、局部且不影响稳定规则时，才按 Fast Track；只要进入非微小改动范围，就优先转 Spec-Driven。
 
 ---
 
@@ -97,7 +102,9 @@
 2. docs/feature-map/*
 3. docs/feature-flows/*
 4. docs/domain-rules/*
-5. 再读代码
+5. 若涉及字段来源、落库、缓存、fallback 或组件协作，再读 docs/system-design/*
+6. 若涉及流程、测试、发布检查或 OpenSpec，再读 docs/dev/*
+7. 再读代码
 
 ---
 
@@ -113,6 +120,7 @@
 6. 风险与影响范围
 7. 最小测试方案
 8. 是否需要更新文档
+9. 这次是否发现需要顺手收口的稳定性缺口；若有，列出“本轮收口项 / 明确不收项”
 
 ---
 
@@ -184,6 +192,7 @@
 4. 不允许同一逻辑散落多个文件
 5. OpenSpec 变更在 implementation / archive 完成前，必须同步检查并补全对应文档
 6. 功能链路优化或新增能力必须同步更新对应分类文档；例如音频/TTS 链路改动要更新 `docs/system-design/audio-tts-pipeline.md`
+7. 处理需求时如果已经发现 stable spec / domain-rules / system-design / feature-flows 之间存在重复语义、边界漂移或入口缺失，必须在同一轮做最小收口，不要把已识别的不稳定点留到后续零散修补
 
 ---
 
@@ -209,7 +218,7 @@
 
 流程：
 
-Proposal → Approval → Implementation → Archive → Specs → CHANGELOG
+Proposal → Approval → Implementation → Archive → Update specs → Update CHANGELOG
 
 规则：
 
@@ -217,6 +226,7 @@ Proposal → Approval → Implementation → Archive → Specs → CHANGELOG
 - 必须有 change-id
 - 必须有 proposal / tasks
 - 行为变更必须写 spec delta
+- 非微小改动若涉及数据流、缓存、测试链路、维护规范或跨页面一致性，也应先走 OpenSpec
 - 实现完成后必须对照 proposal / design / spec delta 回查对应 feature-flow / domain-rules / system-design 文档是否已同步
 - archive 前不得只归档 OpenSpec 而遗漏实际维护文档；若无文档更新，必须说明原因
 

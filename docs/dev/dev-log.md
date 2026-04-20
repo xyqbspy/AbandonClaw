@@ -1,5 +1,73 @@
 ﻿# Dev Log
 
+### [2026-04-20] 收敛 stable spec 与维护入口边界
+- 类型：文档 / 规范治理
+- 状态：已完成
+#### 背景
+随着 `openspec/specs/*`、`docs/*` 和 `AGENTS.md` 持续演进，仓库里逐渐出现了三类问题：
+- 维护入口文档之间的流程口径不完全一致，尤其是 Fast Track / Spec-Driven、OpenSpec 阶段与 CHANGELOG 更新规则。
+- 部分 stable spec 已经归档进主规范，但仍保留归档占位文案、混合格式或缺少长期文档归宿说明。
+- `learning-loop-overview` 逐步吸收了 today、chunks、review、sentence、scene 音频等专项细节，开始偏离“闭环总览”定位。
+
+#### 本次改动
+- 对齐并收口维护入口文档：
+  - 更新 `AGENTS.md`，补齐 `system-design / docs/dev` 阅读入口，统一 Spec-Driven 触发条件、OpenSpec 阶段和 CHANGELOG 规则。
+  - 更新根 `README.md`，统一 OpenSpec 触发口径、本地运行推荐入口与 `docs/dev/*` 实际路径。
+  - 更新 `docs/README.md`、`docs/dev/README.md`、`docs/dev/project-maintenance-playbook.md`，固定“总入口 -> dev 目录页 -> 维护主手册 -> openspec workflow” 的导航关系。
+- 收口 stable spec 的基础质量：
+  - 清掉 10 份 stable spec 中残留的 `TBD - created by archiving change ...` Purpose 占位。
+  - 统一 `openspec/specs/*` 的开头格式，移除残留的 `# <capability> Specification` 顶级标题，全部统一为 `## Purpose` 起始。
+  - 为一批专项 capability 的 `Purpose` 补充“在学习闭环中承接什么边界”的说明，形成从总览 spec 到专项 spec、再从专项 spec 回指总览职责的双向导航。
+- 补齐 spec 到 docs 的长期归宿导航：
+  - 更新 `docs/system-design/README.md`，补充常见 stable spec 与实现文档的对照。
+  - 更新 `docs/domain-rules/README.md`，补充当前承接的 stable spec 范围。
+  - 更新 `docs/README.md`，补充 stable spec 应转去 `domain-rules / system-design / feature-flows / dev` 哪一层继续看的查找建议。
+- 收窄 `learning-loop-overview` 的职责边界：
+  - today 聚合契约指回 `today-learning-contract`
+  - chunks 数据副作用与缓存一致性指回 `chunks-data-contract` 与 `runtime-cache-coherence`
+  - review 阶段、正式信号、排序节奏与来源契约分别指回 `review-progressive-practice`、`review-practice-signals`、`review-scheduling-signals`、`review-source-contract`
+  - sentence 内部推进与完成语义指回 `sentence-progression` 与 `sentence-completion-tracking`
+  - scene 音频按钮与播放编排指回 `audio-action-button-consistency` 与 `audio-playback-orchestration`
+- 额外补了两份专项 spec 的边界说明：
+  - `review-experience` 明确只承接完成反馈与下一步入口体验
+  - `scene-full-audio-reliability` 明确只承接 scene full 专项可靠性边界
+  - `scene-practice-generation` 明确只承接练习题生成质量与生成中反馈边界
+- 继续收窄句子相关 capability 的职责：
+  - `sentence-completion-tracking` 明确只承接服务端记录、API 暴露与聚合消费语义
+  - `scene` 内部步骤、`scene_practice` 与 `done` 推进继续统一回指 `sentence-progression`
+  - 进一步收紧 `sentence-completion-tracking` 的 API 与聚合表述，不再把 `scene_practice` / `done` 并列写成自身主职责
+- 反向补强维护规则，减少后续零散修补：
+  - 在 `AGENTS.md`、`docs/dev/project-maintenance-playbook.md`、`docs/dev/openspec-workflow.md`、`docs/dev/README.md` 增加“稳定性收口检查”要求
+  - 明确需求开始阶段就要判断是否同时暴露旧规则漂移、重复语义、缺失文档、缺失测试或边界不清
+  - 明确 proposal / tasks / dev-log 需要记录“本轮收口项 / 明确不收项”，避免已识别问题再次以后补修补的方式反复出现
+  - 继续把这套规则落到 `docs/dev/change-intake-template.md` 与 `openspec/specs/project-maintenance/spec.md`，让接需求阶段就能结构化记录稳定性收口项
+  - 继续把这套规则落到 `docs/dev/openspec-workflow.md` 的 `proposal / design / tasks` 模板正文，减少提案创建后再人工补结构
+  - 继续把这套规则落到 `.codex/skills/openspec-propose`、`.codex/skills/openspec-apply-change`、`.codex/skills/openspec-explore`，避免自动生成或实施阶段仍沿用旧口径
+  - 继续把这套规则落到仓库级 `README.md` 与 `.codex/skills/openspec-archive-change`，补齐从总入口到归档阶段的最后一段口径
+
+#### 影响范围
+- 影响模块：`AGENTS.md`、根 `README.md`、`docs/README.md`、`docs/dev/*`、`docs/domain-rules/README.md`、`docs/system-design/README.md`、`openspec/specs/*`
+- 是否影响主链路：否，不改变业务实现或用户可见功能
+- 是否影响用户可感知行为：否
+- 是否需要同步文档：本轮已同步完成
+
+#### 测试 / 验证
+- 已运行检索与人工回读：
+  - 检查 `openspec/specs/*` 中 `TBD - created by archiving change` 已清零
+  - 检查 `openspec/specs/*` 中 `# <capability> Specification` 顶级标题已清零
+  - 回读 `AGENTS.md`、根 `README.md`、`docs/README.md`、`docs/dev/README.md`、`docs/dev/project-maintenance-playbook.md`
+  - 回读 `learning-loop-overview` 与相关专项 spec，确认总览与专项 capability 的职责边界已收窄
+- 未运行测试：
+  - 未跑代码单测 / 交互测试，因为本轮仅涉及文档与规范文本
+
+#### 风险 / 未完成项
+- 当前主要完成了入口治理和边界收口，但没有对所有 capability 做逐条语义审计，仍可能存在个别细部措辞重叠。
+- 文档体系已经更稳定，但后续新增 capability 若不继续遵守“总览不重复展开专项规则”的原则，仍可能再次漂移。
+
+#### 后续计划
+- 后续若继续治理，优先做专项 capability 的增量守护，而不是再次大范围改写总览 spec。
+- 若后续出现新的跨层规则冲突，优先先收 `Purpose` 和目录入口说明，再决定是否需要动 `Requirements`。
+
 ### [2026-04-17] TTS 预热收益指标与本地 summary
 - 类型：实现 / 测试 / 文档
 - 状态：已完成

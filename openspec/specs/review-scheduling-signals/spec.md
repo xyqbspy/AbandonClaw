@@ -1,7 +1,5 @@
-# review-scheduling-signals Specification
-
 ## Purpose
-TBD - created by archiving change adapt-review-scheduling-signals. Update Purpose after archive.
+定义 `review` 正式训练信号如何参与待复习项排序与下一次复习节奏调节，确保复习调度能够反映识别、输出信心与完整输出等正式结果。该 capability 在学习闭环中承接 `review` 的排序与节奏专项规则，而不重复定义页面训练阶段或来源语义。
 ## Requirements
 ### Requirement: Review 正式信号必须参与待复习项排序
 系统 MUST 让 `review` 的正式训练信号参与待复习项排序，而不是在 due 条件满足后仍只按旧的时间字段平铺展示。
@@ -34,4 +32,3 @@ TBD - created by archiving change adapt-review-scheduling-signals. Update Purpos
 - **WHEN** 页面需要展示新的复习排序或节奏说明
 - **THEN** 系统必须提供稳定的调度解释基础
 - **AND** 页面不得自行根据零散字段即兴拼接新的调度语义
-

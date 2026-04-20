@@ -1,7 +1,5 @@
-# review-practice-signals Specification
-
 ## Purpose
-TBD - created by archiving change formalize-review-practice-signals. Update Purpose after archive.
+定义 `review` 递进式练习中的正式后端信号边界，明确哪些阶段结果会成为稳定学习信号，以及这些信号如何与最终反馈并存并参与后续调度。该 capability 在学习闭环中承接 `review` 正式信号、聚合摘要与迁移边界，而不重复定义页面阶段流程。
 ## Requirements
 ### Requirement: Review 递进式练习必须定义正式后端信号边界
 系统 MUST 为 `review` 递进式练习定义正式后端信号边界，明确哪些阶段结果会成为稳定学习信号，哪些仍只是前端临时训练态。
@@ -37,4 +35,3 @@ TBD - created by archiving change formalize-review-practice-signals. Update Purp
 - **THEN** 历史记录可以保持空值或保守解释
 - **AND** 新信号必须对上线后的新复习记录稳定生效
 - **AND** 系统不得因为历史记录缺失而伪造不可靠的回填结果
-

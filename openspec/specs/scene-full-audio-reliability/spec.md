@@ -1,5 +1,5 @@
 ## Purpose
-定义 scene full 音频失败诊断、短时冷却、准备态回看与 block-first fallback 承接规则，降低完整场景音频失败带来的重复撞墙和排障成本。
+定义 scene full 音频失败诊断、短时冷却、准备态回看与 block-first fallback 承接规则，降低完整场景音频失败带来的重复撞墙和排障成本。该 capability 在学习闭环中承接 `scene full` 专项可靠性边界，而不重复定义通用播放编排或接口运行护栏。
 
 ## Requirements
 

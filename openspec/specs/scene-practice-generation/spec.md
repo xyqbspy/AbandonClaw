@@ -1,7 +1,5 @@
-# scene-practice-generation Specification
-
 ## Purpose
-TBD - created by archiving change increase-scene-practice-coverage. Update Purpose after archive.
+定义 `scene` 练习题生成的最少题量覆盖、半句复现覆盖范围和统一 loading 反馈边界，确保练习生成结果稳定且用户可见反馈一致。该 capability 在学习闭环中承接 `scene` 练习题生成质量与生成中反馈边界，而不重复定义句子推进里程碑、场景练习完成或学习状态聚合语义。
 ## Requirements
 ### Requirement: 场景填空模块必须提供稳定的最少题量覆盖
 系统 MUST 在 scene 练习的 `cloze` 模块中提供稳定的最少题量覆盖，避免中等以上句子数量的场景只生成极少数填空题。
@@ -23,4 +21,3 @@ TBD - created by archiving change increase-scene-practice-coverage. Update Purpo
 - **WHEN** 场景里可用的半句复现句子多于单轮上限
 - **THEN** 系统应保留不超过当前上限的题量
 - **AND** 该上限必须高于旧版的 4 题限制
-

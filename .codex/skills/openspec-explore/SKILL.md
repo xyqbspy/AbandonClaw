@@ -127,6 +127,7 @@ If the user mentions a change or you detect one is relevant:
    - "That's a design decision. Capture it in design.md?"
    - "This is a new requirement. Add it to specs?"
    - "This changes scope. Update the proposal?"
+   - "This request also exposes some existing instability. Do we want to mark what should be closed in this round versus explicitly deferred?"
 
 4. **The user decides** - Offer and move on. Don't pressure. Don't auto-capture.
 
@@ -286,3 +287,4 @@ But this summary is optional. Sometimes the thinking IS the value.
 - **Do visualize** - A good diagram is worth many paragraphs
 - **Do explore the codebase** - Ground discussions in reality
 - **Do question assumptions** - Including the user's and your own
+- **Do surface stability closure** - If the discussion reveals drifted rules, duplicated semantics, missing docs/tests, or unclear boundaries, explicitly surface whether they belong in this round

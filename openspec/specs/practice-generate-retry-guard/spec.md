@@ -1,7 +1,5 @@
-# practice-generate-retry-guard Specification
-
 ## Purpose
-TBD - created by archiving change fix-practice-generate-retry. Update Purpose after archive.
+定义 practice generate 链路的失败熔断与用户提示边界，避免自动预热或重复点击在失败状态下无限重试，并确保用户可见反馈保持受控中文提示。
 ## Requirements
 ### Requirement: 练习生成必须具备短时间失败熔断
 系统 MUST 为 practice generate 提供短时间连续失败熔断，避免自动预热或重复点击在失败状态下无限重试。
@@ -23,4 +21,3 @@ TBD - created by archiving change fix-practice-generate-retry. Update Purpose af
 - **WHEN** 练习生成接口返回用户可见错误
 - **THEN** 返回文案必须是中文
 - **AND** 应能区分权限失败、参数错误、最终生成失败等主要场景
-

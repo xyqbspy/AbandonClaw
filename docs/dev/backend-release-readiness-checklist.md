@@ -15,6 +15,8 @@
 - [ ] 受保护写接口确认已接入 `Origin` 校验
 - [ ] 关键写接口确认已接入幂等保护
 - [ ] 未知异常确认会统一返回受控错误并带 `requestId`
+- [ ] 外部模型调用已配置可控超时，且超时后会主动终止并返回受控失败
+- [ ] 外部模型空响应、非成功状态与异常抛出都会被统一收敛，不会直接裸透传到接口层
 - [ ] 统一参数校验入口仍覆盖 `review / learning / phrases / practice / scenes`
 
 ## 数据边界
@@ -35,6 +37,7 @@
 - [ ] `practice generate` baseline 已执行
 - [ ] `tts` baseline 已执行
 - [ ] 限流命中与异常结果已记录，不只保留终端输出
+- [ ] 至少验证过一组模型调用超时或上游异常时的受控失败表现
 - [ ] 已按 [real-learning-loop-acceptance-checklist.md](/d:/WorkCode/AbandonClaw/docs/dev/real-learning-loop-acceptance-checklist.md) 走完一轮真实学习闭环
 
 ## 第四阶段补充

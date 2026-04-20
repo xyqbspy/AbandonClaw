@@ -21,6 +21,8 @@
 5. 如果问题涉及字段来源、落库、缓存、fallback 或组件协作，再看 `system-design/README.md` 与对应实现文档
 6. 最后再进入代码
 
+如果问题已经从“系统怎么跑”转成“这次该按什么流程改、要不要走 OpenSpec、测试和上线检查怎么收敛”，请转到 `docs/dev/README.md`，再进入对应维护文档。
+
 禁止：
 - 直接从局部代码推断业务
 - 未理解链路就修改核心逻辑
@@ -72,8 +74,10 @@
 - 学习证据模型
 - review 调度策略
 - 状态推进规则
+- 安全边界与用户态数据访问边界
 
 示例：
+- auth-api-boundaries.md
 - learning-evidence.md
 - review-scheduling-rules.md
 
@@ -105,12 +109,21 @@
 - 测试策略
 - 开发日志
 - 变更模板
+- 上线检查
+- 审计记录
 
 示例：
 - dev/README.md
 - testing-policy.md
 - openspec-workflow.md
+- backend-release-readiness-checklist.md
+- server-data-boundary-audit.md
 - dev-log.md
+
+入口建议：
+- `docs/dev/README.md` 负责目录导航
+- `docs/dev/project-maintenance-playbook.md` 负责维护主手册
+- `docs/dev/openspec-workflow.md` 负责 Spec-Driven 阶段规则
 
 ---
 
@@ -131,6 +144,33 @@
 ---
 
 ## 文档使用规则（必须遵守）
+
+### 安全与接口治理的查找建议
+
+如果问题涉及认证入口、用户态数据权限边界、后台白名单入口：
+
+- 先看 `openspec/specs/auth-api-boundaries/spec.md`
+- 再看 `docs/domain-rules/auth-api-boundaries.md`
+
+如果问题涉及接口失败保护、最小可观测性、运行护栏：
+
+- 先看 `openspec/specs/api-operational-guardrails/spec.md`
+- 再看对应 `docs/dev/*` 验证与检查文档
+
+### stable spec 查找建议
+
+如果你已经拿到某个 `openspec/specs/*` capability，但还不确定应该继续看哪类长期文档：
+
+- 偏判定标准、正式语义、消费边界
+  - 转 `docs/domain-rules/README.md`
+- 偏字段来源、缓存、fallback、服务协作、实现锚点
+  - 转 `docs/system-design/README.md`
+- 偏主链路入口、状态流转、回写和回退路径
+  - 转 `docs/feature-flows/README.md`
+- 偏维护流程、测试、OpenSpec、上线检查
+  - 转 `docs/dev/README.md`
+
+---
 
 ### 1. 修改前必须理解链路
 

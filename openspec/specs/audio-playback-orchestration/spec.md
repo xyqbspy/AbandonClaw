@@ -1,5 +1,5 @@
 ## Purpose
-定义前端音频播放、预热、调度、fallback 与可回看行为，确保 scene detail 的 block-first 主路径、scene full secondary 路径和兼容层语义保持一致。
+定义前端音频播放、预热、调度、fallback 与可回看行为，确保 scene detail 的 block-first 主路径、scene full secondary 路径和兼容层语义保持一致。该 capability 在学习闭环中承接 `scene` 音频消费与播放编排的专项规则，而不重复定义场景步骤或学习完成语义。
 
 ## Requirements
 

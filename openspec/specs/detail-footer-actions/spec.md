@@ -1,5 +1,3 @@
-# detail-footer-actions Specification
-
 ## Purpose
 
 定义学习详情页底部动作区的统一规则，确保 lesson detail 与 chunks detail 在 footer spacing、主操作表达和复习动作呈现上保持一致，降低后续维护时的样式漂移和决策分叉。

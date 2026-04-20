@@ -1,7 +1,5 @@
-# review-progressive-practice Specification
-
 ## Purpose
-TBD - created by archiving change review-progressive-practice. Update Purpose after archive.
+定义 `review` 页面从识别到输出的递进式练习层级，确保单次复习流程能够按掌握状态提供分层训练路径，而不是退回到单层反馈流程。该 capability 在学习闭环中承接 `review` 的阶段式工作台与训练路径设计，而不重复定义正式后端信号、调度或来源契约。
 ## Requirements
 ### Requirement: Review 递进式练习必须覆盖识别到输出的能力层级
 系统 MUST 为单次 `review` 提供从识别到输出的递进式练习层级，至少覆盖熟悉度/输出信心、微回忆、变体改写和完整输出四类训练信号。
@@ -21,14 +19,14 @@ TBD - created by archiving change review-progressive-practice. Update Purpose af
 - **AND** 训练深度必须来自稳定映射规则，而不是由页面临时散落判断
 - **AND** 若条目仍停留在较低训练层级，系统后续调度不得把它与已完成完整输出的条目视作同等节奏
 
-### Requirement: Review 递进式练习必须区分正式回写与 TODO 占位
-系统 MUST 明确区分哪些递进式练习阶段已经接通正式后端记录，哪些仍只是前端 TODO 占位，不得把未接通阶段伪造成正式学习状态或调度信号。系统 MUST 同时定义新增正式信号如何与现有最终反馈并存，并明确哪些阶段结果仍停留在前端训练态。
+### Requirement: Review 递进式练习阶段展示必须遵守正式信号边界
+系统 MUST 在页面阶段展示中明确区分哪些递进式练习阶段已经接通正式后端记录，哪些仍只是前端 TODO 占位，不得把未接通阶段伪造成正式学习状态或调度信号。涉及正式后端信号、与最终反馈并存关系和聚合消费的稳定语义，MUST 以 `review-practice-signals` capability 为准，而不是在页面流程规范中重复定义。
 
 #### Scenario: 某个递进式阶段尚未接通后端
 - **WHEN** 页面展示熟悉度、自信度、变体改写或完整输出中的某个阶段
 - **THEN** 若该阶段尚未有正式后端契约，前端必须明确标记其为待接入能力
 - **AND** 该阶段结果不得被直接当作正式学习完成、review 调度或长期统计结果
-- **AND** 若某个阶段已经升级为正式信号，系统必须说明它与最终 `again / hard / good` 的关系，而不是直接覆盖现有反馈语义
+- **AND** 若某个阶段已经升级为正式信号，其正式语义必须遵守 `review-practice-signals` 中定义的并存与聚合规则
 
 ### Requirement: Review 递进式练习必须提供失败降级路径
 系统 MUST 在用户无法完成更高强度输出时，提供回退到更低提示强度训练的稳定路径，而不是只给出一次性失败判断。
@@ -37,4 +35,3 @@ TBD - created by archiving change review-progressive-practice. Update Purpose af
 - **WHEN** 用户在变体改写或完整输出阶段无法完成当前任务
 - **THEN** 系统必须允许其回退到微回忆、参考提示或回到原场景继续练习
 - **AND** 页面必须把这种回退解释为训练降级，而不是直接结束本次复习
-

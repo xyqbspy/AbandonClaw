@@ -16,6 +16,11 @@ I'll create a change with artifacts:
 - design.md (how)
 - tasks.md (implementation steps)
 
+When generating these artifacts, you MUST also treat "stability closure" as first-class content:
+- Identify instability surfaced by this request (drifted rules, duplicated semantics, missing docs, missing tests, unclear boundaries, stale compatibility semantics)
+- Record what will be closed in this round
+- Record what is explicitly not being closed in this round, why, and where the risk is tracked
+
 When ready to implement, run /opsx:apply
 
 ---
@@ -68,6 +73,10 @@ When ready to implement, run /opsx:apply
       - Read any completed dependency files for context
       - Create the artifact file using `template` as the structure
       - Apply `context` and `rules` as constraints - but do NOT copy them into the file
+      - If the artifact is `proposal`, `design`, or `tasks`, make sure the generated content includes the project's required stability-closure structure, even when the upstream template is sparse:
+        - `proposal`: what this round will close, what it will not close, delay reason, risk tracking location
+        - `design`: unstable points discovered, this-round closure items, deferred items, risk destination
+        - `tasks`: concrete task for minimum necessary closure, plus explicit record of deferred items and risks
       - Show brief progress: "Created <artifact-id>"
 
    b. **Continue until all `applyRequires` artifacts are complete**
@@ -98,6 +107,12 @@ After completing all artifacts, summarize:
 - The schema defines what each artifact should contain - follow it
 - Read dependency artifacts for context before creating new ones
 - Use `template` as the structure for your output file - fill in its sections
+- For this repository, proposal/design/tasks are not complete unless they also answer:
+  - What instability did this request expose?
+  - What gets closed in this round?
+  - What is explicitly not closed in this round?
+  - Why is it deferred?
+  - Where is the remaining risk recorded?
 - **IMPORTANT**: `context` and `rules` are constraints for YOU, not content for the file
   - Do NOT copy `<context>`, `<rules>`, `<project_context>` blocks into the artifact
   - These guide what you write, but should never appear in the output
@@ -108,3 +123,4 @@ After completing all artifacts, summarize:
 - If context is critically unclear, ask the user - but prefer making reasonable decisions to keep momentum
 - If a change with that name already exists, ask if user wants to continue it or create a new one
 - Verify each artifact file exists after writing before proceeding to next
+- Do not generate a proposal/design/tasks set that only describes the feature itself while ignoring already-visible instability in the same chain

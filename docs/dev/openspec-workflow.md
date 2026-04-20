@@ -48,6 +48,7 @@ Proposal -> Approval -> Implementation -> Archive -> Update specs -> Update CHAN
 - 建议 change-id
 - 产出 proposal.md / design.md / tasks.md 草稿
 - 产出 spec delta 草稿
+- 做“稳定性收口检查”，识别本次需求顺带暴露的既有不稳定点
 
 不允许：
 - 正式实施
@@ -79,6 +80,9 @@ Proposal -> Approval -> Implementation -> Archive -> Update specs -> Update CHAN
 - 按 tasks 实施
 - 更新任务勾选状态
 - 必要时补充测试说明与风险
+- 同步记录开发过程与验证结论到 `docs/dev/dev-log.md`
+- 若存在用户可感知变化，可先准备 CHANGELOG 草案，但正式 `CHANGELOG.md` 仍留待合并 `main` 后更新
+- 对 proposal / tasks 中已标记为“本轮收口项”的不稳定点一并完成最小必要收口
 
 不允许：
 - 归档
@@ -88,6 +92,11 @@ Proposal -> Approval -> Implementation -> Archive -> Update specs -> Update CHAN
 若实施中发现范围变化：
 - 先更新 proposal / design / tasks / specs
 - 再继续
+
+若实施中新增发现既有不稳定点：
+- 先判断它是否会直接导致当前需求后续返工、语义冲突、测试失真或文档继续漂移
+- 会的话，纳入本轮最小必要收口，并同步更新 proposal / tasks / dev-log
+- 不会的话，也要明确记入“不收项”和延后理由，避免后续再次以补丁形式反复修补
 
 ---
 
@@ -234,7 +243,7 @@ Security
 无用户可感知变化的实现优化
 纯样式或文案微调（除非用户明确要求）
 
-开发中的重构说明、验证情况、范围说明，不写入正式 CHANGELOG，优先写入开发日志。
+开发中的重构说明、验证情况、范围说明，不写入正式 CHANGELOG，优先写入 `docs/dev/dev-log.md`。
 
 8. Proposal 阶段最小检查
 
@@ -245,6 +254,8 @@ Security
 是否会破坏功能连续性
 测试影响是什么
 有哪些潜在未覆盖风险
+这次需求是否同时暴露旧规则漂移、重复语义、缺失测试、缺失文档或边界不清
+哪些不稳定点必须本轮顺手收口，哪些明确不收，以及原因是什么
 
 若仓库已有功能链路文档或模块说明，优先复用。
 
@@ -277,6 +288,19 @@ draft
 ## What Changes
 - 变更项 1
 - 变更项 2
+
+## Stability Closure
+### In This Round
+- 本轮顺手收口项 1
+- 本轮顺手收口项 2
+
+### Not In This Round
+- 暂不处理项 1：原因
+- 暂不处理项 2：原因
+
+### Risk Tracking
+- 延后原因：
+- 风险记录位置：
 
 ## Scope
 
@@ -312,6 +336,15 @@ draft
 当前问题：
 不一致点 / 不稳定点：
 
+## Stability Closure
+### In This Round
+- 本轮顺手收口项 1
+- 本轮顺手收口项 2
+
+### Not In This Round
+- 暂不处理项 1：原因
+- 暂不处理项 2：原因
+
 ## Decision
 设计决策 1：
 设计决策 2：
@@ -319,11 +352,15 @@ draft
 ## Risks
 风险 1：
 风险 2：
+延后原因：
+风险去向：
 
 ## Validation
 验证方式：
 回归范围：
 未覆盖风险：
+本轮已收口的不稳定点：
+明确延后的不稳定点：
 tasks.md
 # 任务清单
 
@@ -333,14 +370,19 @@ draft
 ## 实施
 - [ ] 任务 1
 - [ ] 任务 2
+- [ ] 完成本轮已识别稳定性缺口的最小必要收口
+- [ ] 明确记录本轮不收项、延后原因与风险去向
 
 ## 验证
 - [ ] 测试任务 1
 - [ ] 测试任务 2
+- [ ] 检查本轮未收口项是否已记录原因与风险
 
 ## 文档
 - [ ] 更新相关说明文档
-- [ ] 如适用，准备变更说明
+- [ ] 更新 `docs/dev/dev-log.md` 或补充验证记录
+- [ ] 在记录中写清本轮收口项 / 明确不收项
+- [ ] 如已合并 main 且存在用户可感知变化，再更新正式 `CHANGELOG.md`
 spec delta
 # 规范文档：<capability>
 

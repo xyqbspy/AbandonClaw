@@ -1,7 +1,5 @@
-# review-source-contract Specification
-
 ## Purpose
-TBD - created by archiving change clarify-review-source-contract. Update Purpose after archive.
+定义 `review` 普通表达复习的数据来源契约与原场景入口边界，确保待复习队列基于已保存且到期的表达生成，并在来源场景失效时保持可降级承接。该 capability 在学习闭环中承接 `review` 的来源解释与原场景回看边界，而不重复定义复习训练层级或调度规则。
 ## Requirements
 ### Requirement: Review 普通表达复习必须基于已保存且到期的表达契约
 系统 MUST 将 `review` 中的普通表达复习解释为“当前用户已保存且到期的表达”，而不是默认解释为“仅来自已完成场景”的表达集合。
@@ -31,4 +29,3 @@ TBD - created by archiving change clarify-review-source-contract. Update Purpose
 - **WHEN** 维护者需要排查 `review` 的来源规则或“查看原场景”行为
 - **THEN** 仓库中必须有可直接查阅的专项维护文档
 - **AND** 文档必须明确区分普通表达复习、场景回补和原场景跳转的不同数据来源
-
