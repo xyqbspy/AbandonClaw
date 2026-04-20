@@ -10,6 +10,7 @@ No explanations.`;
 
 export function buildSceneGenerateUserPrompt(input: {
   promptText: string;
+  mode: "context" | "anchor_sentence";
   tone?: string;
   difficulty?: string;
   sentenceCount: number;
@@ -27,33 +28,54 @@ export function buildSceneGenerateUserPrompt(input: {
           .map((item) => `${item.text} (${item.differenceLabel})`)
           .join("; ")
       : "none";
+  const modeInstruction =
+    input.mode === "anchor_sentence"
+      ? `Generation mode:
+anchor_sentence
 
-  return `Create one English learning scene.
+Anchor sentence:
+${input.promptText}
+
+Anchor sentence rules:
+1) Build the scene around this exact English sentence.
+2) The exact anchor sentence must appear in the final dialogue text at least once.
+3) The anchor sentence must be a key speaking turn, not a throwaway line.
+4) Add realistic context so the anchor sentence feels natural to practice.
+5) Do not paraphrase away the anchor sentence.`
+      : `Generation mode:
+context
 
 User intent (CN or EN):
 ${input.promptText}
 
+Context mode rules:
+1) Treat the input as a situation or practice intent.
+2) Generate one coherent scenario with clear context and goal.`;
+
+  return `Create one English learning scene.
+
+${modeInstruction}
+
 Constraints:
-1) Generate one coherent scenario with clear context and goal.
-2) Use 6-14 short conversational sentences in total. Target sentence count: ${input.sentenceCount}.
-3) Keep language natural spoken English, not academic.
-4) Difficulty should be ${input.difficulty ?? "medium"}.
-5) Tone should be ${input.tone ?? "natural"}.
-6) Keep total length compact and suitable for memorization.
-7) Keep sentences practical for repetition and role-play.
-8) Avoid irrelevant topic drifting.
-9) If reuseKnownChunks is true, naturally reuse some suitable known chunks, but never force.
-10) If a known chunk does not fit the context, skip it.
-11) Prioritize known chunks first for familiarity.
-12) You may optionally introduce 1-2 related chunk variants from the same expression cluster to support familiar-expression transfer.
-13) Do not replace all known chunks with new variants.
-14) Keep dialogue natural and realistic; variant use should feel organic.
-15) Turn design intent:
+1) Use 6-14 short conversational sentences in total. Target sentence count: ${input.sentenceCount}.
+2) Keep language natural spoken English, not academic.
+3) Difficulty should be ${input.difficulty ?? "medium"}.
+4) Tone should be ${input.tone ?? "natural"}.
+5) Keep total length compact and suitable for memorization.
+6) Keep sentences practical for repetition and role-play.
+7) Avoid irrelevant topic drifting.
+8) If reuseKnownChunks is true, naturally reuse some suitable known chunks, but never force.
+9) If a known chunk does not fit the context, skip it.
+10) Prioritize known chunks first for familiarity.
+11) You may optionally introduce 1-2 related chunk variants from the same expression cluster to support familiar-expression transfer.
+12) Do not replace all known chunks with new variants.
+13) Keep dialogue natural and realistic; variant use should feel organic.
+14) Turn design intent:
    - each turn is one speaking block.
    - speaker change implies a new turn.
    - same speaker may have 1-3 short sentences inside one turn when they belong to one speaking intent.
    - do not split one natural speaking turn into many tiny one-sentence turns without reason.
-16) title must be bilingual in this format: English title（中文标题）.
+15) title must be bilingual in this format: English title（中文标题）.
 
 reuseKnownChunks: ${input.reuseKnownChunks ? "true" : "false"}
 Known user chunks:

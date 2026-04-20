@@ -175,6 +175,7 @@ export async function generateSceneVariantsFromApi(params: {
 
 export async function generatePersonalizedSceneFromApi(payload: {
   promptText: string;
+  mode?: "context" | "anchor_sentence";
   tone?: "natural" | "polite" | "casual" | "simple";
   difficulty?: "easy" | "medium";
   sentenceCount?: number;

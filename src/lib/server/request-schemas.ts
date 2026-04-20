@@ -77,6 +77,7 @@ interface ExplainSelectionPayload extends Record<string, unknown> {
 
 interface GenerateScenePayload extends Record<string, unknown> {
   promptText?: unknown;
+  mode?: unknown;
   tone?: unknown;
   difficulty?: unknown;
   sentenceCount?: unknown;
@@ -328,6 +329,7 @@ export const normalizeGenerateScenePayload = (
   payload: GenerateScenePayload,
 ): GeneratePersonalizedSceneInput => ({
   promptText: parseRequiredTrimmedString(payload.promptText, "promptText", 800),
+  mode: payload.mode === "anchor_sentence" ? "anchor_sentence" : "context",
   tone: typeof payload.tone === "string" ? payload.tone : undefined,
   difficulty:
     payload.difficulty === "easy" || payload.difficulty === "medium"

@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { generatePersonalizedSceneFromApi } from "@/lib/utils/scenes-api";
 
+type GenerateMode = "context" | "anchor_sentence";
 type Tone = "natural" | "polite" | "casual" | "simple";
 type Difficulty = "easy" | "medium";
 type SentenceCount = 6 | 10 | 14;
@@ -35,6 +36,11 @@ interface GenerateSceneSheetProps {
   }) => Promise<void> | void;
 }
 
+const generateModeOptions: Array<{ value: GenerateMode; label: string }> = [
+  { value: "anchor_sentence", label: "按句子生成" },
+  { value: "context", label: "按情境生成" },
+];
+
 const toneOptions: Array<{ value: Tone; label: string }> = [
   { value: "natural", label: "自然" },
   { value: "polite", label: "礼貌" },
@@ -54,6 +60,7 @@ const sentenceCountOptions: Array<{ value: SentenceCount; label: string }> = [
 ];
 
 const defaultForm = {
+  mode: "anchor_sentence" as GenerateMode,
   promptText: "",
   tone: "natural" as Tone,
   difficulty: "easy" as Difficulty,
@@ -70,6 +77,7 @@ export function GenerateSceneSheet({
   onGeneratingStatusChange,
   onGenerated,
 }: GenerateSceneSheetProps) {
+  const [mode, setMode] = useState<GenerateMode>(defaultForm.mode);
   const [promptText, setPromptText] = useState(defaultForm.promptText);
   const [tone, setTone] = useState<Tone>(defaultForm.tone);
   const [difficulty, setDifficulty] = useState<Difficulty>(defaultForm.difficulty);
@@ -81,6 +89,7 @@ export function GenerateSceneSheet({
 
   useEffect(() => {
     if (!open) return;
+    setMode(defaultForm.mode);
     setPromptText(defaultForm.promptText);
     setTone(defaultForm.tone);
     setDifficulty(defaultForm.difficulty);
@@ -97,11 +106,19 @@ export function GenerateSceneSheet({
   const handleSubmit = async () => {
     const nextPrompt = promptText.trim();
     if (!nextPrompt) {
-      setError("请先输入你想练的场景方向。");
+      setError(
+        mode === "anchor_sentence"
+          ? "请先输入你想围绕它生成场景的英文句子。"
+          : "请先输入你想练的场景方向。",
+      );
       return;
     }
     if (nextPrompt.length < 3) {
-      setError("再多写一点，至少 3 个字。");
+      setError(
+        mode === "anchor_sentence"
+          ? "再多写一点，至少 3 个字符，尽量直接写那句英文。"
+          : "再多写一点，至少 3 个字。",
+      );
       return;
     }
 
@@ -112,6 +129,7 @@ export function GenerateSceneSheet({
     try {
       const result = await generatePersonalizedSceneFromApi({
         promptText: nextPrompt,
+        mode,
         tone,
         difficulty,
         sentenceCount,
@@ -151,14 +169,30 @@ export function GenerateSceneSheet({
           <div className="px-5 pb-4">
             <h2 className="mb-1 text-[20px] font-bold text-[#1d1d1f]">生成我的场景</h2>
             <p className="text-[14px] text-[#86868B]">
-              可以用中文或英文描述你最近想练的情境。
+              {mode === "anchor_sentence"
+                ? "先给一句你想练住的英文，再让 AI 围绕它生成一个短场景。"
+                : "可以用中文或英文描述你最近想练的情境。"}
             </p>
           </div>
 
           <div className="flex-1 space-y-5 overflow-y-auto px-4 pb-5">
             <div className={panelClassName}>
+              <p className={labelClassName}>生成方式</p>
+              <SegmentedControl
+                ariaLabel="生成方式"
+                value={mode}
+                onChange={(nextMode) => {
+                  setMode(nextMode);
+                  setError(null);
+                }}
+                options={generateModeOptions}
+                disabled={submitting}
+              />
+            </div>
+
+            <div className={panelClassName}>
               <label htmlFor="scene-generate-prompt" className={labelClassName}>
-                场景方向
+                {mode === "anchor_sentence" ? "锚点句子" : "场景方向"}
               </label>
               <Textarea
                 id="scene-generate-prompt"
@@ -168,14 +202,22 @@ export function GenerateSceneSheet({
                   setPromptText(event.target.value);
                   if (error) setError(null);
                 }}
-                placeholder={`明天要和同事开会，但我还没准备好...
+                placeholder={
+                  mode === "anchor_sentence"
+                    ? `I don't care
+That’s not my problem
+I’m trying to move on`
+                    : `明天要和同事开会，但我还没准备好...
 I want a short scene about canceling plans politely
-我想练下班后很累但还得继续工作的表达`}
-                className="min-h-32 border-0 bg-transparent px-0 py-0 text-[15px] leading-[1.5] text-[#1d1d1f] shadow-none focus-visible:ring-0"
+我想练下班后很累但还得继续工作的表达`
+                }
+                className="min-h-32 rounded-[20px] border border-[var(--border)] bg-transparent px-2 py-2 text-[15px] leading-[1.5] text-[#1d1d1f] shadow-none focus-visible:ring-0"
                 disabled={submitting}
               />
               <p className="mt-2.5 text-[12px] leading-[1.4] text-[#86868B]">
-                示例：我想练礼貌拒绝加班 / I want to practice ordering coffee simply.
+                {mode === "anchor_sentence"
+                  ? "示例：输入一句你想记住或练习的英文，系统会围绕它生成可练习的小场景。"
+                  : "示例：我想练礼貌拒绝加班 / I want to practice ordering coffee simply."}
               </p>
             </div>
 

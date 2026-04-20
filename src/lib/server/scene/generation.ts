@@ -22,6 +22,12 @@ import { normalizeParsedSceneDialogue } from "@/lib/shared/scene-dialogue";
 const SCENE_GENERATE_PROMPT_VERSION = "scene-generate-v2-turn-first";
 const DEFAULT_SENTENCE_COUNT = 10;
 const MAX_RELATED_VARIANTS = 2;
+const SCENE_GENERATE_MODE_CONTEXT = "context";
+const SCENE_GENERATE_MODE_ANCHOR_SENTENCE = "anchor_sentence";
+
+export type SceneGenerateMode =
+  | typeof SCENE_GENERATE_MODE_CONTEXT
+  | typeof SCENE_GENERATE_MODE_ANCHOR_SENTENCE;
 
 interface RelatedChunkVariant {
   text: string;
@@ -51,6 +57,7 @@ interface GeneratedSceneDraft {
 
 export interface GeneratePersonalizedSceneInput {
   promptText: string;
+  mode?: SceneGenerateMode;
   tone?: string;
   difficulty?: "easy" | "medium";
   sentenceCount?: number;
@@ -101,6 +108,13 @@ const normalizeDifficulty = (value: unknown) => {
   return "medium";
 };
 
+const normalizeGenerateMode = (value: unknown): SceneGenerateMode => {
+  if (value === SCENE_GENERATE_MODE_ANCHOR_SENTENCE) {
+    return SCENE_GENERATE_MODE_ANCHOR_SENTENCE;
+  }
+  return SCENE_GENERATE_MODE_CONTEXT;
+};
+
 const toShortDifferenceLabel = (value: unknown) => {
   if (typeof value !== "string") return "similar nuance";
   const trimmed = value.trim();
@@ -119,6 +133,11 @@ const sceneTextContainsExpression = (sceneText: string, expressionText: string) 
   if (!normalizedScene || !normalizedExpression) return false;
   return normalizedScene.includes(normalizedExpression);
 };
+
+export const generatedSceneContainsAnchorSentence = (
+  sceneText: string,
+  anchorSentence: string,
+) => sceneTextContainsExpression(sceneText, anchorSentence);
 
 const isDraftSentence = (value: unknown): value is GeneratedSceneDraftSentence => {
   if (!value || typeof value !== "object") return false;
@@ -379,6 +398,7 @@ export async function generatePersonalizedSceneForUser(
   }
 
   const sentenceCount = normalizeSentenceCount(rawInput.sentenceCount);
+  const mode = normalizeGenerateMode(rawInput.mode);
   const tone = normalizeTone(rawInput.tone);
   const difficulty = normalizeDifficulty(rawInput.difficulty);
   const reuseKnownChunks = rawInput.reuseKnownChunks !== false;
@@ -387,6 +407,7 @@ export async function generatePersonalizedSceneForUser(
     runId,
     userId,
     model,
+    mode,
     tone: tone ?? null,
     difficulty,
     sentenceCount,
@@ -413,6 +434,7 @@ export async function generatePersonalizedSceneForUser(
     model,
     promptVersion: SCENE_GENERATE_PROMPT_VERSION,
     promptTextHash: hashPayload(promptText),
+    mode,
     tone: tone ?? null,
     difficulty,
     sentenceCount,
@@ -452,6 +474,7 @@ export async function generatePersonalizedSceneForUser(
       systemPrompt: SCENE_GENERATE_SYSTEM_PROMPT,
       userPrompt: buildSceneGenerateUserPrompt({
         promptText,
+        mode,
         tone,
         difficulty,
         sentenceCount,
@@ -497,6 +520,7 @@ export async function generatePersonalizedSceneForUser(
       sourceRef: `user:${userId}`,
       inputHash: hashPayload({
         promptText,
+        mode,
         tone: tone ?? null,
         difficulty,
         sentenceCount,
@@ -506,6 +530,7 @@ export async function generatePersonalizedSceneForUser(
       }),
       inputJson: {
         promptText,
+        mode,
         tone: tone ?? null,
         difficulty,
         sentenceCount,
@@ -571,6 +596,12 @@ export async function generatePersonalizedSceneForUser(
     .flatMap((block) => block.sentences)
     .map((sentence) => sentence.text)
     .join(" ");
+  if (
+    mode === SCENE_GENERATE_MODE_ANCHOR_SENTENCE &&
+    !generatedSceneContainsAnchorSentence(sceneTextForMatch, promptText)
+  ) {
+    throw new Error("Generated scene does not contain the required anchor sentence.");
+  }
   const relatedChunkVariantsMatched = relatedChunkVariants.filter((item) =>
     sceneTextContainsExpression(sceneTextForMatch, item.text),
   );
@@ -588,6 +619,7 @@ export async function generatePersonalizedSceneForUser(
       relatedChunkVariantsUsed: relatedChunkVariants,
       relatedChunkVariantsMatched,
       reuseKnownChunks,
+      mode,
     },
   };
 }

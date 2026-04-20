@@ -21,6 +21,7 @@
 - [review-practice-signals.md](/d:/WorkCode/AbandonClaw/docs/system-design/review-practice-signals.md)
 - [review-progressive-practice.md](/d:/WorkCode/AbandonClaw/docs/system-design/review-progressive-practice.md)
 - [review-source-mapping.md](/d:/WorkCode/AbandonClaw/docs/system-design/review-source-mapping.md)
+- [scene-generation-pipeline.md](/d:/WorkCode/AbandonClaw/docs/system-design/scene-generation-pipeline.md)
 - [scene-practice-generation.md](/d:/WorkCode/AbandonClaw/docs/system-design/scene-practice-generation.md)
 
 ## 推荐使用方式

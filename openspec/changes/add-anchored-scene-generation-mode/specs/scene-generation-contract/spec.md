@@ -1,0 +1,43 @@
+# 规范文档：scene-generation-contract
+
+## ADDED Requirements
+
+### Requirement: 场景生成入口必须区分情境模式与句子锚点模式
+系统 MUST 在同一个“生成场景”入口内提供可稳定消费的生成模式，至少包括：
+
+- `context`：用户描述想练的情境
+- `anchor_sentence`：用户提供一句希望围绕其生成场景的英文句子
+
+#### Scenario: 用户按情境生成
+WHEN 用户选择 `context` 模式并提交生成请求  
+THEN 系统必须将输入解释为情境描述  
+AND 不得把该输入自动提升为必须原样保留的核心句约束
+
+#### Scenario: 用户按句子生成场景
+WHEN 用户选择 `anchor_sentence` 模式并提交生成请求  
+THEN 系统必须将输入解释为本次场景生成的核心句  
+AND 不得继续仅按泛化情境 prompt 处理该输入
+
+### Requirement: 句子锚点模式必须保留锚点句语义
+系统 MUST 在 `anchor_sentence` 模式下围绕用户提供的锚点句构建一个短场景，并保证该句成为场景中的核心表达。
+
+#### Scenario: 句子锚点生成成功
+WHEN 用户以 `anchor_sentence` 模式提交一句英文句子  
+THEN 生成结果必须在最终场景对话文本中包含该锚点句  
+AND 该句必须服务于场景的主要交流意图，而不是只作为边缘装饰出现一次
+
+### Requirement: 句子锚点模式不得破坏现有短场景生成边界
+系统 MUST 在 `anchor_sentence` 模式下继续满足现有短场景生成的基本边界，包括句数、口语自然度、可练习性与可导入性。
+
+#### Scenario: 句子锚点模式生成结果被消费
+WHEN `anchor_sentence` 模式生成完成并进入后续 parse/import 链路  
+THEN 结果必须仍然满足当前短场景生成的结构化要求  
+AND 不得因为增加锚点约束而绕过既有场景导入和解析主链路
+
+### Requirement: 旧生成调用必须向后兼容
+系统 MUST 对未声明模式的旧场景生成调用保持兼容。
+
+#### Scenario: 旧调用未传 mode
+WHEN 调用方继续只提交原有生成参数且未提供 `mode`  
+THEN 系统必须按 `context` 模式处理  
+AND 不得导致现有情境生成能力回归或报错
