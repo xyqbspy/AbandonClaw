@@ -1,7 +1,6 @@
 "use client";
 
 import { ReactNode } from "react";
-import { RotateCcw } from "lucide-react";
 import { TtsActionButton } from "@/components/audio/tts-action-button";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -12,6 +11,7 @@ import {
   APPLE_BADGE_SUCCESS,
   APPLE_BODY_TEXT,
   APPLE_BUTTON_BASE,
+  APPLE_BUTTON_STRONG,
   APPLE_META_TEXT,
   APPLE_PANEL_RAISED,
 } from "@/lib/ui/apple-style";
@@ -48,12 +48,13 @@ export const selectionFooterButtonClassName = cn(
 
 export const selectionFooterSecondaryButtonClassName = cn(
   selectionFooterButtonClassName,
-  "border border-[var(--app-border-soft)] bg-[var(--app-surface-subtle)] text-[var(--app-foreground)] shadow-none hover:bg-[var(--app-surface-hover)]",
+  "border border-[var(--app-border-soft)] bg-white text-[var(--app-foreground)] shadow-none hover:bg-[var(--app-surface-hover)]",
 );
 
 export const selectionFooterPrimaryButtonClassName = cn(
+  APPLE_BUTTON_STRONG,
   selectionFooterButtonClassName,
-  "border-0 bg-[var(--app-chunks-sheet-primary-bg)] text-[var(--app-chunks-sheet-primary-text)] shadow-[var(--app-chunks-sheet-primary-shadow)] hover:bg-[var(--app-chunks-sheet-primary-hover)] disabled:bg-[#D0D7E2] disabled:text-white/80",
+  "border-transparent disabled:bg-[#D0D7E2] disabled:text-white/80",
 );
 
 const detailBodyClassName = cn(
@@ -265,7 +266,7 @@ export function SelectionDetailActions({
         onClick={onReview}
         disabled={disabled}
       >
-        <RotateCcw className="size-4" />
+        <span aria-hidden="true">📝</span>
         加入复习
       </Button>
     </div>

@@ -18,6 +18,7 @@ import {
 import { FocusDetailSheet } from "@/features/chunks/components/focus-detail-sheet";
 import { MoveIntoClusterSheet } from "@/features/chunks/components/move-into-cluster-sheet";
 import { ExpressionMapSheet } from "@/features/chunks/components/expression-map-sheet";
+import { cn } from "@/lib/utils";
 import { ChunksQuickAddRelatedSheet } from "./chunks-quick-add-related-sheet";
 
 type ManualAssistCandidate = {
@@ -140,6 +141,11 @@ export function ChunksPageSheets({
   expressionMap,
   apple,
 }: ChunksPageSheetsProps) {
+  const overlaySecondaryButtonClassName = cn(
+    "app-button app-button-secondary",
+    "h-[var(--mobile-adapt-overlay-footer-button-height)] rounded-[var(--mobile-adapt-overlay-footer-button-radius)] border px-[var(--mobile-space-sheet)] text-[length:var(--mobile-font-sheet-body)] font-semibold shadow-none [@media(max-height:760px)]:h-[var(--mobile-control-height)] [@media(max-height:760px)]:text-[length:var(--mobile-font-body-sm)]",
+  );
+
   return (
     <>
       <Sheet
@@ -316,7 +322,7 @@ export function ChunksPageSheets({
               <LoadingButton
                 type="button"
                 variant="ghost"
-                className={apple.buttonStrong}
+                className={overlaySecondaryButtonClassName}
                 disabled={manual.state.isSaving}
                 loading={manual.state.isPrimarySaving}
                 loadingText={formatLoadingText(manual.state.primaryActionLabel)}
@@ -328,7 +334,7 @@ export function ChunksPageSheets({
                 <LoadingButton
                   type="button"
                   variant="ghost"
-                  className={apple.button}
+                  className={overlaySecondaryButtonClassName}
                   disabled={manual.state.isSaving}
                   loading={manual.state.isSecondarySaving}
                   loadingText={formatLoadingText(manual.state.secondaryActionLabel)}

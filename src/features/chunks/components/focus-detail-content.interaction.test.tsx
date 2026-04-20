@@ -416,3 +416,102 @@ test("FocusDetailContent 补全中会显示详情占位态", () => {
   assert.ok(screen.getByLabelText("例句补全中"));
   assert.equal(screen.queryByText("example cards"), null);
 });
+
+test("FocusDetailContent 的添加到表达库按钮默认使用白底", () => {
+  const similarRow: FocusDetailRelatedItem = {
+    key: "candidate-similar-1",
+    text: "wear yourself out",
+    translation: "把自己拖垮",
+    differenceLabel: null,
+    kind: "suggested-similar",
+    savedItem: null,
+  };
+  const contrastRow: FocusDetailRelatedItem = {
+    key: "candidate-contrast-1",
+    text: "save your energy",
+    translation: "留点力气",
+    differenceLabel: null,
+    kind: "contrast",
+    savedItem: null,
+  };
+
+  const { rerender } = render(
+    <FocusDetailContent
+      detail={{
+        text: "burn yourself out",
+        kind: "current",
+        savedItem: createRow({
+          userPhraseId: "saved-1",
+          text: "burn yourself out",
+          translation: "把自己耗尽",
+        }),
+      }}
+      activeAssistItem={null}
+      focusDetailTab="similar"
+      focusDetailLoading={false}
+      isDetailSpeaking={false}
+      detailSpeakText="burn yourself out"
+      similarRows={[similarRow]}
+      contrastRows={[contrastRow]}
+      isSavedRelatedLoading={false}
+      usageHint="提醒别透支自己"
+      typicalScenario="长期加班时"
+      semanticFocus="过度消耗"
+      reviewHint="准备复习"
+      exampleCards={<div>example cards</div>}
+      labels={{
+        ...labels,
+        addThisExpression: "加入表达库",
+      }}
+      onSpeak={() => undefined}
+      onTabChange={() => undefined}
+      onOpenSimilarRow={() => undefined}
+      onOpenContrastRow={() => undefined}
+      onSaveSimilarRow={() => undefined}
+      onSaveContrastRow={() => undefined}
+    />,
+  );
+
+  const similarButton = screen.getByLabelText("加入表达库");
+  assert.ok(similarButton.className.includes("bg-white"));
+
+  rerender(
+    <FocusDetailContent
+      detail={{
+        text: "burn yourself out",
+        kind: "current",
+        savedItem: createRow({
+          userPhraseId: "saved-1",
+          text: "burn yourself out",
+          translation: "把自己耗尽",
+        }),
+      }}
+      activeAssistItem={null}
+      focusDetailTab="contrast"
+      focusDetailLoading={false}
+      isDetailSpeaking={false}
+      detailSpeakText="burn yourself out"
+      similarRows={[similarRow]}
+      contrastRows={[contrastRow]}
+      isSavedRelatedLoading={false}
+      usageHint="提醒别透支自己"
+      typicalScenario="长期加班时"
+      semanticFocus="过度消耗"
+      reviewHint="准备复习"
+      exampleCards={<div>example cards</div>}
+      labels={{
+        ...labels,
+        addThisExpression: "加入表达库",
+      }}
+      onSpeak={() => undefined}
+      onTabChange={() => undefined}
+      onOpenSimilarRow={() => undefined}
+      onOpenContrastRow={() => undefined}
+      onSaveSimilarRow={() => undefined}
+      onSaveContrastRow={() => undefined}
+    />,
+  );
+
+  const contrastButton = screen.getByRole("button", { name: "加入表达库" });
+  assert.ok(contrastButton.className.includes("bg-white"));
+});

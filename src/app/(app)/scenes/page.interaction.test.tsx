@@ -221,6 +221,17 @@ test("ScenesPage 点击场景卡片时会显示进入中的覆盖态并预热目
   });
 });
 
+test("ScenesPage 的生成与导入入口保持主次按钮层级一致", async () => {
+  const ScenesPage = getScenesPage();
+  render(<ScenesPage />);
+
+  const generateButton = await screen.findByRole("button", { name: "生成场景" });
+  const importButton = screen.getByRole("button", { name: "导入自定义" });
+
+  assert.ok(generateButton.className.includes("app-button-primary"));
+  assert.ok(importButton.className.includes("app-button-secondary"));
+});
+
 test("ScenesPage 点击场景卡片时会给详情预热一个短暂完成窗口再跳转", async () => {
   const ScenesPage = getScenesPage();
   let resolveWarmup: ((value: boolean) => void) | null = null;

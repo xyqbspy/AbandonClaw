@@ -2,6 +2,7 @@
 
 import { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
+import { APPLE_BUTTON_STRONG } from "@/lib/ui/apple-style";
 import { DetailActionBar } from "./detail-action-bar";
 import { FocusDetailActions } from "./focus-detail-actions";
 
@@ -168,7 +169,7 @@ export function FocusDetailSheetFooter({
             <Button
               type="button"
               variant="ghost"
-              className={`${appleButtonClassName} h-[var(--mobile-adapt-overlay-footer-button-height)] min-w-0 flex-1 rounded-[var(--mobile-adapt-overlay-footer-button-radius)] bg-[var(--app-chunks-sheet-primary-bg)] px-[clamp(16px,4vw,28px)] text-[length:var(--mobile-font-sheet-body)] font-semibold text-[var(--app-chunks-sheet-primary-text)] shadow-[var(--app-chunks-sheet-primary-shadow)] hover:bg-[var(--app-chunks-sheet-primary-hover)] [@media(max-height:760px)]:h-[var(--mobile-control-height)] [@media(max-height:760px)]:px-[var(--mobile-space-xl)] [@media(max-height:760px)]:text-[length:var(--mobile-font-body-sm)]`}
+              className={`${APPLE_BUTTON_STRONG} h-[var(--mobile-adapt-overlay-footer-button-height)] min-w-0 flex-1 rounded-[var(--mobile-adapt-overlay-footer-button-radius)] px-[clamp(16px,4vw,28px)] text-[length:var(--mobile-font-sheet-body)] font-semibold [@media(max-height:760px)]:h-[var(--mobile-control-height)] [@media(max-height:760px)]:px-[var(--mobile-space-xl)] [@media(max-height:760px)]:text-[length:var(--mobile-font-body-sm)]`}
               aria-label={typeof primaryActionLabel === "string" ? primaryActionLabel : undefined}
               onClick={onPrimaryAction}
             >

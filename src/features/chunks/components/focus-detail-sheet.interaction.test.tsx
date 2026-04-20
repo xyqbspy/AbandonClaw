@@ -365,7 +365,7 @@ test("FocusDetailSheet 会显示完成按钮并触发清理操作", () => {
   assert.equal(completeCount, 1);
 });
 
-test("FocusDetailSheet 会在确认弹层打开时处理遮罩、取消和提交态", () => {
+test("FocusDetailSheet 会在确认弹层打开时保持取消与提交禁用态", () => {
   let closeCount = 0;
   let confirmCount = 0;
 
@@ -428,13 +428,68 @@ test("FocusDetailSheet 会在确认弹层打开时处理遮罩、取消和提交
   assert.ok(view.getAllByText("burn yourself out").length >= 1);
   assert.ok(view.getAllByText("把自己耗尽").length >= 1);
 
-  fireEvent.click(view.getByRole("button", { name: "关闭确认弹窗" }));
   fireEvent.click(view.getByRole("button", { name: "取消" }));
 
   const confirmButton = view.getByRole("button", { name: "继续..." });
   assert.equal(confirmButton.hasAttribute("disabled"), true);
   fireEvent.click(confirmButton);
 
-  assert.equal(closeCount, 2);
+  assert.equal(closeCount, 0);
   assert.equal(confirmCount, 0);
+});
+
+test("FocusDetailSheet 的开始复习按钮使用统一主按钮层级", () => {
+  const view = render(
+    <FocusDetailSheet
+      open
+      detail={{ text: "burn yourself out", kind: "current", savedItem: createSavedItem() }}
+      detailTab="info"
+      detailLoading={false}
+      detailActionsOpen={false}
+      detailConfirmAction={null}
+      trailLength={1}
+      canShowSiblingNav={false}
+      canShowFindRelations={false}
+      focusAssistLoading={false}
+      movingIntoCluster={false}
+      ensuringMoveTargetCluster={false}
+      detachingClusterMember={false}
+      canSetCurrentClusterMain={false}
+      canMoveIntoCurrentCluster={false}
+      canSetStandaloneMain={false}
+      primaryActionLabel="开始复习"
+      appleButtonClassName="btn"
+      activeAssistItem={null}
+      isDetailSpeaking={false}
+      detailSpeakText="burn yourself out"
+      similarRows={[]}
+      contrastRows={[]}
+      isSavedRelatedLoading={false}
+      usageHint="提醒别透支自己"
+      typicalScenario="长期加班时"
+      semanticFocus="过度消耗"
+      reviewHint="准备复习"
+      exampleCards={<div>example cards</div>}
+      labels={labels}
+      onOpenChange={() => undefined}
+      onReopenPrevTrail={() => undefined}
+      onFindRelations={() => undefined}
+      onOpenPrevSibling={() => undefined}
+      onOpenNextSibling={() => undefined}
+      onSetDetailActionsOpen={() => undefined}
+      onRequestSetCurrentClusterMain={() => undefined}
+      onRequestMoveIntoCluster={() => undefined}
+      onRequestSetStandaloneMain={() => undefined}
+      onPrimaryAction={() => undefined}
+      onSpeak={() => undefined}
+      onTabChange={() => undefined}
+      onOpenSimilarRow={() => undefined}
+      onOpenContrastRow={() => undefined}
+      onCloseConfirm={() => undefined}
+      onConfirm={() => undefined}
+    />,
+  );
+
+  const primaryButton = view.getByRole("button", { name: "开始复习" });
+  assert.ok(primaryButton.className.includes("app-button-primary"));
 });

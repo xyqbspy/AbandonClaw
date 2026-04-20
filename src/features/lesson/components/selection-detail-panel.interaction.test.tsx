@@ -194,3 +194,33 @@ test("SelectionDetailPanel 会处理加载态与空态", () => {
   assert.equal(view.getAllByText(/点击下方短语查看解析与例句/).length >= 1, true);
   assert.equal(view.queryAllByRole("button", { name: "朗读" }).length, 0);
 });
+test("SelectionDetailPanel 的保存与加入复习按钮使用最新样式", () => {
+  const view = render(
+    <SelectionDetailPanel
+      currentSentence={createSentence()}
+      chunkDetail={createChunkDetail()}
+      relatedChunks={[]}
+      loading={false}
+      speakingText={null}
+      onSave={() => undefined}
+      onReview={() => undefined}
+      onPronounce={() => undefined}
+      onPronounceBlock={() => undefined}
+      onSelectRelated={() => undefined}
+      hoveredChunkKey={null}
+      onHoverChunk={() => undefined}
+      playingChunkKey={null}
+      saved
+    />,
+  );
+
+  const actionBar = view.container.querySelector("div.grid.grid-cols-2");
+  assert.ok(actionBar);
+  const [saveButton, reviewButton] = Array.from(actionBar.querySelectorAll("button"));
+
+  assert.ok(saveButton);
+  assert.ok(reviewButton);
+  assert.ok(saveButton.className.includes("app-button-secondary"));
+  assert.ok(reviewButton.className.includes("app-button-primary"));
+  assert.ok(reviewButton.textContent?.includes("📝"));
+});

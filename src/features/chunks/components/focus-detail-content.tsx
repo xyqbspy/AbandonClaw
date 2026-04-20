@@ -163,7 +163,7 @@ export function FocusDetailContent({
                 type="button"
                 size="sm"
                 variant="ghost"
-                className="h-[var(--mobile-control-height)] rounded-full border border-[var(--app-chunks-sheet-secondary-border)] bg-[var(--app-chunks-sheet-info-soft)] px-[var(--mobile-space-md)] text-[length:var(--mobile-font-caption)] text-[var(--app-chunks-sheet-secondary-text)] shadow-none hover:bg-[var(--app-chunks-sheet-secondary-hover)]"
+                className="h-[var(--mobile-control-height)] rounded-full border border-[var(--app-chunks-sheet-secondary-border)] bg-white px-[var(--mobile-space-md)] text-[length:var(--mobile-font-caption)] text-[var(--app-chunks-sheet-secondary-text)] shadow-none hover:bg-[var(--app-chunks-sheet-secondary-hover)]"
                 disabled={isSaving}
                 onClick={() => onSaveContrastRow(row)}
               >
@@ -207,7 +207,7 @@ export function FocusDetailContent({
               size="sm"
               variant="ghost"
               aria-label={actionLabel}
-              className="size-[var(--mobile-icon-button)] shrink-0 rounded-full bg-[var(--app-chunks-sheet-success-soft)] px-0 text-[length:var(--mobile-font-body)] text-[var(--app-chunks-sheet-success-text)] shadow-none hover:bg-[var(--app-chunks-sheet-success-hover)]"
+              className="size-[var(--mobile-icon-button)] shrink-0 rounded-full border border-[var(--app-chunks-sheet-secondary-border)] bg-white px-0 text-[length:var(--mobile-font-body)] text-[var(--app-chunks-sheet-secondary-text)] shadow-none hover:bg-[var(--app-chunks-sheet-secondary-hover)]"
               disabled={isSaving}
               onClick={() => {
                 if (isSaving) return;
