@@ -96,7 +96,7 @@ Proposal -> Approval -> Implementation -> Archive -> Update specs -> Update CHAN
 - 更新任务勾选状态
 - 必要时补充测试说明与风险
 - 同步记录开发过程与验证结论到 `docs/dev/dev-log.md`
-- 若存在用户可感知变化，可先准备 CHANGELOG 草案，但正式 `CHANGELOG.md` 仍留待合并 `main` 后更新
+- 若存在用户可感知变化，可先明确需要写入 CHANGELOG 的稳定条目；只有在变更已进入或本次完成态收尾后将直接进入 `main` 时，才更新正式 `CHANGELOG.md`
 - 对 proposal / tasks 中已标记为“本轮收口项”的不稳定点一并完成最小必要收口
 
 不允许：
@@ -143,8 +143,9 @@ Proposal -> Approval -> Implementation -> Archive -> Update specs -> Update CHAN
 
 ### Update CHANGELOG
 进入条件：
-- 代码已合并 main
+- 代码已合并 `main`，或本次完成态收尾后将直接进入 `main`
 - 用户明确要求更新 CHANGELOG，或已进入该阶段
+- 本轮存在用户可感知变化
 
 允许：
 - 更新正式 CHANGELOG
@@ -258,7 +259,7 @@ CHANGELOG 与开发过程记录的分工以 `AGENTS.md` 和 `openspec/specs/proj
 
 - 正式 `CHANGELOG.md` 只记录用户可感知变化
 - 开发中的验证结论、范围说明、风险记录优先写入 `docs/dev/dev-log.md`
-- 未合并 `main` 前，不把过程性说明写进正式 `CHANGELOG.md`
+- 未进入 `main` 前，不把过程性说明写进正式 `CHANGELOG.md`
 
 正式 CHANGELOG 常见分类：
 
@@ -419,7 +420,7 @@ draft
 - [ ] 更新相关说明文档
 - [ ] 更新 `docs/dev/dev-log.md` 或补充验证记录
 - [ ] 在记录中写清本轮收口项 / 明确不收项
-- [ ] 如已合并 main 且存在用户可感知变化，再更新正式 `CHANGELOG.md`
+- [ ] 如本次完成态收尾结果已进入或将直接进入 `main`，且存在用户可感知变化，再更新正式 `CHANGELOG.md`
 
 ### spec delta
 

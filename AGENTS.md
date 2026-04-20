@@ -229,6 +229,9 @@ Proposal → Approval → Implementation → Archive → Update specs → Update
 - 行为变更必须写 spec delta
 - 非微小改动若涉及数据流、缓存、测试链路、维护规范或跨页面一致性，也应先走 OpenSpec
 - 实现完成后必须对照 proposal / design / spec delta 回查对应 feature-flow / domain-rules / system-design 文档是否已同步
+- 若本次提交被视为“完成态提交”或用户明确要求“收尾提交”，则必须先完成收尾动作，再提交代码；不得先提交实现代码、再手动补 archive / stable spec / 文档收尾
+- 收尾动作至少包括：tasks 状态更新、相关文档同步、stable spec 同步、change archive；若本次收尾结果将直接进入 `main` 且存在用户可感知变化，则必须同步更新正式 `CHANGELOG.md`
+- 开发中的中间提交允许存在，但不得宣称该变更已完成，也不得跳过后续收尾流程
 - archive 前不得只归档 OpenSpec 而遗漏实际维护文档；若无文档更新，必须说明原因
 
 详见：
@@ -242,7 +245,8 @@ Proposal → Approval → Implementation → Archive → Update specs → Update
 正式 CHANGELOG：
 
 - 只记录用户可感知变化
-- 只在合并 main 后更新
+- 若本次收尾结果将直接进入 `main`，则用户可感知的新功能、交互变化或行为变化必须同步更新
+- 若代码尚未进入 `main`，不得把过程性记录或未发布改动提前写入正式 `CHANGELOG.md`
 
 开发过程：
 
@@ -257,6 +261,12 @@ Proposal → Approval → Implementation → Archive → Update specs → Update
 - feat:
 - fix:
 - test:
+
+补充约束：
+
+- Fast Track / Cleanup 可以按正常节奏提交，但仍需保证该轮最小测试与文档同步已完成
+- Spec-Driven 若只是开发中的中间提交，可以提交，但不得表述为“已完成”
+- Spec-Driven 若是“完成态提交 / 收尾提交”，必须先完成 tasks、文档、stable spec 与 archive，再提交
 
 示例：
 
