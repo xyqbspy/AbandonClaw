@@ -386,3 +386,20 @@ Review 检查项：
 - 已识别但本轮不收的事项、剩余风险与后续入口是否已记录
 
 Fast Track / Cleanup 不默认套用完整实现 Review；只按改动规模完成最小检查即可。
+
+## 11. 上下文预算执行清单
+
+开始处理需求前，先按任务规模控制上下文：
+
+- Fast Track：只读 `AGENTS.md`、相关文件、必要索引和最小测试上下文
+- Cleanup：补读删除对象的入口、引用方和影响范围
+- Spec-Driven：先用 `docs/README.md` 定位，再读相关 feature-flow、domain-rules、stable spec、system-design 和代码
+- 历史 archive、旧 proposal、dev-log 只用于确认历史背景，不得替代当前 stable spec
+- 如果局部改动暴露主链路、状态流、数据流、缓存、权限或稳定规则风险，先补读对应上下文，再重新判断任务类型
+
+完成态 Review 时额外检查：
+
+- 本轮关键依据是否来自当前稳定规则、维护文档、相关链路文档和实际代码
+- 是否误把历史 archive、旧 proposal 或 dev-log 当成当前规则
+- 是否读取了明显无关模块，导致实现判断被噪音污染
+- 是否有刻意未读的相关上下文；如果有，原因、风险和后续入口是否已记录
