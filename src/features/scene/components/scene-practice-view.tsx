@@ -1,21 +1,13 @@
 ﻿"use client";
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { CheckCircle2 } from "lucide-react";
 import {
-  ArrowLeft,
-  CheckCircle2,
-  Lock,
-  MoreHorizontal,
-} from "lucide-react";
-import { AnimatedLoadingText } from "@/components/shared/action-loading";
-import {
-  APPLE_BADGE_INFO,
   APPLE_BADGE_SUBTLE,
   APPLE_BUTTON_BASE,
   APPLE_BUTTON_STRONG,
   APPLE_PANEL_INFO,
   APPLE_PANEL_RAISED,
-  APPLE_PANEL_WARNING,
 } from "@/lib/ui/apple-style";
 import {
   PracticeAssessmentLevel,
@@ -48,6 +40,8 @@ import {
   deriveSentenceMilestoneSummary,
   deriveUnlockedPracticeModes,
 } from "./scene-practice-selectors";
+import { ScenePracticeHeader } from "./scene-practice-header";
+import { ScenePracticeModuleTabs } from "./scene-practice-module-tabs";
 import { ScenePracticeViewLabels } from "./scene-view-labels";
 
 type ScenePracticeViewProps = {
@@ -116,8 +110,6 @@ export function ScenePracticeView({
   onOpenVariants,
   onToggleAnswer,
 }: ScenePracticeViewProps) {
-  const moduleChipBaseClassName =
-    "relative rounded-[12px] border-2 px-[var(--mobile-space-md)] py-[var(--mobile-space-md)] text-center text-[length:var(--mobile-font-body-sm)] font-bold transition-all duration-200";
   const panelClassName =
     `${APPLE_PANEL_RAISED} rounded-[24px]`;
   const softPanelClassName =
@@ -454,8 +446,8 @@ export function ScenePracticeView({
       isCorrect: isPracticeAssessmentComplete(assessment),
       metadata: {
         ...(activeExercise.metadata &&
-        typeof activeExercise.metadata === "object" &&
-        !Array.isArray(activeExercise.metadata)
+          typeof activeExercise.metadata === "object" &&
+          !Array.isArray(activeExercise.metadata)
           ? (activeExercise.metadata as Record<string, unknown>)
           : {}),
         prompt: activeExercise.prompt ?? null,
@@ -504,123 +496,32 @@ export function ScenePracticeView({
 
   return (
     <div className="bg-[var(--app-page-background)] pb-10">
-      <div className="mx-auto w-full max-w-[480px] space-y-[var(--mobile-space-md)] px-[var(--mobile-space-sheet)] pt-[var(--mobile-space-sheet)]">
-        <header className="flex flex-nowrap items-center justify-between gap-[var(--mobile-space-md)] py-[var(--mobile-space-2xs)]">
-          <button
-            type="button"
-            className="inline-flex shrink-0 items-center gap-[var(--mobile-space-sm)] whitespace-nowrap text-[length:var(--mobile-font-body-sm)] font-semibold text-[var(--muted-foreground)]"
-            onClick={onBack}
-          >
-            <ArrowLeft className="size-4" />
-            <span>{labels.back}</span>
-          </button>
+      <div className="mx-auto w-full max-w-[480px] space-y-[var(--mobile-space-md)]">
+        <ScenePracticeHeader
+          allModulesCompleted={allModulesCompleted}
+          headerMenuOpen={headerMenuOpen}
+          labels={labels}
+          localizedPracticeModeLabel={localizedPracticeModeLabel}
+          onBack={onBack}
+          onCloseMenu={() => setHeaderMenuOpen(false)}
+          onComplete={onComplete}
+          onDelete={onDelete}
+          onRegenerate={onRegenerate}
+          onToggleMenu={() => setHeaderMenuOpen((open) => !open)}
+          practiceSet={practiceSet}
+          regenerating={regenerating}
+        />
 
-          <div className="min-w-0 flex-1 overflow-hidden text-center">
-            <p className="truncate whitespace-nowrap text-[length:var(--mobile-font-title)] font-extrabold text-foreground">
-              {localizedPracticeModeLabel}
-            </p>
-          </div>
-
-          <div className="relative shrink-0">
-            <button
-              type="button"
-              aria-label="打开练习菜单"
-              aria-expanded={headerMenuOpen}
-            className="inline-flex size-[var(--mobile-icon-button)] items-center justify-center rounded-full text-[var(--muted-foreground)] transition-colors hover:bg-[var(--app-button-secondary-bg)]/80 disabled:opacity-50"
-              onClick={() => setHeaderMenuOpen((open) => !open)}
-              disabled={!practiceSet}
-            >
-              <MoreHorizontal className="size-4" />
-            </button>
-
-            {headerMenuOpen ? (
-              <>
-                <button
-                  type="button"
-                  aria-label="关闭练习菜单"
-                  className="fixed inset-0 z-10"
-                  onClick={() => setHeaderMenuOpen(false)}
-                />
-                <div className="absolute right-0 top-10 z-20 min-w-[clamp(160px,42vw,172px)] overflow-hidden rounded-[18px] border border-[var(--app-border-soft)] bg-[var(--app-surface)] shadow-[var(--app-shadow-raised)]">
-                  <button
-                    type="button"
-                    className="flex w-full items-center justify-between px-[var(--mobile-space-xl)] py-[var(--mobile-space-md)] text-left text-[length:var(--mobile-font-body-sm)] font-semibold text-foreground transition-colors hover:bg-[var(--app-surface-subtle)] disabled:text-[var(--muted-foreground)]"
-                    onClick={() => {
-                      if (regenerating) return;
-                      onRegenerate?.();
-                    }}
-                    disabled={!practiceSet || !onRegenerate || regenerating}
-                  >
-                    <span>
-                      {regenerating ? (
-                        <AnimatedLoadingText text={labels.regenerating} />
-                      ) : (
-                        labels.regenerate
-                      )}
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    className="flex w-full items-center justify-between border-t border-[var(--app-border-soft)] px-[var(--mobile-space-xl)] py-[var(--mobile-space-md)] text-left text-[length:var(--mobile-font-body-sm)] font-semibold text-foreground transition-colors hover:bg-[var(--app-surface-subtle)]"
-                    onClick={() => {
-                      setHeaderMenuOpen(false);
-                      onDelete();
-                    }}
-                  >
-                    <span>{labels.delete}</span>
-                  </button>
-                  <button
-                    type="button"
-                    className="flex w-full items-center justify-between border-t border-[var(--app-border-soft)] px-[var(--mobile-space-xl)] py-[var(--mobile-space-md)] text-left text-[length:var(--mobile-font-body-sm)] font-semibold text-foreground transition-colors hover:bg-[var(--app-surface-subtle)] disabled:text-[var(--muted-foreground)]"
-                    onClick={() => {
-                      setHeaderMenuOpen(false);
-                      onComplete();
-                    }}
-                    disabled={!practiceSet || practiceSet.status === "completed" || !allModulesCompleted}
-                  >
-                    <span>{labels.complete}</span>
-                  </button>
-                </div>
-              </>
-            ) : null}
-          </div>
-        </header>
-
-        {modules.length > 1 ? (
-          <section className="-mx-1 overflow-x-auto px-1 pb-1">
-            <div className="flex min-w-max gap-[var(--mobile-space-md)]">
-            {modules.map((module) => {
-              const unlocked = unlockedModes.has(module.mode);
-              const done = moduleCompletionMap[module.mode];
-              const active = activeModule?.mode === module.mode;
-              return (
-                <button
-                  key={module.mode}
-                  type="button"
-                  className={`${moduleChipBaseClassName} ${
-                    active
-                      ? "border-[var(--app-scene-panel-accent)] bg-[var(--app-scene-panel-accent-soft)] text-[var(--app-scene-panel-accent)]"
-                      : unlocked
-                        ? "border-transparent bg-[var(--app-surface)] text-foreground shadow-[var(--app-shadow-soft)]"
-                        : "border-transparent bg-[var(--app-surface-subtle)] text-[var(--muted-foreground)] opacity-60"
-                  } min-w-[clamp(112px,30vw,124px)] shrink-0`}
-                  disabled={!unlocked}
-                  onClick={() => {
-                    setActiveMode(module.mode);
-                    setActiveExerciseIndex(0);
-                  }}
-                >
-                  {!unlocked ? <Lock className="absolute right-1.5 top-1.5 size-3 text-[var(--muted-foreground)]" /> : null}
-                  <span className="block">{getPracticeModeLabel(module.mode)}</span>
-                  <span className="mt-1 block text-[length:var(--mobile-font-caption)] font-medium opacity-80">
-                    {done ? "已完成" : unlocked ? "进行中" : "未解锁"}
-                  </span>
-                </button>
-              );
-            })}
-            </div>
-          </section>
-        ) : null}
+        <ScenePracticeModuleTabs
+          activeMode={activeModule?.mode ?? null}
+          moduleCompletionMap={moduleCompletionMap}
+          modules={modules}
+          onSelectMode={(mode) => {
+            setActiveMode(mode);
+            setActiveExerciseIndex(0);
+          }}
+          unlockedModes={unlockedModes}
+        />
 
         <section className="space-y-[var(--mobile-space-sm)]">
           <div className="flex items-center justify-between gap-[var(--mobile-space-md)] text-[length:var(--mobile-font-meta)] font-bold text-[var(--muted-foreground)]">
@@ -770,115 +671,115 @@ export function ScenePracticeView({
               ) : (
                 <p className="py-[clamp(32px,8vw,40px)] text-[length:var(--mobile-font-body-sm)] text-[var(--muted-foreground)]">{labels.finishQuestionSet}</p>
               )}
-          </section>
+            </section>
 
-          <section className={`p-[var(--mobile-space-xl)] ${softPanelClassName}`}>
-            <div className="flex items-center justify-between gap-[var(--mobile-space-md)] text-[length:var(--mobile-font-body-sm)] font-bold text-foreground">
-              <span>📊 本轮进度</span>
-              <span className="text-[var(--app-scene-panel-accent)]">
-                关键词 {sentenceMilestoneSummary.keywordCount} | 骨架 {sentenceMilestoneSummary.structureCount} |
-                复现 {sentenceMilestoneSummary.completeCount}
-              </span>
-            </div>
-            <p className="mt-2 border-t border-[var(--app-border-soft)] pt-2 text-center text-[length:var(--mobile-font-caption)] text-[var(--muted-foreground)]">
-              完成当前题型所有题目后自动解锁下一题型
-            </p>
-          </section>
+            <section className={`p-[var(--mobile-space-xl)] ${softPanelClassName}`}>
+              <div className="flex items-center justify-between gap-[var(--mobile-space-md)] text-[length:var(--mobile-font-body-sm)] font-bold text-foreground">
+                <span>📊 本轮进度</span>
+                <span className="text-[var(--app-scene-panel-accent)]">
+                  关键词 {sentenceMilestoneSummary.keywordCount} | 骨架 {sentenceMilestoneSummary.structureCount} |
+                  复现 {sentenceMilestoneSummary.completeCount}
+                </span>
+              </div>
+              <p className="mt-2 border-t border-[var(--app-border-soft)] pt-2 text-center text-[length:var(--mobile-font-caption)] text-[var(--muted-foreground)]">
+                完成当前题型所有题目后自动解锁下一题型
+              </p>
+            </section>
 
-          <section className="px-1 text-[length:var(--mobile-font-meta)] text-[var(--muted-foreground)]">
-            <div className="flex items-center justify-between gap-[var(--mobile-space-md)]">
-              <span>📋 当前题型进度：{correctCount}/{typingCount}</span>
-              <span>✅ 提交次数：{overallAttempts}</span>
-            </div>
-            <div className="mt-1 flex items-center justify-between gap-[var(--mobile-space-md)]">
-              <span>❌ 错误次数：{overallIncorrectAttempts}</span>
-              <span />
-            </div>
-          </section>
+            <section className="px-1 text-[length:var(--mobile-font-meta)] text-[var(--muted-foreground)]">
+              <div className="flex items-center justify-between gap-[var(--mobile-space-md)]">
+                <span>📋 当前题型进度：{correctCount}/{typingCount}</span>
+                <span>✅ 提交次数：{overallAttempts}</span>
+              </div>
+              <div className="mt-1 flex items-center justify-between gap-[var(--mobile-space-md)]">
+                <span>❌ 错误次数：{overallIncorrectAttempts}</span>
+                <span />
+              </div>
+            </section>
 
             {practiceSet && summaryAllModulesCompleted ? (
               <section className={`p-[var(--mobile-space-xl)] ${panelClassName}`}>
-                  <div className="flex items-center gap-[var(--mobile-space-sm)] text-foreground">
-                    <CheckCircle2 className="size-4" />
-                    <p className="text-[length:var(--mobile-font-body-sm)] font-bold">{labels.summaryTitle}</p>
-                  </div>
-                  <div className="mt-[var(--mobile-space-xl)] space-y-[var(--mobile-space-sm)] text-[length:var(--mobile-font-body-sm)] text-[var(--muted-foreground)]">
-                    <p>
-                      {labels.summaryCompleted}：
-                      <span className="font-semibold text-foreground">
-                        {overallCorrectCount}/{overallTypingCount}
-                      </span>
-                    </p>
-                    <p>
-                      {labels.summaryAttempts}：
-                      <span className="font-semibold text-foreground">{overallAttempts}</span>
-                    </p>
-                    <p>
-                      {labels.summaryIncorrect}：
-                      <span className="font-semibold text-foreground">{overallIncorrectAttempts}</span>
-                    </p>
-                    <p className="pt-1 font-semibold text-foreground">{labels.summaryMistakeChunks}</p>
-                    {incorrectExercisesAcrossModules.length === 0 ? (
-                      <>
-                        <p>{labels.summaryNoMistakes}</p>
-                        <p>{labels.summaryVariantHint}</p>
-                        <div className="flex flex-wrap gap-[var(--mobile-space-sm)] pt-2">
-                          {isCompletedPractice ? (
-                            <button
-                              type="button"
-                              className={secondaryActionButtonClassName}
-                              onClick={() => onRepeatPractice?.()}
-                            >
-                              {labels.summaryRepeatAction}
-                            </button>
-                          ) : null}
+                <div className="flex items-center gap-[var(--mobile-space-sm)] text-foreground">
+                  <CheckCircle2 className="size-4" />
+                  <p className="text-[length:var(--mobile-font-body-sm)] font-bold">{labels.summaryTitle}</p>
+                </div>
+                <div className="mt-[var(--mobile-space-xl)] space-y-[var(--mobile-space-sm)] text-[length:var(--mobile-font-body-sm)] text-[var(--muted-foreground)]">
+                  <p>
+                    {labels.summaryCompleted}：
+                    <span className="font-semibold text-foreground">
+                      {overallCorrectCount}/{overallTypingCount}
+                    </span>
+                  </p>
+                  <p>
+                    {labels.summaryAttempts}：
+                    <span className="font-semibold text-foreground">{overallAttempts}</span>
+                  </p>
+                  <p>
+                    {labels.summaryIncorrect}：
+                    <span className="font-semibold text-foreground">{overallIncorrectAttempts}</span>
+                  </p>
+                  <p className="pt-1 font-semibold text-foreground">{labels.summaryMistakeChunks}</p>
+                  {incorrectExercisesAcrossModules.length === 0 ? (
+                    <>
+                      <p>{labels.summaryNoMistakes}</p>
+                      <p>{labels.summaryVariantHint}</p>
+                      <div className="flex flex-wrap gap-[var(--mobile-space-sm)] pt-2">
+                        {isCompletedPractice ? (
                           <button
                             type="button"
-                            className={primaryActionButtonClassName}
-                            onClick={onOpenVariants}
+                            className={secondaryActionButtonClassName}
+                            onClick={() => onRepeatPractice?.()}
                           >
-                            {labels.summaryVariantAction}
+                            {labels.summaryRepeatAction}
                           </button>
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <ul className="space-y-1">
-                          {incorrectExercisesAcrossModules.map((exercise) => (
-                            <li key={exercise.id}>
-                              {(exercise.type === "chunk_cloze" && getExerciseCanonicalAnswer(exercise)) ||
+                        ) : null}
+                        <button
+                          type="button"
+                          className={primaryActionButtonClassName}
+                          onClick={onOpenVariants}
+                        >
+                          {labels.summaryVariantAction}
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <ul className="space-y-1">
+                        {incorrectExercisesAcrossModules.map((exercise) => (
+                          <li key={exercise.id}>
+                            {(exercise.type === "chunk_cloze" && getExerciseCanonicalAnswer(exercise)) ||
                               (typeof exercise.metadata?.chunkText === "string" && exercise.metadata.chunkText.trim()) ||
                               exercise.answer.text.trim() ||
                               exercise.chunkId ||
                               exercise.id}
-                              {getLocalizedExercisePrompt(exercise)
-                                ? ` - ${getLocalizedExercisePrompt(exercise)}`
-                                : ""}
-                            </li>
-                          ))}
-                        </ul>
-                        <p>{labels.summaryReviewHint}</p>
-                        <div className="flex flex-wrap gap-[var(--mobile-space-sm)] pt-2">
-                          {isCompletedPractice ? (
-                            <button
-                              type="button"
-                              className={secondaryActionButtonClassName}
-                              onClick={() => onRepeatPractice?.()}
-                            >
-                              {labels.summaryRepeatAction}
-                            </button>
-                          ) : null}
+                            {getLocalizedExercisePrompt(exercise)
+                              ? ` - ${getLocalizedExercisePrompt(exercise)}`
+                              : ""}
+                          </li>
+                        ))}
+                      </ul>
+                      <p>{labels.summaryReviewHint}</p>
+                      <div className="flex flex-wrap gap-[var(--mobile-space-sm)] pt-2">
+                        {isCompletedPractice ? (
                           <button
                             type="button"
-                            className={primaryActionButtonClassName}
-                            onClick={onReviewScene}
+                            className={secondaryActionButtonClassName}
+                            onClick={() => onRepeatPractice?.()}
                           >
-                            {labels.summaryReviewAction}
+                            {labels.summaryRepeatAction}
                           </button>
-                        </div>
-                      </>
-                    )}
-                  </div>
+                        ) : null}
+                        <button
+                          type="button"
+                          className={primaryActionButtonClassName}
+                          onClick={onReviewScene}
+                        >
+                          {labels.summaryReviewAction}
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
               </section>
             ) : null}
           </>
@@ -917,4 +818,3 @@ export function ScenePracticeView({
     </div>
   );
 }
-
