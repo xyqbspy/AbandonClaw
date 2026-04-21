@@ -8,6 +8,7 @@ import {
   __resetTtsTestState,
   __setSceneFullFailureCooldownMsForTests,
   buildSceneFullTtsCacheKey,
+  playSceneFullAudioOnce,
   playSceneLoopAudio,
   stopTtsPlayback,
 } from "./tts-api";
@@ -33,6 +34,56 @@ const createLocalStorageMock = () => {
 beforeEach(async () => {
   await __resetTtsTestState();
   clearClientEventRecords();
+});
+
+test("playSceneFullAudioOnce 播放完整场景但不会开启单场景 loop", async () => {
+  let requestCount = 0;
+  let lastAudioLoop: boolean | null = null;
+  globalThis.window = {
+    localStorage: createLocalStorageMock(),
+    dispatchEvent: () => true,
+  } as unknown as Window & typeof globalThis;
+
+  class FakeAudio {
+    preload = "auto";
+    src = "";
+    currentTime = 0;
+    loop = false;
+    onended: null | (() => void) = null;
+    onerror: null | (() => void) = null;
+
+    load() {}
+    play() {
+      lastAudioLoop = this.loop;
+      setTimeout(() => {
+        this.onended?.();
+      }, 0);
+      return Promise.resolve();
+    }
+    pause() {}
+  }
+
+  globalThis.Audio = FakeAudio as unknown as typeof Audio;
+  globalThis.fetch = (async () => {
+    requestCount += 1;
+    return new Response(JSON.stringify({ url: "https://cdn.test/scene-full-once.mp3" }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }) as typeof fetch;
+
+  await playSceneFullAudioOnce({
+    sceneSlug: "demo-scene",
+    sceneType: "dialogue",
+    segments: [{ text: "Hello there", speaker: "A" }],
+  });
+
+  assert.equal(requestCount, 1);
+  assert.equal(lastAudioLoop, false);
+  assert.equal(
+    listClientEventRecords().some((record) => record.name === "scene_full_play_wait_fetch"),
+    true,
+  );
 });
 
 afterEach(async () => {

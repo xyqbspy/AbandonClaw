@@ -12,6 +12,8 @@ const isPrimarySpeaker = (speaker?: string) => normalizeSpeaker(speaker) === "A"
 const speakerLabel = (speaker?: string) => normalizeSpeaker(speaker);
 const dialogueActionButtonClassName =
   "size-[var(--mobile-icon-button)] rounded-full border-transparent bg-transparent text-[var(--app-foreground-muted)] shadow-none transition-colors hover:bg-transparent hover:text-[var(--app-foreground)]";
+const dialogueLoopButtonClassName =
+  "absolute right-0 top-0 size-9 cursor-pointer px-0 transition-all duration-150";
 
 type LessonReaderDialogueContentProps = {
   blockOrder: LessonBlock[];
@@ -92,12 +94,13 @@ export function LessonReaderDialogueContent({
               <LoopActionButton
                 active={isSceneLooping}
                 loading={isSceneLoopLoading}
-                variant="ghost"
+                variant="secondary"
                 size="icon-sm"
+                surface="bubble"
                 iconOnly
-                icon="tts"
+                icon="loop"
                 ariaLabel={isSceneLooping ? "停止循环播放" : "循环播放场景"}
-                className="absolute right-0 top-0 size-9 cursor-pointer border-transparent bg-transparent px-0 transition-all duration-150 hover:bg-transparent hover:text-foreground"
+                className={dialogueLoopButtonClassName}
                 iconClassName="size-4"
                 onClick={toggleSceneLoopPlayback}
               />

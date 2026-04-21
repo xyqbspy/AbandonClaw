@@ -8,6 +8,25 @@ afterEach(() => {
   cleanup();
 });
 
+test("LoopActionButton 的 loop 图标播放中会旋转并保持白底按钮形态", () => {
+  render(
+    <LoopActionButton
+      active
+      surface="bubble"
+      variant="secondary"
+      icon="loop"
+      onClick={() => undefined}
+      ariaLabel="停止循环播放"
+    />,
+  );
+
+  const button = screen.getByRole("button", { name: "停止循环播放" });
+  assert.equal(button.getAttribute("data-audio-state"), "playing");
+  assert.match(button.className, /bg-white/);
+  assert.match(button.className, /rounded-full/);
+  assert.equal(button.querySelector('[data-audio-icon-family="loop"][data-audio-loop-spin="true"]') !== null, true);
+});
+
 test("LoopActionButton 会渲染播放家族的默认、播放中与暂停状态", () => {
   const { rerender } = render(
     <LoopActionButton onClick={() => undefined} ariaLabel="循环播放" icon="play" />,

@@ -1,10 +1,10 @@
 "use client";
 
-import { Pause, Play } from "lucide-react";
+import { Pause, Play, RotateCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export type AudioVisualState = "idle" | "playing" | "paused" | "loading";
-export type AudioIconFamily = "tts" | "play";
+export type AudioIconFamily = "tts" | "play" | "loop";
 
 export function AudioStateIcon({
   family,
@@ -88,6 +88,22 @@ export function AudioStateIcon({
         data-audio-icon-family="play"
         data-audio-icon-state={state}
         className={cn("size-4", className)}
+      />
+    );
+  }
+
+  if (family === "loop") {
+    return (
+      <RotateCw
+        data-audio-icon-family="loop"
+        data-audio-icon-state={state}
+        data-audio-loop-spin={state === "playing" ? "true" : undefined}
+        className={cn(
+          "size-4",
+          state === "playing" && "animate-spin [animation-duration:1.35s]",
+          state === "paused" && "opacity-55",
+          className,
+        )}
       />
     );
   }

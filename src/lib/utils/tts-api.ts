@@ -1295,6 +1295,101 @@ export async function playSceneLoopAudio(params: {
   }
 }
 
+export async function playSceneFullAudioOnce(params: {
+  sceneSlug: string;
+  sceneType?: "dialogue" | "monologue";
+  segments: Array<{ text: string; speaker?: string }>;
+}) {
+  const sceneFullKey = buildSceneFullTtsCacheKey(params);
+  const existingCooldown = getSceneFullCooldown(sceneFullKey);
+  if (existingCooldown) {
+    recordSceneFullCoolingDownEvent(params, sceneFullKey, existingCooldown);
+    throw toControlledSceneFullPlaybackError("cooling_down", {
+      sceneFullKey,
+      readiness: "cooling_down",
+      cooldownMs: existingCooldown.remainingMs,
+      previousFailureReason: existingCooldown.failureReason,
+    });
+  }
+
+  stopTtsPlayback();
+  const requestId = nextPlaybackRequestId();
+  setPlaybackState({
+    kind: "scene",
+    status: "loading",
+    sceneSlug: params.sceneSlug,
+    isLooping: false,
+    text: params.sceneSlug,
+    requestId,
+  });
+  const generation = playbackGeneration;
+
+  try {
+    const readiness = await resolveSceneFullPlaybackReadiness(sceneFullKey);
+    if (readiness === "cooling_down") {
+      const cooldown = getSceneFullCooldown(sceneFullKey);
+      if (cooldown) {
+        recordSceneFullCoolingDownEvent(params, sceneFullKey, cooldown);
+        throw toControlledSceneFullPlaybackError("cooling_down", {
+          sceneFullKey,
+          readiness,
+          cooldownMs: cooldown.remainingMs,
+          previousFailureReason: cooldown.failureReason,
+        });
+      }
+    }
+    recordSceneFullPlayEvent(params, readiness, sceneFullKey);
+    const url = await ensureSceneFullAudio(params);
+    clearSceneFullFailureCooldown(sceneFullKey);
+    if (
+      playbackGeneration !== generation ||
+      playbackState.kind !== "scene" ||
+      playbackState.sceneSlug !== params.sceneSlug ||
+      playbackState.isLooping
+    ) {
+      return { ok: true as const, url: null, stopped: true as const };
+    }
+    setPlaybackState({
+      kind: "scene",
+      status: "playing",
+      sceneSlug: params.sceneSlug,
+      isLooping: false,
+      text: params.sceneSlug,
+      requestId,
+    });
+    await playAudioUrl(url);
+    clearSceneFullFailureCooldown(sceneFullKey);
+    return { ok: true as const, url, stopped: false as const };
+  } catch (error) {
+    const failureReason = getSceneFullFailureReasonFromError(error);
+    if (failureReason !== "cooling_down") {
+      markSceneFullFailureCooldown(sceneFullKey, failureReason);
+    }
+    const cooldown = getSceneFullCooldown(sceneFullKey);
+    const warmupInfo = getWarmupInfo(sceneFullKey);
+    recordClientFailureSummary("scene_full_play_fallback", {
+      sceneSlug: params.sceneSlug,
+      audioUnit: "scene_full",
+      sceneType: params.sceneType ?? "monologue",
+      segmentCount: params.segments.length,
+      sceneFullKey,
+      readiness: cooldown ? "cooling_down" : "failed_recently",
+      failureReason,
+      cooldownMs: cooldown?.remainingMs,
+      message: error instanceof Error ? error.message : "Scene full playback failed.",
+      wasWarmed: warmupInfo.wasWarmed,
+      ...(warmupInfo.source ? { warmupSource: warmupInfo.source } : {}),
+    });
+    throw toControlledSceneFullPlaybackError(failureReason, {
+      sceneFullKey,
+      readiness: cooldown ? "cooling_down" : "failed_recently",
+      cooldownMs: cooldown?.remainingMs,
+    });
+  } finally {
+    clearPlaybackStateIfCurrent(requestId);
+  }
+}
+
 // Backward-compatible aliases currently used in reader code.
 export const ensureSentenceTtsFromApi = ensureSentenceAudio;
 export const ensureChunkTtsFromApi = ensureChunkAudio;

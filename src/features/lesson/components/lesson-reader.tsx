@@ -51,6 +51,10 @@ import { LessonReaderDialogueContent } from "./lesson-reader-dialogue-content";
 import { LessonReaderMobileSections } from "./lesson-reader-mobile-sections";
 
 const appleButtonLgClassName = `${APPLE_BUTTON_BASE} ${APPLE_BUTTON_TEXT_LG}`;
+const sceneLoopButtonClassName =
+  "size-9 cursor-pointer px-0 transition-all duration-150";
+const sceneLoopMobileButtonClassName =
+  "size-[var(--mobile-control-height)] cursor-pointer px-0 transition-all duration-150";
 const hasSpeakerTag = (speaker?: string) => /^[A-Z]$/.test((speaker ?? "").trim().toUpperCase());
 
 export function LessonReader({
@@ -390,9 +394,11 @@ export function LessonReader({
                 <LoopActionButton
                   active={isSceneLooping}
                   loading={isSceneLoopLoading}
-                  variant="ghost"
+                  variant="secondary"
                   size="icon"
-                  className="size-9 cursor-pointer border-transparent bg-transparent px-0 transition-all duration-150 hover:bg-transparent hover:text-foreground"
+                  surface="bubble"
+                  icon="loop"
+                  className={sceneLoopButtonClassName}
                   iconClassName="size-4"
                   onClick={toggleSceneLoopPlayback}
                 />
@@ -407,9 +413,11 @@ export function LessonReader({
                 <LoopActionButton
                   active={isSceneLooping}
                   loading={isSceneLoopLoading}
-                  variant="ghost"
+                  variant="secondary"
                   size="icon"
-                  className="size-9 cursor-pointer border-transparent bg-transparent px-0 transition-all duration-150 hover:bg-transparent hover:text-foreground"
+                  surface="bubble"
+                  icon="loop"
+                  className={sceneLoopButtonClassName}
                   iconClassName="size-4"
                   onClick={toggleSceneLoopPlayback}
                 />
@@ -439,9 +447,11 @@ export function LessonReader({
                     <LoopActionButton
                       active={isSceneLooping}
                       loading={isSceneLoopLoading}
-                      variant="ghost"
+                      variant="secondary"
                       size="icon"
-                      className={`size-[var(--mobile-control-height)] border-transparent bg-transparent px-0 text-[length:var(--mobile-font-caption)] ${APPLE_META_TEXT} hover:bg-transparent hover:text-foreground`}
+                      surface="bubble"
+                      icon="loop"
+                      className={sceneLoopMobileButtonClassName}
                       iconClassName="size-4"
                       onClick={toggleSceneLoopPlayback}
                     />
@@ -479,9 +489,11 @@ export function LessonReader({
                     <LoopActionButton
                       active={isSceneLooping}
                       loading={isSceneLoopLoading}
-                      variant="ghost"
+                      variant="secondary"
                       size="icon"
-                      className="size-9 cursor-pointer border-transparent bg-transparent px-0 transition-all duration-150 hover:bg-transparent hover:text-foreground"
+                      surface="bubble"
+                      icon="loop"
+                      className={sceneLoopButtonClassName}
                       iconClassName="size-4"
                       onClick={toggleSceneLoopPlayback}
                     />

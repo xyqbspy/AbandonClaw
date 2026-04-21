@@ -26,8 +26,12 @@ let clearSceneListCacheCalls = 0;
 let importSceneCalls = 0;
 let deleteSceneCalls = 0;
 let generatedSceneCalls = 0;
+const sceneDetailCalls: string[] = [];
+const sceneFullPlaybackCalls: Array<{ sceneSlug: string; segmentCount: number }> = [];
+let stopTtsPlaybackCalls = 0;
 let importSceneError: Error | null = null;
 let deleteSceneError: Error | null = null;
+let sceneFullPlaybackResolvers: Array<() => void> = [];
 let getScenesFromApiImpl: (options?: { noStore?: boolean }) => Promise<SceneListItemResponse[]> = async (
   options?: { noStore?: boolean },
 ) => {
@@ -130,6 +134,40 @@ const mockedModules = {
   },
   "@/lib/utils/scenes-api": {
     getScenesFromApi: async (options?: { noStore?: boolean }) => getScenesFromApiImpl(options),
+    getSceneDetailBySlugFromApi: async (slug: string) => {
+      sceneDetailCalls.push(slug);
+      return {
+        id: slug,
+        slug,
+        title: slug,
+        subtitle: "detail subtitle",
+        difficulty: "Beginner",
+        estimatedMinutes: 5,
+        completionRate: 0,
+        tags: [],
+        sceneType: slug === "imported-scene" ? "monologue" : "dialogue",
+        sections: [
+          {
+            id: "section-1",
+            blocks: [
+              {
+                id: "block-1",
+                speaker: "A",
+                sentences: [
+                  {
+                    id: "sentence-1",
+                    text: "Hello there.",
+                    translation: "你好。",
+                    chunks: [],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        explanations: [],
+      };
+    },
     importSceneFromApi: async () => {
       importSceneCalls += 1;
       if (importSceneError) throw importSceneError;
@@ -150,6 +188,24 @@ const mockedModules = {
   "@/lib/cache/scene-prefetch": {
     prefetchSceneDetail: (slug: string) => detailPrefetchImpl(slug),
     scheduleScenePrefetch: () => undefined,
+  },
+  "@/lib/utils/tts-api": {
+    playSceneFullAudioOnce: async ({
+      sceneSlug,
+      segments,
+    }: {
+      sceneSlug: string;
+      segments: Array<{ text: string; speaker?: string }>;
+    }) => {
+      sceneFullPlaybackCalls.push({ sceneSlug, segmentCount: segments.length });
+      await new Promise<void>((resolve) => {
+        sceneFullPlaybackResolvers.push(resolve);
+      });
+      return { ok: true, url: "blob:scene-full", stopped: false };
+    },
+    stopTtsPlayback: () => {
+      stopTtsPlaybackCalls += 1;
+    },
   },
 } satisfies Record<string, unknown>;
 
@@ -188,6 +244,13 @@ afterEach(() => {
   importSceneCalls = 0;
   deleteSceneCalls = 0;
   generatedSceneCalls = 0;
+  sceneDetailCalls.length = 0;
+  sceneFullPlaybackCalls.length = 0;
+  stopTtsPlaybackCalls = 0;
+  for (const resolve of sceneFullPlaybackResolvers) {
+    resolve();
+  }
+  sceneFullPlaybackResolvers = [];
   importSceneError = null;
   deleteSceneError = null;
   getScenesFromApiImpl = async (options?: { noStore?: boolean }) => {
@@ -227,9 +290,74 @@ test("ScenesPage 的生成与导入入口保持主次按钮层级一致", async 
 
   const generateButton = await screen.findByRole("button", { name: "生成场景" });
   const importButton = screen.getByRole("button", { name: "导入自定义" });
+  const randomButton = screen.getByRole("button", { name: "暂无可随机播放的场景" });
 
   assert.ok(generateButton.className.includes("app-button-primary"));
   assert.ok(importButton.className.includes("app-button-secondary"));
+  assert.ok(randomButton.className.includes("app-button-secondary"));
+  assert.ok(randomButton.className.includes("bg-white"));
+  assert.equal(randomButton.querySelector('[data-random-review-icon="shuffle"]') !== null, true);
+  assert.equal(randomButton.querySelector("[data-audio-loop-spin]"), null);
+});
+
+test("ScenesPage 没有 60% 以上场景时随机播放入口不可启动", async () => {
+  const ScenesPage = getScenesPage();
+  render(<ScenesPage />);
+
+  await screen.findByText("Coffee Chat");
+  const randomButton = screen.getByRole("button", { name: "暂无可随机播放的场景" });
+
+  assert.equal(randomButton.hasAttribute("disabled"), true);
+  assert.equal(randomButton.getAttribute("title"), "完成 60% 以上的场景后可随机播放");
+});
+
+test("ScenesPage 随机播放会从合格场景中随机起点并播放 scene full", async () => {
+  const originalRandom = Math.random;
+  Math.random = () => 0.6;
+  getScenesFromApiImpl = async (options?: { noStore?: boolean }) => {
+    getScenesCallOptions.push(options);
+    return [
+      {
+        ...sceneList[0],
+        progressPercent: 65,
+      },
+      {
+        ...sceneList[1],
+        progressPercent: 80,
+      },
+    ];
+  };
+
+  try {
+    const ScenesPage = getScenesPage();
+    render(<ScenesPage />);
+
+    await screen.findByText("Coffee Chat");
+    fireEvent.click(screen.getByRole("button", { name: "随机播放场景" }));
+
+    await waitFor(() => {
+      assert.deepEqual(sceneDetailCalls, ["imported-scene"]);
+      assert.deepEqual(sceneFullPlaybackCalls, [
+        {
+          sceneSlug: "imported-scene",
+          segmentCount: 1,
+        },
+      ]);
+    });
+
+    const activeRandomButton = screen.getByRole("button", { name: "停止随机播放" });
+    assert.ok(activeRandomButton.className.includes("app-button-secondary"));
+    assert.ok(activeRandomButton.className.includes("bg-white"));
+    assert.equal(
+      activeRandomButton.querySelector('[data-audio-icon-family="loop"][data-audio-loop-spin="true"]') !== null,
+      true,
+    );
+
+    fireEvent.click(activeRandomButton);
+    assert.equal(stopTtsPlaybackCalls > 0, true);
+  } finally {
+    Math.random = originalRandom;
+  }
 });
 
 test("ScenesPage 点击场景卡片时会给详情预热一个短暂完成窗口再跳转", async () => {

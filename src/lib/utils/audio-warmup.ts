@@ -46,7 +46,7 @@ export const warmupChunkTextsAudio = (
   }
 };
 
-const buildSceneFullSegmentsFromLesson = (lesson: Lesson) =>
+export const buildSceneFullSegmentsFromLesson = (lesson: Lesson) =>
   getLessonSentences(lesson)
     .map((sentence) => ({
       text: getSentenceSpeakText(sentence),

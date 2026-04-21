@@ -20,8 +20,8 @@ type LoopActionButtonProps = {
   iconClassName?: string;
   ariaLabel?: string;
   iconOnly?: boolean;
-  icon?: "play" | "tts";
-  surface?: "plain" | "soft";
+  icon?: "play" | "tts" | "loop";
+  surface?: "plain" | "soft" | "bubble";
 };
 
 export function LoopActionButton({
@@ -50,8 +50,9 @@ export function LoopActionButton({
       : active
         ? "playing"
         : "idle";
-  const family: AudioIconFamily = icon === "tts" ? "tts" : "play";
+  const family: AudioIconFamily = icon === "tts" ? "tts" : icon === "loop" ? "loop" : "play";
   const useSoftSurface = surface === "soft";
+  const useBubbleSurface = surface === "bubble";
 
   return (
     <Button
@@ -60,9 +61,12 @@ export function LoopActionButton({
       variant={variant}
       className={cn(
         "shrink-0",
-        useSoftSurface
-          ? "border-[var(--app-border-soft)] bg-[var(--app-surface-subtle)] text-[var(--app-foreground-muted)] hover:bg-[var(--app-surface-hover)] hover:text-[var(--app-foreground)]"
-          : "text-[var(--muted-foreground)] hover:text-foreground",
+        useBubbleSurface
+          ? "rounded-full border-[var(--border)] bg-white text-[var(--app-foreground-muted)] shadow-[0_8px_20px_rgba(15,23,42,0.08)] hover:bg-white hover:text-[var(--app-foreground)]"
+          : useSoftSurface
+            ? "border-[var(--app-border-soft)] bg-[var(--app-surface-subtle)] text-[var(--app-foreground-muted)] hover:bg-[var(--app-surface-hover)] hover:text-[var(--app-foreground)]"
+            : "text-[var(--muted-foreground)] hover:text-foreground",
+        useBubbleSurface && visualState !== "idle" && "border-primary/20 bg-white text-primary ring-2 ring-primary/10 hover:bg-white hover:text-primary",
         useSoftSurface && visualState !== "idle" && "border-primary/10 bg-primary/12 text-primary hover:bg-primary/16 hover:text-primary",
         !useSoftSurface && visualState !== "idle" && "text-primary hover:text-primary",
         iconOnly && (size === "sm" || size === "default") && "aspect-square px-0",

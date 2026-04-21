@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect } from "react";
-import { Clock3, MessageSquareText, Plus, Sparkles } from "lucide-react";
+import { Clock3, MessageSquareText, Plus, Shuffle, Sparkles } from "lucide-react";
+import { AudioStateIcon } from "@/components/audio/audio-state-icon";
 import { GenerateSceneSheet } from "@/components/scenes/generate-scene-sheet";
 import {
   LoadingOverlay,
@@ -19,6 +20,7 @@ import {
 } from "@/lib/ui/apple-style";
 import { SceneDeleteDialog } from "./scene-delete-dialog";
 import { SceneImportDialog } from "./scene-import-dialog";
+import { useSceneRandomReviewPlayback } from "./use-scene-random-review-playback";
 import { useSceneSwipeActions } from "./use-scene-swipe-actions";
 import { useScenesPageData } from "./use-scenes-page-data";
 
@@ -38,6 +40,8 @@ const learningStatusLabel = {
 const sceneActionButtonClassName = `h-[var(--mobile-adapt-button-height)] gap-[var(--mobile-adapt-space-sm)] text-[length:var(--mobile-adapt-font-body-sm)] ${APPLE_BUTTON_TEXT_MD}`;
 const sceneSecondaryActionButtonClassName =
   `${sceneActionButtonClassName} bg-[var(--app-button-secondary-bg)] text-[var(--app-button-secondary-text)] border-[var(--app-button-secondary-border)]`;
+const sceneRandomReviewButtonClassName =
+  "size-[var(--mobile-adapt-button-height)] rounded-full border-[var(--border)] bg-white px-0 text-[var(--app-foreground-muted)] shadow-[0_8px_20px_rgba(15,23,42,0.08)] hover:bg-white hover:text-[var(--app-foreground)]";
 const sceneCardClassName =
   `${APPLE_CARD_INTERACTIVE} relative z-10 flex cursor-pointer justify-between gap-[var(--mobile-adapt-space-md)] rounded-[var(--app-radius-card)] bg-[var(--app-scene-card-bg)] p-[var(--mobile-adapt-space-sheet)] will-change-transform transition-[transform,box-shadow,opacity] duration-[280ms]`;
 const sceneMetaPillClassName =
@@ -86,6 +90,13 @@ export default function ScenesPage() {
     closeSwipe,
     getRowGestureHandlers,
   } = useSceneSwipeActions();
+  const {
+    currentScene,
+    eligibleScenes,
+    isRandomReviewActive,
+    randomReviewStatus,
+    toggleRandomReview,
+  } = useSceneRandomReviewPlayback(allScenes);
 
   useEffect(() => {
     if (process.env.NODE_ENV !== "development") return;
@@ -233,7 +244,7 @@ export default function ScenesPage() {
 
   return (
     <div className="space-y-[var(--mobile-adapt-space-md)]">
-      <div className="grid grid-cols-2 gap-[var(--mobile-adapt-space-sm)] pb-[var(--mobile-adapt-space-md)]">
+      <div className="grid grid-cols-[1fr_1fr_auto] gap-[var(--mobile-adapt-space-sm)] pb-[var(--mobile-adapt-space-md)]">
         <Button
           type="button"
           radius="lg"
@@ -252,6 +263,41 @@ export default function ScenesPage() {
         >
           <Plus className="size-[clamp(14px,4vw,16px)]" />
           导入自定义
+        </Button>
+        <Button
+          type="button"
+          variant="secondary"
+          radius="lg"
+          className={`${sceneRandomReviewButtonClassName} ${isRandomReviewActive ? "border-primary/20 text-primary ring-2 ring-primary/10 hover:text-primary" : ""}`}
+          disabled={!isRandomReviewActive && eligibleScenes.length === 0}
+          title={
+            eligibleScenes.length === 0
+              ? "完成 60% 以上的场景后可随机播放"
+              : currentScene
+                ? `正在播放：${currentScene.title}`
+                : `可播放 ${eligibleScenes.length} 个场景`
+          }
+          aria-label={
+            isRandomReviewActive
+              ? "停止随机播放"
+              : eligibleScenes.length === 0
+                ? "暂无可随机播放的场景"
+                : "随机播放场景"
+          }
+          onClick={toggleRandomReview}
+        >
+          {isRandomReviewActive && randomReviewStatus === "playing" ? (
+            <AudioStateIcon
+              family="loop"
+              state="playing"
+              className="size-[clamp(14px,4.2vw,17px)]"
+            />
+          ) : (
+            <Shuffle
+              data-random-review-icon="shuffle"
+              className="size-[clamp(14px,4.2vw,17px)]"
+            />
+          )}
         </Button>
       </div>
 
