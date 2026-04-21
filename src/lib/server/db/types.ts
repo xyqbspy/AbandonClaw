@@ -76,7 +76,9 @@ export type ScenePracticeMode =
   | "sentence_recall"
   | "full_dictation";
 export type ScenePracticeRunStatus = "in_progress" | "completed" | "abandoned";
+export type ScenePracticeSetStatus = "generated" | "completed" | "abandoned";
 export type SceneVariantRunStatus = "in_progress" | "completed" | "abandoned";
+export type PracticeGenerationSource = "ai" | "system";
 export type ScenePracticeAssessmentLevel =
   | "incorrect"
   | "keyword"
@@ -142,6 +144,20 @@ export interface UserScenePracticeRunRow {
   started_at: string;
   completed_at: string | null;
   last_active_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UserScenePracticeSetRow {
+  id: string;
+  user_id: string;
+  scene_id: string;
+  source_type: "original" | "variant";
+  source_variant_id: string | null;
+  status: ScenePracticeSetStatus;
+  generation_source: PracticeGenerationSource;
+  practice_set_json: unknown;
+  completed_at: string | null;
   created_at: string;
   updated_at: string;
 }

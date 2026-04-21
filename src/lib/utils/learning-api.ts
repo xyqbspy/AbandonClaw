@@ -2,6 +2,7 @@ import {
   invalidateAfterSceneLearningMutation,
   invalidateAfterScenePracticeMutation,
 } from "@/lib/utils/cache-actions";
+import { PracticeSet } from "@/lib/types/learning-flow";
 
 interface ApiErrorBody {
   error?: string;
@@ -130,6 +131,10 @@ export interface ScenePracticeSnapshotResponse {
     correctAttemptCount: number;
     latestAssessmentLevel: "incorrect" | "keyword" | "structure" | "complete" | null;
   };
+}
+
+export interface ScenePracticeSetResponse {
+  practiceSet: PracticeSet | null;
 }
 
 export interface SceneVariantRunResponse {
@@ -294,6 +299,42 @@ export async function getScenePracticeSnapshotFromApi(
     throw await toApiError(response, "读取练习进度失败。");
   }
   return (await response.json()) as ScenePracticeSnapshotResponse;
+}
+
+export async function getScenePracticeSetFromApi(sceneSlug: string) {
+  const response = await fetch(
+    `/api/learning/scenes/${encodeURIComponent(sceneSlug)}/practice/set`,
+    { method: "GET", cache: "no-store" },
+  );
+  if (!response.ok) {
+    throw await toApiError(response, "读取练习题失败。");
+  }
+  return (await response.json()) as ScenePracticeSetResponse;
+}
+
+export async function saveScenePracticeSetFromApi(
+  sceneSlug: string,
+  payload: {
+    practiceSet: PracticeSet;
+    replaceExisting?: boolean;
+  },
+) {
+  return withScenePracticeCacheInvalidation(async () => {
+    const response = await fetch(
+      `/api/learning/scenes/${encodeURIComponent(sceneSlug)}/practice/set`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      },
+    );
+    if (!response.ok) {
+      throw await toApiError(response, "保存练习题失败。");
+    }
+    return (await response.json()) as { practiceSet: PracticeSet };
+  });
 }
 
 export async function recordScenePracticeAttemptFromApi(

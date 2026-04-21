@@ -191,6 +191,13 @@ let currentVariantRunSnapshot: {
 let currentPracticeSnapshot: import("@/lib/utils/learning-api").ScenePracticeSnapshotResponse | null = null;
 let cachedPracticeSnapshot: ScenePracticeSnapshotResponse | null = null;
 let practiceSnapshotGetCount = 0;
+let currentServerPracticeSet: PracticeSet | null = null;
+let practiceSetGetCount = 0;
+const saveScenePracticeSetCalls: Array<{
+  slug: string;
+  practiceSet: PracticeSet;
+  replaceExisting?: boolean;
+}> = [];
 let pendingPracticeGeneration:
   | {
       promise: Promise<PracticeSet>;
@@ -505,6 +512,10 @@ const mockedModules = {
       practiceSnapshotGetCount += 1;
       return currentPracticeSnapshot;
     },
+    getScenePracticeSetFromApi: async () => {
+      practiceSetGetCount += 1;
+      return { practiceSet: currentServerPracticeSet };
+    },
     getSceneVariantRunSnapshotFromApi: async () => currentVariantRunSnapshot,
     markScenePracticeModeCompleteFromApi: async () => ({ run: null }),
     pauseSceneLearningFromApi: async () => currentLearningState,
@@ -566,6 +577,18 @@ const mockedModules = {
       };
     },
     startSceneLearningFromApi: async () => currentLearningState,
+    saveScenePracticeSetFromApi: async (
+      slug: string,
+      payload: { practiceSet: PracticeSet; replaceExisting?: boolean },
+    ) => {
+      saveScenePracticeSetCalls.push({
+        slug,
+        practiceSet: payload.practiceSet,
+        replaceExisting: payload.replaceExisting,
+      });
+      currentServerPracticeSet = payload.practiceSet;
+      return { practiceSet: payload.practiceSet };
+    },
     startScenePracticeRunFromApi: async () => {
       practiceRunStartCount += 1;
       currentLearningState = buildLearningState({
@@ -855,6 +878,9 @@ afterEach(() => {
   currentPracticeSnapshot = null;
   cachedPracticeSnapshot = null;
   practiceSnapshotGetCount = 0;
+  currentServerPracticeSet = null;
+  practiceSetGetCount = 0;
+  saveScenePracticeSetCalls.length = 0;
   pendingPracticeGeneration = null;
   practiceGenerationFailureMessage = null;
   practiceRunStartCount = 0;
@@ -1247,6 +1273,10 @@ test("SceneDetailPage 在已有练习时支持手动重新生成题目", async (
   await waitFor(() => {
     assert.equal(generatedPracticeCalls.length, 1);
   });
+  assert.equal(
+    saveScenePracticeSetCalls.some((call) => call.replaceExisting === true),
+    true,
+  );
 });
 
 test("SceneDetailPage 在题目页重渲染时不会持续重复启动 practice run", async () => {
@@ -1343,6 +1373,78 @@ test("SceneDetailPage 命中练习快照缓存后仍会后台请求最新快照"
   await waitFor(() => {
     assert.equal(practiceSnapshotGetCount, 1);
   });
+});
+
+test("SceneDetailPage 本地无练习缓存但服务端有 set 时会恢复题目且不重新生成", async () => {
+  currentServerPracticeSet = {
+    ...practiceSet,
+    id: "practice-server",
+  };
+  currentLearningState = buildLearningState({
+    progress: {
+      masteryStage: "scene_practice",
+      masteryPercent: 80,
+    },
+    session: {
+      currentStep: "scene_practice",
+      fullPlayCount: 1,
+      openedExpressionCount: 1,
+      practicedSentenceCount: 1,
+    },
+  });
+
+  const SceneDetailPage = getSceneDetailPage();
+  render(<SceneDetailPage initialLesson={baseLesson} />);
+
+  await waitFor(() => {
+    assert.equal(practiceSetGetCount, 1);
+    assert.equal(currentGeneratedState.latestPracticeSet?.id, "practice-server");
+  });
+  assert.equal(generatedPracticeCalls.length, 0);
+});
+
+test("SceneDetailPage 本地已有练习缓存时仍请求服务端并用服务端 set 覆盖", async () => {
+  currentGeneratedState = {
+    latestPracticeSet: {
+      ...practiceSet,
+      id: "practice-local",
+    },
+    latestVariantSet: null,
+    practiceStatus: "generated",
+    variantStatus: "idle",
+  };
+  currentServerPracticeSet = {
+    ...practiceSet,
+    id: "practice-server",
+  };
+
+  const SceneDetailPage = getSceneDetailPage();
+  render(<SceneDetailPage initialLesson={baseLesson} />);
+
+  assert.equal(currentGeneratedState.latestPracticeSet?.id, "practice-local");
+  await waitFor(() => {
+    assert.equal(practiceSetGetCount, 1);
+    assert.equal(currentGeneratedState.latestPracticeSet?.id, "practice-server");
+  });
+});
+
+test("SceneDetailPage 已有服务端 set 时进入练习页不会重复生成题目", async () => {
+  currentSearchParams = new URLSearchParams("view=practice");
+  currentServerPracticeSet = {
+    ...practiceSet,
+    id: "practice-server",
+  };
+
+  const SceneDetailPage = getSceneDetailPage();
+  render(<SceneDetailPage initialLesson={baseLesson} />);
+
+  await screen.findByText("practice-view");
+  await waitFor(() => {
+    assert.equal(practiceSetGetCount, 1);
+    assert.equal(practiceRunStartCount, 1);
+  });
+  assert.equal(currentGeneratedState.latestPracticeSet?.id, "practice-server");
+  assert.equal(generatedPracticeCalls.length, 0);
 });
 
 test("SceneDetailPage 生成场景练习时会锁定主 CTA，并保持加载文案稳定", async () => {

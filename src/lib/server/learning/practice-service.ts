@@ -8,6 +8,10 @@ import {
 import { getSceneRecordBySlug } from "@/lib/server/scene/service";
 import { NotFoundError } from "@/lib/server/errors";
 import { recordSceneTrainingEvent, startSceneLearning } from "./service";
+import {
+  assertScenePracticeSetBelongsToScene,
+  markScenePracticeSetCompleted,
+} from "./practice-set-service";
 
 const nowIso = () => new Date().toISOString();
 
@@ -425,6 +429,11 @@ export async function startScenePracticeRun(
   },
 ) {
   const scene = await resolveVisibleSceneBySlug(userId, sceneSlug);
+  await assertScenePracticeSetBelongsToScene({
+    userId,
+    sceneId: scene.id,
+    practiceSetId: input.practiceSetId,
+  });
   const learningState = await startSceneLearning(userId, sceneSlug);
   const nextLearningState =
     (learningState.session?.practicedSentenceCount ?? 0) >= 1
@@ -541,6 +550,11 @@ export async function markScenePracticeModeComplete(
   },
 ) {
   const scene = await resolveVisibleSceneBySlug(userId, sceneSlug);
+  await assertScenePracticeSetBelongsToScene({
+    userId,
+    sceneId: scene.id,
+    practiceSetId: input.practiceSetId,
+  });
   const run = await getLatestActiveRunBySet(userId, scene.id, input.practiceSetId);
   if (!run) {
     throw new Error("No active practice run found.");
@@ -579,6 +593,11 @@ export async function completeScenePracticeRun(
   },
 ) {
   const scene = await resolveVisibleSceneBySlug(userId, sceneSlug);
+  await assertScenePracticeSetBelongsToScene({
+    userId,
+    sceneId: scene.id,
+    practiceSetId: input.practiceSetId,
+  });
   const run = await getLatestActiveRunBySet(userId, scene.id, input.practiceSetId);
   if (!run) {
     throw new Error("No active practice run found.");
@@ -598,6 +617,11 @@ export async function completeScenePracticeRun(
     started_at: run.started_at,
     completed_at: nowIso(),
     last_active_at: nowIso(),
+  });
+  await markScenePracticeSetCompleted({
+    userId,
+    sceneId: scene.id,
+    practiceSetId: input.practiceSetId,
   });
 
   return {

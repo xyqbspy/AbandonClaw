@@ -21,9 +21,10 @@ import { normalizePhraseText } from "@/lib/shared/phrases";
 import { Lesson } from "@/lib/types";
 import { recordClientEvent } from "@/lib/utils/client-events";
 import { savePhraseFromApi } from "@/lib/utils/phrases-api";
-import { hydrateVariantSetFromRun } from "@/lib/utils/scene-learning-flow-storage";
+import { hydrateVariantSetFromRun, savePracticeSet } from "@/lib/utils/scene-learning-flow-storage";
 import {
   completeScenePracticeRunFromApi,
+  getScenePracticeSetFromApi,
   getScenePracticeSnapshotFromApi,
   getSceneVariantRunSnapshotFromApi,
   markScenePracticeModeCompleteFromApi,
@@ -32,6 +33,7 @@ import {
   ScenePracticeSnapshotResponse,
   SceneLearningProgressResponse,
   SceneVariantRunResponse,
+  saveScenePracticeSetFromApi,
   startScenePracticeRunFromApi,
   startSceneVariantRunFromApi,
 } from "@/lib/utils/learning-api";
@@ -217,6 +219,23 @@ export default function SceneDetailClientPage({
   const activeVariantItem =
     latestVariantSet?.variants.find((variant) => variant.id === activeVariantId) ?? null;
   const activeVariantLesson = activeVariantItem?.lesson ?? null;
+
+  useEffect(() => {
+    if (!baseLesson) return;
+    let cancelled = false;
+    void getScenePracticeSetFromApi(baseLesson.slug)
+      .then((result) => {
+        if (cancelled || !result.practiceSet) return;
+        savePracticeSet(result.practiceSet);
+        refreshGeneratedState(baseLesson.id);
+      })
+      .catch(() => {
+        // Keep local practice set cache as a non-blocking fallback.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [baseLesson, refreshGeneratedState]);
 
   const {
     practiceLoading,
@@ -542,7 +561,16 @@ export default function SceneDetailClientPage({
         return;
       }
 
-      const runPromise = startScenePracticeRunFromApi(baseLesson.slug, payload)
+      const matchingPracticeSet =
+        latestPracticeSet?.id === payload.practiceSetId ? latestPracticeSet : null;
+      const runPromise = (matchingPracticeSet
+        ? saveScenePracticeSetFromApi(baseLesson.slug, {
+            practiceSet: matchingPracticeSet,
+            replaceExisting: false,
+          }).then(() => undefined)
+        : Promise.resolve()
+      )
+        .then(() => startScenePracticeRunFromApi(baseLesson.slug, payload))
         .then((result) => {
           if (
             (trainingState?.session?.practicedSentenceCount ?? 0) < 1 &&
@@ -586,7 +614,12 @@ export default function SceneDetailClientPage({
         promise: runPromise,
       });
     },
-    [baseLesson, handleLearningStateChange, trainingState?.session?.practicedSentenceCount],
+    [
+      baseLesson,
+      handleLearningStateChange,
+      latestPracticeSet,
+      trainingState?.session?.practicedSentenceCount,
+    ],
   );
 
   const handleTrainingListenStep = useCallback(() => {

@@ -136,6 +136,10 @@ const mockedModules = {
     },
     completeSceneVariantRunFromApi: async () => ({ run: null }),
     recordSceneVariantViewFromApi: async () => ({ run: null }),
+    saveScenePracticeSetFromApi: async (
+      _slug: string,
+      payload: { practiceSet: PracticeSet },
+    ) => ({ practiceSet: payload.practiceSet }),
   },
   "@/lib/utils/scene-resource-actions": {
     warmupRepeatPracticeResources: (payload: {

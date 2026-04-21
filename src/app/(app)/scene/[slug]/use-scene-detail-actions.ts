@@ -15,6 +15,7 @@ import { completeSceneLearningFromApi } from "@/lib/utils/learning-api";
 import {
   completeSceneVariantRunFromApi,
   recordSceneVariantViewFromApi,
+  saveScenePracticeSetFromApi,
 } from "@/lib/utils/learning-api";
 import { Lesson } from "@/lib/types";
 import { ExpressionMapResponse } from "@/lib/types/expression-map";
@@ -71,6 +72,22 @@ const resolvePracticeSourceLesson = ({
   );
 };
 
+const persistPracticeSet = async ({
+  sceneSlug,
+  practiceSet,
+  replaceExisting,
+}: {
+  sceneSlug: string;
+  practiceSet: PracticeSet;
+  replaceExisting: boolean;
+}) => {
+  const result = await saveScenePracticeSetFromApi(sceneSlug, {
+    practiceSet,
+    replaceExisting,
+  });
+  return result.practiceSet;
+};
+
 export function useSceneDetailActions({
   baseLesson,
   latestPracticeSet,
@@ -124,12 +141,17 @@ export function useSceneDetailActions({
           sourceLesson,
           requestPolicy: "manual",
         });
+        const persistedPracticeSet = await persistPracticeSet({
+          sceneSlug: baseLesson.slug,
+          practiceSet,
+          replaceExisting: false,
+        });
 
-        savePracticeSet(practiceSet);
+        savePracticeSet(persistedPracticeSet);
         refreshGeneratedState(baseLesson.id);
         setShowAnswerMap({});
         setViewModeWithRoute("practice");
-        return practiceSet;
+        return persistedPracticeSet;
       } catch (error) {
         setPracticeError(
           error instanceof Error ? error.message : "生成练习题失败，请稍后重试。",
@@ -170,14 +192,19 @@ export function useSceneDetailActions({
           sourceLesson,
           requestPolicy,
         });
+        const persistedPracticeSet = await persistPracticeSet({
+          sceneSlug: baseLesson.slug,
+          practiceSet,
+          replaceExisting: false,
+        });
 
-        savePracticeSet(practiceSet);
+        savePracticeSet(persistedPracticeSet);
         refreshGeneratedState(baseLesson.id);
         setShowAnswerMap({});
         if (openOnReady) {
           setViewModeWithRoute("practice");
         }
-        return practiceSet;
+        return persistedPracticeSet;
       } catch (error) {
         setPracticeError(
           error instanceof Error ? error.message : "生成练习题失败，请稍后重试。",
@@ -212,12 +239,17 @@ export function useSceneDetailActions({
         sourceLesson,
         requestPolicy: "manual",
       });
+      const persistedPracticeSet = await persistPracticeSet({
+        sceneSlug: baseLesson.slug,
+        practiceSet,
+        replaceExisting: true,
+      });
 
-      savePracticeSet(practiceSet);
+      savePracticeSet(persistedPracticeSet);
       refreshGeneratedState(baseLesson.id);
       setShowAnswerMap({});
       setViewModeWithRoute("practice");
-      return practiceSet;
+      return persistedPracticeSet;
     } catch (error) {
       setPracticeError(
         error instanceof Error ? error.message : "生成练习题失败，请稍后重试。",

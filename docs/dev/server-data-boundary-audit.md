@@ -52,6 +52,13 @@
   - SQL: `supabase/sql/20260325_phase18_scene_variant_runs_mvp.sql`
   - 结论：已具备 `select/insert/update/delete own` 策略。
 
+### 2026-04-21 补充：scene practice set 本体表
+
+- `user_scene_practice_sets`
+  - SQL: `supabase/sql/20260421_phase21_scene_practice_sets.sql`
+  - 结论：新增用户态 practice set 本体表，具备 `select/insert/update/delete own` RLS；普通接口通过 `createSupabaseServerClient` 读写，不走 service role。
+  - 边界：`practice_set_json` 是当前题目本体权威快照，`user_scene_practice_runs.practice_set_id` / `user_scene_practice_attempts.practice_set_id` 仅保存运行态锚点；run / attempt 写入前必须校验 set 属于当前 user + scene。
+
 ### 第三阶段结论
 
 - 现有数据库侧最小权限已经能承接第二阶段切回用户上下文的主要用户态读写。
