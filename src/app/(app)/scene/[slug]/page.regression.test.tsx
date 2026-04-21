@@ -4,6 +4,7 @@ import test, { afterEach } from "node:test";
 import React from "react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { toast } from "sonner";
+import { resetSceneDetailToastDedupForTests } from "./scene-detail-notify";
 import type { Lesson } from "@/lib/types";
 import type { ExpressionMapResponse } from "@/lib/types/expression-map";
 import type {
@@ -816,6 +817,12 @@ afterEach(() => {
   toast.error = originalToastError;
   toast.success = originalToastSuccess;
   toast.message = mockToastMessage;
+  resetSceneDetailToastDedupForTests();
+  const pageModulePath = localRequire.resolve("./scene-detail-page");
+  const pageModule = localRequire.cache[pageModulePath]?.exports as
+    | { resetScenePracticeRunStartDedupForTests?: () => void }
+    | undefined;
+  pageModule?.resetScenePracticeRunStartDedupForTests?.();
 });
 
 function createDeferredGeneration<T>() {
@@ -1200,6 +1207,13 @@ test("SceneDetailPage 在题目页重渲染时不会持续重复启动 practice 
   render(<SceneDetailPage initialLesson={baseLesson} />);
 
   await screen.findByText("practice-view");
+  await waitFor(() => {
+    assert.equal(practiceRunStartCount, 1);
+  });
+
+  fireEvent.click(screen.getByRole("button", { name: "start-practice-run" }));
+  fireEvent.click(screen.getByRole("button", { name: "start-practice-run" }));
+
   await waitFor(() => {
     assert.equal(practiceRunStartCount, 1);
   });

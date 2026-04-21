@@ -29,9 +29,11 @@ type UseSceneLearningSyncDeps = {
   setIntervalFn: (callback: () => void, delay: number) => IntervalHandle;
   clearIntervalFn: (handle: IntervalHandle) => void;
   startCooldownMs: number;
+  progressFlushCooldownMs: number;
 };
 
 const sceneLearningStartHistory = new Map<string, number>();
+const sceneLearningProgressFlushHistory = new Map<string, number>();
 
 const defaultDeps: UseSceneLearningSyncDeps = {
   startSceneLearningFromApi,
@@ -45,10 +47,12 @@ const defaultDeps: UseSceneLearningSyncDeps = {
   setIntervalFn: (callback, delay) => window.setInterval(callback, delay),
   clearIntervalFn: (handle) => window.clearInterval(handle),
   startCooldownMs: 30_000,
+  progressFlushCooldownMs: 30_000,
 };
 
 export const resetSceneLearningStartThrottleForTests = () => {
   sceneLearningStartHistory.clear();
+  sceneLearningProgressFlushHistory.clear();
 };
 
 export const useSceneLearningSync = ({
@@ -89,6 +93,7 @@ export const useSceneLearningSync = ({
       lastVariantIndex?: number;
       withPause?: boolean;
     }) => {
+      const now = deps.now();
       const studySecondsDelta = computeElapsedSecondsSinceLastSync();
       if (
         !deps.shouldFlushSceneLearningDelta({
@@ -102,6 +107,25 @@ export const useSceneLearningSync = ({
       }
 
       if (!baseLesson) return Promise.resolve();
+
+      const recentFlushAt = sceneLearningProgressFlushHistory.get(baseLesson.slug) ?? 0;
+      const withinCooldown =
+        recentFlushAt > 0 && now - recentFlushAt < deps.progressFlushCooldownMs;
+
+      if (!payload.withPause && withinCooldown) {
+        return Promise.resolve();
+      }
+
+      if (payload.withPause && studySecondsDelta <= 0 && withinCooldown) {
+        return deps.pauseSceneLearningFromApi(baseLesson.slug).then((pauseResult) => {
+          if (pauseResult && onLearningStateChange) {
+            onLearningStateChange(pauseResult);
+          }
+          return pauseResult;
+        });
+      }
+
+      sceneLearningProgressFlushHistory.set(baseLesson.slug, now);
 
       return deps
         .updateSceneLearningProgressFromApi(baseLesson.slug, {

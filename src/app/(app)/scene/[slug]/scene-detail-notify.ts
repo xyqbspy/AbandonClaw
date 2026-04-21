@@ -8,6 +8,18 @@ import {
   TrainingStepKey,
 } from "./scene-detail-messages";
 
+const shownSceneToastKeys = new Set<string>();
+
+const notifyOnce = (key: string, task: () => void) => {
+  if (shownSceneToastKeys.has(key)) return;
+  shownSceneToastKeys.add(key);
+  task();
+};
+
+export const resetSceneDetailToastDedupForTests = () => {
+  shownSceneToastKeys.clear();
+};
+
 export const notifySceneSessionCompleted = (payload?: {
   savedPhraseCount?: number;
   nextStepHint?: string | null;
@@ -19,31 +31,43 @@ export const notifySceneSessionCompleted = (payload?: {
     nextStepHint ? nextStepHint : null,
   ].filter(Boolean);
 
-  toast.success(sceneDetailMessages.sessionCompleted, {
-    description: descriptionParts.length > 0 ? descriptionParts.join(" ") : undefined,
+  notifyOnce("session-completed", () => {
+    toast.success(sceneDetailMessages.sessionCompleted, {
+      description: descriptionParts.length > 0 ? descriptionParts.join(" ") : undefined,
+    });
   });
 };
 
 export const notifySceneMilestone = (step: TrainingStepKey, sceneTitle: string) => {
-  toast.success(getSceneMilestoneToastMessage(step, sceneTitle));
+  notifyOnce(`milestone:${step}`, () => {
+    toast.success(getSceneMilestoneToastMessage(step, sceneTitle));
+  });
 };
 
 export const notifySceneContinueStep = (
   step: Exclude<TrainingStepKey, "listen" | "done">,
 ) => {
-  toast.message(getSceneContinueStepToastMessage(step));
+  notifyOnce(`continue:${step}`, () => {
+    toast.message(getSceneContinueStepToastMessage(step));
+  });
 };
 
 export const notifySceneLoopPrompt = () => {
-  toast.message(sceneDetailMessages.loopScenePrompt);
+  notifyOnce("loop-prompt", () => {
+    toast.message(sceneDetailMessages.loopScenePrompt);
+  });
 };
 
 export const notifySceneExpressionFocused = () => {
-  toast.message(sceneDetailMessages.focusExpressionPrompt);
+  notifyOnce("expression-focused", () => {
+    toast.message(sceneDetailMessages.focusExpressionPrompt);
+  });
 };
 
 export const notifySceneSentencePracticed = () => {
-  toast.success(sceneDetailMessages.practiceSentencePrompt);
+  notifyOnce("sentence-practiced", () => {
+    toast.success(sceneDetailMessages.practiceSentencePrompt);
+  });
 };
 
 export const notifyScenePhraseAlreadySaved = () => {
@@ -59,7 +83,9 @@ export const notifyScenePhraseSaveFailed = (fallback?: string) => {
 };
 
 export const notifySceneFocusStepHint = () => {
-  toast.message(sceneDetailMessages.focusStepHint);
+  notifyOnce("focus-step-hint", () => {
+    toast.message(sceneDetailMessages.focusStepHint);
+  });
 };
 
 export const notifySceneLoadError = (message: string) => {

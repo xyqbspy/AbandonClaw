@@ -68,7 +68,7 @@ const LEARNING_PROGRESS_PREFIX = "scene-learning-progress:v1:";
 const SAVED_TEXTS_TTL_MS = 30 * 60 * 1000;
 const PRACTICE_SNAPSHOT_TTL_MS = 30 * 60 * 1000;
 const VARIANT_RUN_TTL_MS = 30 * 60 * 1000;
-const LEARNING_PROGRESS_TTL_MS = 30 * 60 * 1000;
+const LEARNING_PROGRESS_TTL_MS = 24 * 60 * 60 * 1000;
 
 const memorySavedTextsRecords = new Map<string, SceneSavedPhraseTextsCacheRecord>();
 const memoryPracticeSnapshotRecords = new Map<string, ScenePracticeSnapshotCacheRecord>();

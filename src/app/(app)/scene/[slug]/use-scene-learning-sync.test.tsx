@@ -151,6 +151,7 @@ test("useSceneLearningSync 会启动学习、同步进度，并在卸载时带 p
       intervals.delete(handle as number);
     },
     startCooldownMs: 30_000,
+    progressFlushCooldownMs: 0,
   };
 
   const { rerender, unmount } = renderHook(
@@ -234,6 +235,7 @@ test("useSceneLearningSync 在冷却窗口内重复进入时不会重复 start",
     setIntervalFn: () => 1,
     clearIntervalFn: () => undefined,
     startCooldownMs: 30_000,
+    progressFlushCooldownMs: 30_000,
   };
 
   const first = renderHook(() =>
@@ -286,6 +288,7 @@ test("useSceneLearningSync 超过冷却窗口后会重新 start", async () => {
     setIntervalFn: () => 1,
     clearIntervalFn: () => undefined,
     startCooldownMs: 10_000,
+    progressFlushCooldownMs: 30_000,
   };
 
   const first = renderHook(() =>
@@ -337,6 +340,7 @@ test("useSceneLearningSync 在有新鲜学习态缓存时不会立刻重复 star
     setIntervalFn: () => 1,
     clearIntervalFn: () => undefined,
     startCooldownMs: 30_000,
+    progressFlushCooldownMs: 30_000,
   };
 
   const hook = renderHook(() =>
@@ -351,5 +355,67 @@ test("useSceneLearningSync 在有新鲜学习态缓存时不会立刻重复 star
   );
 
   assert.deepEqual(startCalls, []);
+  hook.unmount();
+});
+test("useSceneLearningSync short view switches coalesce progress flushes", () => {
+  let now = 1_000;
+  let timeoutId = 0;
+  const timeouts = new Map<number, () => void>();
+  const updateCalls: Array<{ progressPercent: number; studySecondsDelta: number }> = [];
+
+  const deps: LearningSyncDeps = {
+    startSceneLearningFromApi: async () => buildLearningProgressResponse(),
+    pauseSceneLearningFromApi: async () => buildLearningProgressResponse(),
+    updateSceneLearningProgressFromApi: async (_slug, payload) => {
+      updateCalls.push({
+        progressPercent: payload.progressPercent ?? 0,
+        studySecondsDelta: payload.studySecondsDelta ?? 0,
+      });
+      return buildLearningProgressResponse();
+    },
+    shouldFlushSceneLearningDelta: ({
+      hasBaseLesson,
+      learningStarted,
+      studySecondsDelta,
+      withPause,
+    }) => Boolean(hasBaseLesson && learningStarted && (studySecondsDelta > 0 || withPause)),
+    buildSceneLearningUpdatePayload: ({ viewMode }) => ({
+      progressPercent: viewMode === "variant-study" ? 65 : 20,
+    }),
+    now: () => now,
+    setTimeoutFn: (callback: () => void) => {
+      timeoutId += 1;
+      timeouts.set(timeoutId, callback);
+      return timeoutId;
+    },
+    clearTimeoutFn: (handle) => {
+      timeouts.delete(handle as number);
+    },
+    setIntervalFn: () => 1,
+    clearIntervalFn: () => undefined,
+    startCooldownMs: 30_000,
+    progressFlushCooldownMs: 30_000,
+  };
+
+  const hook = renderHook(
+    ({ viewMode }: { viewMode: "scene" | "variant-study" }) =>
+      useSceneLearningSync({
+        baseLesson: lesson,
+        viewMode,
+        activeVariantId: null,
+        deps,
+      }),
+    { initialProps: { viewMode: "scene" } },
+  );
+
+  now = 3_000;
+  Array.from(timeouts.values()).forEach((callback) => callback());
+  assert.equal(updateCalls.length, 1);
+
+  hook.rerender({ viewMode: "variant-study" });
+  now = 5_000;
+  Array.from(timeouts.values()).forEach((callback) => callback());
+  assert.equal(updateCalls.length, 1);
+
   hook.unmount();
 });

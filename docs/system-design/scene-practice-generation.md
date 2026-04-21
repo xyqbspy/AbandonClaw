@@ -31,6 +31,23 @@
    - 前端按模块顺序展示
    - 只有上一模块全部 typing 题答对，下一模块才会解锁
 
+### 2.1 练习页学习态缓存与提示去重
+
+`scene/[slug]` 的学习进度由 `SceneLearningProgressResponse` 承接，页面会把服务端返回的最新状态写入 `scene-runtime-cache`：
+
+- 缓存 key：`scene-learning-progress:v1:{sceneSlug}`
+- TTL：1 天
+- 写入入口：`handleLearningStateChange`
+- 主要来源：开始学习、主动听整段、打开表达、练习 run / attempt / complete 返回的 `learningState`
+
+短时间在句子页和答题页之间切换时，`useSceneLearningSync` 会对被动 progress flush 做冷却合并，避免仅因路由/视图切换反复写 `/progress`。但主动学习动作仍必须以服务端返回为准，并刷新缓存。
+
+同一 scene 内部的 query 路由切换（例如句子页 ↔ 答题页）不得把 `trainingState` 清空回默认步骤；页面应优先沿用 `scene-learning-progress` 缓存或当前状态，后续接口返回后再覆盖，以避免步骤短暂回退到“听熟这段”。
+
+练习页挂载会启动当前题型的 practice run。为避免 React dev 重挂载或短时间来回切换导致重复 `POST /practice/run`，页面层按 `sceneSlug + practiceSetId + mode + source` 做 30 秒去重；不同题型仍可独立启动。
+
+Scene 训练类 toast 使用页面会话级去重：同一里程碑或训练提示最多提示一次，避免练习页重挂载、旧状态闭包或缓存恢复导致重复提示。
+
 ## 3. 为什么当前填空题偏少
 
 当前填空数量少，主要不是 UI 问题，而是生成策略本身比较保守。

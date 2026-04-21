@@ -77,6 +77,19 @@ const appleButtonLgClassName = `${APPLE_BUTTON_BASE} ${APPLE_BUTTON_TEXT_LG}`;
 const appleDangerButtonSmClassName = `${APPLE_BUTTON_DANGER} ${APPLE_BUTTON_TEXT_SM}`;
 const PRACTICE_PREWARM_FAILURE_LIMIT = 3;
 const PRACTICE_PREWARM_FAILURE_WINDOW_MS = 60_000;
+const PRACTICE_RUN_START_DEDUP_MS = 30_000;
+
+const practiceRunStartDedup = new Map<
+  string,
+  {
+    completedAt: number | null;
+    promise: Promise<unknown> | null;
+  }
+>();
+
+export const resetScenePracticeRunStartDedupForTests = () => {
+  practiceRunStartDedup.clear();
+};
 
 type SavePhrasePayload = {
   text: string;
@@ -181,7 +194,10 @@ export default function SceneDetailClientPage({
       setTrainingState(snapshot.record.data.state);
       return;
     }
-    setTrainingState(null);
+    const cachedTrainingState = getSceneLearningProgressCacheSnapshotSync(sceneSlug);
+    if (cachedTrainingState.found && cachedTrainingState.record) {
+      setTrainingState(cachedTrainingState.record.data.state);
+    }
   }, [sceneSlug]);
 
   useSceneLearningSync({
@@ -515,7 +531,24 @@ export default function SceneDetailClientPage({
       sourceVariantId?: string | null;
     }) => {
       if (!baseLesson) return;
-      void startScenePracticeRunFromApi(baseLesson.slug, payload)
+      const runKey = [
+        baseLesson.slug,
+        payload.practiceSetId,
+        payload.mode,
+        payload.sourceType,
+        payload.sourceVariantId ?? "",
+      ].join(":");
+      const currentDedup = practiceRunStartDedup.get(runKey);
+      const now = Date.now();
+      if (currentDedup?.promise) return;
+      if (
+        currentDedup?.completedAt &&
+        now - currentDedup.completedAt < PRACTICE_RUN_START_DEDUP_MS
+      ) {
+        return;
+      }
+
+      const runPromise = startScenePracticeRunFromApi(baseLesson.slug, payload)
         .then((result) => {
           if (
             (trainingState?.session?.practicedSentenceCount ?? 0) < 1 &&
@@ -543,9 +576,21 @@ export default function SceneDetailClientPage({
             return next;
           });
         })
+        .then(() => {
+          practiceRunStartDedup.set(runKey, {
+            completedAt: Date.now(),
+            promise: null,
+          });
+        })
         .catch(() => {
+          practiceRunStartDedup.delete(runKey);
           // Non-blocking.
         });
+
+      practiceRunStartDedup.set(runKey, {
+        completedAt: null,
+        promise: runPromise,
+      });
     },
     [baseLesson, handleLearningStateChange, trainingState?.session?.practicedSentenceCount],
   );
