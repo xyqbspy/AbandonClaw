@@ -371,3 +371,18 @@ node_modules\.bin\openspec.CMD archive <change-name>
 - 新功能先明确它属于 `scene`、`chunks`、`review` 还是聚合层
 - 如果一个页面开始同时承担过多职责，继续按既有模式拆到 `selectors`、`controller`、`components`
 - 如果文档再次出现乱码，直接以 UTF-8 新文档替代
+
+## 10. Spec-Driven 完成态实现 Review
+
+当一项 Spec-Driven Change 准备作为“完成态提交 / 收尾提交”时，提交前必须先做一次实现 Review。
+
+Review 检查项：
+
+- 实现是否与 proposal / tasks / spec delta 一致
+- tasks 是否已更新为真实完成状态
+- 最小相关测试是否已执行，或未执行原因是否已记录
+- feature-flow / domain-rules / system-design / dev 文档是否已按影响范围同步
+- stable spec、archive 与必要的 CHANGELOG 状态是否已完成或明确说明不适用
+- 已识别但本轮不收的事项、剩余风险与后续入口是否已记录
+
+Fast Track / Cleanup 不默认套用完整实现 Review；只按改动规模完成最小检查即可。

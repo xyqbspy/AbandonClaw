@@ -289,3 +289,20 @@ test: 补充 review 回写测试
 - 保证系统理解一致
 - 保证改动可追踪
 - 让 AI 在复杂系统里不迷路
+
+---
+
+# 十二、Spec-Driven 实现 Review
+
+Spec-Driven 变更在“完成态提交 / 收尾提交”前，必须先完成一次实现 Review。
+
+实现 Review 至少检查：
+
+- 实现是否与 proposal / tasks / spec delta 一致
+- tasks 是否已更新为真实完成状态
+- 相关测试是否已执行或明确说明未执行原因
+- feature-flow / domain-rules / system-design / dev 文档是否已按影响范围同步
+- stable spec 与 archive 是否已完成或明确说明不适用
+- 本轮已识别但不收的事项、剩余风险与后续入口是否已记录
+
+Fast Track / Cleanup 不默认套用完整实现 Review；只需要完成与改动规模匹配的最小检查。

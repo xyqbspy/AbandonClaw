@@ -83,3 +83,18 @@
 - **THEN** 应只能够看到当前机器环境下稳定可用的一套推荐 preview 入口
 - **AND** 若前台 preview 方式已确认不稳定，仓库不得继续把它作为默认推荐脚本暴露
 - **AND** 若仍需保留底层能力，必须通过基础命令或说明文档显式表达，而不是继续保留易误用的快捷脚本
+
+### Requirement: Spec-Driven 完成态提交前必须完成实现 Review
+当维护者准备把 Spec-Driven Change 作为“完成态提交”或“收尾提交”时，维护流程 MUST 先完成一次实现 Review，再提交代码。
+
+#### Scenario: 维护者准备完成一个 Spec-Driven 变更
+- **WHEN** 维护者准备把一项 Spec-Driven Change 作为已完成变更提交
+- **THEN** 必须对照 proposal、tasks 与 spec delta 检查实际实现是否一致
+- **AND** 必须确认 tasks、测试、文档、stable spec、archive 与必要的 CHANGELOG 状态已经完成或明确说明不适用
+- **AND** 必须记录已识别但本轮不收的事项、剩余风险与后续入口
+- **AND** 只有实现 Review 通过后，才可将该提交表述为完成态提交
+
+#### Scenario: 维护者处理微小改动
+- **WHEN** 本轮改动明确属于 Fast Track 或 Cleanup，且未升级为 Spec-Driven 完成态收尾
+- **THEN** 不应默认套用完整实现 Review
+- **AND** 只需要完成与改动规模匹配的最小检查、测试与必要文档同步
