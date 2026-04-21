@@ -51,7 +51,7 @@ test("useSceneDetailRouteState 会从 URL 回填视图状态，并在 state 变�
 
   assert.equal(pushes.at(-1), "/scene/scene-a?view=expression-map");
   assert.deepEqual(routeChanges.at(-1), {
-    viewMode: "variant-study",
-    activeVariantId: "variant-2",
+    viewMode: "expression-map",
+    activeVariantId: null,
   });
 });

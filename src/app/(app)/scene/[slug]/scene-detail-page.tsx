@@ -194,10 +194,7 @@ export default function SceneDetailClientPage({
       setTrainingState(snapshot.record.data.state);
       return;
     }
-    const cachedTrainingState = getSceneLearningProgressCacheSnapshotSync(sceneSlug);
-    if (cachedTrainingState.found && cachedTrainingState.record) {
-      setTrainingState(cachedTrainingState.record.data.state);
-    }
+    setTrainingState(null);
   }, [sceneSlug]);
 
   useSceneLearningSync({
@@ -290,8 +287,6 @@ export default function SceneDetailClientPage({
     sessionDoneRef.current = false;
     focusExpressionPromptShownRef.current = false;
     sceneResumeToastShownRef.current = false;
-    setTrainingState(null);
-    setPracticeSnapshot(null);
     practicePrewarmFailureRef.current = {
       count: 0,
       firstFailureAt: null,
@@ -311,7 +306,6 @@ export default function SceneDetailClientPage({
       const cache = await getScenePracticeSnapshotCache(baseLesson.slug, latestPracticeSet.id);
       if (!cancelled && cache.found && cache.record && !cache.isExpired) {
         setPracticeSnapshot(cache.record.data.snapshot);
-        return;
       }
 
       try {
@@ -1144,7 +1138,7 @@ export default function SceneDetailClientPage({
         <button
           type="button"
           className={`${APPLE_BUTTON_DANGER} ${APPLE_BUTTON_TEXT_LG} px-3 py-1.5`}
-          onClick={() => handleDeleteVariantItem(activeVariantLesson.id)}
+          onClick={() => handleDeleteVariantItem(activeVariantItem?.id ?? activeVariantLesson.id)}
         >
           删除变体
         </button>

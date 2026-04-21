@@ -288,7 +288,7 @@ export async function getScenePracticeSnapshotFromApi(
   const query = search.toString();
   const response = await fetch(
     `/api/learning/scenes/${encodeURIComponent(sceneSlug)}/practice/run${query ? `?${query}` : ""}`,
-    { method: "GET" },
+    { method: "GET", cache: "no-store" },
   );
   if (!response.ok) {
     throw await toApiError(response, "读取练习进度失败。");

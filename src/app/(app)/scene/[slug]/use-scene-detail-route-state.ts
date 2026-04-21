@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
   buildSceneDetailHref,
@@ -30,6 +30,10 @@ export const useSceneDetailRouteState = ({
   }) => void;
 }) => {
   const routeState = parseSceneDetailRouteState(searchParams);
+  const pendingRouteStateRef = useRef<{
+    viewMode: SceneViewMode;
+    activeVariantId: string | null;
+  } | null>(null);
   const [viewMode, setViewMode] = useState<SceneViewMode>(routeState.viewMode);
   const [activeVariantId, setActiveVariantId] = useState<string | null>(
     routeState.activeVariantId,
@@ -37,6 +41,15 @@ export const useSceneDetailRouteState = ({
 
   useEffect(() => {
     const nextRouteState = parseSceneDetailRouteState(searchParams);
+    const pendingRouteState = pendingRouteStateRef.current;
+    if (
+      pendingRouteState &&
+      (pendingRouteState.viewMode !== nextRouteState.viewMode ||
+        pendingRouteState.activeVariantId !== nextRouteState.activeVariantId)
+    ) {
+      return;
+    }
+    pendingRouteStateRef.current = null;
     setViewMode(nextRouteState.viewMode);
     setActiveVariantId(nextRouteState.activeVariantId);
     onRouteChange?.(nextRouteState);
@@ -44,6 +57,14 @@ export const useSceneDetailRouteState = ({
 
   const setViewModeWithRoute = useCallback(
     (nextViewMode: SceneViewMode, variantId?: string | null) => {
+      const nextRouteState = {
+        viewMode: nextViewMode,
+        activeVariantId: variantId ?? null,
+      };
+      pendingRouteStateRef.current = nextRouteState;
+      setViewMode(nextRouteState.viewMode);
+      setActiveVariantId(nextRouteState.activeVariantId);
+      onRouteChange?.(nextRouteState);
       const href = buildSceneDetailHref({
         sceneSlug,
         searchParams,
@@ -52,7 +73,7 @@ export const useSceneDetailRouteState = ({
       });
       router.push(href, { scroll: false });
     },
-    [router, sceneSlug, searchParams],
+    [onRouteChange, router, sceneSlug, searchParams],
   );
 
   return {

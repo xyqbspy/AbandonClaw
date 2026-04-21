@@ -12,7 +12,10 @@ import type {
   SceneGeneratedState,
   VariantSet,
 } from "@/lib/types/learning-flow";
-import type { SceneLearningProgressResponse } from "@/lib/utils/learning-api";
+import type {
+  SceneLearningProgressResponse,
+  ScenePracticeSnapshotResponse,
+} from "@/lib/utils/learning-api";
 
 const localRequire = createRequire(import.meta.url);
 const nodeModule = localRequire("node:module") as typeof import("node:module");
@@ -129,6 +132,35 @@ const buildLearningState = (overrides?: {
   },
 });
 
+const buildPracticeSnapshot = (
+  overrides?: Partial<ScenePracticeSnapshotResponse>,
+): ScenePracticeSnapshotResponse => ({
+  run: {
+    id: "practice-run-1",
+    sceneId: "scene-1",
+    sessionId: "session-1",
+    practiceSetId: "practice-1",
+    sourceType: "original",
+    sourceVariantId: null,
+    status: "in_progress",
+    currentMode: "cloze",
+    completedModes: [],
+    startedAt: "2026-03-22T00:00:00.000Z",
+    completedAt: null,
+    lastActiveAt: "2026-03-22T00:00:00.000Z",
+    createdAt: "2026-03-22T00:00:00.000Z",
+    updatedAt: "2026-03-22T00:00:00.000Z",
+  },
+  latestAttempt: null,
+  summary: {
+    completedModeCount: 0,
+    totalAttemptCount: 0,
+    correctAttemptCount: 0,
+    latestAssessmentLevel: null,
+  },
+  ...overrides,
+});
+
 let currentSearchParams = new URLSearchParams();
 let currentGeneratedState: SceneGeneratedState = {
   latestPracticeSet: null,
@@ -157,6 +189,8 @@ let currentVariantRunSnapshot: {
   } | null;
 } = { run: null };
 let currentPracticeSnapshot: import("@/lib/utils/learning-api").ScenePracticeSnapshotResponse | null = null;
+let cachedPracticeSnapshot: ScenePracticeSnapshotResponse | null = null;
+let practiceSnapshotGetCount = 0;
 let pendingPracticeGeneration:
   | {
       promise: Promise<PracticeSet>;
@@ -297,6 +331,7 @@ const mockedModules = {
   "@/features/scene/components/scene-practice-view": {
       ScenePracticeView: ({
         practiceSet,
+        onBack,
         onDelete,
         onRegenerate,
         onSentenceCompleted,
@@ -304,6 +339,7 @@ const mockedModules = {
         onPracticeRunStart,
       }: {
         practiceSet: PracticeSet | null;
+        onBack: () => void;
         onDelete: () => void;
         onRegenerate?: () => void;
         onSentenceCompleted?: () => void;
@@ -335,6 +371,9 @@ const mockedModules = {
         return (
           <div>
             <div>practice-view</div>
+            <button type="button" onClick={onBack}>
+              back-practice
+            </button>
             <button type="button" onClick={onDelete}>
               delete-practice
             </button>
@@ -432,7 +471,18 @@ const mockedModules = {
       },
     }),
     setSceneLearningProgressCache: async () => undefined,
-    getScenePracticeSnapshotCache: async () => ({ found: false, isExpired: false, record: null }),
+    getScenePracticeSnapshotCache: async () =>
+      cachedPracticeSnapshot
+        ? {
+            found: true,
+            isExpired: false,
+            record: {
+              data: {
+                snapshot: cachedPracticeSnapshot,
+              },
+            },
+          }
+        : { found: false, isExpired: false, record: null },
     setScenePracticeSnapshotCache: async () => undefined,
     getSceneVariantRunCache: async () => ({ found: false, isExpired: false, record: null }),
     setSceneVariantRunCache: async () => undefined,
@@ -451,7 +501,10 @@ const mockedModules = {
     completeSceneLearningFromApi: async () => currentLearningState,
     completeScenePracticeRunFromApi: async () => ({ run: null }),
     completeSceneVariantRunFromApi: async () => ({ run: null }),
-    getScenePracticeSnapshotFromApi: async () => currentPracticeSnapshot,
+    getScenePracticeSnapshotFromApi: async () => {
+      practiceSnapshotGetCount += 1;
+      return currentPracticeSnapshot;
+    },
     getSceneVariantRunSnapshotFromApi: async () => currentVariantRunSnapshot,
     markScenePracticeModeCompleteFromApi: async () => ({ run: null }),
     pauseSceneLearningFromApi: async () => currentLearningState,
@@ -800,6 +853,8 @@ afterEach(() => {
   expressionMapResult = null;
   currentVariantRunSnapshot = { run: null };
   currentPracticeSnapshot = null;
+  cachedPracticeSnapshot = null;
+  practiceSnapshotGetCount = 0;
   pendingPracticeGeneration = null;
   practiceGenerationFailureMessage = null;
   practiceRunStartCount = 0;
@@ -1219,6 +1274,77 @@ test("SceneDetailPage 在题目页重渲染时不会持续重复启动 practice 
   });
 });
 
+test("SceneDetailPage 从练习页返回时保留当前练习步骤，不回退到听熟这段", async () => {
+  currentSearchParams = new URLSearchParams("view=practice");
+  currentGeneratedState = {
+    latestPracticeSet: practiceSet,
+    latestVariantSet: null,
+    practiceStatus: "generated",
+    variantStatus: "idle",
+  };
+  currentLearningState = buildLearningState({
+    progress: {
+      masteryStage: "scene_practice",
+      masteryPercent: 80,
+      practicedSentenceCount: 1,
+    },
+    session: {
+      currentStep: "scene_practice",
+      fullPlayCount: 1,
+      openedExpressionCount: 1,
+      practicedSentenceCount: 1,
+    },
+  });
+
+  const SceneDetailPage = getSceneDetailPage();
+  const { rerender } = render(<SceneDetailPage initialLesson={baseLesson} />);
+
+  await screen.findByText("practice-view");
+  fireEvent.click(screen.getByRole("button", { name: "back-practice" }));
+  assert.equal(routerPushCalls.at(-1), "/scene/test-scene");
+
+  currentSearchParams = new URLSearchParams();
+  rerender(<SceneDetailPage initialLesson={baseLesson} />);
+
+  await revealTrainingPanel();
+  assert.ok(screen.getByRole("button", { name: /进入句子练习|继续整段练习/ }));
+  assert.equal(screen.queryByRole("button", { name: "再听" }), null);
+});
+
+test("SceneDetailPage 命中练习快照缓存后仍会后台请求最新快照", async () => {
+  currentSearchParams = new URLSearchParams("view=practice");
+  currentGeneratedState = {
+    latestPracticeSet: practiceSet,
+    latestVariantSet: null,
+    practiceStatus: "generated",
+    variantStatus: "idle",
+  };
+  cachedPracticeSnapshot = buildPracticeSnapshot({
+    summary: {
+      completedModeCount: 0,
+      totalAttemptCount: 1,
+      correctAttemptCount: 1,
+      latestAssessmentLevel: "complete",
+    },
+  });
+  currentPracticeSnapshot = buildPracticeSnapshot({
+    summary: {
+      completedModeCount: 0,
+      totalAttemptCount: 2,
+      correctAttemptCount: 2,
+      latestAssessmentLevel: "complete",
+    },
+  });
+
+  const SceneDetailPage = getSceneDetailPage();
+  render(<SceneDetailPage initialLesson={baseLesson} />);
+
+  await screen.findByText("practice-view");
+  await waitFor(() => {
+    assert.equal(practiceSnapshotGetCount, 1);
+  });
+});
+
 test("SceneDetailPage 生成场景练习时会锁定主 CTA，并保持加载文案稳定", async () => {
   currentLearningState = buildLearningState({
     progress: {
@@ -1534,7 +1660,7 @@ test("SceneDetailPage 删除当前激活变体后会回退到 variants 视图", 
 
   await screen.findByText("variants-view");
   fireEvent.click(screen.getByRole("button", { name: "open-variant" }));
-  fireEvent.click(screen.getByRole("button", { name: "delete-variant" }));
+  fireEvent.click(screen.getByRole("button", { name: /delete-variant|删除变体/ }));
 
   assert.deepEqual(deleteVariantItemCalls, [
     {
