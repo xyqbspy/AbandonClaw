@@ -141,6 +141,11 @@ export function ChunksPageSheets({
   expressionMap,
   apple,
 }: ChunksPageSheetsProps) {
+  const overlayPrimaryButtonClassName = cn(
+    "app-button app-button-primary",
+    "h-[var(--mobile-adapt-overlay-footer-button-height)] rounded-[var(--mobile-adapt-overlay-footer-button-radius)] border px-[var(--mobile-space-sheet)] text-[length:var(--mobile-font-sheet-body)] font-semibold [@media(max-height:760px)]:h-[var(--mobile-control-height)] [@media(max-height:760px)]:text-[length:var(--mobile-font-body-sm)]",
+  );
+
   const overlaySecondaryButtonClassName = cn(
     "app-button app-button-secondary",
     "h-[var(--mobile-adapt-overlay-footer-button-height)] rounded-[var(--mobile-adapt-overlay-footer-button-radius)] border px-[var(--mobile-space-sheet)] text-[length:var(--mobile-font-sheet-body)] font-semibold shadow-none [@media(max-height:760px)]:h-[var(--mobile-control-height)] [@media(max-height:760px)]:text-[length:var(--mobile-font-body-sm)]",
@@ -321,7 +326,7 @@ export function ChunksPageSheets({
             <div className={`grid gap-2 pb-safe ${manual.state.footerGridClassName}`}>
               <LoadingButton
                 type="button"
-                variant="ghost"
+                variant="secondary"
                 className={overlaySecondaryButtonClassName}
                 disabled={manual.state.isSaving}
                 loading={manual.state.isPrimarySaving}
@@ -333,8 +338,8 @@ export function ChunksPageSheets({
               {manual.state.showSecondaryAction ? (
                 <LoadingButton
                   type="button"
-                  variant="ghost"
-                  className={overlaySecondaryButtonClassName}
+                  variant="default"
+                  className={overlayPrimaryButtonClassName}
                   disabled={manual.state.isSaving}
                   loading={manual.state.isSecondarySaving}
                   loadingText={formatLoadingText(manual.state.secondaryActionLabel)}
