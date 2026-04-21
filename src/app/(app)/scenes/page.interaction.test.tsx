@@ -336,7 +336,7 @@ test("ScenesPage 随机播放会从合格场景中随机起点并播放 scene fu
     fireEvent.click(screen.getByRole("button", { name: "随机播放场景" }));
 
     await waitFor(() => {
-      assert.deepEqual(sceneDetailCalls, ["imported-scene"]);
+      assert.deepEqual(sceneDetailCalls, ["coffee-chat", "imported-scene"]);
       assert.deepEqual(sceneFullPlaybackCalls, [
         {
           sceneSlug: "imported-scene",

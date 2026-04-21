@@ -23,6 +23,13 @@ type PlaybackQueueItem = Pick<
 
 const getNextIndex = (index: number, total: number) => (index + 1) % total;
 
+const prefetchSceneDetailByQueueIndex = (queue: PlaybackQueueItem[], index: number) => {
+  if (queue.length <= 1) return;
+  const nextScene = queue[getNextIndex(index, queue.length)];
+  if (!nextScene) return;
+  void getSceneDetailBySlugFromApi(nextScene.slug).catch(() => undefined);
+};
+
 export function useSceneRandomReviewPlayback(allScenes: SceneListItemResponse[]) {
   const eligibleScenes = useMemo(
     () =>
@@ -61,6 +68,7 @@ export function useSceneRandomReviewPlayback(allScenes: SceneListItemResponse[])
       const scene = currentQueue[indexRef.current % currentQueue.length];
       setCurrentScene(scene);
       setStatus("loading");
+      prefetchSceneDetailByQueueIndex(currentQueue, indexRef.current);
 
       try {
         const detail = await getSceneDetailBySlugFromApi(scene.slug);
