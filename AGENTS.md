@@ -141,6 +141,12 @@
 - 使用 apply_patch 精确修改
 - 避免整文件重写
 
+交互事件防护：
+- 涉及拖拽、滑动、下拉刷新、悬浮按钮或 pointer/touch 事件时，提交前必须检查运行时防护
+- `releasePointerCapture` 前必须确认 `hasPointerCapture(pointerId)`，或通过安全 helper 只吞掉已知 `NotFoundError` 竞态
+- `preventDefault()` 前必须确认事件可取消；touch / wheel 类事件优先判断 `event.cancelable`
+- 这类问题通常不能只靠 `build` 发现，必须跑相关 interaction/regression 测试或说明未覆盖原因
+
 ---
 
 # 六、测试策略

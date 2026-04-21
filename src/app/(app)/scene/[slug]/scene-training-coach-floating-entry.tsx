@@ -11,6 +11,32 @@ import {
 } from "./scene-detail-selectors";
 import { getSceneTrainingNextStep, getSceneTrainingStepTitle, sceneDetailMessages } from "./scene-detail-messages";
 
+function safelySetPointerCapture(element: HTMLElement | null, pointerId: number) {
+  if (typeof element?.setPointerCapture !== "function") return;
+  try {
+    element.setPointerCapture(pointerId);
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "NotFoundError") return;
+    throw error;
+  }
+}
+
+function safelyReleasePointerCapture(element: HTMLElement | null, pointerId: number) {
+  if (typeof element?.releasePointerCapture !== "function") return;
+  if (
+    typeof element.hasPointerCapture === "function" &&
+    !element.hasPointerCapture(pointerId)
+  ) {
+    return;
+  }
+  try {
+    element.releasePointerCapture(pointerId);
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "NotFoundError") return;
+    throw error;
+  }
+}
+
 export function SceneTrainingCoachFloatingEntry({
   sceneId,
   trainingState,
@@ -279,9 +305,7 @@ export function SceneTrainingCoachFloatingEntry({
           if (dragStateRef.current.pointerId !== event.pointerId) return;
           dragStateRef.current.activated = true;
           setDragActive(true);
-          if (typeof iconButtonRef.current?.setPointerCapture === "function") {
-            iconButtonRef.current.setPointerCapture(event.pointerId);
-          }
+          safelySetPointerCapture(iconButtonRef.current, event.pointerId);
         }, 180),
       };
     },
@@ -325,8 +349,8 @@ export function SceneTrainingCoachFloatingEntry({
       const { activated, moved } = dragStateRef.current;
       clearDragTimer();
 
-      if (activated && typeof event.currentTarget.releasePointerCapture === "function") {
-        event.currentTarget.releasePointerCapture(event.pointerId);
+      if (activated) {
+        safelyReleasePointerCapture(event.currentTarget, event.pointerId);
       }
 
       if (activated && moved) {
@@ -360,11 +384,8 @@ export function SceneTrainingCoachFloatingEntry({
       event.preventDefault();
       event.stopPropagation();
       clearDragTimer();
-      if (
-        dragStateRef.current.activated &&
-        typeof event.currentTarget.releasePointerCapture === "function"
-      ) {
-        event.currentTarget.releasePointerCapture(event.pointerId);
+      if (dragStateRef.current.activated) {
+        safelyReleasePointerCapture(event.currentTarget, event.pointerId);
       }
       resetDragState();
     },

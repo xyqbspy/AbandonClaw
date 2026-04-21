@@ -91,7 +91,7 @@ export function PullToRefresh({ children }: { children: ReactNode }) {
       const eased = Math.min(110, delta * 0.55);
       pullDistanceRef.current = eased;
       setPullDistance(eased);
-      if (eased > 1) {
+      if (eased > 1 && event.cancelable) {
         event.preventDefault();
       }
     };
