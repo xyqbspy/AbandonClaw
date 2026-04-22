@@ -1,7 +1,10 @@
 import {
   TODAY_SECTION_CLASSNAME,
   TODAY_SECTION_EMOJI_CLASSNAME,
-  TODAY_SECTION_TITLE_CLASSNAME,
+  TODAY_LEARNING_PATH_HEADING_CLASSNAME,
+  TODAY_LEARNING_PRIMARY_CARD_CLASSNAME,
+  TODAY_LEARNING_PRIMARY_REASON_CLASSNAME,
+  TODAY_LEARNING_PRIMARY_TITLE_CLASSNAME,
   TODAY_TASK_STEP_ACTIVE_CLASSNAME,
   TODAY_TASK_STEP_BASE_CLASSNAME,
   TODAY_TASK_STEP_COMPLETED_CLASSNAME,
@@ -42,15 +45,15 @@ export function TodayLearningPathSection({
 }) {
   return (
     <section className={TODAY_SECTION_CLASSNAME}>
-      <div className={`mb-[var(--mobile-space-lg)] ${TODAY_SECTION_TITLE_CLASSNAME} text-[#334155]`}>
+      <div className={TODAY_LEARNING_PATH_HEADING_CLASSNAME}>
         <span className={TODAY_SECTION_EMOJI_CLASSNAME}>🪄</span>
         <span>今日学习路径</span>
       </div>
-      <div className="mb-[var(--mobile-space-md)] rounded-[var(--app-radius-card)] border border-[#DBEAFE] bg-[#F8FBFF] px-[var(--mobile-space-md)] py-[var(--mobile-space-sm)] text-left">
-        <div className="text-[length:var(--mobile-font-body-sm)] font-semibold text-[#1E3A8A]">
+      <div className={TODAY_LEARNING_PRIMARY_CARD_CLASSNAME}>
+        <div className={TODAY_LEARNING_PRIMARY_TITLE_CLASSNAME}>
           {primaryTaskTitle}
         </div>
-        <div className="mt-[var(--mobile-space-2xs)] text-[length:var(--mobile-font-caption)] leading-[1.45] text-[#5B6B85]">
+        <div className={TODAY_LEARNING_PRIMARY_REASON_CLASSNAME}>
           {primaryTaskReason}
         </div>
       </div>

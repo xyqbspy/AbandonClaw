@@ -220,3 +220,20 @@
 - 不把 Review 阶段式训练的私有文字层级提升到 `apple-style.ts`。
 - 不调整 `review/page.tsx` hero 渐变、强阴影和大圆角。
 - 不处理已知 `review/page.interaction.test.tsx` 空队列用例前置状态语义问题。
+
+## 12. Today Welcome 与 Learning Path 局部样式收口记录
+
+已完成：
+
+- `src/features/today/components/today-welcome-card.tsx`
+  - 将欢迎标题、副文案、连续学习 badge、火焰图标、天数和标签样式收回 `today-page-styles.ts`。
+  - 保持文案、结构和渲染行为不变，只减少组件内散落 class。
+- `src/features/today/components/today-learning-path-section.tsx`
+  - 将学习路径标题区和首要任务提示卡样式收回 `today-page-styles.ts`。
+  - task step 的状态样式继续沿用上一轮已收口的 Today 局部常量。
+
+明确不收：
+
+- 不替换 Today 全部十六进制色值。
+- 不抽全局 token 或 shared 组件。
+- 不调整 today 任务编排、点击行为或 locked 语义。

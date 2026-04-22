@@ -6,11 +6,27 @@ import {
   APPLE_BUTTON_BASE,
   APPLE_BUTTON_TEXT_SM,
   APPLE_PANEL_RAISED,
+  APPLE_TITLE_MD,
   APPLE_TITLE_SM,
 } from "@/lib/ui/apple-style";
 
 export const TODAY_SECTION_CLASSNAME = `${APPLE_PANEL_RAISED} px-[var(--mobile-space-sheet)] py-[var(--mobile-space-xl)]`;
 export const TODAY_SECTION_TITLE_CLASSNAME = `flex items-center gap-[var(--mobile-space-sm)] ${APPLE_TITLE_SM}`;
+export const TODAY_WELCOME_TITLE_CLASSNAME = `truncate ${APPLE_TITLE_MD} text-[#0F172A]`;
+export const TODAY_WELCOME_MESSAGE_CLASSNAME =
+  `mt-[var(--mobile-space-2xs)] ${APPLE_META_TEXT}`;
+export const TODAY_WELCOME_STREAK_BADGE_CLASSNAME =
+  "shrink-0 rounded-[var(--app-radius-pill)] bg-[#FEF9E3] px-[var(--mobile-space-lg)] py-[var(--mobile-space-sm)]";
+export const TODAY_WELCOME_STREAK_CONTENT_CLASSNAME =
+  "flex items-center gap-[var(--mobile-space-sm)]";
+export const TODAY_WELCOME_STREAK_ICON_CLASSNAME =
+  "inline-flex text-[clamp(1.05rem,5vw,1.25rem)] leading-none";
+export const TODAY_WELCOME_STREAK_VALUE_CLASSNAME =
+  "text-[length:var(--mobile-font-body)] font-bold text-[#B45309]";
+export const TODAY_WELCOME_STREAK_UNIT_CLASSNAME =
+  "text-[length:var(--mobile-font-caption)] font-medium";
+export const TODAY_WELCOME_STREAK_LABEL_CLASSNAME =
+  "text-[length:var(--mobile-font-caption)] text-[#92400E]";
 export const TODAY_CONTINUE_BUTTON_CLASSNAME = `${APPLE_BUTTON_STRONG} ${APPLE_BUTTON_TEXT_MD} mt-[var(--mobile-space-xl)] h-[var(--mobile-button-height)] w-full justify-center shadow-[0_8px_18px_rgba(37,99,235,0.25)] active:scale-[0.97] disabled:cursor-default disabled:opacity-70 disabled:shadow-none`;
 export const TODAY_CONTINUE_TITLE_CLASSNAME =
   "truncate text-[length:clamp(1.15rem,5.6vw,1.25rem)] leading-[1.2] font-extrabold tracking-[-0.03em] text-[#0B2B40]";
@@ -80,6 +96,14 @@ export const TODAY_TASK_STEP_TITLE_CLASSNAME =
   "text-[length:var(--mobile-font-body-sm)] font-semibold leading-[1.2] tracking-[-0.01em] text-[#1F2A44]";
 export const TODAY_TASK_STEP_DESC_CLASSNAME =
   "mt-[var(--mobile-space-2xs)] text-[length:var(--mobile-font-caption)] leading-[1.35] text-[#6C7A91]";
+export const TODAY_LEARNING_PATH_HEADING_CLASSNAME =
+  `mb-[var(--mobile-space-lg)] ${TODAY_SECTION_TITLE_CLASSNAME} text-[#334155]`;
+export const TODAY_LEARNING_PRIMARY_CARD_CLASSNAME =
+  "mb-[var(--mobile-space-md)] rounded-[var(--app-radius-card)] border border-[#DBEAFE] bg-[#F8FBFF] px-[var(--mobile-space-md)] py-[var(--mobile-space-sm)] text-left";
+export const TODAY_LEARNING_PRIMARY_TITLE_CLASSNAME =
+  "text-[length:var(--mobile-font-body-sm)] font-semibold text-[#1E3A8A]";
+export const TODAY_LEARNING_PRIMARY_REASON_CLASSNAME =
+  "mt-[var(--mobile-space-2xs)] text-[length:var(--mobile-font-caption)] leading-[1.45] text-[#5B6B85]";
 
 export const TODAY_INLINE_LINK_CLASSNAME =
   "text-[length:var(--mobile-font-caption)] font-medium text-[#3B82F6]";
