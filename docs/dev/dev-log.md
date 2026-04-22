@@ -1,5 +1,44 @@
 ﻿# Dev Log
 
+### [2026-04-22] 瘦身核心维护入口文档
+- 类型：Spec-Driven / 核心维护文档瘦身
+- 状态：已完成
+
+#### 背景
+前几轮已经完成维护检查脚本、archive 收尾和入口可读性第一轮优化，但 `AGENTS.md` 仍承载了过多执行细则，`docs/README.md`、`CHANGELOG.md` 与维护手册之间也需要进一步明确职责边界。
+
+#### 本次改动
+- 精简 `AGENTS.md`，只保留强约束、任务分流、修改前输出、OpenSpec 红线、测试/文档/提交约束。
+- 重写 `docs/README.md` 为短入口，保留文档分层、最小阅读路径和常见问题定位。
+- 更新 `docs/dev/project-maintenance-playbook.md`，承接从 `AGENTS.md` 迁出的执行细则入口。
+- 在 `CHANGELOG.md` 顶部声明正式发布记录边界，避免写入过程性维护记录。
+- 同步 `openspec/specs/project-maintenance/spec.md`，固定 AGENTS 瘦身与核心入口可读性要求。
+
+#### 本轮收口项
+- `AGENTS.md` 从长规则文档收敛为强约束入口。
+- 核心文档入口改成短路径，降低 Fast Track 和普通维护阅读成本。
+- `CHANGELOG.md` 明确只记录用户可感知变化，开发过程回到 dev-log。
+
+#### 明确不收项
+- 不清理所有历史 archive 和旧 proposal。
+- 不重写所有 feature-flow、domain-rules 或 system-design 文档。
+- 不新增自动文档格式化或乱码修复工具。
+
+#### 影响范围
+- 影响模块：`AGENTS.md`、`docs/README.md`、`docs/dev/project-maintenance-playbook.md`、`docs/dev/dev-log.md`、`CHANGELOG.md`、`openspec/specs/project-maintenance/spec.md`
+- 是否影响主链路：否
+- 是否影响用户可感知行为：否
+- 是否改业务代码、API、数据库、缓存或 UI：否
+
+#### 测试 / 验证
+- 已运行：
+  - `pnpm exec openspec validate slim-core-maintenance-docs --strict`
+  - `pnpm exec openspec validate --all --strict`
+  - `pnpm run text:check-mojibake`
+  - `git diff --check`
+  - `pnpm run maintenance:check`
+  - `pnpm exec openspec list --json`
+
 ### [2026-04-20] 收紧完成态提交与正式 CHANGELOG 收口规则
 - 类型：文档 / 规范治理
 - 状态：已完成

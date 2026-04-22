@@ -1,119 +1,62 @@
-# AI 协作开发规则（AGENTS.md）
+# AI 协作开发规则
 
-你是本项目的 AI 协作工程师。
+你是本项目的 AI 协作工程师。所有输出使用中文，风格简洁、直接、执行导向。优先给最小可维护方案，避免过度设计、额外抽象和无关重构。
 
-所有输出使用中文。
-风格要求：简洁、直接、执行导向。
-优先给最小可维护方案，避免过度设计、额外抽象和无关重构。
+本文件只保留强约束和任务分流。详细执行清单在 `docs/dev/README.md`、`docs/dev/project-maintenance-playbook.md` 和 `openspec/specs/project-maintenance/spec.md`。
 
----
+## 1. 修改前必须做
 
-# 一、核心执行流程（必须遵守）
+在开始修改前，按顺序完成：
 
-在开始修改前，必须按以下顺序执行：
+1. 判断任务类型：Fast Track / Cleanup / Spec-Driven。
+2. 先读 `docs/README.md` 定位文档，再按需读 feature-map、feature-flows、domain-rules、system-design、stable spec 或 dev 文档。
+3. 做稳定性收口检查：是否暴露旧规则漂移、重复语义、缺失文档、缺失测试、边界不清或旧兼容语义未收口。
+4. 输出问题分析与最小方案。
+5. 再修改代码或文档。
+6. 必要时同步测试与文档。
 
-1. 判断任务类型（Fast Track / Cleanup / Spec-Driven）
-2. 阅读相关文档（先看 `docs/README.md` 做入口定位，再按需读对应 `feature-map` / `feature-flows` / `domain-rules`；若涉及稳定规则、正式语义、跨页面契约或已知 capability，必须补读对应 `openspec/specs/*`；若涉及字段来源 / 缓存 / fallback / 组件协作，再看 `system-design`；若涉及流程 / 测试 / OpenSpec，再看 `docs/dev`）
-3. 做一次“稳定性收口检查”，判断这次需求是否同时暴露了旧规则漂移、重复语义、缺失文档、缺失测试或边界不清
-4. 输出问题分析与最小方案
-5. 再开始修改代码
-6. 必要时同步更新测试与文档
+禁止直接从局部代码猜业务语义；涉及主链路、状态流、回写、恢复、Scene 完成判定时必须先理解完整链路。
 
-禁止：
-- 直接从局部代码开始修改
-- 未理解链路就修改核心逻辑
+## 2. 任务分流
 
----
+### Fast Track
 
-# 二、任务分流（唯一标准）
-
-## 1. Fast Track（直接修）
-
-适用于：
-- UI / 样式 / 文案调整
-- lint / type / import 修复
-- 局部测试补齐或修复
-- 小范围重构（不改变业务语义）
-- 删除局部冗余代码
+适用于 UI / 样式 / 文案、lint / type / import、局部测试、小范围不改业务语义的重构、删除局部冗余代码。
 
 规则：
-- 可以直接改代码
-- 不走 OpenSpec
-- 只读最少上下文
-- 只跑最小测试
-- 不做无关改动
-- 若只是这类微小改动的正常提交或回归修复提交，不要求执行 archive、stable spec sync、dev-log 补记或正式 `CHANGELOG.md` 更新这类“大收尾”动作
-- 这类改动的收尾标准是：代码改对、最小相关测试通过、必要文档已做最小同步，然后即可直接提交
-- 但若在处理中发现同一链路里存在会直接导致后续返工的稳定性缺口，必须在同一轮一并补齐最小必要收口，而不是留到后面再补文档或规则
 
----
+- 不走 OpenSpec。
+- 只读最小上下文。
+- 只跑最小相关测试。
+- 不做无关改动。
+- 不默认执行 archive、stable spec sync、dev-log、正式 `CHANGELOG.md` 这类大收尾。
+- 若处理中暴露主链路或稳定规则风险，必须补读上下文并重新判断是否升级。
 
-## 2. Cleanup / Removal（清理）
+### Cleanup / Removal
 
-适用于：
-- 删除废弃 / 重复 / 低价值功能
-- 删除旧入口 / 旧状态 / 旧测试 / 旧文档
+适用于删除废弃、重复、低价值功能，或删除旧入口、旧状态、旧测试、旧文档。
 
 规则：
-- 允许删除代码与测试
-- 必须说明删除依据和影响范围
-- 不得误删主链路
-- 若改变用户行为 → 转 Spec-Driven
 
----
+- 必须说明删除依据和影响范围。
+- 不得误删主链路。
+- 若改变用户行为，升级 Spec-Driven。
 
-## 3. Spec-Driven Change（规范变更）
+### Spec-Driven
 
-适用于：
-- 改变业务行为 / 用户能力
-- 改变主链路 / 状态流转 / 数据流
-- 修改 API / 数据模型 / 权限 / 缓存
-- 修改测试链路 / 维护规范 / 跨页面 UI 一致性
-- 详情组件结构性复用边界或跨模块结构收敛
-- 跨模块影响
-- 用户明确要求走 proposal
+适用于改变业务行为、用户能力、主链路、状态流、数据流、API、数据模型、权限、缓存、测试链路、维护规范、跨页面一致性、详情组件结构边界或跨模块契约。
 
 规则：
-- 必须先 proposal / tasks
-- 未 approved 前不实施
-- 必须写 spec delta
-- proposal / tasks 里必须明确“本轮顺手收口哪些既有不稳定点，哪些明确不收”
 
----
+- 必须先有 proposal / design / spec delta / tasks。
+- 未批准前不实施业务代码。
+- proposal / tasks 必须记录本轮收口项和明确不收项。
+- 完成态提交前必须完成 tasks、文档同步、stable spec 同步、archive 和实现 Review。
+- 若完成态将直接进入 `main` 且存在用户可感知变化，必须同步正式 `CHANGELOG.md`。
 
-## 默认原则
+## 3. 修改前必须输出
 
-默认先判断这次是不是“微小改动”。  
-只有明确属于微小、局部且不影响稳定规则时，才按 Fast Track；只要进入非微小改动范围，就优先转 Spec-Driven。
-
----
-
-# 三、文档阅读规则（强制）
-
-涉及以下内容时必须先读文档：
-
-- 推荐逻辑
-- 状态流转
-- 回写逻辑
-- Session 恢复
-- Scene 完成判定
-
-阅读顺序：
-
-1. `docs/README.md`，先定位本次问题属于哪个模块、链路、规则或维护流程
-2. 对应 `docs/feature-map/README.md` 与相关模块文档
-3. 对应 `docs/feature-flows/*` 链路文档
-4. `docs/domain-rules/README.md` 与对应规则文档
-5. 若涉及稳定规则、正式语义、跨页面契约或已知 capability，再读对应 `openspec/specs/*`
-6. 若涉及字段来源、落库、缓存、fallback 或组件协作，再读 `docs/system-design/*`
-7. 若涉及流程、测试、发布检查或 OpenSpec，再读 `docs/dev/README.md` 与对应维护文档
-8. 再读代码
-
----
-
-# 四、修改前必须输出
-
-在动代码前必须输出：
+动代码或核心文档前，必须输出：
 
 1. 任务分类
 2. 问题定位
@@ -123,215 +66,96 @@
 6. 风险与影响范围
 7. 最小测试方案
 8. 是否需要更新文档
-9. 这次是否发现需要顺手收口的稳定性缺口；若有，列出“本轮收口项 / 明确不收项”
+9. 本轮收口项 / 明确不收项
 
----
+## 4. 文档阅读入口
 
-# 五、代码修改原则
+默认入口是 `docs/README.md`。
 
-- 优先复用已有实现
-- 优先删除绕路逻辑
-- 不新增不必要抽象
-- 不引入大依赖
-- 只改必要文件
-- 不顺手改无关代码
+- 涉及正式语义、跨页面契约或已知 capability：补读 `openspec/specs/*`。
+- 涉及字段来源、落库、缓存、fallback、组件协作：补读 `docs/system-design/*`。
+- 涉及流程、测试、OpenSpec、发布检查：补读 `docs/dev/README.md`。
+- Fast Track 只读入口规则、相关文件、必要索引和最小测试上下文。
 
-编码要求：
-- UTF-8 读写中文
-- 使用 apply_patch 精确修改
-- 避免整文件重写
+## 5. 代码与文件修改
 
-交互事件防护：
-- 涉及拖拽、滑动、下拉刷新、悬浮按钮或 pointer/touch 事件时，提交前必须检查运行时防护
-- `releasePointerCapture` 前必须确认 `hasPointerCapture(pointerId)`，或通过安全 helper 只吞掉已知 `NotFoundError` 竞态
-- `preventDefault()` 前必须确认事件可取消；touch / wheel 类事件优先判断 `event.cancelable`
-- 这类问题通常不能只靠 `build` 发现，必须跑相关 interaction/regression 测试或说明未覆盖原因
+- 优先复用已有实现。
+- 优先删除绕路逻辑。
+- 不新增不必要抽象。
+- 不引入大依赖。
+- 只改必要文件。
+- 不顺手改无关代码。
+- 使用 UTF-8。
+- 手工编辑使用 `apply_patch`，避免整文件重写；若核心文档本身需要清理，可重写但必须说明范围。
+- 不得回滚用户或他人未授权改动。
 
----
+涉及 pointer / touch / wheel / 拖拽 / 滑动 / 下拉刷新 / 悬浮按钮时，提交前必须检查运行时防护：
 
-# 六、测试策略
+- `releasePointerCapture` 前确认 `hasPointerCapture(pointerId)`，或使用安全 helper。
+- `preventDefault()` 前确认事件可取消。
+- 运行相关 interaction / regression 测试，或说明未覆盖原因。
 
-默认：
-- 只跑最小相关测试
-- 不跑全量测试
+## 6. 测试
 
-测试失败时必须：
+默认只跑最小相关测试，不跑全量。
 
-1. 说明测试保护的行为
-2. 判断属于：
-   - 业务语义
-   - 模块行为
-   - 实现细节
-   - 历史遗留
-3. 判断失败原因：
-   - 代码 bug
-   - 测试过时
-   - 实现耦合
-   - 功能废弃
-4. 决定：
-   - 改代码
-   - 改测试
-   - 重写测试
-   - 删除测试
+测试失败时必须说明：
 
-禁止：
-- 为通过测试删除断言
-- 无解释弱化测试
-- 用 mock 掩盖问题
-- 跳过分析直接改单测
+- 测试保护的行为。
+- 失败属于业务语义、模块行为、实现细节还是历史遗留。
+- 失败原因是代码 bug、测试过时、实现耦合还是功能废弃。
+- 决定改代码、改测试、重写测试还是删除测试。
 
----
+禁止为通过测试删除断言、无解释弱化测试、用 mock 掩盖问题或跳过分析直接改单测。
 
-# 七、文档维护规则
+## 7. 文档维护
 
-文档必须归类：
-
-- feature-map（模块）
-- feature-flows（链路）
-- domain-rules（规则）
-- system-design（实现）
-- dev（开发）
-- meta（认知）
+文档必须归类到 feature-map、feature-flows、domain-rules、system-design、dev 或 meta。
 
 规则：
 
-1. 优先更新已有文档
-2. 不新增重复语义文档
-3. 主链路变更必须更新文档
-4. 不允许同一逻辑散落多个文件
-5. OpenSpec 变更在 implementation / archive 完成前，必须同步检查并补全对应文档
-6. 功能链路优化或新增能力必须同步更新对应分类文档；例如音频/TTS 链路改动要更新 `docs/system-design/audio-tts-pipeline.md`
-7. 处理需求时如果已经发现 stable spec / domain-rules / system-design / feature-flows 之间存在重复语义、边界漂移或入口缺失，必须在同一轮做最小收口，不要把已识别的不稳定点留到后续零散修补
+- 优先更新已有文档。
+- 不新增重复语义文档。
+- 主链路变更必须更新 feature-flow。
+- OpenSpec 变更 archive 前必须检查相关维护文档和 stable spec 是否同步。
+- 已发现的稳定性缺口必须在同一轮做最小必要收口，或明确记录不收项和风险位置。
 
----
+## 8. OpenSpec 收尾红线
 
-# 八、功能链路规则（关键）
+Spec-Driven 完成态提交前必须：
 
-涉及以下改动：
+- tasks 真实更新为完成状态。
+- 对照 proposal / design / spec delta 做实现 Review。
+- 运行或说明最小验证。
+- 同步相关文档和 stable spec。
+- 完成 archive。
+- 确认 `pnpm run maintenance:check` 通过。
+- 用户可感知变化进入 `main` 时更新正式 `CHANGELOG.md`。
 
-- 入口
-- 推荐逻辑
-- 状态流转
-- 回写逻辑
-- 恢复逻辑
+Fast Track / Cleanup 不默认套用完整收尾。
 
-必须：
+## 9. CHANGELOG 与 dev-log
 
-- 先理解完整链路
-- 再修改代码
-- 修改后同步更新 feature-flows
+- `CHANGELOG.md` 只记录用户可感知变化。
+- 开发过程、验证结果、剩余风险记录到 `docs/dev/dev-log.md`。
+- 未发布或过程性记录不得提前写入正式 `CHANGELOG.md`。
 
----
+## 10. Git 提交
 
-# 九、OpenSpec（仅 Spec-Driven 使用）
+提交信息使用中文前缀：
 
-流程：
+- `feat:`
+- `fix:`
+- `test:`
 
-Proposal → Approval → Implementation → Archive → Update specs → Update CHANGELOG
+Spec-Driven 若只是中间提交，不得表述为已完成。完成态提交必须先完成收尾动作再提交。
 
-规则：
+## 核心原则
 
-- 未 approved 不写实现代码
-- 必须有 change-id
-- 必须有 proposal / tasks
-- 行为变更必须写 spec delta
-- 非微小改动若涉及数据流、缓存、测试链路、维护规范或跨页面一致性，也应先走 OpenSpec
-- 实现完成后必须对照 proposal / design / spec delta 回查对应 feature-flow / domain-rules / system-design 文档是否已同步
-- 若本次提交被视为“完成态提交”或用户明确要求“收尾提交”，则必须先完成收尾动作，再提交代码；不得先提交实现代码、再手动补 archive / stable spec / 文档收尾
-- 收尾动作至少包括：tasks 状态更新、相关文档同步、stable spec 同步、change archive；若本次收尾结果将直接进入 `main` 且存在用户可感知变化，则必须同步更新正式 `CHANGELOG.md`
-- 上述“完整收尾”要求只适用于 Spec-Driven 的完成态提交；Fast Track / Cleanup 的微小改动不应默认套用同等级收尾流程
-- 开发中的中间提交允许存在，但不得宣称该变更已完成，也不得跳过后续收尾流程
-- archive 前不得只归档 OpenSpec 而遗漏实际维护文档；若无文档更新，必须说明原因
+目标不是尽快写代码，而是：
 
-详见：
-- `openspec/specs/project-maintenance/spec.md`（长期稳定维护约束）
-- `docs/dev/openspec-workflow.md`（Spec-Driven 阶段细化流程）
-
----
-
-# 十、CHANGELOG 规则
-
-正式 CHANGELOG：
-
-- 只记录用户可感知变化
-- 若本次收尾结果将直接进入 `main`，则用户可感知的新功能、交互变化或行为变化必须同步更新
-- 若代码尚未进入 `main`，不得把过程性记录或未发布改动提前写入正式 `CHANGELOG.md`
-
-开发过程：
-
-- 记录在 docs/dev/dev-log.md
-
----
-
-# 十一、Git 提交
-
-使用中文：
-
-- feat:
-- fix:
-- test:
-
-补充约束：
-
-- Fast Track / Cleanup 可以按正常节奏提交，但仍需保证该轮最小测试与文档同步已完成
-- Fast Track / Cleanup 不要求为一次普通小改动额外执行 archive、stable spec sync、dev-log 补记或正式 `CHANGELOG.md` 更新，除非该轮同时被提升为明确的规范变更或发布收尾
-- Spec-Driven 若只是开发中的中间提交，可以提交，但不得表述为“已完成”
-- Spec-Driven 若是“完成态提交 / 收尾提交”，必须先完成 tasks、文档、stable spec 与 archive，再提交
-
-示例：
-
-feat: 增加 Today 推荐优先级逻辑  
-fix: 修复 session 恢复路径错误  
-test: 补充 review 回写测试
-
----
-
-# 核心原则（最重要）
-
-你的目标不是“尽快写代码”，而是：
-
-- 不破坏主链路
-- 不误改状态流转
-- 保证系统理解一致
-- 保证改动可追踪
-- 让 AI 在复杂系统里不迷路
-
----
-
-# 十二、Spec-Driven 实现 Review
-
-Spec-Driven 变更在“完成态提交 / 收尾提交”前，必须先完成一次实现 Review。
-
-实现 Review 至少检查：
-
-- 实现是否与 proposal / tasks / spec delta 一致
-- tasks 是否已更新为真实完成状态
-- 相关测试是否已执行或明确说明未执行原因
-- feature-flow / domain-rules / system-design / dev 文档是否已按影响范围同步
-- stable spec 与 archive 是否已完成或明确说明不适用
-- 本轮已识别但不收的事项、剩余风险与后续入口是否已记录
-
-Fast Track / Cleanup 不默认套用完整实现 Review；只需要完成与改动规模匹配的最小检查。
-
----
-
-# 十三、上下文预算规则
-
-所有任务都必须控制上下文预算，目标是“够用且相关”，不是读得越多越好。
-
-规则：
-
-- Fast Track：只读入口规则、相关文件、必要索引和最小测试上下文；不默认通读 feature-flows、domain-rules、system-design、OpenSpec archive 或 dev-log
-- Cleanup：除局部代码外，必须读删除对象的入口、引用方和影响范围；不读无关模块历史
-- Spec-Driven：先用 `docs/README.md` 和索引定位，再按相关 feature-flow、domain-rules、stable spec、system-design、代码递进阅读
-- 历史 archive、旧 proposal、dev-log 只能作为历史参考，不能替代当前 stable spec、维护文档和实际代码
-- 若处理中发现主链路、状态流、数据流、缓存、权限或稳定规则风险，必须补读对应上下文，并重新判断是否升级任务类型
-- 完成态 Review 时，必须确认本轮依据没有被无关历史材料或跨模块噪音污染
-
-规则关系：
-
-- `AGENTS.md`：入口强约束和任务分流
-- `docs/README.md`：文档定位顺序
-- `openspec/specs/project-maintenance/spec.md`：长期稳定契约
-- `docs/dev/project-maintenance-playbook.md`：执行清单
-- `docs/dev/change-intake-template.md`：接需求阶段的问题分析骨架
+- 不破坏主链路。
+- 不误改状态流转。
+- 保证系统理解一致。
+- 保证改动可追踪。
+- 让 AI 在复杂系统里不迷路。

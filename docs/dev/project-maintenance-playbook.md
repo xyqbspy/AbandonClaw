@@ -25,6 +25,22 @@
 - 处理中发现旧规则漂移、重复语义、缺失文档、缺失测试或边界不清。
 - 准备做 Spec-Driven 完成态提交、stable spec 同步或 archive。
 
+### 从 AGENTS 迁出的执行细则
+
+`AGENTS.md` 现在只保留强约束。以下细节以后优先在本手册或 `openspec/specs/project-maintenance/spec.md` 维护：
+
+- Fast Track / Cleanup 的最小收尾口径。
+- Spec-Driven 的 proposal、implementation、archive 执行清单。
+- 测试失败分析流程。
+- 文档分类、stable spec 同步和 dev-log / CHANGELOG 分工。
+- 上下文预算和完成态 Review 清单。
+
+如果要新增维护规则，先判断它是“强制红线”还是“执行细节”：
+
+- 强制红线才进入 `AGENTS.md`。
+- 执行细节进入本手册。
+- 长期稳定契约进入 `openspec/specs/project-maintenance/spec.md`。
+
 ## 1. 项目是什么
 
 这是一个面向中文学习者的英语学习系统。它不是单纯的单词卡片应用，而是把学习拆成一条连续闭环：
