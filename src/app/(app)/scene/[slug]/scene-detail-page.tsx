@@ -235,7 +235,7 @@ export default function SceneDetailClientPage({
     return () => {
       cancelled = true;
     };
-  }, [baseLesson, refreshGeneratedState]);
+  }, [baseLesson, refreshGeneratedState, viewMode]);
 
   const {
     practiceLoading,
