@@ -205,3 +205,18 @@
 
 - `review/page.tsx` 的 hero 渐变、`rounded-[32px]` 和强阴影仍是 review 页面私有视觉语义，暂不提升到 `apple-style.ts`。
 - 后续若 review、today、progress 出现同类 hero / fixed footer 结构，再评估是否抽成共享页面骨架 token。
+
+## 11. Review Stage Panel 内部文案层级收口记录
+
+已完成：
+
+- `src/app/(app)/review/review-page-stage-panel.tsx`
+  - 将空队列标题、场景标题、场景正文、场景期望答案、表达遮罩、表达标题、调度提示、reference toggle、评分提示等固定文字层级抽为同文件局部常量。
+  - 将练习模式 pill 和场景反馈结果的固定基础 class 抽为局部常量，动态状态色仍保留原有判断。
+  - 保持视觉和交互条件不变；这轮只继续减少 JSX 中散落的文字层级 class，不改变 Review 队列、阶段推进或提交逻辑。
+
+明确不收：
+
+- 不把 Review 阶段式训练的私有文字层级提升到 `apple-style.ts`。
+- 不调整 `review/page.tsx` hero 渐变、强阴影和大圆角。
+- 不处理已知 `review/page.interaction.test.tsx` 空队列用例前置状态语义问题。
