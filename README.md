@@ -34,46 +34,32 @@ ADMIN_EMAILS=your-admin@example.com,another-admin@example.com
 这个仓库最省心的本地工作流是：
 
 - 默认不常驻前端服务
-- 默认只推荐一条预览入口：后台 `preview:up`
-- 只有确实需要热更新排查局部页面时，才临时使用 `pnpm run dev`
+- 需要看页面或排查交互时，临时使用 `pnpm run dev`
+- 需要确认生产构建时，手动组合 `pnpm run build` 和 `pnpm run start`
+- 不再保留后台 preview 管理脚本，避免隐藏进程与状态文件带来的误判
 
-默认推荐命令：
+本地开发命令：
 
 ```bash
-pnpm run preview:up
-pnpm run preview:down
-pnpm run preview:restart
-pnpm run preview:status
+pnpm run dev
 ```
 
-推荐习惯：
+生产模式验证命令：
 
-- 大多数时候让 Codex 改代码，但不要长期挂着 `next dev`
-- 只想看页面结果时，运行 `pnpm run preview:up`
-- 需要实时 HMR 时，再临时运行 `pnpm run dev`，看完就关掉
-
-如果你在 Windows 上想要更低操作成本的预览流：
-
-- `pnpm run preview:up`：后台构建并启动 preview，成功后可直接访问 `http://localhost:3000/`
-- `pnpm run preview:status`：查看 preview 是否在运行
-- `pnpm run preview:down`：关闭后台 preview 服务
-- `pnpm run preview:restart`：重新构建并重启 preview
-
-如果你想手动前台运行生产模式，也仍然可以直接组合：
-
-```bash
 pnpm run build
 pnpm run start
 ```
 
+推荐习惯：
+
+- 大多数时候让 Codex 改代码，不长期挂着 `next dev`
+- 需要 HMR 或人工看页面时，再临时运行 `pnpm run dev`，看完就关掉
+- 需要排查生产模式差异时，使用 `build` + `start` 前台运行
+
 说明：
 
-- `pnpm run preview:up` 是仓库级默认推荐入口
-- `pnpm run dev` 只用于确实需要 HMR 的局部排查，不作为并列预览方案
+- `pnpm run dev` 是仓库级默认本地开发入口
 - `pnpm run dev:turbo` 不再作为默认推荐入口
-
-后台预览管理器会把运行状态写到 `.tmp/preview-server.json`，日志写到 `.tmp/preview-server.log`。
-如果 `preview:up` 已成功启动，默认访问地址也是 `http://localhost:3000/`。
 
 ## 3）数据库初始化（Supabase SQL Editor）
 

@@ -1,6 +1,17 @@
 import Link from "next/link";
+import { CalendarClock, Search, UploadCloud, UserRound } from "lucide-react";
 import { buildAdminHref, readAdminPositivePage, readAdminStringParam } from "@/app/(app)/admin/admin-page-state";
-import { AdminPagination, AdminTableShell } from "@/components/shared/admin-list-shell";
+import {
+  AdminEmptyState,
+  AdminList,
+  AdminListBadges,
+  AdminListContent,
+  AdminListIcon,
+  AdminListItem,
+  AdminListMeta,
+  AdminListTitle,
+  AdminPagination,
+} from "@/components/shared/admin-list-shell";
 import { FilterBar, FilterBarForm } from "@/components/shared/filter-bar";
 import { PageHeader } from "@/components/shared/page-header";
 import { Badge } from "@/components/ui/badge";
@@ -8,11 +19,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { listAdminScenes } from "@/lib/server/admin/service";
 import {
-  APPLE_BUTTON_BASE,
-  APPLE_BUTTON_TEXT_SM,
+  APPLE_ADMIN_CONTROL,
   APPLE_META_TEXT,
-  APPLE_TABLE_HEAD,
-  APPLE_TABLE_ROW,
   APPLE_TITLE_SM,
 } from "@/lib/ui/apple-style";
 
@@ -23,6 +31,9 @@ const LABELS = {
     "\u5feb\u901f\u67e5\u770b imported \u5185\u5bb9\uff0c\u4fbf\u4e8e\u6392\u67e5 parse \u8d28\u91cf\u4e0e\u6e05\u7406\u3002",
   search: "\u641c\u7d22\u6807\u9898\u6216 slug",
   submit: "\u641c\u7d22",
+  imported: "\u5bfc\u5165",
+  public: "\u516c\u5f00",
+  private: "\u79c1\u6709",
   empty: "\u672a\u627e\u5230\u5bfc\u5165\u573a\u666f\u3002",
   summaryPrefix: "\u663e\u793a",
   summaryMiddle: "/ \u5171",
@@ -37,8 +48,6 @@ export default async function AdminImportedScenesPage({
   const q = readAdminStringParam(params, "q");
   const page = readAdminPositivePage(params);
   const pageSize = 20;
-  const appleButtonClassName = `${APPLE_BUTTON_BASE} ${APPLE_BUTTON_TEXT_SM}`;
-
   const result = await listAdminScenes({
     origin: "imported",
     search: q,
@@ -56,55 +65,57 @@ export default async function AdminImportedScenesPage({
 
       <FilterBar>
         <FilterBarForm className="sm:grid-cols-[1fr_auto]">
-          <Input name="q" defaultValue={q} placeholder={LABELS.search} />
-          <Button type="submit" variant="ghost" className={appleButtonClassName}>
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input name="q" defaultValue={q} placeholder={LABELS.search} className={`${APPLE_ADMIN_CONTROL} pl-9`} />
+          </div>
+          <Button type="submit" variant="default" size="lg" className="gap-2">
+            <Search className="size-4" />
             {LABELS.submit}
           </Button>
         </FilterBarForm>
       </FilterBar>
 
-      <AdminTableShell>
-        <table className="min-w-full text-sm">
-          <thead className={`${APPLE_TABLE_HEAD} text-left text-xs`}>
-            <tr>
-              <th className="px-3 py-2">title</th>
-              <th className="px-3 py-2">slug</th>
-              <th className="px-3 py-2">origin</th>
-              <th className="px-3 py-2">is_public</th>
-              <th className="px-3 py-2">created_by</th>
-              <th className="px-3 py-2">created_at</th>
-            </tr>
-          </thead>
-          <tbody>
-            {result.rows.map((row) => (
-              <tr key={row.id} className={`${APPLE_TABLE_ROW} align-top`}>
-                <td className="px-3 py-2">
+      {result.rows.length > 0 ? (
+        <AdminList>
+          {result.rows.map((row) => (
+            <AdminListItem key={row.id}>
+              <AdminListIcon>
+                <UploadCloud className="size-5" />
+              </AdminListIcon>
+              <AdminListContent>
+                <div className="flex flex-wrap items-center gap-2">
+                  <AdminListTitle>
                   <Link
                     href={`/admin/scenes/${row.id}`}
                     className={`${APPLE_TITLE_SM} underline-offset-2 hover:underline`}
                   >
                     {row.title}
                   </Link>
-                </td>
-                <td className={`px-3 py-2 font-mono ${APPLE_META_TEXT}`}>{row.slug}</td>
-                <td className="px-3 py-2">
-                  <Badge variant="outline">{row.origin}</Badge>
-                </td>
-                <td className="px-3 py-2">{row.is_public ? "true" : "false"}</td>
-                <td className={`px-3 py-2 font-mono ${APPLE_META_TEXT}`}>{row.created_by ?? "-"}</td>
-                <td className={`px-3 py-2 whitespace-nowrap ${APPLE_META_TEXT}`}>{row.created_at}</td>
-              </tr>
-            ))}
-            {result.rows.length === 0 ? (
-              <tr>
-                <td colSpan={6} className="px-3 py-6 text-center text-muted-foreground">
-                  {LABELS.empty}
-                </td>
-              </tr>
-            ) : null}
-          </tbody>
-        </table>
-      </AdminTableShell>
+                  </AdminListTitle>
+                  <AdminListBadges>
+                    <Badge variant="outline">{LABELS.imported}</Badge>
+                    <Badge variant="secondary">{row.is_public ? LABELS.public : LABELS.private}</Badge>
+                  </AdminListBadges>
+                </div>
+                <p className={`font-mono text-xs ${APPLE_META_TEXT}`}>{row.slug}</p>
+                <AdminListMeta>
+                  <span className="flex items-center gap-1.5">
+                    <UserRound className="size-3.5" />
+                    创建者：{row.created_by ?? "-"}
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <CalendarClock className="size-3.5" />
+                    创建时间：{row.created_at}
+                  </span>
+                </AdminListMeta>
+              </AdminListContent>
+            </AdminListItem>
+          ))}
+        </AdminList>
+      ) : (
+        <AdminEmptyState>{LABELS.empty}</AdminEmptyState>
+      )}
 
       <AdminPagination
         summary={

@@ -29,7 +29,7 @@
 
 ## 真实 HTTP 验证
 
-- [ ] preview 或目标环境已启动
+- [ ] 本地开发服务或目标环境已启动
 - [ ] baseline 脚本使用的 `Origin` 与服务端允许域一致
 - [ ] 认证 cookie 已通过真实登录流程获取
 - [ ] `review submit` baseline 已执行
@@ -53,7 +53,6 @@
 ## 最小验证命令
 
 ```bash
-pnpm preview:status
 pnpm run validate:db-guardrails
 node --import tsx --test src/app/api/review/handlers.test.ts src/app/api/learning/handlers.test.ts src/app/api/practice/generate/route.test.ts src/lib/server/rate-limit.test.ts
 node --import tsx --test src/features/today/components/today-page-selectors.test.ts src/lib/utils/tts-api.test.ts src/lib/utils/tts-api.scene-loop.test.ts src/lib/server/tts/service.test.ts src/app/api/tts/regenerate/route.test.ts
@@ -64,7 +63,7 @@ pnpm load:api-baseline --dry-run --path=/api/practice/generate --method=POST --b
 
 ## 当前已知风险
 
-- preview / 本地环境的真实 HTTP baseline 依赖临时登录 cookie 与临时测试数据，不是正式生产容量结果
+- 本地环境的真实 HTTP baseline 依赖临时登录 cookie 与临时测试数据，不是正式生产容量结果
 - `practice generate` 在当前阈值下会按预期触发 `429`
 - `tts` 在当前环境里出现过单次 `500`，日志表现为 `Connect Error: {}`
 - 数据库策略仍缺少独立的真实环境冒烟验证，这一项需要在可用数据库环境下单独补齐

@@ -157,7 +157,7 @@ export function FocusDetailSheetFooter({
           {canCompleteAssist ? (
             <Button
               type="button"
-              variant="ghost"
+              variant="secondary"
               className={`${appleButtonClassName} h-[var(--mobile-adapt-overlay-footer-button-height)] rounded-[var(--mobile-adapt-overlay-footer-button-radius)] border-0 bg-[var(--app-chunks-sheet-secondary-bg)] px-[var(--mobile-space-sheet)] text-[var(--app-chunks-sheet-secondary-text)] shadow-none hover:bg-[var(--app-chunks-sheet-secondary-hover)] [@media(max-height:760px)]:h-[var(--mobile-control-height)] [@media(max-height:760px)]:px-[var(--mobile-space-lg)] [@media(max-height:760px)]:text-[length:var(--mobile-font-body-sm)]`}
               disabled={completeAssistDisabled}
               onClick={onCompleteAssist}
@@ -168,7 +168,7 @@ export function FocusDetailSheetFooter({
           {detail?.savedItem ? (
             <Button
               type="button"
-              variant="ghost"
+              variant="default"
               className={`${APPLE_BUTTON_STRONG} h-[var(--mobile-adapt-overlay-footer-button-height)] min-w-0 flex-1 rounded-[var(--mobile-adapt-overlay-footer-button-radius)] px-[clamp(16px,4vw,28px)] text-[length:var(--mobile-font-sheet-body)] font-semibold [@media(max-height:760px)]:h-[var(--mobile-control-height)] [@media(max-height:760px)]:px-[var(--mobile-space-xl)] [@media(max-height:760px)]:text-[length:var(--mobile-font-body-sm)]`}
               aria-label={typeof primaryActionLabel === "string" ? primaryActionLabel : undefined}
               onClick={onPrimaryAction}

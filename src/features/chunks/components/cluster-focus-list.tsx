@@ -130,6 +130,7 @@ export function ClusterFocusList({
               label={`🔆 ${labels.similarTab}${previewSimilarItems.length > 0 ? ` · ${previewSimilarItems.length}` : ""}`}
               actionLabel={labels.openCurrentDetail}
               onAction={() => onOpenMainSimilarTab(row)}
+              collapsed={!isExpanded}
             >
               <div
                 className={`overflow-hidden transition-all duration-200 ${
@@ -160,4 +161,3 @@ export function ClusterFocusList({
     </div>
   );
 }
-

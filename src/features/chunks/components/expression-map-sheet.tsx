@@ -16,6 +16,7 @@ import {
   APPLE_BADGE_SUBTLE,
   APPLE_BADGE_SUCCESS,
   APPLE_BUTTON_STRONG,
+  APPLE_BUTTON_TEXT_SM,
   APPLE_BODY_TEXT,
   APPLE_LIST_ITEM,
   APPLE_META_TEXT,
@@ -103,22 +104,21 @@ export function ExpressionMapSheet({
           {!loading && !error && data?.clusters.length ? (
             <div className="space-y-[var(--mobile-adapt-space-xl)]">
               <div className="flex flex-wrap gap-[var(--mobile-adapt-space-sm)]">
-                {data.clusters.map((cluster) => (
-                  <Button
-                    key={cluster.id}
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    className={`${appleButtonClassName} ${
-                      activeClusterId === cluster.id
-                        ? APPLE_BUTTON_STRONG
-                        : ""
-                    }`}
-                    onClick={() => onSelectCluster(cluster.id)}
-                  >
-                    {cluster.anchor}
-                  </Button>
-                ))}
+                {data.clusters.map((cluster) => {
+                  const active = activeClusterId === cluster.id;
+                  return (
+                    <Button
+                      key={cluster.id}
+                      type="button"
+                      size="sm"
+                      variant={active ? "default" : "secondary"}
+                      className={active ? `${APPLE_BUTTON_STRONG} ${APPLE_BUTTON_TEXT_SM}` : appleButtonClassName}
+                      onClick={() => onSelectCluster(cluster.id)}
+                    >
+                      {cluster.anchor}
+                    </Button>
+                  );
+                })}
               </div>
 
               {activeCluster ? (

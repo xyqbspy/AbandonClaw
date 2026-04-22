@@ -1,4 +1,5 @@
 import { deleteAdminPhraseAction, enrichAdminPhraseAction, enrichAdminPhrasesBatchAction } from "@/app/(app)/admin/actions";
+import { BookOpen, FileText, Filter, Search, Trash2, Wand2 } from "lucide-react";
 import {
   buildAdminHref,
   readAdminNotice,
@@ -10,9 +11,20 @@ import {
   AdminActionBarActions,
   AdminActionBarHint,
 } from "@/components/shared/admin-action-bar";
+import { AdminActionButton, AdminConfirmActionButton } from "@/components/admin/admin-action-button";
 import { AdminNoticeCard } from "@/components/shared/admin-info-card";
-import { AdminPagination, AdminTableShell } from "@/components/shared/admin-list-shell";
-import { ConfirmButton } from "@/components/shared/confirm-action";
+import {
+  AdminEmptyState,
+  AdminList,
+  AdminListActions,
+  AdminListBadges,
+  AdminListContent,
+  AdminListIcon,
+  AdminListItem,
+  AdminListMeta,
+  AdminListTitle,
+  AdminPagination,
+} from "@/components/shared/admin-list-shell";
 import { FilterBar, FilterBarForm } from "@/components/shared/filter-bar";
 import { PageHeader } from "@/components/shared/page-header";
 import { Badge } from "@/components/ui/badge";
@@ -20,30 +32,27 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { listAdminPhrases } from "@/lib/server/admin/service";
 import {
-  APPLE_BUTTON_BASE,
-  APPLE_BUTTON_DANGER,
-  APPLE_BUTTON_TEXT_SM,
-  APPLE_INPUT_BASE,
+  APPLE_ADMIN_CONTROL,
+  APPLE_ADMIN_SELECT,
   APPLE_META_TEXT,
-  APPLE_TABLE_HEAD,
-  APPLE_TABLE_ROW,
 } from "@/lib/ui/apple-style";
 
 const LABELS = {
   eyebrow: "\u7ba1\u7406\u540e\u53f0",
   title: "\u8868\u8fbe\u5e93\u7ba1\u7406",
   description:
-    "\u652f\u6301\u6309 chunk / \u53e5\u5b50\u7b5b\u9009\uff0c\u5217\u8868\u533a\u5206\u7c7b\u578b\u5e76\u53ef\u76f4\u63a5\u5220\u9664\u3002",
+    "\u652f\u6301\u6309\u8868\u8fbe / \u53e5\u5b50\u7b5b\u9009\uff0c\u5217\u8868\u533a\u5206\u7c7b\u578b\u5e76\u53ef\u76f4\u63a5\u5220\u9664\u3002",
   search: "\u641c\u7d22\u8868\u8fbe / \u53e5\u5b50 / \u7ffb\u8bd1",
   allTypes: "\u5168\u90e8\u7c7b\u578b",
+  chunk: "\u8868\u8fbe",
   sentence: "\u53e5\u5b50",
   submit: "\u7b5b\u9009",
-  batchHint: "\u52fe\u9009\u540e\u53ef\u6279\u91cf\u8865\u5168\u9009\u4e2d\u7684 chunk\u3002",
+  batchHint: "\u52fe\u9009\u540e\u53ef\u6279\u91cf\u8865\u5168\u9009\u4e2d\u7684\u8868\u8fbe\u3002",
   batchAction: "\u6279\u91cf\u8865\u5168\u9009\u4e2d\u9879",
   example: "\u4f8b\u53e5\uff1a",
   delete: "\u5220\u9664",
   deleteConfirmSentence: "\u786e\u8ba4\u5220\u9664\u8fd9\u6761\u53e5\u5b50\u5417\uff1f",
-  deleteConfirmChunk: "\u786e\u8ba4\u5220\u9664\u8fd9\u6761 chunk \u5417\uff1f",
+  deleteConfirmChunk: "\u786e\u8ba4\u5220\u9664\u8fd9\u6761\u8868\u8fbe\u5417\uff1f",
   deleteFinal: "\u5220\u9664\u540e\u65e0\u6cd5\u6062\u590d\uff0c\u662f\u5426\u7ee7\u7eed\uff1f",
   empty: "\u672a\u627e\u5230\u8868\u8fbe\u3002",
   summaryPrefix: "\u663e\u793a",
@@ -64,7 +73,6 @@ export default async function AdminPhrasesPage({
   const notice = readAdminNotice(params);
 
   const pageSize = 20;
-  const appleButtonClassName = `${APPLE_BUTTON_BASE} ${APPLE_BUTTON_TEXT_SM}`;
   const result = await listAdminPhrases({
     search: q,
     learningItemType: itemType,
@@ -94,17 +102,21 @@ export default async function AdminPhrasesPage({
 
       <FilterBar>
         <FilterBarForm className="sm:grid-cols-[1fr_auto_auto]">
-          <Input name="q" defaultValue={q} placeholder={LABELS.search} />
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input name="q" defaultValue={q} placeholder={LABELS.search} className={`${APPLE_ADMIN_CONTROL} pl-9`} />
+          </div>
           <select
             name="itemType"
             defaultValue={itemTypeRaw}
-            className={`h-8 px-2.5 text-sm ${APPLE_INPUT_BASE}`}
+            className={APPLE_ADMIN_SELECT}
           >
             <option value="all">{LABELS.allTypes}</option>
-            <option value="chunk">chunk</option>
+            <option value="chunk">{LABELS.chunk}</option>
             <option value="sentence">{LABELS.sentence}</option>
           </select>
-          <Button type="submit" variant="ghost" className={appleButtonClassName}>
+          <Button type="submit" variant="default" size="lg" className="gap-2">
+            <Filter className="size-4" />
             {LABELS.submit}
           </Button>
         </FilterBarForm>
@@ -114,40 +126,34 @@ export default async function AdminPhrasesPage({
         <input type="hidden" name="returnTo" value={currentHref} />
       </form>
 
-      <AdminTableShell>
+      <div className="rounded-[var(--app-radius-panel)] border border-[var(--app-border-soft)] bg-[var(--app-surface)] shadow-[var(--app-shadow-soft)]">
         <AdminActionBar>
           <AdminActionBarHint>{LABELS.batchHint}</AdminActionBarHint>
           <AdminActionBarActions>
-            <Button
+            <AdminActionButton
               type="submit"
               form="admin-phrases-batch-enrich-form"
-              size="sm"
-              variant="ghost"
-              className={appleButtonClassName}
             >
+              <Wand2 className="size-3.5" />
               {LABELS.batchAction}
-            </Button>
+            </AdminActionButton>
           </AdminActionBarActions>
         </AdminActionBar>
 
-        <table className="min-w-full text-sm">
-          <thead className={`${APPLE_TABLE_HEAD} text-left text-xs`}>
-            <tr>
-              <th className="w-12 px-3 py-2">选择</th>
-              <th className="px-3 py-2">内容</th>
-              <th className="px-3 py-2">类型</th>
-              <th className="px-3 py-2">补全状态</th>
-              <th className="px-3 py-2">翻译</th>
-              <th className="px-3 py-2">来源场景</th>
-              <th className="px-3 py-2">用户</th>
-              <th className="px-3 py-2">保存时间</th>
-              <th className="px-3 py-2">操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            {result.rows.map((row) => (
-              <tr key={row.userPhraseId} className={`${APPLE_TABLE_ROW} align-top`}>
-                <td className="px-3 py-2">
+        <div className="p-3">
+          {result.rows.length > 0 ? (
+            <AdminList>
+              {result.rows.map((row) => (
+                <AdminListItem key={row.userPhraseId}>
+                  <AdminListIcon>
+                    {row.learningItemType === "sentence" ? (
+                      <FileText className="size-5" />
+                    ) : (
+                      <BookOpen className="size-5" />
+                    )}
+                  </AdminListIcon>
+                  <AdminListContent>
+                    <div className="flex flex-wrap items-center gap-2">
                   {row.learningItemType === "expression" ? (
                     <input
                       type="checkbox"
@@ -155,97 +161,83 @@ export default async function AdminPhrasesPage({
                       value={row.userPhraseId}
                       form="admin-phrases-batch-enrich-form"
                       className="size-4 rounded border-border/70"
+                      aria-label={`选择 ${row.text}`}
                     />
                   ) : null}
-                </td>
-                <td className="max-w-[360px] px-3 py-2">
-                  <p className="line-clamp-2 font-medium">{row.text}</p>
+                      <AdminListTitle className="line-clamp-2">{row.text}</AdminListTitle>
+                      <AdminListBadges>
+                        <Badge variant={row.learningItemType === "sentence" ? "secondary" : "outline"}>
+                          {row.learningItemType === "sentence" ? LABELS.sentence : LABELS.chunk}
+                        </Badge>
+                        <Badge
+                          variant={
+                            row.enrichmentState === "done"
+                              ? "secondary"
+                              : row.enrichmentState === "pending"
+                                ? "outline"
+                                : row.enrichmentState === "missing"
+                                  ? "destructive"
+                                  : "outline"
+                          }
+                        >
+                          {row.enrichmentLabel}
+                        </Badge>
+                      </AdminListBadges>
+                    </div>
                   {row.sourceSentenceText && row.learningItemType === "expression" ? (
-                    <p className={`mt-0.5 line-clamp-1 ${APPLE_META_TEXT}`}>
+                      <p className={`line-clamp-1 text-sm ${APPLE_META_TEXT}`}>
                       {LABELS.example}
                       {row.sourceSentenceText}
                     </p>
                   ) : null}
-                </td>
-                <td className="px-3 py-2">
-                  <Badge variant={row.learningItemType === "sentence" ? "secondary" : "outline"}>
-                    {row.learningItemType === "sentence" ? LABELS.sentence : "chunk"}
-                  </Badge>
-                </td>
-                <td className="px-3 py-2">
-                  <Badge
-                    variant={
-                      row.enrichmentState === "done"
-                        ? "secondary"
-                        : row.enrichmentState === "pending"
-                          ? "outline"
-                          : row.enrichmentState === "missing"
-                            ? "destructive"
-                            : "outline"
-                    }
-                  >
-                    {row.enrichmentLabel}
-                  </Badge>
-                </td>
-                <td className={`max-w-[260px] px-3 py-2 ${APPLE_META_TEXT}`}>
-                  <p className="line-clamp-2">{row.translation ?? "-"}</p>
-                </td>
-                <td className={`px-3 py-2 ${APPLE_META_TEXT}`}>{row.sourceSceneSlug ?? "-"}</td>
-                <td className={`px-3 py-2 font-mono ${APPLE_META_TEXT}`}>
-                  {row.userId.slice(0, 8)}...
-                </td>
-                <td className={`px-3 py-2 whitespace-nowrap ${APPLE_META_TEXT}`}>
-                  {row.savedAt}
-                </td>
-                <td className="px-3 py-2">
-                  <div className="flex items-center gap-2">
+                    <p className={`line-clamp-2 text-sm ${APPLE_META_TEXT}`}>{row.translation ?? "-"}</p>
+                    <AdminListMeta>
+                      <span>来源场景：{row.sourceSceneSlug ?? "-"}</span>
+                      <span className="font-mono">用户：{row.userId.slice(0, 8)}...</span>
+                      <span>保存时间：{row.savedAt}</span>
+                    </AdminListMeta>
+                  </AdminListContent>
+                  <AdminListActions>
                     <form action={enrichAdminPhraseAction}>
                       <input type="hidden" name="userPhraseId" value={row.userPhraseId} />
                       <input type="hidden" name="returnTo" value={currentHref} />
-                      <Button
+                      <AdminActionButton
                         type="submit"
-                        size="sm"
-                        variant="ghost"
-                        className={appleButtonClassName}
                         disabled={
                           row.learningItemType !== "expression" || row.enrichmentState === "pending"
                         }
                       >
+                        <Wand2 className="size-3.5" />
                         补全
-                      </Button>
+                      </AdminActionButton>
                     </form>
                     <form action={deleteAdminPhraseAction}>
                       <input type="hidden" name="userPhraseId" value={row.userPhraseId} />
                       <input type="hidden" name="returnTo" value={currentHref} />
-                      <ConfirmButton
+                      <AdminConfirmActionButton
                         type="submit"
-                        size="sm"
-                        variant="ghost"
-                        className={`${APPLE_BUTTON_DANGER} ${APPLE_BUTTON_TEXT_SM}`}
+                        tone="danger"
                         confirmText={
                           row.learningItemType === "sentence"
                             ? LABELS.deleteConfirmSentence
                             : LABELS.deleteConfirmChunk
                         }
                         finalConfirmText={LABELS.deleteFinal}
+                        aria-label={LABELS.delete}
                       >
+                        <Trash2 className="size-3.5" />
                         {LABELS.delete}
-                      </ConfirmButton>
+                      </AdminConfirmActionButton>
                     </form>
-                  </div>
-                </td>
-              </tr>
-            ))}
-            {result.rows.length === 0 ? (
-              <tr>
-                <td colSpan={9} className="px-3 py-6 text-center text-muted-foreground">
-                  {LABELS.empty}
-                </td>
-              </tr>
-            ) : null}
-          </tbody>
-        </table>
-      </AdminTableShell>
+                  </AdminListActions>
+                </AdminListItem>
+              ))}
+            </AdminList>
+          ) : (
+            <AdminEmptyState>{LABELS.empty}</AdminEmptyState>
+          )}
+        </div>
+      </div>
 
       <AdminPagination
         summary={

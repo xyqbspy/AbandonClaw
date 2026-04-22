@@ -1,18 +1,26 @@
 import Link from "next/link";
+import { CalendarClock, Filter, GitBranch, Search, SlidersHorizontal } from "lucide-react";
 import { buildAdminHref, readAdminPositivePage, readAdminStringParam } from "@/app/(app)/admin/admin-page-state";
-import { AdminPagination, AdminTableShell } from "@/components/shared/admin-list-shell";
+import {
+  AdminEmptyState,
+  AdminList,
+  AdminListBadges,
+  AdminListContent,
+  AdminListIcon,
+  AdminListItem,
+  AdminListMeta,
+  AdminListTitle,
+  AdminPagination,
+} from "@/components/shared/admin-list-shell";
 import { FilterBar, FilterBarForm } from "@/components/shared/filter-bar";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { listAdminVariants } from "@/lib/server/admin/service";
 import {
-  APPLE_BUTTON_BASE,
-  APPLE_BUTTON_TEXT_SM,
-  APPLE_INPUT_BASE,
+  APPLE_ADMIN_CONTROL,
+  APPLE_ADMIN_SELECT,
   APPLE_META_TEXT,
-  APPLE_TABLE_HEAD,
-  APPLE_TABLE_ROW,
   APPLE_TITLE_SM,
 } from "@/lib/ui/apple-style";
 
@@ -20,9 +28,9 @@ const LABELS = {
   eyebrow: "\u7ba1\u7406\u540e\u53f0",
   title: "\u53d8\u4f53\u5217\u8868",
   description: "\u67e5\u770b\u751f\u6210\u53d8\u4f53\uff0c\u5e76\u8ffd\u6eaf\u6240\u5c5e\u573a\u666f\u3002",
-  search: "\u641c\u7d22\u573a\u666f\u6807\u9898 / slug / scene_id / cache_key",
-  sortDesc: "\u6309 created_at \u5012\u5e8f",
-  sortAsc: "\u6309 created_at \u6b63\u5e8f",
+  search: "\u641c\u7d22\u573a\u666f\u6807\u9898 / Slug / \u573a\u666f ID / \u7f13\u5b58\u952e",
+  sortDesc: "\u6309\u521b\u5efa\u65f6\u95f4\u5012\u5e8f",
+  sortAsc: "\u6309\u521b\u5efa\u65f6\u95f4\u6b63\u5e8f",
   submit: "\u7b5b\u9009",
   empty: "\u672a\u627e\u5230\u53d8\u4f53\u3002",
   summaryPrefix: "\u663e\u793a",
@@ -38,8 +46,6 @@ export default async function AdminVariantsPage({
   const q = readAdminStringParam(params, "q");
   const sort = readAdminStringParam(params, "sort") === "asc" ? "asc" : "desc";
   const page = readAdminPositivePage(params);
-  const appleButtonClassName = `${APPLE_BUTTON_BASE} ${APPLE_BUTTON_TEXT_SM}`;
-
   const result = await listAdminVariants({ page, pageSize: 30, search: q, sort });
   const buildListUrl = (nextPage: number) =>
     buildAdminHref("/admin/variants", { q, sort, page: nextPage });
@@ -54,60 +60,66 @@ export default async function AdminVariantsPage({
 
       <FilterBar>
         <FilterBarForm className="sm:grid-cols-[1fr_auto_auto]">
-          <Input name="q" defaultValue={q} placeholder={LABELS.search} />
-          <select name="sort" defaultValue={sort} className={`h-8 px-2.5 text-sm ${APPLE_INPUT_BASE}`}>
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input name="q" defaultValue={q} placeholder={LABELS.search} className={`${APPLE_ADMIN_CONTROL} pl-9`} />
+          </div>
+          <select name="sort" defaultValue={sort} className={APPLE_ADMIN_SELECT}>
             <option value="desc">{LABELS.sortDesc}</option>
             <option value="asc">{LABELS.sortAsc}</option>
           </select>
-          <Button type="submit" variant="ghost" className={appleButtonClassName}>
+          <Button type="submit" variant="default" size="lg" className="gap-2">
+            <Filter className="size-4" />
             {LABELS.submit}
           </Button>
         </FilterBarForm>
       </FilterBar>
 
-      <AdminTableShell>
-        <table className="min-w-full text-sm">
-          <thead className={`${APPLE_TABLE_HEAD} text-left text-xs`}>
-            <tr>
-              <th className="px-3 py-2">scene</th>
-              <th className="px-3 py-2">variant_index</th>
-              <th className="px-3 py-2">model</th>
-              <th className="px-3 py-2">prompt_version</th>
-              <th className="px-3 py-2">retain_ratio</th>
-              <th className="px-3 py-2">theme</th>
-              <th className="px-3 py-2">created_at</th>
-            </tr>
-          </thead>
-          <tbody>
-            {result.rows.map((row) => (
-              <tr key={row.id} className={`${APPLE_TABLE_ROW} align-top`}>
-                <td className="px-3 py-2">
+      {result.rows.length > 0 ? (
+        <AdminList>
+          {result.rows.map((row) => (
+            <AdminListItem key={row.id}>
+              <AdminListIcon>
+                <GitBranch className="size-5" />
+              </AdminListIcon>
+              <AdminListContent>
+                <div className="flex flex-wrap items-center gap-2">
+                  <AdminListTitle>
                   <Link
                     href={`/admin/scenes/${row.scene_id}`}
                     className={`${APPLE_TITLE_SM} underline-offset-2 hover:underline`}
                   >
                     {row.scene?.title ?? row.scene_id}
                   </Link>
-                  <p className={`font-mono ${APPLE_META_TEXT}`}>{row.scene?.slug ?? row.scene_id}</p>
-                </td>
-                <td className="px-3 py-2">{row.variant_index}</td>
-                <td className="px-3 py-2">{row.model ?? "-"}</td>
-                <td className="px-3 py-2">{row.prompt_version ?? "-"}</td>
-                <td className="px-3 py-2">{row.retain_chunk_ratio ?? "-"}</td>
-                <td className="px-3 py-2">{row.theme ?? "-"}</td>
-                <td className={`px-3 py-2 whitespace-nowrap ${APPLE_META_TEXT}`}>{row.created_at}</td>
-              </tr>
-            ))}
-            {result.rows.length === 0 ? (
-              <tr>
-                <td colSpan={7} className="px-3 py-6 text-center text-muted-foreground">
-                  {LABELS.empty}
-                </td>
-              </tr>
-            ) : null}
-          </tbody>
-        </table>
-      </AdminTableShell>
+                  </AdminListTitle>
+                  <AdminListBadges>
+                    <span className="rounded-md bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground">
+                      第 {row.variant_index} 个变体
+                    </span>
+                    <span className="rounded-md bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground">
+                      模型：{row.model ?? "-"}
+                    </span>
+                  </AdminListBadges>
+                </div>
+                <p className={`font-mono text-xs ${APPLE_META_TEXT}`}>{row.scene?.slug ?? row.scene_id}</p>
+                <AdminListMeta>
+                  <span className="flex items-center gap-1.5">
+                    <SlidersHorizontal className="size-3.5" />
+                    提示词版本：{row.prompt_version ?? "-"} / 保留比例：{row.retain_chunk_ratio ?? "-"}
+                  </span>
+                  <span>主题：{row.theme ?? "-"}</span>
+                  <span className="flex items-center gap-1.5">
+                    <CalendarClock className="size-3.5" />
+                    创建时间：{row.created_at}
+                  </span>
+                </AdminListMeta>
+              </AdminListContent>
+            </AdminListItem>
+          ))}
+        </AdminList>
+      ) : (
+        <AdminEmptyState>{LABELS.empty}</AdminEmptyState>
+      )}
 
       <AdminPagination
         summary={

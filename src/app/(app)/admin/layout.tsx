@@ -21,7 +21,7 @@ export default async function AdminLayout({
   return (
     <div className="space-y-5">
       <AdminNav />
-      {children}
+      <main className="min-w-0 space-y-5">{children}</main>
     </div>
   );
 }

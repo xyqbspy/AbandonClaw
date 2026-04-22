@@ -17,6 +17,7 @@ import {
   APPLE_BADGE_INFO,
   APPLE_BADGE_SUBTLE,
   APPLE_BUTTON_STRONG,
+  APPLE_BUTTON_TEXT_SM,
   APPLE_BODY_TEXT,
   APPLE_LIST_ITEM,
   APPLE_META_TEXT,
@@ -154,10 +155,10 @@ export function MoveIntoClusterSheet({
                           </button>
                           <Button
                             type="button"
-                            variant="ghost"
+                            variant={groupSelected ? "default" : "ghost"}
                             className={`h-auto px-[var(--mobile-adapt-space-sm)] py-[var(--mobile-adapt-space-2xs)] text-[length:var(--mobile-adapt-overlay-meta)] ${
                               groupSelected
-                                ? APPLE_BUTTON_STRONG
+                                ? `${APPLE_BUTTON_STRONG} ${APPLE_BUTTON_TEXT_SM}`
                                 : ""
                             }`}
                             onClick={() => onToggleGroupSelect(group, groupSelected)}
@@ -268,13 +269,13 @@ export function MoveIntoClusterSheet({
 
         <SheetFooter className="shrink-0 border-t border-[var(--app-chunks-sheet-card-border)] bg-[var(--app-chunks-sheet-card-bg)] px-[var(--mobile-adapt-space-overlay)] pb-[calc(env(safe-area-inset-bottom)+var(--mobile-adapt-space-md))] pt-[var(--mobile-adapt-space-md)]">
           <div className="grid grid-cols-2 gap-[var(--mobile-adapt-space-sm)]">
-            <Button type="button" variant="ghost" className={appleButtonClassName} onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="secondary" className={appleButtonClassName} onClick={() => onOpenChange(false)}>
               {labels.close}
             </Button>
             <LoadingButton
               type="button"
-              variant="ghost"
-              className={APPLE_BUTTON_STRONG}
+              variant="default"
+              className={`${APPLE_BUTTON_STRONG} ${APPLE_BUTTON_TEXT_SM}`}
               loading={submitting}
               loadingText={formatLoadingText(labels.submit)}
               onClick={onSubmit}

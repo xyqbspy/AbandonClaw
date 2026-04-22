@@ -33,8 +33,8 @@ test("ClientEventsPanel 会展示最近业务事件并支持筛选和清空", ()
 
   render(<ClientEventsPanel />);
 
-  screen.getByText("Block warm hit");
-  screen.getByText("Warmup source");
+  screen.getByText("段落预热命中");
+  screen.getByText("预热来源");
   screen.getByText("today_continue_clicked");
   screen.getByText("tts_scene_loop_failed");
   screen.getByText("scene_full_play_cooling_down");

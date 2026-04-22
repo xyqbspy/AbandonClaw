@@ -1,16 +1,15 @@
 import Link from "next/link";
+import { RefreshCw } from "lucide-react";
 import { syncSeedScenesAction } from "@/app/(app)/admin/actions";
 import { readAdminNotice } from "@/app/(app)/admin/admin-page-state";
+import { AdminActionButton } from "@/components/admin/admin-action-button";
 import { AdminInfoCard, AdminInfoList, AdminNoticeCard } from "@/components/shared/admin-info-card";
 import { PageHeader } from "@/components/shared/page-header";
 import { StatCard } from "@/components/shared/stat-card";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireAdmin } from "@/lib/server/auth";
 import { getAdminOverviewStats } from "@/lib/server/admin/service";
 import {
-  APPLE_BUTTON_BASE,
-  APPLE_BUTTON_TEXT_SM,
   APPLE_CARD_INTERACTIVE,
   APPLE_META_TEXT,
   APPLE_TITLE_MD,
@@ -20,8 +19,8 @@ const LABELS = {
   eyebrow: "\u5185\u90e8\u5de5\u5177",
   title: "\u7ba1\u7406\u540e\u53f0",
   description: "\u7528\u4e8e\u6392\u67e5\u548c\u7ef4\u62a4\u5185\u5bb9\u6570\u636e\u7684\u6781\u7b80\u7ba1\u7406\u9875\u3002",
-  syncSeed: "\u540c\u6b65 Seed \u573a\u666f",
-  scenesTitle: "Seed + \u5bfc\u5165\u573a\u666f",
+  syncSeed: "\u540c\u6b65\u5185\u7f6e\u573a\u666f",
+  scenesTitle: "\u5185\u7f6e\u4e0e\u5bfc\u5165\u573a\u666f",
   scenesHint: "\u5bfc\u5165\u573a\u666f\uff1a",
   variantsTitle: "\u573a\u666f\u53d8\u4f53",
   cacheHint: "\u6700\u8fd1\u7f13\u5b58\uff1a",
@@ -80,7 +79,6 @@ export default async function AdminHomePage({
   const params = await searchParams;
   const notice = readAdminNotice(params);
   const [adminUser, stats] = await Promise.all([requireAdmin(), getAdminOverviewStats()]);
-  const appleButtonClassName = `${APPLE_BUTTON_BASE} ${APPLE_BUTTON_TEXT_SM}`;
 
   return (
     <div className="space-y-6">
@@ -90,9 +88,10 @@ export default async function AdminHomePage({
         description={LABELS.description}
         actions={
           <form action={syncSeedScenesAction}>
-            <Button type="submit" variant="ghost" size="sm" className={appleButtonClassName}>
+            <AdminActionButton type="submit">
+              <RefreshCw className="size-3.5" />
               {LABELS.syncSeed}
-            </Button>
+            </AdminActionButton>
           </form>
         }
       />
@@ -107,7 +106,7 @@ export default async function AdminHomePage({
         />
         <StatCard title={LABELS.variantsTitle} value={stats.totalVariants} />
         <StatCard
-          title="AI Cache"
+          title="AI 缓存"
           value={stats.totalCacheRows}
           hint={`${LABELS.cacheHint}${stats.latestCacheCreatedAt ?? "-"}`}
         />

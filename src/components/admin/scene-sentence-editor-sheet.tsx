@@ -2,10 +2,10 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { Save, X } from "lucide-react";
 import { toast } from "sonner";
 import { updateSceneSentencesAction } from "@/app/(app)/admin/actions";
-import { LoadingButton } from "@/components/shared/action-loading";
-import { Button } from "@/components/ui/button";
+import { AdminActionButton, AdminLoadingActionButton } from "@/components/admin/admin-action-button";
 import { Input } from "@/components/ui/input";
 import {
   Sheet,
@@ -17,8 +17,6 @@ import {
 } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  APPLE_BUTTON_BASE,
-  APPLE_BUTTON_TEXT_SM,
   APPLE_INPUT_BASE,
   APPLE_META_TEXT,
   APPLE_PANEL,
@@ -135,15 +133,12 @@ export function SceneSentenceEditorSheet({
 
   return (
     <>
-      <Button
+      <AdminActionButton
         type="button"
-        size="sm"
-        variant="outline"
-        className={`${APPLE_BUTTON_BASE} ${APPLE_BUTTON_TEXT_SM}`}
         onClick={() => handleOpenChange(true)}
       >
         编辑句子
-      </Button>
+      </AdminActionButton>
 
       <Sheet open={open} onOpenChange={handleOpenChange}>
         <SheetContent side="right" className="w-full max-w-4xl overflow-y-auto">
@@ -151,7 +146,7 @@ export function SceneSentenceEditorSheet({
             <SheetTitle>编辑场景句子</SheetTitle>
             <SheetDescription>
               {title} · {slug}
-              {origin === "seed" ? " · seed 场景后续同步可能覆盖手工修改" : ""}
+              {origin === "seed" ? " · 内置场景后续同步可能覆盖手工修改" : ""}
             </SheetDescription>
           </SheetHeader>
 
@@ -160,7 +155,7 @@ export function SceneSentenceEditorSheet({
               <section key={section.sectionId} className={`space-y-3 p-4 ${APPLE_SURFACE}`}>
                 <div className="space-y-1">
                   <p className={APPLE_TITLE_SM}>
-                    Section {sectionIndex + 1}
+                    第 {sectionIndex + 1} 个段落
                     {section.title ? ` · ${section.title}` : ""}
                   </p>
                   <p className={APPLE_META_TEXT}>
@@ -171,7 +166,7 @@ export function SceneSentenceEditorSheet({
                 {section.blocks.map((block, blockIndex) => (
                   <div key={block.blockId} className={`space-y-3 p-3 ${APPLE_PANEL} rounded-xl`}>
                     <div className={APPLE_META_TEXT}>
-                      Block {blockIndex + 1} · {block.type} · speaker: {block.speaker ?? "-"}
+                    第 {blockIndex + 1} 个内容块 · 类型：{block.type === "dialogue" ? "对话" : "独白"} · 说话人：{block.speaker ?? "-"}
                     </div>
 
                     {block.sentences.map((sentence, sentenceIndex) => (
@@ -180,7 +175,7 @@ export function SceneSentenceEditorSheet({
                         className="space-y-2 rounded-xl border border-border/60 bg-background p-3"
                       >
                         <div className={APPLE_META_TEXT}>
-                          Sentence {sentenceIndex + 1} · ID: {sentence.sentenceId} · speaker:{" "}
+                          第 {sentenceIndex + 1} 句 · ID: {sentence.sentenceId} · 说话人：{" "}
                           {sentence.speaker ?? block.speaker ?? "-"}
                         </div>
 
@@ -218,7 +213,7 @@ export function SceneSentenceEditorSheet({
                         </div>
 
                         <div className="space-y-1">
-                          <label className={APPLE_META_TEXT}>Chunks（每行一个）</label>
+                          <label className={APPLE_META_TEXT}>表达片段（每行一个）</label>
                           <Textarea
                             value={sentence.chunks.join("\n")}
                             onChange={(event) =>
@@ -236,27 +231,27 @@ export function SceneSentenceEditorSheet({
           </div>
 
           <SheetFooter className="gap-2 px-4 pb-4">
-            <Button
+            <AdminActionButton
               type="button"
-              variant="ghost"
-              className={`${APPLE_BUTTON_BASE} ${APPLE_BUTTON_TEXT_SM}`}
               onClick={() => {
                 resetDraft();
                 setOpen(false);
               }}
               disabled={isPending}
             >
+              <X className="size-3.5" />
               取消
-            </Button>
-            <LoadingButton
+            </AdminActionButton>
+            <AdminLoadingActionButton
               type="button"
-              className={`${APPLE_BUTTON_BASE} ${APPLE_BUTTON_TEXT_SM}`}
+              tone="primary"
               onClick={handleSave}
               loading={isPending}
               loadingText="保存中..."
             >
+              <Save className="size-3.5" />
               保存并清理音频
-            </LoadingButton>
+            </AdminLoadingActionButton>
           </SheetFooter>
         </SheetContent>
       </Sheet>

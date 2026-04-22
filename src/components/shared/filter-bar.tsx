@@ -1,6 +1,4 @@
 import { ReactNode } from "react";
-import { Card, CardContent } from "@/components/ui/card";
-import { APPLE_SURFACE } from "@/lib/ui/apple-style";
 import { cn } from "@/lib/utils";
 
 export function FilterBar({
@@ -11,9 +9,14 @@ export function FilterBar({
   className?: string;
 }) {
   return (
-    <Card className={APPLE_SURFACE}>
-      <CardContent className={cn("pt-4", className)}>{children}</CardContent>
-    </Card>
+    <div
+      className={cn(
+        "rounded-[var(--app-radius-panel)] border border-[var(--app-border-soft)] bg-[var(--app-surface)] p-4 shadow-[var(--app-shadow-soft)]",
+        className,
+      )}
+    >
+      {children}
+    </div>
   );
 }
 

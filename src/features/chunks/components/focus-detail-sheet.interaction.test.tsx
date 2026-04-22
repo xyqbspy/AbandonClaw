@@ -492,4 +492,5 @@ test("FocusDetailSheet 的开始复习按钮使用统一主按钮层级", () => 
 
   const primaryButton = view.getByRole("button", { name: "开始复习" });
   assert.ok(primaryButton.className.includes("app-button-primary"));
+  assert.ok(!primaryButton.className.includes("app-button-ghost"));
 });

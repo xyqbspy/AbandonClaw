@@ -62,16 +62,18 @@ export function ExpressionSummaryGroup({
   onAction,
   children,
   footer,
+  collapsed = false,
 }: {
   label: ReactNode;
   actionLabel?: string;
   onAction?: () => void;
   children?: ReactNode;
   footer?: ReactNode;
+  collapsed?: boolean;
 }) {
   return (
-    <div className={GROUP_CLASS}>
-      <div className={GROUP_HEADER_CLASS}>
+    <div className={cn(GROUP_CLASS, collapsed ? "flex min-h-[44px] flex-col justify-center" : "")}>
+      <div className={cn(GROUP_HEADER_CLASS, collapsed ? "mb-0" : "")}>
         <span className={GROUP_LABEL_CLASS}>{label}</span>
         {actionLabel && onAction ? (
           <button type="button" className={GROUP_LINK_CLASS} onClick={onAction}>
