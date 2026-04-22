@@ -39,12 +39,18 @@ export function AdminActionButton({
     <Button
       variant={variant}
       size={size}
-      className={adminActionButtonClassName(tone, className)}
+      className={(state: any) =>
+        adminActionButtonClassName(
+          tone,
+          typeof className === "function" ? className(state) : className
+        )
+      }
       {...props}
     />
   );
 }
 
+// ====================== LoadingButton 修复 ======================
 type AdminLoadingActionButtonProps = ComponentProps<typeof LoadingButton> & {
   tone?: AdminActionTone;
 };
@@ -60,12 +66,18 @@ export function AdminLoadingActionButton({
     <LoadingButton
       variant={variant}
       size={size}
-      className={adminActionButtonClassName(tone, className)}
+      className={(state: any) =>
+        adminActionButtonClassName(
+          tone,
+          typeof className === "function" ? className(state) : className
+        )
+      }
       {...props}
     />
   );
 }
 
+// ====================== ConfirmButton 修复 ======================
 type AdminConfirmActionButtonProps = ComponentProps<typeof ConfirmButton> & {
   tone?: AdminActionTone;
 };
@@ -81,7 +93,12 @@ export function AdminConfirmActionButton({
     <ConfirmButton
       variant={variant}
       size={size}
-      className={adminActionButtonClassName(tone, className)}
+      className={(state: any) =>
+        adminActionButtonClassName(
+          tone,
+          typeof className === "function" ? className(state) : className
+        )
+      }
       {...props}
     />
   );
