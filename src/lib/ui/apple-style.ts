@@ -6,6 +6,8 @@ export const APPLE_SURFACE =
   "app-surface border-[var(--app-border-soft)] ring-0 shadow-none";
 
 export const APPLE_CARD_INTERACTIVE = "app-surface app-surface-interactive";
+export const APPLE_SUMMARY_CARD =
+  "rounded-[18px] bg-white/88 p-3 shadow-[0_10px_30px_rgba(15,23,42,0.06)] ring-1 ring-black/5";
 export const APPLE_PANEL = "app-surface-subtle";
 export const APPLE_PANEL_RAISED =
   "rounded-[var(--app-radius-panel)] border border-[var(--app-border-soft)] bg-[var(--app-surface)] shadow-[var(--app-shadow-raised)]";

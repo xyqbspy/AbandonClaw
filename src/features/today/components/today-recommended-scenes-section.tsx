@@ -1,8 +1,11 @@
 import { LoadingState } from "@/components/shared/action-loading";
 import {
   TODAY_BADGE_EMOJI_CLASSNAME,
-  TODAY_PILL_BASE_CLASSNAME,
+  TODAY_RECOMMEND_BADGE_CLASSNAME,
   TODAY_RECOMMEND_CARD_CLASSNAME,
+  TODAY_RECOMMEND_EMPTY_CLASSNAME,
+  TODAY_RECOMMEND_REASON_PILL_CLASSNAME,
+  TODAY_RECOMMEND_TITLE_CLASSNAME,
   TODAY_SECTION_CLASSNAME,
   TODAY_SECTION_EMOJI_CLASSNAME,
   TODAY_SECTION_TITLE_CLASSNAME,
@@ -42,9 +45,7 @@ export function TodayRecommendedScenesSection({
           <LoadingState text={loadingText} className="py-0" />
         </div>
       ) : recommendedScenes.length === 0 ? (
-        <div className={`${TODAY_SECTION_CLASSNAME} py-[calc(var(--mobile-space-xl)+var(--mobile-space-lg))] text-[length:var(--mobile-font-body)] text-[#6C7A91]`}>
-          {emptyText}
-        </div>
+        <div className={TODAY_RECOMMEND_EMPTY_CLASSNAME}>{emptyText}</div>
       ) : (
         <div className="flex gap-[var(--mobile-space-md)] overflow-x-auto pb-[var(--mobile-space-2xs)]">
           {recommendedScenes.map((scene) => (
@@ -54,18 +55,14 @@ export function TodayRecommendedScenesSection({
               className={TODAY_RECOMMEND_CARD_CLASSNAME}
               onClick={() => onOpenScene(scene.slug)}
             >
-              <div className="text-[length:clamp(0.98rem,4.4vw,1rem)] leading-[1.28] font-bold tracking-[-0.02em] text-[#1E293B]">
-                {scene.title}
-              </div>
+              <div className={TODAY_RECOMMEND_TITLE_CLASSNAME}>{scene.title}</div>
               <div className={`mt-[var(--mobile-space-sm)] ${APPLE_META_TEXT} leading-[1.35]`}>
                 <span className={TODAY_BADGE_EMOJI_CLASSNAME}>⏰</span> {scene.estimatedMinutes} 分钟
               </div>
-              <div className={`${TODAY_PILL_BASE_CLASSNAME} mt-[var(--mobile-space-md)] inline-flex bg-[#F1F5F9] px-[var(--mobile-space-md)] py-[var(--mobile-space-2xs)] text-[#334155]`}>
+              <div className={TODAY_RECOMMEND_REASON_PILL_CLASSNAME}>
                 {getRecommendationReason(scene)}
               </div>
-              <div className="mt-[var(--mobile-space-sm)] text-[length:var(--mobile-font-caption)] font-medium text-[#7B8798]">
-                {getRecommendationBadge(scene)}
-              </div>
+              <div className={TODAY_RECOMMEND_BADGE_CLASSNAME}>{getRecommendationBadge(scene)}</div>
             </button>
           ))}
         </div>

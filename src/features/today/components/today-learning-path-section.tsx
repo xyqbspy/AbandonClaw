@@ -2,6 +2,13 @@ import {
   TODAY_SECTION_CLASSNAME,
   TODAY_SECTION_EMOJI_CLASSNAME,
   TODAY_SECTION_TITLE_CLASSNAME,
+  TODAY_TASK_STEP_ACTIVE_CLASSNAME,
+  TODAY_TASK_STEP_BASE_CLASSNAME,
+  TODAY_TASK_STEP_COMPLETED_CLASSNAME,
+  TODAY_TASK_STEP_DESC_CLASSNAME,
+  TODAY_TASK_STEP_ICON_CLASSNAME,
+  TODAY_TASK_STEP_INACTIVE_CLASSNAME,
+  TODAY_TASK_STEP_TITLE_CLASSNAME,
   TODAY_TASK_ICON_GLYPH_CLASSNAME,
 } from "@/features/today/components/today-page-styles";
 import { DailyTask } from "@/lib/types";
@@ -56,27 +63,25 @@ export function TodayLearningPathSection({
               key={task.id}
               type="button"
               disabled={isLocked}
-              className={`flex-1 rounded-[var(--app-radius-card)] border px-[var(--mobile-space-sm)] py-[var(--mobile-space-md)] text-center transition ${
+              className={`${TODAY_TASK_STEP_BASE_CLASSNAME} ${
                 variant === "completed"
-                  ? "border-[#A3E9B0] bg-[#E6F7EC]"
+                  ? TODAY_TASK_STEP_COMPLETED_CLASSNAME
                   : variant === "active"
-                    ? "border-[#3B82F6] bg-[#EFF6FF] shadow-[0_2px_6px_rgba(59,130,246,0.1)]"
-                    : "border-[#EDF2F7] bg-[#F8FAFE]"
+                    ? TODAY_TASK_STEP_ACTIVE_CLASSNAME
+                    : TODAY_TASK_STEP_INACTIVE_CLASSNAME
               } ${isLocked ? "cursor-not-allowed opacity-80" : "active:scale-[0.98]"}`}
               onClick={() => {
                 if (isLocked) return;
                 onOpenTask(task);
               }}
             >
-              <div className="mx-auto mb-[var(--mobile-space-sm)] flex size-11 min-h-11 min-w-11 shrink-0 items-center justify-center rounded-[14px] bg-white/80 shadow-[inset_0_0_0_1px_rgba(148,163,184,0.14)] aspect-square">
+              <div className={TODAY_TASK_STEP_ICON_CLASSNAME}>
                 <span className={TODAY_TASK_ICON_GLYPH_CLASSNAME}>
                   {variant === "completed" ? "✓" : STEP_ICONS[index] ?? "•"}
                 </span>
               </div>
-              <div className="text-[length:var(--mobile-font-body-sm)] font-semibold leading-[1.2] tracking-[-0.01em] text-[#1F2A44]">
-                {task.title}
-              </div>
-              <div className="mt-[var(--mobile-space-2xs)] text-[length:var(--mobile-font-caption)] leading-[1.35] text-[#6C7A91]">
+              <div className={TODAY_TASK_STEP_TITLE_CLASSNAME}>{task.title}</div>
+              <div className={TODAY_TASK_STEP_DESC_CLASSNAME}>
                 {getTaskStepDescription(task, index)}
               </div>
             </button>

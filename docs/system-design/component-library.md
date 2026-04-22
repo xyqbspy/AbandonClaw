@@ -7,6 +7,8 @@
 - 一个组件应该放在 `src/components/*`、`src/features/*/components`，还是页面层？
 - 一个组件已经被别的 feature 复用时，什么时候该迁到公共层？
 
+如果问题是“新增页面或功能时 UI 风格应该怎么统一”，先看 [ui-style-guidelines.md](/d:/WorkCode/AbandonClaw/docs/system-design/ui-style-guidelines.md)。如果问题是“现有页面样式漂移应该从哪里开始收”，先看 [ui-style-audit.md](/d:/WorkCode/AbandonClaw/docs/system-design/ui-style-audit.md)。本文件只负责组件分层和公共化边界。
+
 当前仓库已经稳定存在三类组件职责：
 
 - 公共组件：跨页面、跨 feature 复用，职责稳定
@@ -137,6 +139,8 @@
 - 不为了追求“目录整齐”而把 feature 内组装组件抽空
 
 ## 4. 新增组件时怎么判断
+
+新增组件前，先确认它所在页面和动作层级是否符合 [ui-style-guidelines.md](/d:/WorkCode/AbandonClaw/docs/system-design/ui-style-guidelines.md)。再按下面顺序判断组件落点。
 
 按下面顺序判断：
 

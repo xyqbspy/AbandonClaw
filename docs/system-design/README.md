@@ -23,6 +23,8 @@
 - [review-source-mapping.md](/d:/WorkCode/AbandonClaw/docs/system-design/review-source-mapping.md)
 - [scene-generation-pipeline.md](/d:/WorkCode/AbandonClaw/docs/system-design/scene-generation-pipeline.md)
 - [scene-practice-generation.md](/d:/WorkCode/AbandonClaw/docs/system-design/scene-practice-generation.md)
+- [ui-style-guidelines.md](/d:/WorkCode/AbandonClaw/docs/system-design/ui-style-guidelines.md)
+- [ui-style-audit.md](/d:/WorkCode/AbandonClaw/docs/system-design/ui-style-audit.md)
 
 ## 推荐使用方式
 
@@ -49,6 +51,8 @@
   - 对应 `learning-overview-mapping.md` 与相关 `feature-flows/today-recommendation.md`
 - `openspec/specs/audio-playback-orchestration/spec.md`
   - 对应 `audio-tts-pipeline.md`
+- `openspec/specs/component-library-governance/spec.md`、`openspec/specs/learning-action-button-hierarchy/spec.md`、`openspec/specs/detail-footer-actions/spec.md`
+  - 对应 `ui-style-guidelines.md` 与 `component-library.md`
 
 如果某个 capability 同时涉及实现协作和主链路承接，先看这里确认实现归宿，再回到对应 `feature-flows/` 或 `domain-rules/` 补完整语义。
 
@@ -60,6 +64,7 @@
 - 正式信号落库位置变化
 - 服务/缓存/组件的实现协作关系变化
 - 某条链路的实现锚点和测试锚点需要固定下来
+- 新增页面、功能入口或跨页面 UI 调整需要统一风格入口
 
 以下内容通常不应单独写在这里：
 

@@ -1,6 +1,8 @@
 ## Purpose
 
 定义项目当前稳定的学习闭环，确保 `today`、`scene`、`chunks`、`review` 与学习状态同步之间保持一致，不会因为局部改动破坏整条学习链路。
+
+这条学习闭环服务于产品北极星：让每一次场景学习，都沉淀为用户在未来真实场景中能回忆、能使用、能迁移的表达资产。`today -> scene -> chunks -> review` 是实现机制，不应替代这个用户结果导向。
 ## Requirements
 ### Requirement: Today 必须作为每日学习入口
 系统 MUST 提供 `today` 入口，把继续学习、复习任务和学习概览聚合成当日可执行入口。涉及 continue 入口优先级、任务解释文案、聚合字段映射与 fallback 语义的专项规则，MUST 遵守 `today-learning-contract` capability，而不是在学习闭环总览中重复展开 today 聚合契约。

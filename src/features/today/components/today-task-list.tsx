@@ -3,15 +3,18 @@ import { CheckCircle2, Circle, Lock } from "lucide-react";
 import { DailyTask } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  APPLE_BUTTON_BASE,
-  APPLE_BUTTON_STRONG,
-  APPLE_BUTTON_TEXT_SM,
   APPLE_CARD_INTERACTIVE,
   APPLE_BODY_TEXT,
   APPLE_META_TEXT,
   APPLE_PANEL,
   APPLE_TITLE_MD,
 } from "@/lib/ui/apple-style";
+import {
+  TODAY_TASK_ACTION_BASE_CLASSNAME,
+  TODAY_TASK_ACTION_DISABLED_CLASSNAME,
+  TODAY_TASK_ACTION_STRONG_CLASSNAME,
+  TODAY_TASK_ACTION_WRAPPER_CLASSNAME,
+} from "@/features/today/components/today-page-styles";
 
 export function TodayTaskList({
   tasks,
@@ -20,10 +23,6 @@ export function TodayTaskList({
   tasks: DailyTask[];
   onStartTask?: (task: DailyTask) => void;
 }) {
-  const buttonClassName = `${APPLE_BUTTON_BASE} ${APPLE_BUTTON_TEXT_SM} h-[var(--mobile-control-height)] px-[var(--mobile-space-md)]`;
-  const buttonStrongClassName = `${APPLE_BUTTON_STRONG} ${APPLE_BUTTON_TEXT_SM} h-[var(--mobile-control-height)] px-[var(--mobile-space-md)]`;
-  const disabledButtonClassName = `${buttonClassName} cursor-not-allowed border-transparent bg-[var(--app-surface-hover)] text-[var(--muted-foreground)] shadow-none`;
-
   return (
     <Card className={APPLE_CARD_INTERACTIVE}>
       <CardHeader>
@@ -60,12 +59,12 @@ export function TodayTaskList({
                 type="button"
                 disabled={task.status === "locked"}
                 onClick={() => onStartTask(task)}
-                className={`inline-flex cursor-pointer items-center justify-center active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 ${
+                className={`${TODAY_TASK_ACTION_WRAPPER_CLASSNAME} ${
                   task.done
-                    ? buttonClassName
+                    ? TODAY_TASK_ACTION_BASE_CLASSNAME
                     : task.status === "locked"
-                      ? disabledButtonClassName
-                      : buttonStrongClassName
+                      ? TODAY_TASK_ACTION_DISABLED_CLASSNAME
+                      : TODAY_TASK_ACTION_STRONG_CLASSNAME
                 }`}
               >
                 {task.actionLabel ??
@@ -76,12 +75,12 @@ export function TodayTaskList({
             ) : (
               <Link
                 href={task.actionHref}
-                className={`inline-flex cursor-pointer items-center justify-center active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 ${
+                className={`${TODAY_TASK_ACTION_WRAPPER_CLASSNAME} ${
                   task.done
-                    ? buttonClassName
+                    ? TODAY_TASK_ACTION_BASE_CLASSNAME
                     : task.status === "locked"
-                      ? `${disabledButtonClassName} pointer-events-none`
-                      : buttonStrongClassName
+                      ? `${TODAY_TASK_ACTION_DISABLED_CLASSNAME} pointer-events-none`
+                      : TODAY_TASK_ACTION_STRONG_CLASSNAME
                 }`}
               >
                 {task.actionLabel ??

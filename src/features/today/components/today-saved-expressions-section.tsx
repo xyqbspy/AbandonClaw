@@ -2,6 +2,10 @@ import Link from "next/link";
 import {
   TODAY_INFO_PILL_CLASSNAME,
   TODAY_INLINE_META_ICON_CLASSNAME,
+  TODAY_INLINE_LINK_CLASSNAME,
+  TODAY_SAVED_FOOTNOTE_CLASSNAME,
+  TODAY_SAVED_ITEM_CLASSNAME,
+  TODAY_SAVED_ITEM_META_CLASSNAME,
   TODAY_SECTION_CLASSNAME,
   TODAY_SECTION_EMOJI_CLASSNAME,
   TODAY_SECTION_TITLE_CLASSNAME,
@@ -29,26 +33,21 @@ export function TodaySavedExpressionsSection({
             {savedPhraseCount}
           </span>
         </div>
-        <Link href="/chunks" className="text-[length:var(--mobile-font-caption)] font-medium text-[#3B82F6]">
+        <Link href="/chunks" className={TODAY_INLINE_LINK_CLASSNAME}>
           查看全部 →
         </Link>
       </div>
 
       <div className={TODAY_SOFT_PANEL_CLASSNAME}>
         {items.map((item) => (
-          <div
-            key={item.key}
-            className="border-b border-dashed border-[#E2E8F0] py-[var(--mobile-space-sm)] text-[length:var(--mobile-font-body-sm)] font-medium leading-[1.45] text-[#1F2A44] last:border-b-0"
-          >
+          <div key={item.key} className={TODAY_SAVED_ITEM_CLASSNAME}>
             <div>“{item.text}”</div>
-            <div className="mt-[var(--mobile-space-2xs)] text-[length:var(--mobile-font-caption)] leading-[1.4] font-normal text-[#7A8699]">
-              {item.meta}
-            </div>
+            <div className={TODAY_SAVED_ITEM_META_CLASSNAME}>{item.meta}</div>
           </div>
         ))}
       </div>
 
-      <p className="mt-[var(--mobile-space-sm)] flex items-center gap-[6px] text-[length:var(--mobile-font-caption)] leading-[1.3] text-[#8A99B0]">
+      <p className={TODAY_SAVED_FOOTNOTE_CLASSNAME}>
         <span aria-hidden="true" className={TODAY_INLINE_META_ICON_CLASSNAME}>
           📎
         </span>

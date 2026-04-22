@@ -1,5 +1,8 @@
 import {
   TODAY_BADGE_EMOJI_CLASSNAME,
+  TODAY_REVIEW_ACCURACY_VALUE_CLASSNAME,
+  TODAY_REVIEW_CLEAR_PILL_CLASSNAME,
+  TODAY_REVIEW_DUE_PILL_CLASSNAME,
   TODAY_REVIEW_PILL_CLASSNAME,
   TODAY_SECTION_CLASSNAME,
 } from "@/features/today/components/today-page-styles";
@@ -21,14 +24,14 @@ export function TodayReviewSummaryCard({
       onClick={onClick}
     >
       <div>
-        <div className="text-[length:clamp(1.55rem,7vw,1.8rem)] font-extrabold text-[#10B981]">
+        <div className={TODAY_REVIEW_ACCURACY_VALUE_CLASSNAME}>
           {reviewAccuracy == null ? "--" : `${reviewAccuracy}%`}
         </div>
         <p className={`${APPLE_META_TEXT} leading-[1.35]`}>复习正确率 · 近 7 天</p>
       </div>
       <div
         className={`${TODAY_REVIEW_PILL_CLASSNAME} ${
-          dueReviewCount > 0 ? "bg-[#FEF2F2] text-[#DC2626]" : "bg-[#E6F7EC] text-[#2E7D32]"
+          dueReviewCount > 0 ? TODAY_REVIEW_DUE_PILL_CLASSNAME : TODAY_REVIEW_CLEAR_PILL_CLASSNAME
         }`}
       >
         {dueReviewCount > 0 ? (

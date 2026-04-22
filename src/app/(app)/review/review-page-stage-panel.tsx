@@ -12,7 +12,27 @@ import { ReviewPageLabels } from "./review-page-labels";
 import { assessmentLabelMap, getInlinePracticeFeedback, getInlinePracticePlaceholder, getReviewModeAccentClassName, reviewModeLabelMap } from "./review-page-messages";
 import { PhraseRewritePrompt, ReviewTaskStage } from "./review-page-selectors";
 
-const stagePanelClassName = "rounded-[24px] border border-[var(--app-border-soft)] bg-white p-5 shadow-[0_16px_50px_rgba(15,23,42,0.08)]";
+const stagePanelClassName =
+  "rounded-[24px] border border-[var(--app-border-soft)] bg-white p-5 shadow-[0_16px_50px_rgba(15,23,42,0.08)]";
+const stageStepTagClassName =
+  "mb-4 inline-flex rounded-xl bg-sky-50 px-3 py-1 text-xs font-bold text-sky-700";
+const stageTitleClassName = "text-2xl font-semibold tracking-tight text-slate-950";
+const reviewStageBlockClassName = `rounded-[20px] p-4 ${APPLE_PANEL}`;
+const reviewDashedBlockClassName = "rounded-[20px] border border-dashed border-slate-200 bg-slate-50 p-4";
+const reviewStrongDashedBlockClassName =
+  "rounded-[20px] border-2 border-dashed border-slate-200 bg-slate-50 p-4";
+const reviewTodoTitleClassName = "text-sm font-semibold text-slate-900";
+const reviewPromptTitleClassName = "text-sm font-medium text-slate-700";
+const reviewFieldLabelClassName = "mt-3 text-sm font-medium text-slate-800";
+const reviewReferenceBlockClassName = "mt-3 rounded-[18px] bg-white p-4 shadow-sm";
+const reviewWarningBlockClassName = "rounded-[18px] border border-amber-200 bg-amber-50/80 p-4";
+const reviewWarningLabelClassName =
+  "text-xs font-semibold uppercase tracking-[0.16em] text-amber-700";
+const reviewFeedbackPillBaseClassName = "rounded-full px-3 py-1";
+const reviewFeedbackPillSubtleClassName = `${reviewFeedbackPillBaseClassName} bg-slate-100 text-slate-700`;
+const reviewFeedbackPillInfoClassName = `${reviewFeedbackPillBaseClassName} bg-sky-50 text-sky-700`;
+const reviewFeedbackPillWarningClassName = `${reviewFeedbackPillBaseClassName} bg-amber-50 text-amber-700`;
+const reviewFeedbackPillSuccessClassName = `${reviewFeedbackPillBaseClassName} bg-emerald-50 text-emerald-700`;
 
 type StageMeta = {
   stepTag: string;
@@ -123,15 +143,15 @@ export function ReviewPageStagePanel({
 
   return (
     <section className={stagePanelClassName}>
-      <div className="mb-4 inline-flex rounded-xl bg-sky-50 px-3 py-1 text-xs font-bold text-sky-700">
+      <div className={stageStepTagClassName}>
         {stageMeta.stepTag}
       </div>
-      <h2 className="text-2xl font-semibold tracking-tight text-slate-950">{stageMeta.title}</h2>
+      <h2 className={stageTitleClassName}>{stageMeta.title}</h2>
       <p className={`mt-2 ${APPLE_META_TEXT}`}>{trainingHintSubtle}</p>
 
       {activeTaskKind === "scene_practice" && currentScenePracticeItem ? (
         <div className="mt-6 space-y-4">
-          <div className={`rounded-[20px] p-4 ${APPLE_PANEL}`}>
+          <div className={reviewStageBlockClassName}>
             <p className={APPLE_META_TEXT}>{labels.sceneScenarioLabel}</p>
             <p className="mt-2 text-lg font-semibold text-foreground">
               {currentScenePracticeItem.sceneTitle}
@@ -143,7 +163,7 @@ export function ReviewPageStagePanel({
             ) : null}
           </div>
 
-          <div className="rounded-[20px] border-2 border-dashed border-slate-200 bg-slate-50 p-4">
+          <div className={reviewStrongDashedBlockClassName}>
             <div className="flex flex-wrap items-center gap-2">
               <span className={APPLE_META_TEXT}>{labels.practiceModePrefix}</span>
               <span
@@ -182,7 +202,7 @@ export function ReviewPageStagePanel({
           </div>
 
           {taskStage === "practice" ? (
-            <div className={`rounded-[20px] p-4 ${APPLE_PANEL}`}>
+            <div className={reviewStageBlockClassName}>
               <p className={APPLE_META_TEXT}>{labels.scenePracticeLabel}</p>
               {currentScenePracticeItem.recommendedMode === "full_dictation" ? (
                 <textarea
@@ -210,7 +230,7 @@ export function ReviewPageStagePanel({
 
           {taskStage === "feedback" && sceneFeedback ? (
             <div className="space-y-4">
-              <div className={`rounded-[20px] p-4 ${APPLE_PANEL}`}>
+              <div className={reviewStageBlockClassName}>
                 <p className={APPLE_META_TEXT}>{labels.sceneFeedbackLabel}</p>
                 <p
                   className={cn(
@@ -235,8 +255,8 @@ export function ReviewPageStagePanel({
                       ] ?? sceneFeedback.assessment}`}
                 </p>
               </div>
-              <div className="rounded-[20px] border border-dashed border-slate-200 bg-slate-50 p-4">
-                <p className="text-sm font-semibold text-slate-900">{labels.sceneTodoTitle}</p>
+              <div className={reviewDashedBlockClassName}>
+                <p className={reviewTodoTitleClassName}>{labels.sceneTodoTitle}</p>
                 <p className={`mt-2 text-sm ${APPLE_META_TEXT}`}>{labels.sceneTodoBody}</p>
               </div>
             </div>
@@ -245,14 +265,14 @@ export function ReviewPageStagePanel({
       ) : currentPhraseItem ? (
         <div className="mt-6 space-y-4">
           {currentPhraseSchedulingReason ? (
-            <div className="rounded-[18px] border border-amber-200 bg-amber-50/80 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-700">
+            <div className={reviewWarningBlockClassName}>
+              <p className={reviewWarningLabelClassName}>
                 调度提示
               </p>
               <p className="mt-2 text-sm text-amber-800">{currentPhraseSchedulingReason}</p>
             </div>
           ) : null}
-          <div className={`rounded-[20px] p-4 ${APPLE_PANEL}`}>
+          <div className={reviewStageBlockClassName}>
             <p className={APPLE_META_TEXT}>
               {taskStage === "recall" ? labels.phraseRecallScenarioLabel : labels.phraseScenarioLabel}
             </p>
@@ -268,8 +288,8 @@ export function ReviewPageStagePanel({
             </p>
           </div>
 
-          <div className="rounded-[20px] border-2 border-dashed border-slate-200 bg-slate-50 p-4">
-            <p className="text-sm font-medium text-slate-700">
+          <div className={reviewStrongDashedBlockClassName}>
+            <p className={reviewPromptTitleClassName}>
               {taskStage === "recall" ? labels.phraseMicroRecallTitle : labels.activeRecallHint}
             </p>
             <p className={`mt-2 text-sm ${APPLE_META_TEXT}`}>
@@ -284,7 +304,7 @@ export function ReviewPageStagePanel({
               {showReference ? labels.hideReference : labels.showReference}
             </Button>
             {showReference ? (
-              <div className="mt-3 rounded-[18px] bg-white p-4 shadow-sm">
+              <div className={reviewReferenceBlockClassName}>
                 <p className={APPLE_META_TEXT}>{labels.phraseReferenceLabel}</p>
                 <p className={`mt-1 ${APPLE_BODY_TEXT}`}>{currentPhraseExampleSentence}</p>
                 {currentPhraseItem.usageNote ? (
@@ -296,9 +316,9 @@ export function ReviewPageStagePanel({
 
           {taskStage === "confidence" ? (
             <div className="space-y-4">
-              <div className={`rounded-[20px] p-4 ${APPLE_PANEL}`}>
+              <div className={reviewStageBlockClassName}>
                 <p className={APPLE_META_TEXT}>{labels.phraseConfidenceLabel}</p>
-                <p className="mt-3 text-sm font-medium text-slate-800">
+                <p className={reviewFieldLabelClassName}>
                   {labels.phraseRecognitionLabel}
                 </p>
                 <div className="mt-3 grid grid-cols-2 gap-2">
@@ -342,9 +362,9 @@ export function ReviewPageStagePanel({
 
           {taskStage === "rewrite" ? (
             <div className="space-y-4">
-              <div className={`rounded-[20px] p-4 ${APPLE_PANEL}`}>
+              <div className={reviewStageBlockClassName}>
                 <p className={APPLE_META_TEXT}>{labels.phraseRewriteLabel}</p>
-                <p className="mt-3 text-sm font-medium text-slate-800">
+                <p className={reviewFieldLabelClassName}>
                   {labels.phraseRewritePromptLabel}
                 </p>
                 <div className="mt-3 flex flex-wrap gap-2">
@@ -369,15 +389,15 @@ export function ReviewPageStagePanel({
                   onChange={(event) => setPhraseRewriteDraft(event.target.value)}
                 />
               </div>
-              <div className="rounded-[20px] border border-dashed border-slate-200 bg-slate-50 p-4">
-                <p className="text-sm font-semibold text-slate-900">{labels.phraseRewriteTodoTitle}</p>
+              <div className={reviewDashedBlockClassName}>
+                <p className={reviewTodoTitleClassName}>{labels.phraseRewriteTodoTitle}</p>
                 <p className={`mt-2 text-sm ${APPLE_META_TEXT}`}>{labels.phraseRewriteTodoBody}</p>
               </div>
             </div>
           ) : null}
 
           {taskStage === "practice" ? (
-            <div className={`rounded-[20px] p-4 ${APPLE_PANEL}`}>
+            <div className={reviewStageBlockClassName}>
               <p className={APPLE_META_TEXT}>{labels.phraseOutputLabel}</p>
               <textarea
                 className={`mt-3 min-h-28 w-full px-4 py-3 text-sm ${APPLE_INPUT_PANEL}`}
@@ -390,31 +410,31 @@ export function ReviewPageStagePanel({
 
           {taskStage === "feedback" ? (
             <div className="space-y-4">
-              <div className={`rounded-[20px] p-4 ${APPLE_PANEL}`}>
+              <div className={reviewStageBlockClassName}>
                 <p className={APPLE_META_TEXT}>{labels.phraseFeedbackLabel}</p>
                 <p className="mt-2 text-sm text-slate-700">{labels.phraseScoringHint}</p>
                 <div className="mt-3 flex flex-wrap gap-2 text-xs">
                   {phraseRecognition ? (
-                    <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">
+                    <span className={reviewFeedbackPillSubtleClassName}>
                       {phraseRecognition === "recognized"
                         ? labels.phraseRecognitionKnown
                         : labels.phraseRecognitionUnknown}
                     </span>
                   ) : null}
                   {phraseOutputConfidence ? (
-                    <span className="rounded-full bg-sky-50 px-3 py-1 text-sky-700">
+                    <span className={reviewFeedbackPillInfoClassName}>
                       {phraseOutputConfidence === "high"
                         ? labels.phraseOutputConfidenceHigh
                         : labels.phraseOutputConfidenceLow}
                     </span>
                   ) : null}
                   {phraseRewriteDraft.trim() ? (
-                    <span className="rounded-full bg-amber-50 px-3 py-1 text-amber-700">
+                    <span className={reviewFeedbackPillWarningClassName}>
                       {currentRewritePrompt?.title}
                     </span>
                   ) : null}
                   {phraseDraft.trim() ? (
-                    <span className="rounded-full bg-emerald-50 px-3 py-1 text-emerald-700">
+                    <span className={reviewFeedbackPillSuccessClassName}>
                       已完成完整输出草稿
                     </span>
                   ) : null}
@@ -424,8 +444,8 @@ export function ReviewPageStagePanel({
                   {currentPhraseItem.correctCount}，{labels.incorrect} {currentPhraseItem.incorrectCount}
                 </p>
               </div>
-              <div className="rounded-[20px] border border-dashed border-slate-200 bg-slate-50 p-4">
-                <p className="text-sm font-semibold text-slate-900">{labels.phraseFeedbackTodoTitle}</p>
+              <div className={reviewDashedBlockClassName}>
+                <p className={reviewTodoTitleClassName}>{labels.phraseFeedbackTodoTitle}</p>
                 <p className={`mt-2 text-sm ${APPLE_META_TEXT}`}>{labels.phraseFeedbackTodoBody}</p>
               </div>
             </div>
