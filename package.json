@@ -20,6 +20,7 @@
     "test:interaction:theme-semantic": "node --import tsx --import ./src/test/setup-dom.ts --test \"src/app/(app)/scenes/page.interaction.test.tsx\" \"src/app/(app)/chunks/page.interaction.test.tsx\" \"src/app/(app)/chunks/chunks-list-view.interaction.test.tsx\" \"src/features/chunks/components/focus-detail-actions.interaction.test.tsx\" \"src/features/chunks/components/focus-detail-content.interaction.test.tsx\" \"src/features/chunks/components/focus-detail-sheet.interaction.test.tsx\" \"src/features/chunks/components/expression-map-sheet.interaction.test.tsx\" \"src/features/chunks/components/move-into-cluster-sheet.interaction.test.tsx\" \"src/features/chunks/components/cluster-focus-list.interaction.test.tsx\" \"src/features/chunks/components/example-sentence-cards.test.tsx\" \"src/features/scene/components/scene-expression-map-view.interaction.test.tsx\" \"src/features/scene/components/scene-practice-view.interaction.test.tsx\" \"src/features/scene/components/scene-variants-view.interaction.test.tsx\" \"src/app/(app)/scene/[[]slug[]]/page.regression.test.tsx\"",
     "test:all": "pnpm run test:unit && pnpm run test:interaction",
     "text:check-mojibake": "node --import tsx scripts/check-mojibake.ts",
+    "maintenance:check": "node --import tsx scripts/check-maintenance-guardrails.ts",
     "phrases:infer-relations": "npx tsx scripts/infer-missing-phrase-relations.ts",
     "phrases:backfill-relation-families": "npx tsx scripts/backfill-phrase-relation-families.ts",
     "phrases:enrich-missing": "npx tsx scripts/enrich-missing-phrases.ts",

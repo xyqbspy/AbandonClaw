@@ -2,6 +2,23 @@
 
 在开始任何非微小改动前，先用这份模板快速过一遍。
 
+## 0. 任务分流速查
+
+先用这张表做第一轮判断，避免小改动误套大流程：
+
+| 类型 | 适用场景 | 收尾标准 |
+| --- | --- | --- |
+| Fast Track | UI / 样式 / 文案、lint / type / import、局部测试、小范围不改语义重构 | 最小相关测试通过，必要文档最小同步即可 |
+| Cleanup / Removal | 删除废弃入口、重复逻辑、旧状态、旧测试或旧文档 | 说明删除依据和影响范围；若改变用户行为，升级 Spec-Driven |
+| Spec-Driven | 改业务行为、主链路、状态流、数据流、API、数据模型、权限、缓存、跨页面一致性或维护规范 | proposal / design / spec delta / tasks / 文档 / stable spec / archive 按完成态收尾 |
+
+职责入口保持分层：
+- `AGENTS.md`：强制红线和任务分流。
+- `docs/README.md`：告诉你应该读哪类文档。
+- `openspec/specs/project-maintenance/spec.md`：长期稳定契约。
+- `docs/dev/project-maintenance-playbook.md`：执行清单和日常维护说明。
+- 本文件：接需求阶段的问题分析骨架。
+
 ## 1. 变更摘要
 
 - 变更名称：

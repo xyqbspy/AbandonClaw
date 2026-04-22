@@ -19,6 +19,14 @@
 - `openspec-workflow.md` 是 Spec-Driven 阶段规则的唯一细化说明
 - 开始做需求前，先按维护手册做一次“稳定性收口检查”，不要把已识别的不稳定点留到后续零散修补
 
+入口职责边界：
+
+- `AGENTS.md` 只承载强制红线和任务分流，避免重复展开完整执行细节
+- `docs/README.md` 负责定位阅读路径
+- `project-maintenance-playbook.md` 负责执行清单和日常检查
+- `openspec/specs/project-maintenance/spec.md` 负责长期稳定契约
+- `change-intake-template.md` 负责接需求阶段的最小问题分析骨架
+
 ## 当前目录
 
 - [project-maintenance-playbook.md](/d:/WorkCode/AbandonClaw/docs/dev/project-maintenance-playbook.md)
