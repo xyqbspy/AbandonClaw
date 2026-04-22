@@ -50,6 +50,20 @@
 - **THEN** 必须检查该 change 涉及的稳定规则是否已同步到主 `openspec/specs/*`
 - **AND** 若稳定规范尚未承接，不得只完成归档而宣称规范同步已经结束
 
+### Requirement: 较大改动必须同轮同步 docs 现状文档
+当一轮改动达到非微小规模，或改变用户可见能力、跨页面 UI 一致性、主链路、数据流、状态流、缓存、权限、维护流程、测试链路或模块边界时，维护流程 MUST 在同一轮检查并同步 `docs/` 下受影响的现状文档，不得把已知文档漂移留给用户事后手动补。
+
+#### Scenario: 较大 UI 或能力改动影响现有文档描述
+- **WHEN** 维护者完成一轮较大 UI、能力或跨模块一致性改动
+- **AND** `docs/README.md` 定位到的 feature-map、feature-flows、domain-rules、system-design、dev 或 meta 文档存在相关现状描述
+- **THEN** 必须在本轮同步更新这些已有文档，或明确说明为何不受影响
+- **AND** 不得只更新代码、测试和 CHANGELOG 后把 `docs/` 同步留给后续人工处理
+
+#### Scenario: 改动只属于微小局部修复
+- **WHEN** 本轮改动明确属于 Fast Track 小修，且不改变文档中描述的现状、流程、模块边界或维护口径
+- **THEN** 可以说明无需更新 `docs/`
+- **AND** 该说明必须基于已检查的相关入口，而不是默认跳过文档同步判断
+
 ### Requirement: Spec-Driven 完成态提交前必须先完成收尾
 当维护者处理 Spec-Driven Change 且本次提交被视为“完成态提交”或用户明确要求“收尾提交”时，维护流程 MUST 先完成收尾动作，再提交代码；不得先提交实现代码，再手动补 tasks、文档、stable spec 或 archive。
 

@@ -67,6 +67,33 @@
 - 会被多个页面或 feature 共用
 - 比一般 shared 组件更适合集中在音频命名空间
 
+### `src/components/admin`
+
+放管理后台子域内复用的组件。
+
+当前典型组件：
+
+- `admin-action-button`
+- `admin-nav`
+- `client-events-panel`
+- `tts-browser-cache-panel`
+
+判断标准：
+
+- 只服务 `/admin` 及后台维护页面
+- 承载后台统一操作层级、菜单或维护面板语义
+- 不应因为“样式像按钮/列表”就上移到 `shared`
+
+后台操作按钮统一通过 `AdminActionButton`、`AdminLoadingActionButton` 或 `AdminConfirmActionButton` 表达 `secondary / primary / danger` 三种层级。页面不应继续手拼 `APPLE_BUTTON_* + APPLE_BUTTON_TEXT_*`。
+
+按钮样式规则：
+
+- `Button` 的 `variant` 和 `APPLE_BUTTON_*` 外观类必须保持同一语义层级。
+- 主按钮使用 `variant="default"` 或对应封装，不得写成 `variant="ghost" + APPLE_BUTTON_STRONG`。
+- 次按钮使用 `variant="secondary"` 或对应封装，不得写成 `variant="ghost" + APPLE_BUTTON_BASE`。
+- 危险按钮使用 `variant="destructive"` 或对应封装，不得写成 `variant="ghost" + APPLE_BUTTON_DANGER`。
+- `src/components/ui/button-style-guardrails.test.ts` 会防止 `ghost` 与 `APPLE_BUTTON_*` 在同一个按钮里混搭。
+
 ### `src/features/*/components`
 
 放 feature 私有组件。
