@@ -163,7 +163,7 @@ export async function saveScenePracticeSet(
   }
 
   return {
-    practiceSet: toPracticeSet(data),
+    practiceSet: toPracticeSet(data!),
   };
 }
 
@@ -217,6 +217,6 @@ export async function markScenePracticeSetCompleted(params: {
   }
 
   return {
-    practiceSet: toPracticeSet(data),
+    practiceSet: toPracticeSet(data!),
   };
 }
