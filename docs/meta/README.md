@@ -4,6 +4,12 @@
 
 这里不负责定义正式业务规则，也不负责描述实现细节，而是帮助新维护者、分享者或 AI 快速建立整个项目的认知骨架。
 
+当前 meta 文档应围绕同一个产品北极星展开：
+
+> 让每一次场景学习，都变成用户能复用、能回忆、能说出口的表达资产。
+
+`today -> scene -> chunks -> review` 是实现机制，不应替代这个用户结果导向。新增或调整 meta 文档时，优先检查叙述是否仍服务于“表达资产 -> 主动回忆/输出能力”。
+
 ## 当前目录
 
 - [product-overview.md](/d:/WorkCode/AbandonClaw/docs/meta/product-overview.md)
