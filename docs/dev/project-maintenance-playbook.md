@@ -1,5 +1,30 @@
 # AbandonClaw 项目维护手册
 
+## 0. 快速入口
+
+这份手册是深读材料，不是每次改动的默认必读全文。
+
+| 当前任务 | 默认阅读 | 继续深读条件 |
+| --- | --- | --- |
+| Fast Track | `AGENTS.md`、相关文件、最小测试上下文 | 暴露主链路、状态流、数据流、缓存、权限或稳定规则风险 |
+| Cleanup / Removal | 删除对象、引用方、影响范围 | 删除会改变用户行为或跨模块契约 |
+| Spec-Driven | `docs/README.md` 定位后，再读本手册相关章节 | 进入 proposal / implementation / archive |
+| 完成态收尾 | 本手册第 6、9、10、11 节 | 需要同步 stable spec、archive、dev-log 或 CHANGELOG |
+
+优先记住这条最小路径：
+
+1. 先用 `docs/dev/change-intake-template.md` 填最小块。
+2. 小改动只跑最小相关测试和必要文档同步。
+3. 非微小改动再回到本手册深读。
+4. 收尾前运行 `pnpm run maintenance:check`。
+
+深读触发条件：
+
+- 改动影响推荐逻辑、状态流转、回写、Session 恢复或 Scene 完成判定。
+- 改动影响 API、数据模型、权限、缓存、测试链路或维护规范。
+- 处理中发现旧规则漂移、重复语义、缺失文档、缺失测试或边界不清。
+- 准备做 Spec-Driven 完成态提交、stable spec 同步或 archive。
+
 ## 1. 项目是什么
 
 这是一个面向中文学习者的英语学习系统。它不是单纯的单词卡片应用，而是把学习拆成一条连续闭环：

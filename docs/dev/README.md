@@ -1,114 +1,58 @@
 # Dev
 
-本目录用于维护“开发流程与维护约定”文档。
+本目录只回答一个问题：这次改动应该按什么维护流程推进。
 
-这里回答的是：
+它不承载业务规则本身。业务链路、字段来源、缓存、权限和页面语义仍从 `docs/README.md` 定位，再进入对应 feature-flow、domain-rules、system-design 或 stable spec。
 
-- 这个项目平时怎么改
-- 什么情况要走 OpenSpec
-- 测试和验证该怎么收敛
-- 变更过程记录在哪里
+## 先走哪条路
 
-如果你已经通过 `docs/README.md` 理解了模块、链路、规则和实现，但还需要知道“应该按什么流程动手”，再看这里。
+| 场景 | 先看 | 收尾 |
+| --- | --- | --- |
+| Fast Track 小改动 | `change-intake-template.md` 的最小填写块 | 最小相关测试，必要文档同步即可 |
+| Cleanup / Removal | `project-maintenance-playbook.md` 的快速入口和影响范围 | 说明删除依据、影响范围和测试 |
+| Spec-Driven | `openspec-workflow.md`，再看 stable spec | proposal / design / spec / tasks / 文档 / archive |
+| 发布或完成态收尾 | `project-maintenance-playbook.md` 的收尾清单 | `pnpm run maintenance:check` |
 
-使用约定：
+## 入口职责
 
-- 本文件负责目录导航，不重复展开所有流程细节
-- `docs/README.md` 是仓库总入口；`project-maintenance-playbook.md` 是 `dev` 目录下的日常维护主入口
-- `openspec/specs/project-maintenance/spec.md` 是开发流程与维护约定的稳定约束入口
-- `openspec-workflow.md` 是 Spec-Driven 阶段规则的唯一细化说明
-- 开始做需求前，先按维护手册做一次“稳定性收口检查”，不要把已识别的不稳定点留到后续零散修补
-
-入口职责边界：
-
-- `AGENTS.md` 只承载强制红线和任务分流，避免重复展开完整执行细节
-- `docs/README.md` 负责定位阅读路径
-- `project-maintenance-playbook.md` 负责执行清单和日常检查
-- `openspec/specs/project-maintenance/spec.md` 负责长期稳定契约
-- `change-intake-template.md` 负责接需求阶段的最小问题分析骨架
+- `AGENTS.md`：强制红线和任务分流。
+- `docs/README.md`：定位该读哪类业务文档。
+- `openspec/specs/project-maintenance/spec.md`：长期稳定维护契约。
+- `project-maintenance-playbook.md`：日常执行清单和深读说明。
+- `change-intake-template.md`：接需求阶段的最小问题分析骨架。
+- `openspec-workflow.md`：进入 Spec-Driven 后的阶段细节。
 
 ## 当前目录
 
 - [project-maintenance-playbook.md](/d:/WorkCode/AbandonClaw/docs/dev/project-maintenance-playbook.md)
-  - 项目维护主入口，适合新维护者先读
-- [testing-policy.md](/d:/WorkCode/AbandonClaw/docs/dev/testing-policy.md)
-  - 测试策略与验证边界
-- [openspec-workflow.md](/d:/WorkCode/AbandonClaw/docs/dev/openspec-workflow.md)
-  - Spec-Driven 变更流程说明
+  - 日常维护手册；Fast Track 不需要默认通读全文。
 - [change-intake-template.md](/d:/WorkCode/AbandonClaw/docs/dev/change-intake-template.md)
-  - 需求接入与变更梳理模板
+  - 接需求时填写；顶部短块优先，复杂变更再补详细检查。
+- [openspec-workflow.md](/d:/WorkCode/AbandonClaw/docs/dev/openspec-workflow.md)
+  - Spec-Driven proposal、implementation、archive 阶段说明。
+- [testing-policy.md](/d:/WorkCode/AbandonClaw/docs/dev/testing-policy.md)
+  - 测试策略、最小验证和回归边界。
 - [backend-release-readiness-checklist.md](/d:/WorkCode/AbandonClaw/docs/dev/backend-release-readiness-checklist.md)
-  - 服务端治理上线前检查入口，对应运行护栏与真实 HTTP baseline
+  - 服务端上线前检查、运行护栏和真实 HTTP baseline。
 - [server-data-boundary-audit.md](/d:/WorkCode/AbandonClaw/docs/dev/server-data-boundary-audit.md)
-  - 用户态数据边界、RLS / SQL 映射与后台白名单审计记录
+  - 用户态数据边界、RLS、SQL 映射和服务端白名单审计。
 - [dev-log.md](/d:/WorkCode/AbandonClaw/docs/dev/dev-log.md)
-  - 开发过程记录，不是正式 CHANGELOG
+  - 开发过程记录；不是正式 CHANGELOG。
 
-## 推荐使用方式
+## 常用命令
 
-- 第一次接手项目
-  - 先看 `docs/README.md`
-  - 再看 `project-maintenance-playbook.md`
-- 需要确认哪些开发约束属于长期稳定规则
-  - 先看 `openspec/specs/project-maintenance/spec.md`
-  - 再回到 `project-maintenance-playbook.md` 或 `openspec-workflow.md` 看执行细节
-- 判断这次要不要走规范变更
-  - 先看 `project-maintenance-playbook.md` 的判断口径
-  - 进入 Spec-Driven 后再看 `openspec-workflow.md`
-- 做测试、补测试或判断验证范围
-  - 看 `testing-policy.md`
-- 做服务端治理上线检查或真实 HTTP baseline
-  - 看 `backend-release-readiness-checklist.md`
-- 盘点用户态数据边界、白名单入口或 RLS / SQL 映射
-  - 看 `server-data-boundary-audit.md`
-- 需要记录本轮改动和中间态决策
-  - 追加到 `dev-log.md`
+```bash
+pnpm run maintenance:check
+pnpm exec openspec validate --all --strict
+pnpm run text:check-mojibake
+git diff --check
+```
 
-如果这次改动同时涉及稳定 spec 分工，建议这样找：
+## 深读触发
 
-- 认证入口、来源校验、用户态数据边界
-  - 先看 `openspec/specs/auth-api-boundaries/spec.md`
-- 接口失败保护、最小可观测性、运行护栏
-  - 先看 `openspec/specs/api-operational-guardrails/spec.md`
-  - 再看 `backend-release-readiness-checklist.md`
-- 开发过程记录与正式 CHANGELOG 规则
-  - 先看 `openspec/specs/project-maintenance/spec.md`
-  - 再看 `openspec-workflow.md` 与 `dev-log.md`
+只有出现以下情况时，才继续深读维护手册或专项文档：
 
-如果你只想记一条最小路径，可以这样理解：
-
-- `docs/README.md`
-  - 负责先定位问题属于系统哪一层
-- `docs/dev/project-maintenance-playbook.md`
-  - 负责日常维护怎么判断、怎么落地
-- `openspec/specs/project-maintenance/spec.md`
-  - 负责哪些维护规则属于长期稳定约束
-- `docs/dev/openspec-workflow.md`
-  - 负责进入 Spec-Driven 后每个阶段具体怎么走
-
-## 使用原则
-
-出现这些情况时，应优先补或改 `dev`：
-
-- 开发流程变化
-- 测试策略变化
-- OpenSpec 使用规则变化
-- 维护入口或交接方式变化
-
-以下内容通常不应单独写在这里：
-
-- 业务规则定义
-- 页面字段映射
-- 模块职责说明
-- 主链路本身的产品语义
-
-## 建议正文模板
-
-新增或重写 `dev` 文档时，优先按这组章节组织：
-
-1. 文档目标
-2. 适用范围
-3. 使用原则
-4. 操作流程或决策规则
-5. 常见风险
-6. 相关入口
+- 改动影响主链路、状态流、数据流、缓存、权限或稳定规则。
+- Fast Track / Cleanup 处理中暴露了规则漂移、重复语义、缺失文档、缺失测试或边界不清。
+- 准备做 Spec-Driven 完成态提交或 archive。
+- 需要判断正式 `CHANGELOG.md`、dev-log、stable spec 是否要同步。
