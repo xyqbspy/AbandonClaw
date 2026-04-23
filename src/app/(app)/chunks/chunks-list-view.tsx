@@ -240,6 +240,67 @@ function ChunksSentenceExpressionTags({
   );
 }
 
+function ChunksSourceSentenceField({
+  labels,
+  item,
+  playingText,
+  ttsPlaybackText,
+  ttsLoadingText,
+  handlePronounceSentence,
+  renderExampleSentenceCards,
+  renderSentenceWithExpressionHighlight,
+}: {
+  labels: Pick<ChunksListViewLabels, "sourceSentence" | "speakSentence" | "learningInfoPending" | "noSourceSentence">;
+  item: UserPhraseItemResponse;
+  playingText: string | null;
+  ttsPlaybackText: string | null | undefined;
+  ttsLoadingText: string | null | undefined;
+  handlePronounceSentence: (text?: string | null) => void;
+  renderExampleSentenceCards: ChunksListViewProps["renderExampleSentenceCards"];
+  renderSentenceWithExpressionHighlight: ChunksListViewProps["renderSentenceWithExpressionHighlight"];
+}) {
+  const pronounceText = (item.exampleSentences[0]?.en ?? item.sourceSentenceText ?? "").trim();
+
+  return (
+    <div className={INFO_FIELD_CLASS}>
+      <div className="flex items-center justify-between gap-2">
+        <p className={APPLE_META_TEXT}>{labels.sourceSentence}</p>
+        <TtsActionButton
+          active={playingText === pronounceText}
+          loading={ttsLoadingText === pronounceText}
+          size="icon"
+          variant="ghost"
+          className="size-8 border-transparent bg-transparent px-0 text-[var(--app-foreground-muted)] hover:bg-transparent hover:text-[var(--app-foreground)] [@media(max-height:760px)]:size-7"
+          iconClassName="size-4 [@media(max-height:760px)]:size-3.5"
+          onClick={() => handlePronounceSentence(item.exampleSentences[0]?.en ?? item.sourceSentenceText)}
+          label={labels.speakSentence}
+        />
+      </div>
+      {item.exampleSentences.length > 0 ? (
+        renderExampleSentenceCards(item.exampleSentences, item.text, {
+          onSpeak: handlePronounceSentence,
+          isSpeakingText: (text) => {
+            const normalizedText = text?.trim();
+            return Boolean(normalizedText) && (playingText === normalizedText || ttsPlaybackText === normalizedText);
+          },
+          isLoadingText: (text) => {
+            const normalizedText = text?.trim();
+            return Boolean(normalizedText) && ttsLoadingText === normalizedText;
+          },
+        })
+      ) : (
+        <p className={`line-clamp-2 text-sm ${APPLE_META_TEXT}`}>
+          {item.sourceSentenceText
+            ? renderSentenceWithExpressionHighlight(item.sourceSentenceText, item.text)
+            : item.aiEnrichmentStatus === "pending"
+              ? labels.learningInfoPending
+              : labels.noSourceSentence}
+        </p>
+      )}
+    </div>
+  );
+}
+
 type ChunksListViewLabels = {
   sentenceUnit: string;
   expressionUnit: string;
@@ -595,45 +656,16 @@ export function ChunksListView({
                             : labels.noTranslation)}
                     </ChunksInfoField>
                     <ChunksInfoField label={labels.usageHint}>{getUsageHint(item)}</ChunksInfoField>
-                    <div className="space-y-0.5">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className={APPLE_META_TEXT}>{labels.sourceSentence}</p>
-                        <TtsActionButton
-                          active={playingText === (item.exampleSentences[0]?.en ?? item.sourceSentenceText ?? "").trim()}
-                          loading={ttsLoadingText === (item.exampleSentences[0]?.en ?? item.sourceSentenceText ?? "").trim()}
-                          size="icon"
-                          variant="ghost"
-                          className="size-8 border-transparent bg-transparent px-0 text-[var(--app-foreground-muted)] hover:bg-transparent hover:text-[var(--app-foreground)] [@media(max-height:760px)]:size-7"
-                          iconClassName="size-4 [@media(max-height:760px)]:size-3.5"
-                          onClick={() =>
-                            handlePronounceSentence(item.exampleSentences[0]?.en ?? item.sourceSentenceText)
-                          }
-                          label={labels.speakSentence}
-                        />
-                      </div>
-                      {item.exampleSentences.length > 0 ? (
-                        renderExampleSentenceCards(item.exampleSentences, item.text, {
-                          onSpeak: handlePronounceSentence,
-                          isSpeakingText: (text) => {
-                            const normalizedText = text?.trim();
-                            return Boolean(normalizedText) &&
-                              (playingText === normalizedText || ttsPlaybackText === normalizedText);
-                          },
-                          isLoadingText: (text) => {
-                            const normalizedText = text?.trim();
-                            return Boolean(normalizedText) && ttsLoadingText === normalizedText;
-                          },
-                        })
-                      ) : (
-                        <p className={`line-clamp-2 text-sm ${APPLE_META_TEXT}`}>
-                          {item.sourceSentenceText
-                            ? renderSentenceWithExpressionHighlight(item.sourceSentenceText, item.text)
-                            : item.aiEnrichmentStatus === "pending"
-                              ? labels.learningInfoPending
-                              : labels.noSourceSentence}
-                        </p>
-                      )}
-                    </div>
+                    <ChunksSourceSentenceField
+                      labels={labels}
+                      item={item}
+                      playingText={playingText}
+                      ttsPlaybackText={ttsPlaybackText}
+                      ttsLoadingText={ttsLoadingText}
+                      handlePronounceSentence={handlePronounceSentence}
+                      renderExampleSentenceCards={renderExampleSentenceCards}
+                      renderSentenceWithExpressionHighlight={renderSentenceWithExpressionHighlight}
+                    />
                     <ChunksInfoField label={labels.semanticFocusLabel} bodyClassName={APPLE_META_TEXT}>
                       {item.semanticFocus ??
                         (item.aiEnrichmentStatus === "pending" ? labels.semanticFocusPending : labels.diffRelated)}
