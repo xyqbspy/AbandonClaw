@@ -185,6 +185,37 @@
 - `SceneTrainingCoachFloatingEntry`：强依赖 scene 训练状态、移动端 overlay 和当前步骤动作。
 - `FocusDetailSheet` / `SelectionDetailPanel`：都像详情容器，但业务模型和交互职责不同。
 
+## 3.2 最近一轮验证过的边界样例
+
+下面这些案例已经在代码里真实落地，适合作为后续新增页面或继续收口时的判断样板。
+
+### 仍然留在 feature-private 的展示语义
+
+这些组件已经做了内部收口，但仍然留在 feature 内，原因不是“不够整洁”，而是它们的语义仍然强依赖当前 feature。
+
+| 文件 | 当前做法 | 为什么不抽 shared |
+| --- | --- | --- |
+| `src/app/(app)/chunks/chunks-list-view.tsx` | 收出 `ChunksInfoField`、`ChunksPendingInfoBlock`、`ChunksSimilarExpressionsPanel`、`ChunksSentenceExpressionTags`、`ChunksSourceSentenceField` 等文件内私有展示块 | 这些块虽然都像“信息区/列表项/提示块”，但仍然携带 chunks 列表的字段语义、fallback 规则和交互上下文 |
+| `src/features/scene/components/scene-variants-view.tsx` | 收出 `SceneVariantsActionRow`、`SceneVariantListItem` | variants 的动作和条目仍然绑定 scene 变体训练语义，不是通用 action row / list item |
+| `src/features/scene/components/scene-expression-map-view.tsx` | 收出 `SceneExpressionMapHeader`、`SceneExpressionMapClusterItem` | expression map 的 header 和 cluster item 都服务 scene 学习流程，不是通用信息列表 |
+| `src/features/scene/components/scene-practice-header.tsx` | 收出 `ScenePracticeHeaderBackButton`、`ScenePracticeHeaderMenu` | 头部菜单和完成/重生成动作强依赖 practice 状态与 scene 训练流程 |
+| `src/features/scene/components/scene-practice-question-card.tsx` | 收出 `ScenePracticeQuestionNavigator`、`ScenePracticeHintBlock`、`ScenePracticeAnswerActions` 等题卡私有块 | 虽然形态上像导航/提示/操作区，但都深度绑定练习题卡的输入、反馈和答案展示语义 |
+| `src/features/progress/components/progress-overview.tsx` | 收出 `ProgressWeeklyMinutesCard`、`ProgressSkillBreakdownCard`，并整理 `statCards` 配置 | 目前仍是 progress 页私有统计区，暂未形成跨页面稳定复用的统计面板契约 |
+| `src/features/review/components/review-card.tsx` | 收出 `ReviewCardContextBlock`、`ReviewCardMasteryBlock` | review 卡片虽然是独立展示卡，但仍然绑定 review item 的 due/mastery 语义 |
+
+### 这轮同时验证出的一个规则
+
+如果一个文件已经出现下面两种信号，可以优先做“文件内私有展示单元收口”：
+
+- 主 JSX 已经能看出几个完整的信息块、动作块、条目块
+- 这些块脱离当前 feature 后，名称会立刻变空，比如只剩 `Header`、`Menu`、`Panel`、`Item`
+
+这种情况下，优先目标不是迁到 `src/components/shared`，而是：
+
+1. 先把主 render 变成组装层
+2. 先把展示语义沉到文件内私有组件
+3. 等第二个、第三个真实使用方出现后，再决定是否升级到 shared
+
 ## 4. 新增组件时怎么判断
 
 新增组件前，先确认它所在页面和动作层级是否符合 [ui-style-guidelines.md](/d:/WorkCode/AbandonClaw/docs/system-design/ui-style-guidelines.md)。再按下面顺序判断组件落点。
