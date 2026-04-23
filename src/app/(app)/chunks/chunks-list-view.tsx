@@ -301,6 +301,22 @@ function ChunksSourceSentenceField({
   );
 }
 
+function ChunksSentenceSourceField({
+  labels,
+  sourceSceneSlug,
+}: {
+  labels: Pick<ChunksListViewLabels, "sentenceSource" | "sentenceSourceFallback" | "sentenceUnitHint">;
+  sourceSceneSlug?: string | null;
+}) {
+  return (
+    <div className={INFO_FIELD_CLASS}>
+      <p className={APPLE_META_TEXT}>{labels.sentenceSource}</p>
+      <p className={INFO_FIELD_META_BODY_CLASS}>{sourceSceneSlug ? sourceSceneSlug : labels.sentenceSourceFallback}</p>
+      <p className={APPLE_META_TEXT}>{labels.sentenceUnitHint}</p>
+    </div>
+  );
+}
+
 type ChunksListViewLabels = {
   sentenceUnit: string;
   expressionUnit: string;
@@ -621,13 +637,7 @@ export function ChunksListView({
                 {item.learningItemType === "sentence" ? (
                   <>
                     <ChunksInfoField label={labels.usageHint}>{getUsageHint(item)}</ChunksInfoField>
-                    <div className={INFO_FIELD_CLASS}>
-                      <p className={APPLE_META_TEXT}>{labels.sentenceSource}</p>
-                      <p className={INFO_FIELD_META_BODY_CLASS}>
-                        {item.sourceSceneSlug ? item.sourceSceneSlug : labels.sentenceSourceFallback}
-                      </p>
-                      <p className={APPLE_META_TEXT}>{labels.sentenceUnitHint}</p>
-                    </div>
+                    <ChunksSentenceSourceField labels={labels} sourceSceneSlug={item.sourceSceneSlug} />
                     <ChunksSentenceExpressionTags
                       labels={labels}
                       item={item}

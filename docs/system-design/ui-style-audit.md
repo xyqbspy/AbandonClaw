@@ -325,6 +325,7 @@
   - 语义重点、典型场景、复习阶段统一复用 `ChunksInfoField`，保留原 fallback 文案和展示层级。
   - 将句子卡片里的表达 chips 与保存按钮收为文件内 `ChunksSentenceExpressionTags`，保留原保存状态与 key 计算。
   - 将表达卡片里的来源句子字段收为文件内 `ChunksSourceSentenceField`，保留 TTS、例句渲染与 fallback 逻辑。
+  - 将句子卡片里的来源场景字段收为文件内 `ChunksSentenceSourceField`，保留原来源 slug 与 fallback 文案。
   - 保持卡片展开、相似项展开、句子记录、TTS、表达地图、来源场景和 AI 补全重试逻辑不变。
 
 明确不收：
