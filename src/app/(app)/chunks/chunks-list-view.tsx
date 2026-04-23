@@ -30,9 +30,29 @@ const EXPR_TAG_CLASS =
   `inline-flex items-center px-2.5 py-1 text-[11px] font-bold [@media(max-height:760px)]:px-2 [@media(max-height:760px)]:py-0.5 [@media(max-height:760px)]:text-[10px] ${APPLE_BADGE_INFO}`;
 const EXPAND_BUTTON_CLASS =
   "mt-3 w-full border-t border-[var(--app-chunks-sheet-card-border)] pt-2 text-center text-[13px] font-semibold text-[var(--app-feedback-success-text)] [@media(max-height:760px)]:mt-2 [@media(max-height:760px)]:pt-1.5 [@media(max-height:760px)]:text-[12px]";
+const INFO_FIELD_CLASS = "space-y-0.5";
+const INFO_FIELD_BODY_CLASS = `line-clamp-2 ${APPLE_BODY_TEXT}`;
+const INFO_FIELD_META_BODY_CLASS = `line-clamp-2 text-sm ${APPLE_META_TEXT}`;
 
 const APPLE_STATUS_BADGE = APPLE_BADGE_INFO;
 const APPLE_PENDING_BADGE = APPLE_BADGE_SUBTLE;
+
+function ChunksInfoField({
+  label,
+  children,
+  bodyClassName = INFO_FIELD_BODY_CLASS,
+}: {
+  label: ReactNode;
+  children: ReactNode;
+  bodyClassName?: string;
+}) {
+  return (
+    <div className={INFO_FIELD_CLASS}>
+      <p className={APPLE_META_TEXT}>{label}</p>
+      <p className={bodyClassName}>{children}</p>
+    </div>
+  );
+}
 
 type ChunksListViewLabels = {
   sentenceUnit: string;
@@ -268,20 +288,14 @@ export function ChunksListView({
                       ) : null}
                     </div>
                   ) : null}
-                  <div className="space-y-0.5">
-                    <p className={APPLE_META_TEXT}>{labels.usageHint}</p>
-                    <p className={`line-clamp-2 ${APPLE_BODY_TEXT}`}>{getUsageHint(item)}</p>
-                  </div>
-                  <div className="space-y-0.5">
-                    <p className={APPLE_META_TEXT}>{labels.sourceSentence}</p>
-                    <p className={`line-clamp-2 text-sm ${APPLE_META_TEXT}`}>
-                      {item.sourceSentenceText
-                        ? renderSentenceWithExpressionHighlight(item.sourceSentenceText, item.text)
-                        : item.aiEnrichmentStatus === "pending"
-                          ? labels.learningInfoPending
-                          : labels.noSourceSentence}
-                    </p>
-                  </div>
+                  <ChunksInfoField label={labels.usageHint}>{getUsageHint(item)}</ChunksInfoField>
+                  <ChunksInfoField label={labels.sourceSentence} bodyClassName={INFO_FIELD_META_BODY_CLASS}>
+                    {item.sourceSentenceText
+                      ? renderSentenceWithExpressionHighlight(item.sourceSentenceText, item.text)
+                      : item.aiEnrichmentStatus === "pending"
+                        ? labels.learningInfoPending
+                        : labels.noSourceSentence}
+                  </ChunksInfoField>
                   <div className="flex flex-wrap gap-2 pt-1 [@media(max-height:760px)]:gap-1.5 [@media(max-height:760px)]:pt-0.5">
                     <Button
                       type="button"
@@ -366,13 +380,10 @@ export function ChunksListView({
               <CardContent className="space-y-3.5 p-3 pb-2 pt-2.5 [@media(max-height:760px)]:space-y-2.5 [@media(max-height:760px)]:p-2.5 [@media(max-height:760px)]:pb-2 [@media(max-height:760px)]:pt-2">
                 {item.learningItemType === "sentence" ? (
                   <>
-                    <div className="space-y-0.5">
-                      <p className={APPLE_META_TEXT}>{labels.usageHint}</p>
-                      <p className={`line-clamp-2 ${APPLE_BODY_TEXT}`}>{getUsageHint(item)}</p>
-                    </div>
-                    <div className="space-y-0.5">
+                    <ChunksInfoField label={labels.usageHint}>{getUsageHint(item)}</ChunksInfoField>
+                    <div className={INFO_FIELD_CLASS}>
                       <p className={APPLE_META_TEXT}>{labels.sentenceSource}</p>
-                      <p className={`line-clamp-2 text-sm ${APPLE_META_TEXT}`}>
+                      <p className={INFO_FIELD_META_BODY_CLASS}>
                         {item.sourceSceneSlug ? item.sourceSceneSlug : labels.sentenceSourceFallback}
                       </p>
                       <p className={APPLE_META_TEXT}>{labels.sentenceUnitHint}</p>
@@ -431,21 +442,15 @@ export function ChunksListView({
                         ) : null}
                       </div>
                     ) : null}
-                    <div className="space-y-0.5">
-                      <p className={APPLE_META_TEXT}>{labels.translationLabel}</p>
-                      <p className={`line-clamp-2 ${APPLE_BODY_TEXT}`}>
-                        {item.translation ??
-                          (item.aiEnrichmentStatus === "pending"
-                            ? labels.learningInfoPending
-                            : item.aiEnrichmentStatus === "failed"
-                              ? labels.learningInfoFailed
-                              : labels.noTranslation)}
-                      </p>
-                    </div>
-                    <div className="space-y-0.5">
-                      <p className={APPLE_META_TEXT}>{labels.usageHint}</p>
-                      <p className={`line-clamp-2 ${APPLE_BODY_TEXT}`}>{getUsageHint(item)}</p>
-                    </div>
+                    <ChunksInfoField label={labels.translationLabel}>
+                      {item.translation ??
+                        (item.aiEnrichmentStatus === "pending"
+                          ? labels.learningInfoPending
+                          : item.aiEnrichmentStatus === "failed"
+                            ? labels.learningInfoFailed
+                            : labels.noTranslation)}
+                    </ChunksInfoField>
+                    <ChunksInfoField label={labels.usageHint}>{getUsageHint(item)}</ChunksInfoField>
                     <div className="space-y-0.5">
                       <div className="flex items-center justify-between gap-2">
                         <p className={APPLE_META_TEXT}>{labels.sourceSentence}</p>

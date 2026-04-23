@@ -313,3 +313,17 @@
 - 不继续拆 `review-page-stage-panel.tsx` 的业务分支或 props 契约。
 - 不处理已知空队列测试前置状态语义问题。
 - 不新增全局 token 或 shared 页面骨架。
+
+## 14. Chunks List View 私有信息字段收口记录
+
+已完成：
+
+- `src/app/(app)/chunks/chunks-list-view.tsx`
+  - 将列表卡片中重复的“字段 label + 内容 body”纯展示结构收为文件内 `ChunksInfoField`。
+  - 保持卡片展开、相似项展开、句子记录、TTS、表达地图、来源场景和 AI 补全重试逻辑不变。
+
+明确不收：
+
+- 不拆 `src/app/(app)/chunks/page.tsx`。
+- 不抽 shared 组件或全局 token。
+- 不调整 chunks detail sheet、footer action、overlay radius 或移动端适配变量。
