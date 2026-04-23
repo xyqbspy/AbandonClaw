@@ -41,6 +41,121 @@ type SceneVariantsViewProps = {
   chunkDetailSheet?: ReactNode;
 };
 
+function SceneVariantsActionRow({
+  variantSet,
+  appleButtonSmClassName,
+  appleDangerButtonSmClassName,
+  labels,
+  onBack,
+  onComplete,
+  onRepeatVariants,
+  onDeleteSet,
+}: {
+  variantSet: VariantSet | null;
+  appleButtonSmClassName: string;
+  appleDangerButtonSmClassName: string;
+  labels: Pick<SceneVariantsViewLabels, "back" | "repeat" | "complete" | "deleteSet">;
+  onBack: () => void;
+  onComplete: () => void;
+  onRepeatVariants?: () => void;
+  onDeleteSet: () => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-center justify-end gap-[var(--mobile-space-sm)]">
+      <button
+        type="button"
+        className={`h-[var(--mobile-control-height)] whitespace-nowrap ${appleButtonSmClassName}`}
+        onClick={onBack}
+      >
+        {labels.back}
+      </button>
+      {variantSet?.status === "completed" && onRepeatVariants ? (
+        <button
+          type="button"
+          className={`h-[var(--mobile-control-height)] whitespace-nowrap ${appleButtonSmClassName}`}
+          onClick={onRepeatVariants}
+        >
+          {labels.repeat}
+        </button>
+      ) : (
+        <button
+          type="button"
+          className={`h-[var(--mobile-control-height)] whitespace-nowrap ${appleButtonSmClassName} disabled:opacity-60`}
+          onClick={onComplete}
+          disabled={!variantSet || variantSet.status === "completed"}
+        >
+          {labels.complete}
+        </button>
+      )}
+      <button
+        type="button"
+        className={`h-[var(--mobile-control-height)] whitespace-nowrap px-[var(--mobile-space-md)] ${appleDangerButtonSmClassName} disabled:opacity-60`}
+        onClick={onDeleteSet}
+        disabled={!variantSet}
+      >
+        {labels.deleteSet}
+      </button>
+    </div>
+  );
+}
+
+function SceneVariantListItem({
+  variant,
+  appleButtonSmClassName,
+  appleDangerButtonSmClassName,
+  labels,
+  onOpenVariant,
+  onDeleteVariant,
+  toVariantTitle,
+  toVariantStatusLabel,
+}: {
+  variant: VariantSet["variants"][number];
+  appleButtonSmClassName: string;
+  appleDangerButtonSmClassName: string;
+  labels: Pick<SceneVariantsViewLabels, "statusPrefix" | "open" | "delete">;
+  onOpenVariant: (variantId: string) => void;
+  onDeleteVariant: (variantId: string) => void;
+  toVariantTitle: (title: string) => string;
+  toVariantStatusLabel: (status: "unviewed" | "viewed" | "completed") => string;
+}) {
+  return (
+    <li className={SCENE_VARIANTS_LIST_ITEM_CLASSNAME}>
+      <div className="min-w-0 flex-1">
+        <p className={APPLE_TITLE_SM}>{toVariantTitle(variant.lesson.title)}</p>
+        <p className={`mt-0.5 line-clamp-2 ${APPLE_META_TEXT}`}>
+          {variant.lesson.sections[0]?.summary ?? variant.lesson.subtitle}
+        </p>
+        <div className="mt-1">
+          <span
+            className={`px-[var(--mobile-space-md)] py-[var(--mobile-space-2xs)] text-[length:var(--mobile-font-caption)] font-semibold ${
+              variant.status === "completed" ? APPLE_BADGE_INFO : APPLE_BADGE_SUBTLE
+            }`}
+          >
+            {labels.statusPrefix}
+            {toVariantStatusLabel(variant.status)}
+          </span>
+        </div>
+      </div>
+      <div className="flex shrink-0 items-center gap-[var(--mobile-space-xs)]">
+        <button
+          type="button"
+          className={`h-[var(--mobile-control-height)] whitespace-nowrap ${appleButtonSmClassName}`}
+          onClick={() => onOpenVariant(variant.id)}
+        >
+          {labels.open}
+        </button>
+        <button
+          type="button"
+          className={`h-[var(--mobile-control-height)] whitespace-nowrap px-[var(--mobile-space-sm)] ${appleDangerButtonSmClassName}`}
+          onClick={() => onDeleteVariant(variant.id)}
+        >
+          {labels.delete}
+        </button>
+      </div>
+    </li>
+  );
+}
+
 export function SceneVariantsView({
   baseLesson,
   variantSet,
@@ -63,41 +178,16 @@ export function SceneVariantsView({
   return (
     <div className={SCENE_VARIANTS_STACK_CLASSNAME}>
       <section className={SCENE_VARIANTS_SECTION_CLASSNAME}>
-        <div className="flex flex-wrap items-center justify-end gap-[var(--mobile-space-sm)]">
-          <button
-            type="button"
-            className={`h-[var(--mobile-control-height)] whitespace-nowrap ${appleButtonSmClassName}`}
-            onClick={onBack}
-          >
-            {labels.back}
-          </button>
-          {variantSet?.status === "completed" && onRepeatVariants ? (
-            <button
-              type="button"
-              className={`h-[var(--mobile-control-height)] whitespace-nowrap ${appleButtonSmClassName}`}
-              onClick={onRepeatVariants}
-            >
-              {labels.repeat}
-            </button>
-          ) : (
-            <button
-              type="button"
-              className={`h-[var(--mobile-control-height)] whitespace-nowrap ${appleButtonSmClassName} disabled:opacity-60`}
-              onClick={onComplete}
-              disabled={!variantSet || variantSet.status === "completed"}
-            >
-              {labels.complete}
-            </button>
-          )}
-          <button
-            type="button"
-            className={`h-[var(--mobile-control-height)] whitespace-nowrap px-[var(--mobile-space-md)] ${appleDangerButtonSmClassName} disabled:opacity-60`}
-            onClick={onDeleteSet}
-            disabled={!variantSet}
-          >
-            {labels.deleteSet}
-          </button>
-        </div>
+        <SceneVariantsActionRow
+          variantSet={variantSet}
+          appleButtonSmClassName={appleButtonSmClassName}
+          appleDangerButtonSmClassName={appleDangerButtonSmClassName}
+          labels={labels}
+          onBack={onBack}
+          onComplete={onComplete}
+          onRepeatVariants={onRepeatVariants}
+          onDeleteSet={onDeleteSet}
+        />
 
         <div className={`space-y-0.5 ${APPLE_META_TEXT}`}>
           <p>{labels.sourceScenePrefix}{baseLesson.title}</p>
@@ -145,42 +235,17 @@ export function SceneVariantsView({
           </div>
           <ul className="space-y-[var(--mobile-space-sm)]">
             {variantSet.variants.map((variant) => (
-              <li
+              <SceneVariantListItem
                 key={variant.id}
-                className={SCENE_VARIANTS_LIST_ITEM_CLASSNAME}
-              >
-                <div className="min-w-0 flex-1">
-                  <p className={APPLE_TITLE_SM}>{toVariantTitle(variant.lesson.title)}</p>
-                  <p className={`mt-0.5 line-clamp-2 ${APPLE_META_TEXT}`}>
-                    {variant.lesson.sections[0]?.summary ?? variant.lesson.subtitle}
-                  </p>
-                  <div className="mt-1">
-                    <span
-                      className={`px-[var(--mobile-space-md)] py-[var(--mobile-space-2xs)] text-[length:var(--mobile-font-caption)] font-semibold ${
-                        variant.status === "completed" ? APPLE_BADGE_INFO : APPLE_BADGE_SUBTLE
-                      }`}
-                    >
-                      {labels.statusPrefix}{toVariantStatusLabel(variant.status)}
-                    </span>
-                  </div>
-                </div>
-                <div className="flex shrink-0 items-center gap-[var(--mobile-space-xs)]">
-                  <button
-                    type="button"
-                    className={`h-[var(--mobile-control-height)] whitespace-nowrap ${appleButtonSmClassName}`}
-                    onClick={() => onOpenVariant(variant.id)}
-                  >
-                    {labels.open}
-                  </button>
-                  <button
-                    type="button"
-                    className={`h-[var(--mobile-control-height)] whitespace-nowrap px-[var(--mobile-space-sm)] ${appleDangerButtonSmClassName}`}
-                    onClick={() => onDeleteVariant(variant.id)}
-                  >
-                    {labels.delete}
-                  </button>
-                </div>
-              </li>
+                variant={variant}
+                appleButtonSmClassName={appleButtonSmClassName}
+                appleDangerButtonSmClassName={appleDangerButtonSmClassName}
+                labels={labels}
+                onOpenVariant={onOpenVariant}
+                onDeleteVariant={onDeleteVariant}
+                toVariantTitle={toVariantTitle}
+                toVariantStatusLabel={toVariantStatusLabel}
+              />
             ))}
           </ul>
         </section>

@@ -334,3 +334,12 @@
 - 不拆 `src/app/(app)/chunks/page.tsx`。
 - 不抽 shared 组件或全局 token。
 - 不调整 chunks detail sheet、footer action、overlay radius 或移动端适配变量。
+
+## 15. Scene variants 展示层收口记录
+
+已完成：
+
+- `src/features/scene/components/scene-variants-view.tsx`
+  - 将顶部 variants 动作区收为文件内 `SceneVariantsActionRow`，保留返回、完成、再练、删除集的原有 disabled 与点击逻辑。
+  - 将单个变体条目收为文件内 `SceneVariantListItem`，保留标题、状态 badge、打开与删除动作。
+  - 继续保持 scene-local 私有展示语义，暂不升级为 shared action row / list item。
