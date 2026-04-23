@@ -44,6 +44,134 @@ const assessmentTextClassName = (assessment: PracticeAssessmentLevel | null | un
   return "text-destructive";
 };
 
+function ScenePracticeQuestionNavigator({
+  currentQuestionNumber,
+  exerciseCount,
+  labels,
+  safeActiveExerciseIndex,
+  setActiveExerciseIndex,
+}: {
+  currentQuestionNumber: number;
+  exerciseCount: number;
+  labels: Pick<ScenePracticeViewLabels, "prevQuestion" | "currentQuestionLabel" | "nextQuestion">;
+  safeActiveExerciseIndex: number;
+  setActiveExerciseIndex: Dispatch<SetStateAction<number>>;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-[var(--mobile-space-md)] text-[length:var(--mobile-font-body-sm)] font-semibold text-[var(--muted-foreground)]">
+      <button
+        type="button"
+        className={`${APPLE_BADGE_SUBTLE} px-[var(--mobile-space-md)] py-[var(--mobile-space-2xs)] text-[length:var(--mobile-font-meta)] disabled:opacity-50`}
+        disabled={safeActiveExerciseIndex <= 0}
+        onClick={() => setActiveExerciseIndex((current) => Math.max(0, current - 1))}
+      >
+        {labels.prevQuestion}
+      </button>
+      <span>
+        {labels.currentQuestionLabel}：{currentQuestionNumber}/{exerciseCount}
+      </span>
+      <button
+        type="button"
+        className={`${APPLE_BADGE_SUBTLE} px-[var(--mobile-space-md)] py-[var(--mobile-space-2xs)] text-[length:var(--mobile-font-meta)] disabled:opacity-50`}
+        disabled={safeActiveExerciseIndex >= exerciseCount - 1}
+        onClick={() =>
+          setActiveExerciseIndex((current) => Math.min(exerciseCount - 1, current + 1))
+        }
+      >
+        {labels.nextQuestion}
+      </button>
+    </div>
+  );
+}
+
+function ScenePracticeHintBlock({ hint }: { hint?: string | null }) {
+  return (
+    <div className="mt-[var(--mobile-space-xl)] rounded-[12px] bg-[var(--app-surface-subtle)] p-[var(--mobile-space-md)] text-left text-[length:var(--mobile-font-body-sm)] leading-6 text-[var(--muted-foreground)]">
+      {hint ? (
+        <p>
+          <span className="mr-1 font-bold text-[var(--app-scene-panel-accent)]">含义:</span>
+          {hint}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function ScenePracticeAnswerActions({
+  activeAnswerValue,
+  activeExerciseId,
+  handleResetAnswer,
+  labels,
+  onToggleAnswer,
+  showAnswer,
+}: {
+  activeAnswerValue: string;
+  activeExerciseId: string;
+  handleResetAnswer: (exerciseId: string) => void;
+  labels: Pick<ScenePracticeViewLabels, "checkAnswer" | "resetAnswer" | "hideAnswer" | "showAnswer">;
+  onToggleAnswer: (exerciseId: string) => void;
+  showAnswer: boolean;
+}) {
+  return (
+    <div className="mt-[var(--mobile-space-sheet)] grid grid-cols-[1.5fr_1fr_1fr] gap-[var(--mobile-space-md)]">
+      <button
+        type="submit"
+        className={`${SCENE_MOBILE_PRIMARY_ACTION_CLASSNAME} transition-transform active:scale-[0.98] disabled:opacity-50`}
+        disabled={!activeAnswerValue.trim()}
+      >
+        {labels.checkAnswer}
+      </button>
+      <button
+        type="button"
+        className={`${SCENE_MOBILE_SECONDARY_ACTION_CLASSNAME} transition-transform active:scale-[0.98]`}
+        onClick={() => handleResetAnswer(activeExerciseId)}
+      >
+        {labels.resetAnswer}
+      </button>
+      <button
+        type="button"
+        className={`${SCENE_MOBILE_SECONDARY_ACTION_CLASSNAME} transition-transform active:scale-[0.98]`}
+        onClick={() => onToggleAnswer(activeExerciseId)}
+      >
+        {showAnswer ? labels.hideAnswer : labels.showAnswer}
+      </button>
+    </div>
+  );
+}
+
+function ScenePracticeAttemptSummary({
+  activeAttemptCount,
+  activeIncorrectCount,
+  labels,
+}: {
+  activeAttemptCount: number;
+  activeIncorrectCount: number;
+  labels: Pick<ScenePracticeViewLabels, "currentAttemptsLabel" | "currentIncorrectLabel">;
+}) {
+  return (
+    <p className="mt-[var(--mobile-space-xl)] text-[length:var(--mobile-font-meta)] text-[var(--muted-foreground)]">
+      {labels.currentAttemptsLabel}：{activeAttemptCount} 次 | {labels.currentIncorrectLabel}：{activeIncorrectCount} 次
+    </p>
+  );
+}
+
+function ScenePracticeAnswerReveal({
+  answer,
+  answerLabel,
+}: {
+  answer: string;
+  answerLabel: string;
+}) {
+  return (
+    <div className="mt-[var(--mobile-space-xl)] rounded-[12px] bg-[var(--app-surface-subtle)] p-[var(--mobile-space-xl)] text-left">
+      <p className="text-[length:var(--mobile-font-meta)] font-bold uppercase tracking-[0.12em] text-[var(--muted-foreground)]">
+        {answerLabel}
+      </p>
+      <p className="mt-2 text-[length:var(--mobile-font-body)] font-semibold text-foreground">{answer}</p>
+    </div>
+  );
+}
+
 export function ScenePracticeQuestionCard({
   activeAnswerValue,
   activeAttemptCount,
@@ -74,29 +202,13 @@ export function ScenePracticeQuestionCard({
 
   return (
     <section className={`px-[var(--mobile-space-sheet)] py-[clamp(24px,6.4vw,32px)] text-center ${SCENE_MOBILE_PANEL_CLASSNAME}`}>
-      <div className="flex items-center justify-between gap-[var(--mobile-space-md)] text-[length:var(--mobile-font-body-sm)] font-semibold text-[var(--muted-foreground)]">
-        <button
-          type="button"
-          className={`${APPLE_BADGE_SUBTLE} px-[var(--mobile-space-md)] py-[var(--mobile-space-2xs)] text-[length:var(--mobile-font-meta)] disabled:opacity-50`}
-          disabled={safeActiveExerciseIndex <= 0}
-          onClick={() => setActiveExerciseIndex((current) => Math.max(0, current - 1))}
-        >
-          {labels.prevQuestion}
-        </button>
-        <span>
-          {labels.currentQuestionLabel}：{currentQuestionNumber}/{exerciseCount}
-        </span>
-        <button
-          type="button"
-          className={`${APPLE_BADGE_SUBTLE} px-[var(--mobile-space-md)] py-[var(--mobile-space-2xs)] text-[length:var(--mobile-font-meta)] disabled:opacity-50`}
-          disabled={safeActiveExerciseIndex >= exerciseCount - 1}
-          onClick={() =>
-            setActiveExerciseIndex((current) => Math.min(exerciseCount - 1, current + 1))
-          }
-        >
-          {labels.nextQuestion}
-        </button>
-      </div>
+      <ScenePracticeQuestionNavigator
+        currentQuestionNumber={currentQuestionNumber}
+        exerciseCount={exerciseCount}
+        labels={labels}
+        safeActiveExerciseIndex={safeActiveExerciseIndex}
+        setActiveExerciseIndex={setActiveExerciseIndex}
+      />
 
       {activeExercise ? (
         <>
@@ -106,17 +218,13 @@ export function ScenePracticeQuestionCard({
             </h3>
           ) : null}
 
-          <div className="mt-[var(--mobile-space-xl)] rounded-[12px] bg-[var(--app-surface-subtle)] p-[var(--mobile-space-md)] text-left text-[length:var(--mobile-font-body-sm)] leading-6 text-[var(--muted-foreground)]">
-            {activeExercise.hint ? (
-              <p>
-                <span className="mr-1 font-bold text-[var(--app-scene-panel-accent)]">含义:</span>
-                {activeExercise.hint}
-              </p>
-            ) : null}
-          </div>
+          <ScenePracticeHintBlock hint={activeExercise.hint} />
 
           {activeExercise.inputMode === "typing" ? (
-            <form className="mt-[var(--mobile-space-sheet)]" onSubmit={(event) => handleSubmit(event, activeExercise.id)}>
+            <form
+              className="mt-[var(--mobile-space-sheet)]"
+              onSubmit={(event) => handleSubmit(event, activeExercise.id)}
+            >
               {activeModuleMode === "full_dictation" ? (
                 <textarea
                   ref={(element) => {
@@ -141,56 +249,42 @@ export function ScenePracticeQuestionCard({
                 />
               )}
 
-              <div className="mt-[var(--mobile-space-sheet)] grid grid-cols-[1.5fr_1fr_1fr] gap-[var(--mobile-space-md)]">
-                <button
-                  type="submit"
-                  className={`${SCENE_MOBILE_PRIMARY_ACTION_CLASSNAME} transition-transform active:scale-[0.98] disabled:opacity-50`}
-                  disabled={!activeAnswerValue.trim()}
-                >
-                  {labels.checkAnswer}
-                </button>
-                <button
-                  type="button"
-                  className={`${SCENE_MOBILE_SECONDARY_ACTION_CLASSNAME} transition-transform active:scale-[0.98]`}
-                  onClick={() => handleResetAnswer(activeExercise.id)}
-                >
-                  {labels.resetAnswer}
-                </button>
-                <button
-                  type="button"
-                  className={`${SCENE_MOBILE_SECONDARY_ACTION_CLASSNAME} transition-transform active:scale-[0.98]`}
-                  onClick={() => onToggleAnswer(activeExercise.id)}
-                >
-                  {showAnswerMap[activeExercise.id] ? labels.hideAnswer : labels.showAnswer}
-                </button>
-              </div>
+              <ScenePracticeAnswerActions
+                activeAnswerValue={activeAnswerValue}
+                activeExerciseId={activeExercise.id}
+                handleResetAnswer={handleResetAnswer}
+                labels={labels}
+                onToggleAnswer={onToggleAnswer}
+                showAnswer={Boolean(showAnswerMap[activeExercise.id])}
+              />
 
-              <p className="mt-[var(--mobile-space-xl)] text-[length:var(--mobile-font-meta)] text-[var(--muted-foreground)]">
-                {labels.currentAttemptsLabel}：{activeAttemptCount} 次 | {labels.currentIncorrectLabel}：
-                {activeIncorrectCount} 次
-              </p>
+              <ScenePracticeAttemptSummary
+                activeAttemptCount={activeAttemptCount}
+                activeIncorrectCount={activeIncorrectCount}
+                labels={labels}
+              />
 
               {currentAssessment ? (
-                <p className={`mt-[var(--mobile-space-md)] text-center text-[length:var(--mobile-font-body-sm)] font-semibold ${assessmentTextClassName(currentAssessment)}`}>
+                <p
+                  className={`mt-[var(--mobile-space-md)] text-center text-[length:var(--mobile-font-body-sm)] font-semibold ${assessmentTextClassName(currentAssessment)}`}
+                >
                   {getPracticeAssessmentMessage(currentAssessment, labels)}
                 </p>
               ) : null}
 
               {showAnswerMap[activeExercise.id] ? (
-                <div className="mt-[var(--mobile-space-xl)] rounded-[12px] bg-[var(--app-surface-subtle)] p-[var(--mobile-space-xl)] text-left">
-                  <p className="text-[length:var(--mobile-font-meta)] font-bold uppercase tracking-[0.12em] text-[var(--muted-foreground)]">
-                    {labels.answerLabel}
-                  </p>
-                  <p className="mt-2 text-[length:var(--mobile-font-body)] font-semibold text-foreground">
-                    {getExerciseCanonicalAnswer(activeExercise)}
-                  </p>
-                </div>
+                <ScenePracticeAnswerReveal
+                  answer={getExerciseCanonicalAnswer(activeExercise)}
+                  answerLabel={labels.answerLabel}
+                />
               ) : null}
             </form>
           ) : null}
         </>
       ) : (
-        <p className="py-[clamp(32px,8vw,40px)] text-[length:var(--mobile-font-body-sm)] text-[var(--muted-foreground)]">{labels.finishQuestionSet}</p>
+        <p className="py-[clamp(32px,8vw,40px)] text-[length:var(--mobile-font-body-sm)] text-[var(--muted-foreground)]">
+          {labels.finishQuestionSet}
+        </p>
       )}
     </section>
   );

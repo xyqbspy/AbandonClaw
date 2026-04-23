@@ -379,3 +379,12 @@
   - 将返回按钮收为文件内 `ScenePracticeHeaderBackButton`，保留返回行为与标题布局。
   - 将右上菜单与菜单面板收为文件内 `ScenePracticeHeaderMenu`，保留重生成、删除、完成的原有点击与 disabled 逻辑。
   - 修复菜单开关的 aria-label 乱码，恢复为正常中文文本。
+
+## 20. Scene practice 题卡展示层收口记录
+
+已完成：
+
+- `src/features/scene/components/scene-practice-question-card.tsx`
+  - 修复原文件中的乱码与字符串断裂，恢复为可编译状态。
+  - 将题目切换区收为文件内 `ScenePracticeQuestionNavigator`，保留上一题/下一题与当前题号逻辑。
+  - 将提示块、答案操作区、尝试统计和答案展示分别收为文件内私有展示块，保留提交、重置、显示答案与反馈文案逻辑。
