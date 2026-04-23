@@ -4,9 +4,7 @@ import { DailyTask } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   APPLE_CARD_INTERACTIVE,
-  APPLE_BODY_TEXT,
   APPLE_META_TEXT,
-  APPLE_PANEL,
   APPLE_TITLE_MD,
 } from "@/lib/ui/apple-style";
 import {
@@ -14,6 +12,14 @@ import {
   TODAY_TASK_ACTION_DISABLED_CLASSNAME,
   TODAY_TASK_ACTION_STRONG_CLASSNAME,
   TODAY_TASK_ACTION_WRAPPER_CLASSNAME,
+  TODAY_TASK_CONTENT_STACK_CLASSNAME,
+  TODAY_TASK_DONE_ICON_CLASSNAME,
+  TODAY_TASK_INDEX_BADGE_CLASSNAME,
+  TODAY_TASK_META_ICON_CLASSNAME,
+  TODAY_TASK_ROW_ACTIVE_CLASSNAME,
+  TODAY_TASK_ROW_BASE_CLASSNAME,
+  TODAY_TASK_ROW_DEFAULT_CLASSNAME,
+  TODAY_TASK_TITLE_LINE_CLASSNAME,
 } from "@/features/today/components/today-page-styles";
 
 export function TodayTaskList({
@@ -32,22 +38,22 @@ export function TodayTaskList({
         {tasks.map((task, index) => (
           <div
             key={task.id}
-            className={`flex flex-col gap-[var(--mobile-space-md)] p-[var(--mobile-space-md)] sm:flex-row sm:items-center sm:justify-between ${
+            className={`${TODAY_TASK_ROW_BASE_CLASSNAME} ${
               task.status === "up_next"
-                ? "rounded-[var(--app-radius-panel)] border border-primary/20 bg-primary/[0.05] shadow-[var(--app-shadow-soft)]"
-                : APPLE_PANEL
+                ? TODAY_TASK_ROW_ACTIVE_CLASSNAME
+                : TODAY_TASK_ROW_DEFAULT_CLASSNAME
             }`}
           >
-            <div className="space-y-[var(--mobile-space-2xs)]">
-              <p className={`flex items-center gap-[var(--mobile-space-sm)] font-semibold ${APPLE_BODY_TEXT}`}>
+            <div className={TODAY_TASK_CONTENT_STACK_CLASSNAME}>
+              <p className={TODAY_TASK_TITLE_LINE_CLASSNAME}>
                 {task.done ? (
-                  <CheckCircle2 className="size-4 text-emerald-600" />
+                  <CheckCircle2 className={TODAY_TASK_DONE_ICON_CLASSNAME} />
                 ) : task.status === "locked" ? (
-                  <Lock className={`size-4 ${APPLE_META_TEXT}`} />
+                  <Lock className={TODAY_TASK_META_ICON_CLASSNAME} />
                 ) : (
-                  <Circle className={`size-4 ${APPLE_META_TEXT}`} />
+                  <Circle className={TODAY_TASK_META_ICON_CLASSNAME} />
                 )}
-                <span className={`inline-flex size-[clamp(18px,4.8vw,20px)] items-center justify-center rounded-full bg-[var(--app-surface)] text-[length:var(--mobile-font-caption)] ${APPLE_META_TEXT}`}>
+                <span className={TODAY_TASK_INDEX_BADGE_CLASSNAME}>
                   {index + 1}
                 </span>
                 {task.title}

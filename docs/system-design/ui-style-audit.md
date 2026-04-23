@@ -199,8 +199,8 @@
 ## 6. 待办
 
 - `src/features/today/components/today-task-list.tsx`
-  - 已将 task action 的主按钮、次按钮、禁用态和 wrapper 组合收回 `today-page-styles.ts`
-  - 保留 `APPLE_BUTTON_BASE` / `APPLE_BUTTON_STRONG` 作为底层主次语义，不新增独立按钮体系
+  - 已完成 task action 与任务行样式收口，详见第 12 节。
+  - 保留 `APPLE_BUTTON_BASE` / `APPLE_BUTTON_STRONG` 作为底层主次语义，不新增独立按钮体系。
 - `src/features/today/components/today-saved-expressions-section.tsx`
   - 已将“查看表达库”链接、saved item、meta 和 footnote 样式收回 `today-page-styles.ts`
   - 该链接仍是 Today 私有 inline link，暂不提升成全局 link token
@@ -279,6 +279,9 @@
 - `src/features/today/components/today-learning-path-section.tsx`
   - 将学习路径标题区和首要任务提示卡样式收回 `today-page-styles.ts`。
   - task step 的状态样式继续沿用上一轮已收口的 Today 局部常量。
+- `src/features/today/components/today-task-list.tsx`
+  - 将任务行基础布局、up next 高亮行、任务标题行、状态 icon、序号 badge 等固定样式收回 `today-page-styles.ts`。
+  - 保持任务点击、locked 禁用、done 展示和链接跳转逻辑不变，只减少组件内散落 class。
 
 明确不收：
 

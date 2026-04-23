@@ -5,6 +5,7 @@ import {
   APPLE_META_TEXT,
   APPLE_BUTTON_BASE,
   APPLE_BUTTON_TEXT_SM,
+  APPLE_PANEL,
   APPLE_PANEL_RAISED,
   APPLE_TITLE_MD,
   APPLE_TITLE_SM,
@@ -122,3 +123,15 @@ export const TODAY_TASK_ACTION_DISABLED_CLASSNAME =
   `${TODAY_TASK_ACTION_BASE_CLASSNAME} cursor-not-allowed border-transparent bg-[var(--app-surface-hover)] text-[var(--muted-foreground)] shadow-none`;
 export const TODAY_TASK_ACTION_WRAPPER_CLASSNAME =
   "inline-flex cursor-pointer items-center justify-center active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50";
+export const TODAY_TASK_ROW_BASE_CLASSNAME =
+  "flex flex-col gap-[var(--mobile-space-md)] p-[var(--mobile-space-md)] sm:flex-row sm:items-center sm:justify-between";
+export const TODAY_TASK_ROW_DEFAULT_CLASSNAME = APPLE_PANEL;
+export const TODAY_TASK_ROW_ACTIVE_CLASSNAME =
+  "rounded-[var(--app-radius-panel)] border border-primary/20 bg-primary/[0.05] shadow-[var(--app-shadow-soft)]";
+export const TODAY_TASK_CONTENT_STACK_CLASSNAME = "space-y-[var(--mobile-space-2xs)]";
+export const TODAY_TASK_TITLE_LINE_CLASSNAME =
+  `flex items-center gap-[var(--mobile-space-sm)] font-semibold ${APPLE_BODY_TEXT}`;
+export const TODAY_TASK_DONE_ICON_CLASSNAME = "size-4 text-emerald-600";
+export const TODAY_TASK_META_ICON_CLASSNAME = `size-4 ${APPLE_META_TEXT}`;
+export const TODAY_TASK_INDEX_BADGE_CLASSNAME =
+  `inline-flex size-[clamp(18px,4.8vw,20px)] items-center justify-center rounded-full bg-[var(--app-surface)] text-[length:var(--mobile-font-caption)] ${APPLE_META_TEXT}`;
