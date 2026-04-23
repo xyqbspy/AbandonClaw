@@ -50,7 +50,7 @@ import { cancelScheduledIdleAction, scheduleIdleAction } from "@/lib/utils/resou
 import { useSceneDetailActions } from "./use-scene-detail-actions";
 import { SceneBaseView } from "./scene-base-view";
 import { toVariantStatusLabel, toVariantTitle } from "./scene-detail-logic";
-import { sceneDetailMessages, TrainingStepKey } from "./scene-detail-messages";
+import { sceneDetailMessages } from "./scene-detail-messages";
 import {
   notifySceneContinueStep,
   notifySceneExpressionFocused,
@@ -119,16 +119,6 @@ export default function SceneDetailClientPage({
     count: 0,
     firstFailureAt: null,
   });
-  const currentTrainingStepRef = useRef<TrainingStepKey | "done">("listen");
-  const variantUnlockedRef = useRef(false);
-  const latestPracticeStatusRef = useRef<"idle" | "generated" | "completed">("idle");
-  const latestVariantStatusRef = useRef<"idle" | "generated" | "completed">("idle");
-  const listenStepActionRef = useRef<() => unknown>(() => undefined);
-  const focusExpressionStepActionRef = useRef<() => unknown>(() => undefined);
-  const practiceToolActionRef = useRef<() => unknown>(() => undefined);
-  const variantToolActionRef = useRef<() => unknown>(() => undefined);
-  const repeatPracticeActionRef = useRef<() => unknown>(() => undefined);
-  const repeatVariantsActionRef = useRef<() => unknown>(() => undefined);
   const initialTrainingStateSnapshot = getSceneLearningProgressCacheSnapshotSync(sceneSlug);
   const [trainingState, setTrainingState] = useState<SceneLearningProgressResponse | null>(
     initialTrainingStateSnapshot.found && initialTrainingStateSnapshot.record
@@ -192,12 +182,15 @@ export default function SceneDetailClientPage({
   }, [sceneSlug]);
 
   useEffect(() => {
-    const snapshot = getSceneLearningProgressCacheSnapshotSync(sceneSlug);
-    if (snapshot.found && snapshot.record) {
-      setTrainingState(snapshot.record.data.state);
-      return;
-    }
-    setTrainingState(null);
+    let cancelled = false;
+    void Promise.resolve().then(() => {
+      if (cancelled) return;
+      const snapshot = getSceneLearningProgressCacheSnapshotSync(sceneSlug);
+      setTrainingState(snapshot.found && snapshot.record ? snapshot.record.data.state : null);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [sceneSlug]);
 
   useSceneLearningSync({
@@ -301,25 +294,34 @@ export default function SceneDetailClientPage({
     latestVariantSet,
   });
 
-  onRouteChangeRef.current = () => {
-    resetRouteScopedState();
-    resetChunkDetailState();
-    sessionDoneRef.current = false;
-    focusExpressionPromptShownRef.current = false;
-    sceneResumeToastShownRef.current = false;
-    practicePrewarmFailureRef.current = {
-      count: 0,
-      firstFailureAt: null,
+  useEffect(() => {
+    onRouteChangeRef.current = () => {
+      resetRouteScopedState();
+      resetChunkDetailState();
+      sessionDoneRef.current = false;
+      focusExpressionPromptShownRef.current = false;
+      sceneResumeToastShownRef.current = false;
+      practicePrewarmFailureRef.current = {
+        count: 0,
+        firstFailureAt: null,
+      };
+      setPracticePrewarmBlocked(false);
+      setPracticeRetryError(null);
+      setViewResetVersion((current) => current + 1);
     };
-    setPracticePrewarmBlocked(false);
-    setPracticeRetryError(null);
-    setViewResetVersion((current) => current + 1);
-  };
+  }, [resetChunkDetailState, resetRouteScopedState]);
 
   useEffect(() => {
     if (!baseLesson || !latestPracticeSet) {
-      setPracticeSnapshot(null);
-      return;
+      let cancelled = false;
+      void Promise.resolve().then(() => {
+        if (!cancelled) {
+          setPracticeSnapshot(null);
+        }
+      });
+      return () => {
+        cancelled = true;
+      };
     }
     let cancelled = false;
     void (async () => {
@@ -737,17 +739,6 @@ export default function SceneDetailClientPage({
     practiceLoading,
   ]);
 
-  currentTrainingStepRef.current = sceneTrainingState.currentStep;
-  variantUnlockedRef.current = variantUnlocked;
-  latestPracticeStatusRef.current = latestPracticeSet?.status ?? generatedState.practiceStatus;
-  latestVariantStatusRef.current = latestVariantSet?.status ?? generatedState.variantStatus;
-  listenStepActionRef.current = handleTrainingListenStep;
-  focusExpressionStepActionRef.current = handleTrainingFocusExpressionStep;
-  practiceToolActionRef.current = handlePracticeToolAction;
-  variantToolActionRef.current = handleVariantToolClick;
-  repeatPracticeActionRef.current = handleRepeatPractice;
-  repeatVariantsActionRef.current = handleRepeatVariants;
-
   useEffect(() => {
     const currentStep = trainingState?.session?.currentStep;
     const scheduleKey = baseLesson
@@ -911,44 +902,7 @@ export default function SceneDetailClientPage({
       practiceModuleCount={latestPracticeSet?.modules?.length ?? 0}
       currentStepActionLabel={currentStepAction.label}
       currentStepActionLoading={currentStepAction.loading}
-      onCurrentStepAction={
-        currentStepAction.label
-          ? () => {
-              const currentStep = currentTrainingStepRef.current;
-              if (currentStep === "listen") {
-                listenStepActionRef.current();
-                return;
-              }
-              if (currentStep === "focus_expression") {
-                focusExpressionStepActionRef.current();
-                return;
-              }
-              if (currentStep === "practice_sentence" || currentStep === "scene_practice") {
-                if (latestPracticeStatusRef.current === "completed") {
-                  repeatPracticeActionRef.current();
-                  return;
-                }
-                practiceToolActionRef.current();
-                return;
-              }
-              if (currentStep === "done" || variantUnlockedRef.current) {
-                if (latestVariantStatusRef.current === "completed") {
-                  repeatVariantsActionRef.current();
-                  return;
-                }
-                variantToolActionRef.current();
-                return;
-              }
-              switch (currentStep) {
-                case "listen":
-                  listenStepActionRef.current();
-                  return;
-                default:
-                  currentStepAction.onClick?.();
-              }
-            }
-          : null
-      }
+      onCurrentStepAction={currentStepAction.onClick}
       currentStepActionDisabled={currentStepAction.disabled}
       practiceStepAction={practiceStepAction}
     />
