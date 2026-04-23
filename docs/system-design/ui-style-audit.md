@@ -343,3 +343,12 @@
   - 将顶部 variants 动作区收为文件内 `SceneVariantsActionRow`，保留返回、完成、再练、删除集的原有 disabled 与点击逻辑。
   - 将单个变体条目收为文件内 `SceneVariantListItem`，保留标题、状态 badge、打开与删除动作。
   - 继续保持 scene-local 私有展示语义，暂不升级为 shared action row / list item。
+
+## 16. Scene expression map 展示层收口记录
+
+已完成：
+
+- `src/features/scene/components/scene-expression-map-view.tsx`
+  - 将顶部返回与说明区收为文件内 `SceneExpressionMapHeader`，保留返回按钮、说明文案和错误提示。
+  - 将单个表达簇条目收为文件内 `SceneExpressionMapClusterItem`，保留 anchor、含义、来源场景数量和表达点击逻辑。
+  - 继续保持 scene-local 私有展示语义，暂不升级为 shared header / list item。
