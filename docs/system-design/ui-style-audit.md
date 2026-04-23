@@ -352,3 +352,12 @@
   - 将顶部返回与说明区收为文件内 `SceneExpressionMapHeader`，保留返回按钮、说明文案和错误提示。
   - 将单个表达簇条目收为文件内 `SceneExpressionMapClusterItem`，保留 anchor、含义、来源场景数量和表达点击逻辑。
   - 继续保持 scene-local 私有展示语义，暂不升级为 shared header / list item。
+
+## 17. Progress overview 展示层收口记录
+
+已完成：
+
+- `src/features/progress/components/progress-overview.tsx`
+  - 将周进度图收为文件内 `ProgressWeeklyMinutesCard`，保留柱高计算和分钟文案。
+  - 将能力分布区收为文件内 `ProgressSkillBreakdownCard`，保留技能名、百分比和进度条展示。
+  - 将顶部统计卡整理为 `statCards` 展示配置，继续复用现有 `StatCard`，不新增 shared 抽象。
