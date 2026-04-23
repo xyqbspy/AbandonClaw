@@ -177,6 +177,69 @@ function ChunksSimilarExpressionsPanel({
   );
 }
 
+function ChunksSentenceExpressionTags({
+  labels,
+  item,
+  sentenceExpressions,
+  savedSentenceExpressionKeys,
+  savingSentenceExpressionKey,
+  saveExpressionFromSentence,
+}: {
+  labels: Pick<
+    ChunksListViewLabels,
+    | "sentenceExpressions"
+    | "sentenceExpressionsHint"
+    | "sentenceNoExpressions"
+    | "sentenceSaveExpression"
+    | "sentenceSavedExpression"
+  >;
+  item: UserPhraseItemResponse;
+  sentenceExpressions: string[];
+  savedSentenceExpressionKeys: Record<string, boolean>;
+  savingSentenceExpressionKey: string | null;
+  saveExpressionFromSentence: (item: UserPhraseItemResponse, expression: string) => Promise<void>;
+}) {
+  return (
+    <div className="space-y-1">
+      <p className={APPLE_META_TEXT}>{labels.sentenceExpressions}</p>
+      <p className={APPLE_META_TEXT}>{labels.sentenceExpressionsHint}</p>
+      {sentenceExpressions.length > 0 ? (
+        <div className="flex flex-wrap gap-1.5">
+          {sentenceExpressions.map((expression) => {
+            const normalized = normalizePhraseText(expression);
+            const key = `${item.userPhraseId}:${normalized}`;
+            const isSaved = Boolean(savedSentenceExpressionKeys[key]);
+            const isSaving = savingSentenceExpressionKey === key;
+
+            return (
+              <div
+                key={key}
+                className={`flex items-center gap-1 rounded-full px-2 py-1 [@media(max-height:760px)]:px-1.5 [@media(max-height:760px)]:py-0.5 ${APPLE_BADGE_SUBTLE}`}
+              >
+                <span className={APPLE_BODY_TEXT}>{expression}</span>
+                <LoadingButton
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="h-5 px-1.5 py-0 text-xs"
+                  disabled={isSaved}
+                  loading={isSaving}
+                  loadingText={`${labels.sentenceSaveExpression}中...`}
+                  onClick={() => void saveExpressionFromSentence(item, expression)}
+                >
+                  {isSaved ? labels.sentenceSavedExpression : labels.sentenceSaveExpression}
+                </LoadingButton>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <p className={APPLE_META_TEXT}>{labels.sentenceNoExpressions}</p>
+      )}
+    </div>
+  );
+}
+
 type ChunksListViewLabels = {
   sentenceUnit: string;
   expressionUnit: string;
@@ -504,42 +567,14 @@ export function ChunksListView({
                       </p>
                       <p className={APPLE_META_TEXT}>{labels.sentenceUnitHint}</p>
                     </div>
-                    <div className="space-y-1">
-                      <p className={APPLE_META_TEXT}>{labels.sentenceExpressions}</p>
-                      <p className={APPLE_META_TEXT}>{labels.sentenceExpressionsHint}</p>
-                      {sentenceExpressions.length > 0 ? (
-                        <div className="flex flex-wrap gap-1.5">
-                          {sentenceExpressions.map((expression) => {
-                            const normalized = normalizePhraseText(expression);
-                            const key = `${item.userPhraseId}:${normalized}`;
-                            const isSaved = Boolean(savedSentenceExpressionKeys[key]);
-                            const isSaving = savingSentenceExpressionKey === key;
-                            return (
-                              <div
-                                key={key}
-                                className={`flex items-center gap-1 rounded-full px-2 py-1 [@media(max-height:760px)]:px-1.5 [@media(max-height:760px)]:py-0.5 ${APPLE_BADGE_SUBTLE}`}
-                              >
-                                <span className={APPLE_BODY_TEXT}>{expression}</span>
-                                <LoadingButton
-                                  type="button"
-                                  size="sm"
-                                  variant="ghost"
-                                  className="h-5 px-1.5 py-0 text-xs"
-                                  disabled={isSaved}
-                                  loading={isSaving}
-                                  loadingText={`${labels.sentenceSaveExpression}中...`}
-                                  onClick={() => void saveExpressionFromSentence(item, expression)}
-                                >
-                                  {isSaved ? labels.sentenceSavedExpression : labels.sentenceSaveExpression}
-                                </LoadingButton>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <p className={APPLE_META_TEXT}>{labels.sentenceNoExpressions}</p>
-                      )}
-                    </div>
+                    <ChunksSentenceExpressionTags
+                      labels={labels}
+                      item={item}
+                      sentenceExpressions={sentenceExpressions}
+                      savedSentenceExpressionKeys={savedSentenceExpressionKeys}
+                      savingSentenceExpressionKey={savingSentenceExpressionKey}
+                      saveExpressionFromSentence={saveExpressionFromSentence}
+                    />
                   </>
                 ) : (
                   <>

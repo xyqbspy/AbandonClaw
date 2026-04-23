@@ -323,6 +323,7 @@
   - 将 AI 补全 pending 提示块收为文件内 `ChunksPendingInfoBlock`，继续保留为 chunks list 私有展示语义。
   - 将表达详情里的同类表达面板收为文件内 `ChunksSimilarExpressionsPanel`，先沉淀 chunks 私有面板语义；暂不升级共享组件。
   - 语义重点、典型场景、复习阶段统一复用 `ChunksInfoField`，保留原 fallback 文案和展示层级。
+  - 将句子卡片里的表达 chips 与保存按钮收为文件内 `ChunksSentenceExpressionTags`，保留原保存状态与 key 计算。
   - 保持卡片展开、相似项展开、句子记录、TTS、表达地图、来源场景和 AI 补全重试逻辑不变。
 
 明确不收：
