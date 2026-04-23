@@ -54,6 +54,37 @@ function ChunksInfoField({
   );
 }
 
+function ChunksPendingInfoBlock({
+  labels,
+  text,
+  reviewHint,
+  similarDiffLabel,
+}: {
+  labels: Pick<
+    ChunksListViewLabels,
+    "learningInfoPending" | "learningInfoPendingHint" | "reviewStage" | "similarExpressions"
+  >;
+  text: string;
+  reviewHint: string;
+  similarDiffLabel: string | null;
+}) {
+  return (
+    <div className={`space-y-1 p-2.5 ${APPLE_PANEL_INFO}`}>
+      <p className={APPLE_META_TEXT}>{labels.learningInfoPending}</p>
+      <p className="text-sm font-medium text-foreground">{text}</p>
+      <p className={APPLE_META_TEXT}>{labels.learningInfoPendingHint}</p>
+      <p className={APPLE_META_TEXT}>
+        {labels.reviewStage}：{reviewHint}
+      </p>
+      {similarDiffLabel ? (
+        <p className={APPLE_META_TEXT}>
+          {labels.similarExpressions}：{similarDiffLabel}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 type ChunksListViewLabels = {
   sentenceUnit: string;
   expressionUnit: string;
@@ -274,19 +305,12 @@ export function ChunksListView({
               >
                 <div className="space-y-3.5 [@media(max-height:760px)]:space-y-2.5">
                   {item.aiEnrichmentStatus === "pending" ? (
-                    <div className={`space-y-1 p-2.5 ${APPLE_PANEL_INFO}`}>
-                      <p className={APPLE_META_TEXT}>{labels.learningInfoPending}</p>
-                      <p className="text-sm font-medium text-foreground">{item.text}</p>
-                      <p className={APPLE_META_TEXT}>{labels.learningInfoPendingHint}</p>
-                      <p className={APPLE_META_TEXT}>
-                        {labels.reviewStage}：{getReviewActionHint(item.reviewStatus)}
-                      </p>
-                      {pendingSimilarDiffLabel ? (
-                        <p className={APPLE_META_TEXT}>
-                          {labels.similarExpressions}：{pendingSimilarDiffLabel}
-                        </p>
-                      ) : null}
-                    </div>
+                    <ChunksPendingInfoBlock
+                      labels={labels}
+                      text={item.text}
+                      reviewHint={getReviewActionHint(item.reviewStatus)}
+                      similarDiffLabel={pendingSimilarDiffLabel}
+                    />
                   ) : null}
                   <ChunksInfoField label={labels.usageHint}>{getUsageHint(item)}</ChunksInfoField>
                   <ChunksInfoField label={labels.sourceSentence} bodyClassName={INFO_FIELD_META_BODY_CLASS}>
@@ -428,19 +452,12 @@ export function ChunksListView({
                 ) : (
                   <>
                     {item.aiEnrichmentStatus === "pending" ? (
-                      <div className={`space-y-1 p-2.5 ${APPLE_PANEL_INFO}`}>
-                        <p className={APPLE_META_TEXT}>{labels.learningInfoPending}</p>
-                        <p className="text-sm font-medium text-foreground">{item.text}</p>
-                        <p className={APPLE_META_TEXT}>{labels.learningInfoPendingHint}</p>
-                        <p className={APPLE_META_TEXT}>
-                          {labels.reviewStage}：{getReviewActionHint(item.reviewStatus)}
-                        </p>
-                        {pendingSimilarDiffLabel ? (
-                          <p className={APPLE_META_TEXT}>
-                            {labels.similarExpressions}：{pendingSimilarDiffLabel}
-                          </p>
-                        ) : null}
-                      </div>
+                      <ChunksPendingInfoBlock
+                        labels={labels}
+                        text={item.text}
+                        reviewHint={getReviewActionHint(item.reviewStatus)}
+                        similarDiffLabel={pendingSimilarDiffLabel}
+                      />
                     ) : null}
                     <ChunksInfoField label={labels.translationLabel}>
                       {item.translation ??
