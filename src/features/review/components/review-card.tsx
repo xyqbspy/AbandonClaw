@@ -2,16 +2,29 @@
 
 import { toast } from "sonner";
 import { ReviewItem } from "@/lib/types";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Button } from "@/components/ui/button";
 import {
   APPLE_BODY_TEXT,
   APPLE_CARD_INTERACTIVE,
   APPLE_META_TEXT,
   APPLE_PANEL,
 } from "@/lib/ui/apple-style";
+
+function ReviewCardContextBlock({ sentence }: { sentence: string }) {
+  return <p className={`p-3 ${APPLE_PANEL} ${APPLE_BODY_TEXT}`}>&quot;{sentence}&quot;</p>;
+}
+
+function ReviewCardMasteryBlock({ mastery }: { mastery: number }) {
+  return (
+    <div className="space-y-2">
+      <p className={APPLE_META_TEXT}>掌握度</p>
+      <Progress value={mastery} className="h-2" />
+    </div>
+  );
+}
 
 export function ReviewCard({ item }: { item: ReviewItem }) {
   const dueLabel =
@@ -27,11 +40,8 @@ export function ReviewCard({ item }: { item: ReviewItem }) {
         <p className={APPLE_META_TEXT}>{item.meaning}</p>
       </CardHeader>
       <CardContent className="space-y-3">
-        <p className={`p-3 ${APPLE_PANEL} ${APPLE_BODY_TEXT}`}>&quot;{item.contextSentence}&quot;</p>
-        <div className="space-y-2">
-          <p className={APPLE_META_TEXT}>掌握度</p>
-          <Progress value={item.mastery} className="h-2" />
-        </div>
+        <ReviewCardContextBlock sentence={item.contextSentence} />
+        <ReviewCardMasteryBlock mastery={item.mastery} />
       </CardContent>
       <CardFooter className="gap-2">
         <Button

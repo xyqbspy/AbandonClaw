@@ -361,3 +361,12 @@
   - 将周进度图收为文件内 `ProgressWeeklyMinutesCard`，保留柱高计算和分钟文案。
   - 将能力分布区收为文件内 `ProgressSkillBreakdownCard`，保留技能名、百分比和进度条展示。
   - 将顶部统计卡整理为 `statCards` 展示配置，继续复用现有 `StatCard`，不新增 shared 抽象。
+
+## 18. Review card 展示层收口记录
+
+已完成：
+
+- `src/features/review/components/review-card.tsx`
+  - 修复原文件中的乱码与字符串/标签断裂，恢复为可编译状态。
+  - 将上下文句子块收为文件内 `ReviewCardContextBlock`，保留引用句样式。
+  - 将掌握度区收为文件内 `ReviewCardMasteryBlock`，保留文案和进度条展示。
