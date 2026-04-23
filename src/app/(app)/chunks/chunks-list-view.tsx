@@ -599,20 +599,14 @@ export function ChunksListView({
                         </p>
                       )}
                     </div>
-                    <div className="space-y-0.5">
-                      <p className={APPLE_META_TEXT}>{labels.semanticFocusLabel}</p>
-                      <p className={APPLE_META_TEXT}>
-                        {item.semanticFocus ??
-                          (item.aiEnrichmentStatus === "pending" ? labels.semanticFocusPending : labels.diffRelated)}
-                      </p>
-                    </div>
-                    <div className="space-y-0.5">
-                      <p className={APPLE_META_TEXT}>{labels.typicalScenarioLabel}</p>
-                      <p className={APPLE_META_TEXT}>
-                        {item.typicalScenario ??
-                          (item.aiEnrichmentStatus === "pending" ? labels.typicalScenarioPending : labels.diffRelated)}
-                      </p>
-                    </div>
+                    <ChunksInfoField label={labels.semanticFocusLabel} bodyClassName={APPLE_META_TEXT}>
+                      {item.semanticFocus ??
+                        (item.aiEnrichmentStatus === "pending" ? labels.semanticFocusPending : labels.diffRelated)}
+                    </ChunksInfoField>
+                    <ChunksInfoField label={labels.typicalScenarioLabel} bodyClassName={APPLE_META_TEXT}>
+                      {item.typicalScenario ??
+                        (item.aiEnrichmentStatus === "pending" ? labels.typicalScenarioPending : labels.diffRelated)}
+                    </ChunksInfoField>
                     <ChunksSimilarExpressionsPanel
                       labels={labels}
                       item={item}
@@ -637,10 +631,9 @@ export function ChunksListView({
                     ) : null}
                   </div>
                 ) : null}
-                <div className="space-y-0.5">
-                  <p className={APPLE_META_TEXT}>{labels.reviewStage}</p>
-                  <p className={APPLE_META_TEXT}>{getReviewActionHint(item.reviewStatus)}</p>
-                </div>
+                <ChunksInfoField label={labels.reviewStage} bodyClassName={APPLE_META_TEXT}>
+                  {getReviewActionHint(item.reviewStatus)}
+                </ChunksInfoField>
                 {item.usageNote && item.usageNote.trim().length > 70 ? (
                   <div className="space-y-1.5 [@media(max-height:760px)]:space-y-1">
                     <Button
