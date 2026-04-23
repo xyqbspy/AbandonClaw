@@ -1,5 +1,10 @@
 # Documentation Index
 
+## Quick Links
+
+- 当前后端技术栈、Java 重写评估与重构步骤大纲：
+  `docs/system-design/backend-rewrite/java-backend-rewrite-assessment.md`
+
 本目录用于定位项目文档。先用这里判断问题属于哪一层，再进入对应文档；不要从局部代码反推业务语义。
 
 ## 最小阅读路径
