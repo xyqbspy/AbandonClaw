@@ -370,3 +370,12 @@
   - 修复原文件中的乱码与字符串/标签断裂，恢复为可编译状态。
   - 将上下文句子块收为文件内 `ReviewCardContextBlock`，保留引用句样式。
   - 将掌握度区收为文件内 `ReviewCardMasteryBlock`，保留文案和进度条展示。
+
+## 19. Scene practice header 展示层收口记录
+
+已完成：
+
+- `src/features/scene/components/scene-practice-header.tsx`
+  - 将返回按钮收为文件内 `ScenePracticeHeaderBackButton`，保留返回行为与标题布局。
+  - 将右上菜单与菜单面板收为文件内 `ScenePracticeHeaderMenu`，保留重生成、删除、完成的原有点击与 disabled 逻辑。
+  - 修复菜单开关的 aria-label 乱码，恢复为正常中文文本。
