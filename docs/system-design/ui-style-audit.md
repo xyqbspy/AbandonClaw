@@ -282,6 +282,10 @@
 - `src/features/today/components/today-task-list.tsx`
   - 将任务行基础布局、up next 高亮行、任务标题行、状态 icon、序号 badge 等固定样式收回 `today-page-styles.ts`。
   - 保持任务点击、locked 禁用、done 展示和链接跳转逻辑不变，只减少组件内散落 class。
+- `src/features/today/components/today-recommended-scenes-section.tsx`
+  - 将推荐区标题行、标题色、loading block、横向列表和时间 meta 固定样式收回 `today-page-styles.ts`。
+- `src/features/today/components/today-saved-expressions-section.tsx`
+  - 将已保存表达标题行、标题色和数量 pill 固定样式收回 `today-page-styles.ts`。
 
 明确不收：
 

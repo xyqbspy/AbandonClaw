@@ -84,6 +84,15 @@ export const TODAY_RECOMMEND_REASON_PILL_CLASSNAME =
   `${TODAY_PILL_BASE_CLASSNAME} mt-[var(--mobile-space-md)] inline-flex bg-[#F1F5F9] px-[var(--mobile-space-md)] py-[var(--mobile-space-2xs)] text-[#334155]`;
 export const TODAY_RECOMMEND_BADGE_CLASSNAME =
   "mt-[var(--mobile-space-sm)] text-[length:var(--mobile-font-caption)] font-medium text-[#7B8798]";
+export const TODAY_RECOMMEND_HEADER_CLASSNAME =
+  "flex items-end justify-between gap-[var(--mobile-space-md)]";
+export const TODAY_RECOMMEND_HEADING_CLASSNAME = `${TODAY_SECTION_TITLE_CLASSNAME} text-[#334155]`;
+export const TODAY_RECOMMEND_LOADING_CLASSNAME =
+  `${TODAY_SECTION_CLASSNAME} py-[calc(var(--mobile-space-xl)+var(--mobile-space-lg))]`;
+export const TODAY_RECOMMEND_LIST_CLASSNAME =
+  "flex gap-[var(--mobile-space-md)] overflow-x-auto pb-[var(--mobile-space-2xs)]";
+export const TODAY_RECOMMEND_META_CLASSNAME =
+  `mt-[var(--mobile-space-sm)] ${APPLE_META_TEXT} leading-[1.35]`;
 
 export const TODAY_TASK_STEP_BASE_CLASSNAME =
   "flex-1 rounded-[var(--app-radius-card)] border px-[var(--mobile-space-sm)] py-[var(--mobile-space-md)] text-center transition";
@@ -114,6 +123,11 @@ export const TODAY_SAVED_ITEM_META_CLASSNAME =
   "mt-[var(--mobile-space-2xs)] text-[length:var(--mobile-font-caption)] leading-[1.4] font-normal text-[#7A8699]";
 export const TODAY_SAVED_FOOTNOTE_CLASSNAME =
   "mt-[var(--mobile-space-sm)] flex items-center gap-[6px] text-[length:var(--mobile-font-caption)] leading-[1.3] text-[#8A99B0]";
+export const TODAY_SAVED_HEADER_CLASSNAME =
+  "mb-[var(--mobile-space-lg)] flex items-center justify-between gap-[var(--mobile-space-md)]";
+export const TODAY_SAVED_HEADING_CLASSNAME = `${TODAY_SECTION_TITLE_CLASSNAME} text-[#1F2A44]`;
+export const TODAY_SAVED_COUNT_PILL_CLASSNAME =
+  `${TODAY_INFO_PILL_CLASSNAME} px-[var(--mobile-space-sm)] py-[2px]`;
 
 export const TODAY_TASK_ACTION_BASE_CLASSNAME =
   `${APPLE_BUTTON_BASE} ${APPLE_BUTTON_TEXT_SM} h-[var(--mobile-control-height)] px-[var(--mobile-space-md)]`;

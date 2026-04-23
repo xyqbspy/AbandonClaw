@@ -4,11 +4,14 @@ import {
   TODAY_RECOMMEND_BADGE_CLASSNAME,
   TODAY_RECOMMEND_CARD_CLASSNAME,
   TODAY_RECOMMEND_EMPTY_CLASSNAME,
+  TODAY_RECOMMEND_HEADER_CLASSNAME,
+  TODAY_RECOMMEND_HEADING_CLASSNAME,
+  TODAY_RECOMMEND_LIST_CLASSNAME,
+  TODAY_RECOMMEND_LOADING_CLASSNAME,
+  TODAY_RECOMMEND_META_CLASSNAME,
   TODAY_RECOMMEND_REASON_PILL_CLASSNAME,
   TODAY_RECOMMEND_TITLE_CLASSNAME,
-  TODAY_SECTION_CLASSNAME,
   TODAY_SECTION_EMOJI_CLASSNAME,
-  TODAY_SECTION_TITLE_CLASSNAME,
 } from "@/features/today/components/today-page-styles";
 import { APPLE_META_TEXT } from "@/lib/ui/apple-style";
 import { SceneListItemResponse } from "@/lib/utils/scenes-api";
@@ -32,8 +35,8 @@ export function TodayRecommendedScenesSection({
 }) {
   return (
     <section className="space-y-[var(--mobile-space-md)]">
-      <div className="flex items-end justify-between gap-[var(--mobile-space-md)]">
-        <div className={`flex items-center gap-[var(--mobile-space-sm)] ${TODAY_SECTION_TITLE_CLASSNAME} text-[#334155]`}>
+      <div className={TODAY_RECOMMEND_HEADER_CLASSNAME}>
+        <div className={TODAY_RECOMMEND_HEADING_CLASSNAME}>
           <span className={TODAY_SECTION_EMOJI_CLASSNAME}>✨</span>
           <span>推荐下一组场景</span>
         </div>
@@ -41,13 +44,13 @@ export function TodayRecommendedScenesSection({
       </div>
 
       {loading && recommendedScenes.length === 0 ? (
-        <div className={`${TODAY_SECTION_CLASSNAME} py-[calc(var(--mobile-space-xl)+var(--mobile-space-lg))]`}>
+        <div className={TODAY_RECOMMEND_LOADING_CLASSNAME}>
           <LoadingState text={loadingText} className="py-0" />
         </div>
       ) : recommendedScenes.length === 0 ? (
         <div className={TODAY_RECOMMEND_EMPTY_CLASSNAME}>{emptyText}</div>
       ) : (
-        <div className="flex gap-[var(--mobile-space-md)] overflow-x-auto pb-[var(--mobile-space-2xs)]">
+        <div className={TODAY_RECOMMEND_LIST_CLASSNAME}>
           {recommendedScenes.map((scene) => (
             <button
               key={scene.id}
@@ -56,7 +59,7 @@ export function TodayRecommendedScenesSection({
               onClick={() => onOpenScene(scene.slug)}
             >
               <div className={TODAY_RECOMMEND_TITLE_CLASSNAME}>{scene.title}</div>
-              <div className={`mt-[var(--mobile-space-sm)] ${APPLE_META_TEXT} leading-[1.35]`}>
+              <div className={TODAY_RECOMMEND_META_CLASSNAME}>
                 <span className={TODAY_BADGE_EMOJI_CLASSNAME}>⏰</span> {scene.estimatedMinutes} 分钟
               </div>
               <div className={TODAY_RECOMMEND_REASON_PILL_CLASSNAME}>
