@@ -62,6 +62,20 @@
 - **AND** 不得仅因为样式被局部复用，就直接提升为全局 token 或 shared 组件
 - **AND** 必须记录本轮不提升为全局样式入口的原因和后续风险位置
 
+### Requirement: 局部 styles 收口不得被视为公共样式抽象
+系统 MUST 区分 feature-private styles、design tokens 和 shared UI semantics，避免把 class 变量化误认为公共组件或公共样式体系。
+
+#### Scenario: 维护者把页面内 class 收到私有 styles 文件
+- **WHEN** 维护者将 JSX 中的 class 迁入 `today-page-styles.ts`、`review-page-styles.ts`、`scene-page-styles.ts` 或类似 feature 私有样式入口
+- **THEN** 该操作只能被视为页面族或 feature 内部样式收口
+- **AND** 不得因此宣称已经形成公共组件、公共样式或设计系统能力
+
+#### Scenario: 维护者准备把样式或结构提升到公共层
+- **WHEN** 维护者准备把某类样式、结构或组件提升到 `src/components/shared`、全局 token 或通用 variant
+- **THEN** 必须确认该能力表达的是跨页面稳定 UI 语义，而不是单一 feature 的视觉细节
+- **AND** 必须优先抽稳定组件、variant 或 token，而不是直接上移 `TODAY_*`、`REVIEW_*`、`SCENE_*` 这类私有 class 常量
+- **AND** 若只有视觉相似但 props、状态职责或交互语义尚不稳定，必须继续保留在 feature-private styles 并记录为候选
+
 ### Requirement: Page-family UI consolidation must be audited and batched
 The system MUST require maintainers to record scope, batch order, main-flow protection points, and explicit non-goals before consolidating styles for a page family such as `scene`.
 

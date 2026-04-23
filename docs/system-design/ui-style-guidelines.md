@@ -261,6 +261,21 @@
 3. 复用已有局部 helper 或封装。
 4. 最后才写页面局部 class。
 
+注意：把局部 class 收到 `today-page-styles.ts`、`review-page-styles.ts`、`scene-page-styles.ts` 这类文件，只是页面族内部样式收口，不是公共样式抽象。它适合用来减少 JSX 噪音和防止同一页面继续漂移，但不应该被当成最终设计系统。
+
+需要公共化时，优先抽稳定 UI 语义，而不是抽 class 字符串：
+
+- 底层一致性用 design tokens 表达，例如颜色、圆角、阴影、字体、间距。
+- 跨页面稳定结构用 shared 组件或组件 variant 表达，例如空态、信息块、状态 pill、固定 footer action。
+- 单个 feature 的组合视觉继续留在 feature-private styles，直到出现真实跨页面复用需求。
+
+升级判断：
+
+- 只有一个页面或一个 feature 使用：保留局部 styles。
+- 多个组件都在同一 feature 内使用：优先 feature-private styles 或 feature 内组件。
+- 2-3 个页面或 feature 出现相同 UI 语义，且 props 与交互职责稳定：再考虑 shared 组件。
+- 只是颜色、圆角、阴影看起来相似：不抽 shared，先记录为候选。
+
 禁止默认做法：
 
 - 为单页手拼一套新的主按钮、次按钮或危险按钮。

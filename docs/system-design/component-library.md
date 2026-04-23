@@ -15,6 +15,23 @@
 - feature 组件：只服务某个学习域，携带明确业务语义
 - 页面组装组件：负责路由态、数据拼装、页面级编排
 
+## 1.1 公共化不是把 class 变成变量
+
+把页面 JSX 里的 class 收到 `*-page-styles.ts` 或 feature 私有 styles 文件，只是样式收口，不等于公共组件或公共样式抽象。
+
+三层职责必须区分：
+
+- design tokens：颜色、圆角、阴影、字体、间距等底层变量，放在全局 CSS 或底层样式入口，不携带业务语义。
+- shared UI semantics：跨页面稳定复用的 UI 语义，例如 `EmptyState`、`DetailInfoBlock`、音频动作按钮、admin 操作按钮；这类能力才适合进入 `src/components/shared`、`src/components/audio` 或 `src/components/admin`。
+- feature-private styles：只服务单个页面族或 feature 的组合样式，例如 `today-page-styles.ts`、`review-page-styles.ts`、`scene-page-styles.ts`；它们用于减少漂移和 JSX 噪音，但仍是私有实现细节。
+
+判断规则：
+
+- 只在一个 feature 内复用的 class，优先留在 feature 私有 styles。
+- 只有当同一种 UI 语义在 2-3 个页面或 feature 中稳定出现，并且名称、props、状态职责脱离原 feature 后仍然清晰，才考虑抽 shared 组件。
+- 不要把 `TODAY_*`、`REVIEW_*`、`SCENE_*` 这类私有常量直接上移为公共样式；如果确实要公共化，应先抽稳定组件或 variant，而不是只移动 class 字符串。
+- 公共化的目标是复用稳定语义，不是复用视觉巧合。
+
 ## 2. 目录分层规则
 
 ### `src/components/ui`
