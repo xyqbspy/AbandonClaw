@@ -85,6 +85,98 @@ function ChunksPendingInfoBlock({
   );
 }
 
+function ChunksSimilarExpressionsPanel({
+  labels,
+  item,
+  similarPreview,
+  isSimilarExpanded,
+  appleButtonClassName,
+  generatingSimilarForId,
+  toggleSimilarExpanded,
+  applyClusterFilter,
+  openGenerateSimilarSheet,
+  buildDifferenceNote,
+}: {
+  labels: Pick<
+    ChunksListViewLabels,
+    | "similarExpressions"
+    | "hideSimilar"
+    | "showSimilar"
+    | "similarEmpty"
+    | "viewAllSimilar"
+    | "generatingSimilar"
+    | "findMoreSimilar"
+  >;
+  item: UserPhraseItemResponse;
+  similarPreview: UserPhraseItemResponse[];
+  isSimilarExpanded: boolean;
+  appleButtonClassName: string;
+  generatingSimilarForId: string | null;
+  toggleSimilarExpanded: (userPhraseId: string) => void;
+  applyClusterFilter: (clusterId: string, expressionText: string) => void;
+  openGenerateSimilarSheet: (item: UserPhraseItemResponse) => Promise<void>;
+  buildDifferenceNote: (centerExpression: string, targetExpression: string) => string;
+}) {
+  const hasSimilarPreview = similarPreview.length > 0;
+
+  return (
+    <div className={`space-y-1.5 p-2.5 [@media(max-height:760px)]:space-y-1 [@media(max-height:760px)]:p-2 ${APPLE_PANEL}`}>
+      <button
+        type="button"
+        className="flex w-full items-center justify-between text-left"
+        onClick={() => toggleSimilarExpanded(item.userPhraseId)}
+        aria-expanded={isSimilarExpanded}
+      >
+        <p className={APPLE_META_TEXT}>{labels.similarExpressions}</p>
+        <p className={APPLE_META_TEXT}>{isSimilarExpanded ? labels.hideSimilar : labels.showSimilar}</p>
+      </button>
+      {isSimilarExpanded ? (
+        hasSimilarPreview ? (
+          <div className="space-y-2 [@media(max-height:760px)]:space-y-1.5">
+            {similarPreview.map((similarItem) => (
+              <div
+                key={similarItem.userPhraseId}
+                className={`px-2 py-1.5 [@media(max-height:760px)]:px-1.5 [@media(max-height:760px)]:py-1 ${APPLE_LIST_ITEM}`}
+              >
+                <p className={`font-medium ${APPLE_BODY_TEXT}`}>{similarItem.text}</p>
+                <p className={APPLE_META_TEXT}>{buildDifferenceNote(item.text, similarItem.text)}</p>
+              </div>
+            ))}
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="h-7 px-0 text-xs"
+              onClick={() =>
+                item.expressionClusterId
+                  ? applyClusterFilter(item.expressionClusterId, item.text)
+                  : void openGenerateSimilarSheet(item)
+              }
+            >
+              {labels.viewAllSimilar}
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-2 [@media(max-height:760px)]:space-y-1.5">
+            <p className={APPLE_META_TEXT}>{labels.similarEmpty}</p>
+            <LoadingButton
+              type="button"
+              size="sm"
+              variant="ghost"
+              className={`h-7 text-xs ${appleButtonClassName}`}
+              loading={generatingSimilarForId === item.userPhraseId}
+              loadingText={`${labels.generatingSimilar}...`}
+              onClick={() => void openGenerateSimilarSheet(item)}
+            >
+              {labels.findMoreSimilar}
+            </LoadingButton>
+          </div>
+        )
+      ) : null}
+    </div>
+  );
+}
+
 type ChunksListViewLabels = {
   sentenceUnit: string;
   expressionUnit: string;
@@ -521,64 +613,18 @@ export function ChunksListView({
                           (item.aiEnrichmentStatus === "pending" ? labels.typicalScenarioPending : labels.diffRelated)}
                       </p>
                     </div>
-                    <div className={`space-y-1.5 p-2.5 [@media(max-height:760px)]:space-y-1 [@media(max-height:760px)]:p-2 ${APPLE_PANEL}`}>
-                      <button
-                        type="button"
-                        className="flex w-full items-center justify-between text-left"
-                        onClick={() => toggleSimilarExpanded(item.userPhraseId)}
-                        aria-expanded={isSimilarExpanded}
-                      >
-                        <p className={APPLE_META_TEXT}>{labels.similarExpressions}</p>
-                        <p className={APPLE_META_TEXT}>
-                          {isSimilarExpanded ? labels.hideSimilar : labels.showSimilar}
-                        </p>
-                      </button>
-                      {isSimilarExpanded ? (
-                        hasSimilarPreview ? (
-                          <div className="space-y-2 [@media(max-height:760px)]:space-y-1.5">
-                            {similarPreview.map((similarItem) => (
-                              <div
-                                key={similarItem.userPhraseId}
-                                className={`px-2 py-1.5 [@media(max-height:760px)]:px-1.5 [@media(max-height:760px)]:py-1 ${APPLE_LIST_ITEM}`}
-                              >
-                                <p className={`font-medium ${APPLE_BODY_TEXT}`}>{similarItem.text}</p>
-                                <p className={APPLE_META_TEXT}>
-                                  {buildDifferenceNote(item.text, similarItem.text)}
-                                </p>
-                              </div>
-                            ))}
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="ghost"
-                              className="h-7 px-0 text-xs"
-                              onClick={() =>
-                                item.expressionClusterId
-                                  ? applyClusterFilter(item.expressionClusterId, item.text)
-                                  : void openGenerateSimilarSheet(item)
-                              }
-                            >
-                              {labels.viewAllSimilar}
-                            </Button>
-                          </div>
-                        ) : (
-                          <div className="space-y-2 [@media(max-height:760px)]:space-y-1.5">
-                            <p className={APPLE_META_TEXT}>{labels.similarEmpty}</p>
-                            <LoadingButton
-                              type="button"
-                              size="sm"
-                              variant="ghost"
-                              className={`h-7 text-xs ${appleButtonClassName}`}
-                              loading={generatingSimilarForId === item.userPhraseId}
-                              loadingText={`${labels.generatingSimilar}...`}
-                              onClick={() => void openGenerateSimilarSheet(item)}
-                            >
-                              {labels.findMoreSimilar}
-                            </LoadingButton>
-                          </div>
-                        )
-                      ) : null}
-                    </div>
+                    <ChunksSimilarExpressionsPanel
+                      labels={labels}
+                      item={item}
+                      similarPreview={similarPreview}
+                      isSimilarExpanded={isSimilarExpanded}
+                      appleButtonClassName={appleButtonClassName}
+                      generatingSimilarForId={generatingSimilarForId}
+                      toggleSimilarExpanded={toggleSimilarExpanded}
+                      applyClusterFilter={applyClusterFilter}
+                      openGenerateSimilarSheet={openGenerateSimilarSheet}
+                      buildDifferenceNote={buildDifferenceNote}
+                    />
                   </>
                 )}
                 {item.sourceType === "manual" ? (
