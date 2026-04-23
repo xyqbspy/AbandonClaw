@@ -4,9 +4,8 @@ import { useCallback, useMemo, useState } from "react";
 import { clearAllReviewPageCache, setReviewPageCache } from "@/lib/cache/review-page-cache";
 import { LoadingButton, LoadingContent } from "@/components/shared/action-loading";
 import { PageHeader } from "@/components/shared/page-header";
-import { buttonVariants } from "@/components/ui/button";
 import { recordClientEvent } from "@/lib/utils/client-events";
-import { APPLE_BODY_TEXT, APPLE_META_TEXT } from "@/lib/ui/apple-style";
+import { APPLE_BODY_TEXT } from "@/lib/ui/apple-style";
 import {
   buildAcceptedPracticeAnswers,
   getPracticeAssessment,
@@ -48,43 +47,30 @@ import {
 } from "./review-page-selectors";
 import { ReviewPageStagePanel } from "./review-page-stage-panel";
 import { ReviewPageSummaryCards } from "./review-page-summary-cards";
+import {
+  REVIEW_FOOTER_CLASSNAME,
+  REVIEW_FOOTER_DANGER_BUTTON_CLASSNAME,
+  REVIEW_FOOTER_INNER_CLASSNAME,
+  REVIEW_FOOTER_MUTED_TEXT_CLASSNAME,
+  REVIEW_FOOTER_PRIMARY_BUTTON_CLASSNAME,
+  REVIEW_FOOTER_PRIMARY_FULL_BUTTON_CLASSNAME,
+  REVIEW_FOOTER_REVIEW_GRID_CLASSNAME,
+  REVIEW_FOOTER_SECONDARY_BUTTON_CLASSNAME,
+  REVIEW_HERO_BODY_CLASSNAME,
+  REVIEW_HERO_CLASSNAME,
+  REVIEW_HERO_HEADER_CLASSNAME,
+  REVIEW_HERO_STREAK_PILL_CLASSNAME,
+  REVIEW_HINT_SOURCE_CLASSNAME,
+  REVIEW_HINT_STACK_CLASSNAME,
+  REVIEW_PAGE_CLASSNAME,
+  REVIEW_PROGRESS_FILL_CLASSNAME,
+  REVIEW_PROGRESS_HEADER_CLASSNAME,
+  REVIEW_PROGRESS_TRACK_CLASSNAME,
+  REVIEW_SOURCE_ACTIONS_CLASSNAME,
+  REVIEW_SOURCE_UNAVAILABLE_CLASSNAME,
+  REVIEW_SOURCE_UNAVAILABLE_HINT_CLASSNAME,
+} from "./review-page-styles";
 import { ReviewSummary, useReviewPageData } from "./use-review-page-data";
-import { cn } from "@/lib/utils";
-
-const reviewPageClassName = "space-y-6 pb-28";
-const reviewHeroClassName =
-  "overflow-hidden rounded-[32px] bg-[linear-gradient(180deg,#eef5ff_0%,#f8fafc_72%,#ffffff_100%)] p-5 shadow-[0_22px_60px_rgba(37,99,235,0.12)] ring-1 ring-sky-100";
-const reviewHeroHeaderClassName = "mb-4 flex items-center justify-between gap-3";
-const reviewHeroStreakPillClassName =
-  "rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700";
-const reviewHeroBodyClassName = "mt-5 space-y-4";
-const reviewProgressHeaderClassName = `mb-2 flex items-center justify-between text-xs ${APPLE_META_TEXT}`;
-const reviewProgressTrackClassName = "h-2 overflow-hidden rounded-full bg-slate-200";
-const reviewProgressFillClassName =
-  "h-full rounded-full bg-[linear-gradient(90deg,#3b82f6,#2563eb)] transition-all";
-const reviewHintStackClassName = "space-y-2";
-const reviewHintSourceClassName = `text-xs ${APPLE_META_TEXT}`;
-const reviewSourceActionsClassName = "flex flex-wrap gap-3";
-const reviewSourceUnavailableClassName =
-  "rounded-full border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-700";
-const reviewSourceUnavailableHintClassName = "text-xs text-amber-600";
-const reviewFooterClassName =
-  "fixed inset-x-0 bottom-0 z-20 border-t border-slate-200/80 bg-white/90 px-4 py-4 backdrop-blur";
-const reviewFooterInnerClassName = "mx-auto flex max-w-3xl flex-col gap-3";
-const reviewFooterReviewGridClassName = "grid grid-cols-3 gap-2";
-const reviewFooterMutedTextClassName =
-  "rounded-full px-4 py-3 text-center text-sm text-[var(--muted-foreground)]";
-const reviewFooterPrimaryButtonClassName = buttonVariants({
-  className: "h-14 rounded-full text-base",
-});
-const reviewFooterSecondaryButtonClassName = buttonVariants({
-  variant: "secondary",
-  className: "w-full",
-});
-const reviewFooterDangerButtonClassName = buttonVariants({
-  variant: "destructive",
-  className: "w-full",
-});
 
 export default function ReviewPage() {
   const [loading, setLoading] = useState(true);
@@ -328,25 +314,25 @@ export default function ReviewPage() {
   };
 
   return (
-    <div className={reviewPageClassName}>
-      <section className={reviewHeroClassName}>
-        <div className={reviewHeroHeaderClassName}>
-          <span className={reviewHeroStreakPillClassName}>
+    <div className={REVIEW_PAGE_CLASSNAME}>
+      <section className={REVIEW_HERO_CLASSNAME}>
+        <div className={REVIEW_HERO_HEADER_CLASSNAME}>
+          <span className={REVIEW_HERO_STREAK_PILL_CLASSNAME}>
             {zh.streakSummary}
           </span>
         </div>
         <PageHeader eyebrow={zh.eyebrow} title={zh.title} description={zh.desc} />
-        <div className={reviewHeroBodyClassName}>
+        <div className={REVIEW_HERO_BODY_CLASSNAME}>
           <div>
-            <div className={reviewProgressHeaderClassName}>
+            <div className={REVIEW_PROGRESS_HEADER_CLASSNAME}>
               <span>{zh.progressLabel}</span>
               <span>
                 {progressModel.completedCount}/{Math.max(progressModel.totalCount, 1)}
               </span>
             </div>
-            <div className={reviewProgressTrackClassName}>
+            <div className={REVIEW_PROGRESS_TRACK_CLASSNAME}>
               <div
-                className={reviewProgressFillClassName}
+                className={REVIEW_PROGRESS_FILL_CLASSNAME}
                 style={{ width: `${progressModel.progressPercent}%` }}
               />
             </div>
@@ -363,10 +349,10 @@ export default function ReviewPage() {
         </div>
       </section>
 
-      <div className={reviewHintStackClassName}>
+      <div className={REVIEW_HINT_STACK_CLASSNAME}>
         <p className={APPLE_BODY_TEXT}>{primaryHint}</p>
         {sourceLabel ? (
-          <p className={reviewHintSourceClassName}>
+          <p className={REVIEW_HINT_SOURCE_CLASSNAME}>
             {zh.sourcePrefix}：{sourceLabel}
           </p>
         ) : null}
@@ -405,7 +391,7 @@ export default function ReviewPage() {
       />
       {/* onOpenToday={() => router.push("/today")} todu 报错了需要修复 */}
       {activeTaskKind === "scene_practice" && currentScenePracticeItem ? (
-        <div className={reviewSourceActionsClassName}>
+        <div className={REVIEW_SOURCE_ACTIONS_CLASSNAME}>
           <LoadingButton
             type="button"
             variant="outline"
@@ -426,7 +412,7 @@ export default function ReviewPage() {
           </LoadingButton>
         </div>
       ) : currentPhraseItem?.sourceSceneSlug ? (
-        <div className={reviewSourceActionsClassName}>
+        <div className={REVIEW_SOURCE_ACTIONS_CLASSNAME}>
           {currentPhraseItem.sourceSceneAvailable ? (
             <LoadingButton
               type="button"
@@ -438,21 +424,21 @@ export default function ReviewPage() {
               {zh.openSourceScene}
             </LoadingButton>
           ) : (
-            <div className={reviewSourceUnavailableClassName}>
+            <div className={REVIEW_SOURCE_UNAVAILABLE_CLASSNAME}>
               <p className="font-medium">{zh.sourceSceneUnavailable}</p>
-              <p className={reviewSourceUnavailableHintClassName}>{zh.sourceSceneUnavailableHint}</p>
+              <p className={REVIEW_SOURCE_UNAVAILABLE_HINT_CLASSNAME}>{zh.sourceSceneUnavailableHint}</p>
             </div>
           )}
         </div>
       ) : null}
 
-      <div className={reviewFooterClassName}>
-        <div className={reviewFooterInnerClassName}>
+      <div className={REVIEW_FOOTER_CLASSNAME}>
+        <div className={REVIEW_FOOTER_INNER_CLASSNAME}>
           {activeTaskKind === "phrase_review" && taskStage === "feedback" ? (
-            <div className={reviewFooterReviewGridClassName}>
+            <div className={REVIEW_FOOTER_REVIEW_GRID_CLASSNAME}>
               <button
                 type="button"
-                className={reviewFooterDangerButtonClassName}
+                className={REVIEW_FOOTER_DANGER_BUTTON_CLASSNAME}
                 disabled={submitting}
                 onClick={() => void submitPhraseReview("again")}
               >
@@ -462,7 +448,7 @@ export default function ReviewPage() {
               </button>
               <button
                 type="button"
-                className={reviewFooterSecondaryButtonClassName}
+                className={REVIEW_FOOTER_SECONDARY_BUTTON_CLASSNAME}
                 disabled={submitting}
                 onClick={() => void submitPhraseReview("hard")}
               >
@@ -472,7 +458,7 @@ export default function ReviewPage() {
               </button>
               <button
                 type="button"
-                className={cn(reviewFooterPrimaryButtonClassName, "w-full")}
+                className={REVIEW_FOOTER_PRIMARY_FULL_BUTTON_CLASSNAME}
                 disabled={submitting}
                 onClick={() => void submitPhraseReview("good")}
               >
@@ -487,7 +473,7 @@ export default function ReviewPage() {
             taskStage === "recall" ? (
               <button
                 type="button"
-                className={reviewFooterPrimaryButtonClassName}
+                className={REVIEW_FOOTER_PRIMARY_BUTTON_CLASSNAME}
                 onClick={() => setTaskStage("practice")}
               >
                 {zh.sceneRecallCta}
@@ -495,7 +481,7 @@ export default function ReviewPage() {
             ) : taskStage === "practice" ? (
               <button
                 type="button"
-                className={reviewFooterPrimaryButtonClassName}
+                className={REVIEW_FOOTER_PRIMARY_BUTTON_CLASSNAME}
                 disabled={submitting}
                 onClick={() => void submitScenePractice()}
               >
@@ -506,7 +492,7 @@ export default function ReviewPage() {
             ) : (
               <button
                 type="button"
-                className={reviewFooterPrimaryButtonClassName}
+                className={REVIEW_FOOTER_PRIMARY_BUTTON_CLASSNAME}
                 disabled={submitting}
                 onClick={() => void refreshAfterScenePractice()}
               >
@@ -518,7 +504,7 @@ export default function ReviewPage() {
           ) : taskStage === "recall" ? (
             <button
               type="button"
-              className={reviewFooterPrimaryButtonClassName}
+              className={REVIEW_FOOTER_PRIMARY_BUTTON_CLASSNAME}
               onClick={() => {
                 setShowReference(true);
                 setTaskStage("confidence");
@@ -529,7 +515,7 @@ export default function ReviewPage() {
           ) : taskStage === "confidence" ? (
             <button
               type="button"
-              className={reviewFooterPrimaryButtonClassName}
+              className={REVIEW_FOOTER_PRIMARY_BUTTON_CLASSNAME}
               disabled={!phraseCanContinueFromConfidence}
               onClick={() => setTaskStage("rewrite")}
             >
@@ -538,7 +524,7 @@ export default function ReviewPage() {
           ) : taskStage === "rewrite" ? (
             <button
               type="button"
-              className={reviewFooterPrimaryButtonClassName}
+              className={REVIEW_FOOTER_PRIMARY_BUTTON_CLASSNAME}
               disabled={!phraseCanContinueFromRewrite}
               onClick={() => setTaskStage("practice")}
             >
@@ -547,14 +533,14 @@ export default function ReviewPage() {
           ) : taskStage === "practice" ? (
             <button
               type="button"
-              className={reviewFooterPrimaryButtonClassName}
+              className={REVIEW_FOOTER_PRIMARY_BUTTON_CLASSNAME}
               disabled={!phraseCanContinueFromPractice}
               onClick={() => setTaskStage("feedback")}
             >
               {zh.phraseFeedbackCta}
             </button>
           ) : (
-            <div className={reviewFooterMutedTextClassName}>
+            <div className={REVIEW_FOOTER_MUTED_TEXT_CLASSNAME}>
               选择一个复习判断后会自动进入下一项。
             </div>
           )}
