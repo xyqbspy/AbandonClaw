@@ -1,18 +1,21 @@
 "use client";
 
 import { Skeleton } from "@/components/ui/skeleton";
-
-const SECTION_CARD_CLASS =
-  "rounded-[var(--mobile-adapt-overlay-card-radius)] border border-border/50 bg-background/92 p-[var(--mobile-adapt-space-md)] shadow-sm";
+import {
+  SCENE_SKELETON_CONTAINER_CLASSNAME,
+  SCENE_SKELETON_SECTION_CARD_CLASSNAME,
+  SCENE_SKELETON_SECTION_STACK_CLASSNAME,
+  SCENE_SKELETON_STATS_GRID_CLASSNAME,
+} from "./scene-page-styles";
 
 export function SceneDetailSkeleton() {
   return (
     <div
-      className="space-y-[var(--mobile-adapt-space-xl)] p-[var(--mobile-adapt-space-sheet)]"
+      className={SCENE_SKELETON_CONTAINER_CLASSNAME}
       aria-label="场景加载骨架"
       aria-busy="true"
     >
-      <section className={SECTION_CARD_CLASS}>
+      <section className={SCENE_SKELETON_SECTION_CARD_CLASSNAME}>
         <div className="flex items-start justify-between gap-[var(--mobile-adapt-space-md)]">
           <div className="min-w-0 flex-1 space-y-3">
             <Skeleton className="h-4 w-24 rounded-full" />
@@ -23,7 +26,7 @@ export function SceneDetailSkeleton() {
         </div>
       </section>
 
-      <section className={SECTION_CARD_CLASS}>
+      <section className={SCENE_SKELETON_SECTION_CARD_CLASSNAME}>
         <div className="flex items-center justify-between gap-[var(--mobile-adapt-space-md)]">
           <div className="space-y-2">
             <Skeleton className="h-4 w-20 rounded-full" />
@@ -31,7 +34,7 @@ export function SceneDetailSkeleton() {
           </div>
           <Skeleton className="h-11 w-28 rounded-full" />
         </div>
-        <div className="mt-[var(--mobile-adapt-space-md)] grid grid-cols-4 gap-[var(--mobile-adapt-space-sm)]">
+        <div className={SCENE_SKELETON_STATS_GRID_CLASSNAME}>
           <Skeleton className="h-16 rounded-2xl" />
           <Skeleton className="h-16 rounded-2xl" />
           <Skeleton className="h-16 rounded-2xl" />
@@ -39,8 +42,8 @@ export function SceneDetailSkeleton() {
         </div>
       </section>
 
-      <section className="space-y-[var(--mobile-adapt-space-md)]">
-        <div className={SECTION_CARD_CLASS}>
+      <section className={SCENE_SKELETON_SECTION_STACK_CLASSNAME}>
+        <div className={SCENE_SKELETON_SECTION_CARD_CLASSNAME}>
           <Skeleton className="h-5 w-28 rounded-full" />
           <div className="mt-[var(--mobile-adapt-space-md)] space-y-3">
             <Skeleton className="h-4 w-full rounded-full" />
@@ -53,7 +56,7 @@ export function SceneDetailSkeleton() {
           </div>
         </div>
 
-        <div className={SECTION_CARD_CLASS}>
+        <div className={SCENE_SKELETON_SECTION_CARD_CLASSNAME}>
           <div className="space-y-3">
             <Skeleton className="h-4 w-24 rounded-full" />
             <Skeleton className="h-4 w-full rounded-full" />

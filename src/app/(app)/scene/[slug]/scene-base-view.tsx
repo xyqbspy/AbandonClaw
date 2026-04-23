@@ -2,6 +2,11 @@
 
 import { ReactNode } from "react";
 import { LessonReader } from "@/features/lesson/components/lesson-reader";
+import {
+  SCENE_PAGE_CONTENT_ANCHOR_CLASSNAME,
+  SCENE_PAGE_ERROR_TEXT_CLASSNAME,
+  SCENE_PAGE_STACK_CLASSNAME,
+} from "@/features/scene/components/scene-page-styles";
 import { Lesson } from "@/lib/types";
 
 type SavePhrasePayload = {
@@ -61,12 +66,12 @@ export function SceneBaseView({
   chunkDetailSheet: ReactNode;
 }) {
   return (
-    <div className="space-y-[var(--mobile-adapt-space-2xl)]">
-      {practiceError ? <p className="text-[length:var(--mobile-adapt-font-body-sm)] text-destructive">{practiceError}</p> : null}
-      {variantsError ? <p className="text-[length:var(--mobile-adapt-font-body-sm)] text-destructive">{variantsError}</p> : null}
+    <div className={SCENE_PAGE_STACK_CLASSNAME}>
+      {practiceError ? <p className={SCENE_PAGE_ERROR_TEXT_CLASSNAME}>{practiceError}</p> : null}
+      {variantsError ? <p className={SCENE_PAGE_ERROR_TEXT_CLASSNAME}>{variantsError}</p> : null}
 
       {trainingPanel}
-      <div className="relative">
+      <div className={SCENE_PAGE_CONTENT_ANCHOR_CLASSNAME}>
         <LessonReader
           lesson={lesson}
           headerTools={headerTools}

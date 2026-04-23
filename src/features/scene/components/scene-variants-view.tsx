@@ -8,12 +8,17 @@ import {
   APPLE_BADGE_INFO,
   APPLE_BADGE_SUBTLE,
   APPLE_BUTTON_BASE,
-  APPLE_LIST_ITEM,
   APPLE_META_TEXT,
-  APPLE_PANEL_RAISED,
   APPLE_TITLE_MD,
   APPLE_TITLE_SM,
 } from "@/lib/ui/apple-style";
+import {
+  SCENE_VARIANTS_CHIP_CLASSNAME,
+  SCENE_VARIANTS_LIST_ITEM_CLASSNAME,
+  SCENE_VARIANTS_LIST_SECTION_CLASSNAME,
+  SCENE_VARIANTS_SECTION_CLASSNAME,
+  SCENE_VARIANTS_STACK_CLASSNAME,
+} from "./scene-page-styles";
 import { SceneVariantsViewLabels } from "./scene-view-labels";
 
 type SceneVariantsViewProps = {
@@ -55,12 +60,9 @@ export function SceneVariantsView({
   toVariantStatusLabel,
   chunkDetailSheet,
 }: SceneVariantsViewProps) {
-  const sceneVariantChipClassName =
-    `${APPLE_BADGE_SUBTLE} px-[var(--mobile-space-md)] py-[var(--mobile-space-2xs)] text-[length:var(--mobile-font-caption)] font-medium`;
-
   return (
-    <div className="space-y-[var(--mobile-space-2xl)]">
-      <section className={`space-y-[var(--mobile-space-xl)] p-[var(--mobile-space-sheet)] sm:p-[var(--mobile-space-sheet)] ${APPLE_PANEL_RAISED}`}>
+    <div className={SCENE_VARIANTS_STACK_CLASSNAME}>
+      <section className={SCENE_VARIANTS_SECTION_CLASSNAME}>
         <div className="flex flex-wrap items-center justify-end gap-[var(--mobile-space-sm)]">
           <button
             type="button"
@@ -122,7 +124,7 @@ export function SceneVariantsView({
                 <button
                   key={chunk}
                   type="button"
-                  className={sceneVariantChipClassName}
+                  className={SCENE_VARIANTS_CHIP_CLASSNAME}
                   onClick={() => onOpenChunk(chunk)}
                 >
                   {chunk}
@@ -136,7 +138,7 @@ export function SceneVariantsView({
       {!variantSet ? (
         <p className={APPLE_META_TEXT}>{labels.empty}</p>
       ) : (
-        <section className={`space-y-[var(--mobile-space-md)] p-[var(--mobile-space-sheet)] sm:p-[var(--mobile-space-sheet)] ${APPLE_PANEL_RAISED}`}>
+        <section className={SCENE_VARIANTS_LIST_SECTION_CLASSNAME}>
           <div className="space-y-[var(--mobile-space-2xs)]">
             <h3 className={APPLE_TITLE_SM}>变体列表</h3>
             <p className={APPLE_META_TEXT}>按顺序浏览和完成本轮变体，已完成后可重新开启一轮。</p>
@@ -145,7 +147,7 @@ export function SceneVariantsView({
             {variantSet.variants.map((variant) => (
               <li
                 key={variant.id}
-                className={`flex items-center justify-between gap-[var(--mobile-space-md)] p-[var(--mobile-space-md)] ${APPLE_LIST_ITEM}`}
+                className={SCENE_VARIANTS_LIST_ITEM_CLASSNAME}
               >
                 <div className="min-w-0 flex-1">
                   <p className={APPLE_TITLE_SM}>{toVariantTitle(variant.lesson.title)}</p>

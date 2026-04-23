@@ -1,5 +1,53 @@
 # UI 样式渐进收口审计
 
+## Scene 页面族专项审计
+
+本轮 OpenSpec change：`standardize-scene-page-style`。
+
+审计范围：
+
+- `src/app/(app)/scene/[slug]/*`
+  - `scene-detail-page.tsx`：页面主装配、not found fallback、底部/局部动作按钮。
+  - `scene-base-view.tsx`：主内容垂直节奏、practice / variants 错误反馈、训练浮层入口容器。
+  - `loading.tsx`、`scene-detail-skeleton.tsx`：加载态与骨架屏卡片结构。
+  - `scene-training-coach-floating-entry.tsx`：训练进度浮层，强依赖移动端 overlay 与学习状态，不作为第一批样式收口对象。
+- `src/features/scene/components/*`
+  - `scene-practice-view.tsx`、`scene-practice-question-card.tsx`：已有重复 panel / primary / secondary action class，依赖练习状态与提交语义，第二批之后再收。
+  - `scene-practice-header.tsx`、`scene-practice-module-tabs.tsx`：动作菜单、模块 tab 与 locked 状态强相关，暂不提 shared。
+  - `scene-variants-view.tsx`、`scene-expression-map-view.tsx`：使用相近 panel / list / badge / button 结构，先记录为 scene-local 候选。
+- `src/features/lesson/components/*`
+  - `lesson-reader.tsx`、`lesson-reader-dialogue-content.tsx`、`lesson-reader-mobile-sections.tsx`、`sentence-block.tsx`：阅读器、句块、音频与选择行为耦合，不在第一批做结构性统一。
+  - `selection-detail-*`、`selection-toolbar.tsx`：与 chunks detail / selection 体系相关，暂不纳入 scene 页面族第一批。
+
+分批顺序：
+
+1. 先建立 scene 页面族私有样式入口，只承载 page shell、section、action row、status、skeleton 等局部 class。
+2. 第一批只收 `scene-detail-page` / `scene-base-view` / `loading` / `scene-detail-skeleton` 的页面骨架和 section class。
+3. 第二批再评估 practice / variants / expression map 的 panel、badge、button、status class。
+4. lesson reader 与 selection detail 只记录漂移，不在本 change 中做跨 feature 抽象。
+
+主链路保护点：
+
+- 不改变 scene 阅读、音频播放、loop、表达保存、practice 生成/提交、variants 解锁、expression map 渲染、session 恢复、route state、learning sync 和完成判定。
+- 不移动现有 handler，不改变条件渲染，不调整 store / cache / API / DB / TTS 行为。
+- 若某个样式收口需要改 props 契约或组件边界，停止并记录为后续 change。
+
+样式候选归类：
+
+- 保持 scene-local：
+  - scene page shell / section spacing / skeleton card。
+  - scene practice panel / primary action / secondary action。
+  - scene variants / expression map 的列表、badge、empty/status block。
+- 未来可评估 shared：
+  - 多页面都出现的 page-family shell。
+  - 多 feature 都稳定复用的 action row。
+  - 不依赖学习状态的通用 skeleton section。
+- 明确不收：
+  - 全局 token 重命名。
+  - scene 私有训练组件直接提到 `src/components/*`。
+  - chunks detail overlay。
+  - lesson selection detail 的跨 feature 抽象。
+
 ## 1. 目标
 
 这份文档记录当前 UI 样式的第一批漂移点和渐进收口顺序。

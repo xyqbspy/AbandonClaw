@@ -1,10 +1,15 @@
 "use client";
 
 import { Dispatch, FormEvent, SetStateAction } from "react";
-import { APPLE_BADGE_SUBTLE, APPLE_BUTTON_BASE, APPLE_BUTTON_STRONG, APPLE_PANEL_RAISED } from "@/lib/ui/apple-style";
+import { APPLE_BADGE_SUBTLE } from "@/lib/ui/apple-style";
 import { PracticeAssessmentLevel, PracticeMode } from "@/lib/types/learning-flow";
 import { PracticeExercise } from "@/lib/types/scene-parser";
 import { getPracticeAssessmentMessage } from "./scene-practice-messages";
+import {
+  SCENE_MOBILE_PANEL_CLASSNAME,
+  SCENE_MOBILE_PRIMARY_ACTION_CLASSNAME,
+  SCENE_MOBILE_SECONDARY_ACTION_CLASSNAME,
+} from "./scene-page-styles";
 import { ScenePracticeViewLabels } from "./scene-view-labels";
 
 type ScenePracticeQuestionCardProps = {
@@ -60,11 +65,6 @@ export function ScenePracticeQuestionCard({
   showAnswerMap,
   onToggleAnswer,
 }: ScenePracticeQuestionCardProps) {
-  const panelClassName = `${APPLE_PANEL_RAISED} rounded-[24px]`;
-  const secondaryActionButtonClassName =
-    `${APPLE_BUTTON_BASE} h-[var(--mobile-button-height)] rounded-[14px] px-[var(--mobile-space-xl)] text-[length:var(--mobile-font-body-sm)] font-bold`;
-  const primaryActionButtonClassName =
-    `${APPLE_BUTTON_STRONG} h-[var(--mobile-button-height)] rounded-[14px] px-[var(--mobile-space-xl)] text-[length:var(--mobile-font-body-sm)] font-bold`;
   const inputStateClassName =
     currentResult === "correct"
       ? "border-emerald-500 text-emerald-700 ring-4 ring-emerald-100"
@@ -73,7 +73,7 @@ export function ScenePracticeQuestionCard({
         : "border-[#E2E8F0] text-[#1A365D] focus:border-[#3182CE] focus:ring-4 focus:ring-[#DBEAFE]";
 
   return (
-    <section className={`px-[var(--mobile-space-sheet)] py-[clamp(24px,6.4vw,32px)] text-center ${panelClassName}`}>
+    <section className={`px-[var(--mobile-space-sheet)] py-[clamp(24px,6.4vw,32px)] text-center ${SCENE_MOBILE_PANEL_CLASSNAME}`}>
       <div className="flex items-center justify-between gap-[var(--mobile-space-md)] text-[length:var(--mobile-font-body-sm)] font-semibold text-[var(--muted-foreground)]">
         <button
           type="button"
@@ -144,21 +144,21 @@ export function ScenePracticeQuestionCard({
               <div className="mt-[var(--mobile-space-sheet)] grid grid-cols-[1.5fr_1fr_1fr] gap-[var(--mobile-space-md)]">
                 <button
                   type="submit"
-                  className={`${primaryActionButtonClassName} transition-transform active:scale-[0.98] disabled:opacity-50`}
+                  className={`${SCENE_MOBILE_PRIMARY_ACTION_CLASSNAME} transition-transform active:scale-[0.98] disabled:opacity-50`}
                   disabled={!activeAnswerValue.trim()}
                 >
                   {labels.checkAnswer}
                 </button>
                 <button
                   type="button"
-                  className={`${secondaryActionButtonClassName} transition-transform active:scale-[0.98]`}
+                  className={`${SCENE_MOBILE_SECONDARY_ACTION_CLASSNAME} transition-transform active:scale-[0.98]`}
                   onClick={() => handleResetAnswer(activeExercise.id)}
                 >
                   {labels.resetAnswer}
                 </button>
                 <button
                   type="button"
-                  className={`${secondaryActionButtonClassName} transition-transform active:scale-[0.98]`}
+                  className={`${SCENE_MOBILE_SECONDARY_ACTION_CLASSNAME} transition-transform active:scale-[0.98]`}
                   onClick={() => onToggleAnswer(activeExercise.id)}
                 >
                   {showAnswerMap[activeExercise.id] ? labels.hideAnswer : labels.showAnswer}

@@ -13,6 +13,9 @@ import {
 } from "@/lib/ui/apple-style";
 
 type AdminActionTone = "secondary" | "primary" | "danger";
+type AdminActionClassName = ComponentProps<typeof Button>["className"];
+type AdminActionClassNameFunction = Extract<NonNullable<AdminActionClassName>, (state: never) => unknown>;
+type AdminActionButtonState = Parameters<AdminActionClassNameFunction>[0];
 
 const adminActionToneClassName: Record<AdminActionTone, string> = {
   secondary: APPLE_BUTTON_BASE,
@@ -22,6 +25,14 @@ const adminActionToneClassName: Record<AdminActionTone, string> = {
 
 export function adminActionButtonClassName(tone: AdminActionTone = "secondary", className?: string) {
   return cn(adminActionToneClassName[tone], APPLE_BUTTON_TEXT_SM, "min-h-9 gap-1.5", className);
+}
+
+function composeAdminActionClassName(tone: AdminActionTone, className: AdminActionClassName) {
+  return (state: AdminActionButtonState) =>
+    adminActionButtonClassName(
+      tone,
+      typeof className === "function" ? className(state) : className,
+    );
 }
 
 type AdminActionButtonProps = ComponentProps<typeof Button> & {
@@ -39,18 +50,12 @@ export function AdminActionButton({
     <Button
       variant={variant}
       size={size}
-      className={(state: any) =>
-        adminActionButtonClassName(
-          tone,
-          typeof className === "function" ? className(state) : className
-        )
-      }
+      className={composeAdminActionClassName(tone, className)}
       {...props}
     />
   );
 }
 
-// ====================== LoadingButton 修复 ======================
 type AdminLoadingActionButtonProps = ComponentProps<typeof LoadingButton> & {
   tone?: AdminActionTone;
 };
@@ -66,18 +71,12 @@ export function AdminLoadingActionButton({
     <LoadingButton
       variant={variant}
       size={size}
-      className={(state: any) =>
-        adminActionButtonClassName(
-          tone,
-          typeof className === "function" ? className(state) : className
-        )
-      }
+      className={composeAdminActionClassName(tone, className)}
       {...props}
     />
   );
 }
 
-// ====================== ConfirmButton 修复 ======================
 type AdminConfirmActionButtonProps = ComponentProps<typeof ConfirmButton> & {
   tone?: AdminActionTone;
 };
@@ -93,12 +92,7 @@ export function AdminConfirmActionButton({
     <ConfirmButton
       variant={variant}
       size={size}
-      className={(state: any) =>
-        adminActionButtonClassName(
-          tone,
-          typeof className === "function" ? className(state) : className
-        )
-      }
+      className={composeAdminActionClassName(tone, className)}
       {...props}
     />
   );

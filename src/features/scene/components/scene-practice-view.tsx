@@ -3,11 +3,13 @@
 import { useState } from "react";
 import { CheckCircle2 } from "lucide-react";
 import {
-  APPLE_BUTTON_BASE,
-  APPLE_BUTTON_STRONG,
-  APPLE_PANEL_INFO,
-  APPLE_PANEL_RAISED,
-} from "@/lib/ui/apple-style";
+  SCENE_MOBILE_NARROW_STACK_CLASSNAME,
+  SCENE_MOBILE_PANEL_CLASSNAME,
+  SCENE_MOBILE_PRIMARY_ACTION_CLASSNAME,
+  SCENE_MOBILE_SECONDARY_ACTION_CLASSNAME,
+  SCENE_MOBILE_SOFT_PANEL_CLASSNAME,
+  SCENE_MOBILE_SURFACE_CLASSNAME,
+} from "./scene-page-styles";
 import {
   PracticeAssessmentLevel,
   PracticeMode,
@@ -85,14 +87,6 @@ export function ScenePracticeView({
   onOpenVariants,
   onToggleAnswer,
 }: ScenePracticeViewProps) {
-  const panelClassName =
-    `${APPLE_PANEL_RAISED} rounded-[24px]`;
-  const softPanelClassName =
-    `${APPLE_PANEL_INFO} rounded-[18px] shadow-[var(--app-shadow-soft)]`;
-  const secondaryActionButtonClassName =
-    `${APPLE_BUTTON_BASE} h-[var(--mobile-button-height)] rounded-[14px] px-[var(--mobile-space-xl)] text-[length:var(--mobile-font-body-sm)] font-bold`;
-  const primaryActionButtonClassName =
-    `${APPLE_BUTTON_STRONG} h-[var(--mobile-button-height)] rounded-[14px] px-[var(--mobile-space-xl)] text-[length:var(--mobile-font-body-sm)] font-bold`;
   const {
     activeAnswerValue,
     activeAttemptCount,
@@ -159,8 +153,8 @@ export function ScenePracticeView({
     }));
 
   return (
-    <div className="bg-[var(--app-page-background)] pb-10">
-      <div className="mx-auto w-full max-w-[480px] space-y-[var(--mobile-space-md)]">
+    <div className={SCENE_MOBILE_SURFACE_CLASSNAME}>
+      <div className={SCENE_MOBILE_NARROW_STACK_CLASSNAME}>
         <ScenePracticeHeader
           allModulesCompleted={allModulesCompleted}
           headerMenuOpen={headerMenuOpen}
@@ -211,7 +205,7 @@ export function ScenePracticeView({
         ) : null}
 
         {!practiceSet ? (
-          <section className={`p-[var(--mobile-space-sheet)] ${panelClassName}`}>
+          <section className={`p-[var(--mobile-space-sheet)] ${SCENE_MOBILE_PANEL_CLASSNAME}`}>
             <p className="text-[length:var(--mobile-font-body-sm)] text-[var(--muted-foreground)]">{labels.empty}</p>
           </section>
         ) : (
@@ -238,7 +232,7 @@ export function ScenePracticeView({
               onToggleAnswer={onToggleAnswer}
             />
 
-            <section className={`p-[var(--mobile-space-xl)] ${softPanelClassName}`}>
+            <section className={`p-[var(--mobile-space-xl)] ${SCENE_MOBILE_SOFT_PANEL_CLASSNAME}`}>
               <div className="flex items-center justify-between gap-[var(--mobile-space-md)] text-[length:var(--mobile-font-body-sm)] font-bold text-foreground">
                 <span>📊 本轮进度</span>
                 <span className="text-[var(--app-scene-panel-accent)]">
@@ -263,7 +257,7 @@ export function ScenePracticeView({
             </section>
 
             {practiceSet && summaryAllModulesCompleted ? (
-              <section className={`p-[var(--mobile-space-xl)] ${panelClassName}`}>
+              <section className={`p-[var(--mobile-space-xl)] ${SCENE_MOBILE_PANEL_CLASSNAME}`}>
                 <div className="flex items-center gap-[var(--mobile-space-sm)] text-foreground">
                   <CheckCircle2 className="size-4" />
                   <p className="text-[length:var(--mobile-font-body-sm)] font-bold">{labels.summaryTitle}</p>
@@ -292,7 +286,7 @@ export function ScenePracticeView({
                         {isCompletedPractice ? (
                           <button
                             type="button"
-                            className={secondaryActionButtonClassName}
+                            className={SCENE_MOBILE_SECONDARY_ACTION_CLASSNAME}
                             onClick={() => onRepeatPractice?.()}
                           >
                             {labels.summaryRepeatAction}
@@ -300,7 +294,7 @@ export function ScenePracticeView({
                         ) : null}
                         <button
                           type="button"
-                          className={primaryActionButtonClassName}
+                          className={SCENE_MOBILE_PRIMARY_ACTION_CLASSNAME}
                           onClick={onOpenVariants}
                         >
                           {labels.summaryVariantAction}
@@ -328,7 +322,7 @@ export function ScenePracticeView({
                         {isCompletedPractice ? (
                           <button
                             type="button"
-                            className={secondaryActionButtonClassName}
+                            className={SCENE_MOBILE_SECONDARY_ACTION_CLASSNAME}
                             onClick={() => onRepeatPractice?.()}
                           >
                             {labels.summaryRepeatAction}
@@ -336,7 +330,7 @@ export function ScenePracticeView({
                         ) : null}
                         <button
                           type="button"
-                          className={primaryActionButtonClassName}
+                          className={SCENE_MOBILE_PRIMARY_ACTION_CLASSNAME}
                           onClick={onReviewScene}
                         >
                           {labels.summaryReviewAction}
@@ -351,7 +345,7 @@ export function ScenePracticeView({
         )}
 
         {practiceSet ? (
-          <details className={`p-[var(--mobile-space-xl)] ${panelClassName}`}>
+          <details className={`p-[var(--mobile-space-xl)] ${SCENE_MOBILE_PANEL_CLASSNAME}`}>
             <summary className="cursor-pointer text-[length:var(--mobile-font-body-sm)] font-semibold text-foreground">练习调试视图</summary>
             <div className="mt-[var(--mobile-space-md)] space-y-[var(--mobile-space-sm)] text-[length:var(--mobile-font-caption)] text-[var(--muted-foreground)]">
               <p>practiceSetId: {practiceSet.id}</p>

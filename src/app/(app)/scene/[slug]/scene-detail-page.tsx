@@ -15,6 +15,15 @@ import { SelectionDetailSheet } from "@/features/lesson/components/selection-det
 import { SceneExpressionMapView } from "@/features/scene/components/scene-expression-map-view";
 import { ScenePracticeView } from "@/features/scene/components/scene-practice-view";
 import { SceneDetailSkeleton } from "@/features/scene/components/scene-detail-skeleton";
+import {
+  SCENE_ACTION_BUTTON_LG_CLASSNAME,
+  SCENE_ACTION_BUTTON_SM_CLASSNAME,
+  SCENE_DANGER_ACTION_BUTTON_LG_CLASSNAME,
+  SCENE_DANGER_ACTION_BUTTON_SM_CLASSNAME,
+  SCENE_PAGE_MUTED_TEXT_CLASSNAME,
+  SCENE_PAGE_RAISED_SECTION_CLASSNAME,
+  SCENE_PAGE_SHEET_PADDING_CLASSNAME,
+} from "@/features/scene/components/scene-page-styles";
 import { SceneVariantsView } from "@/features/scene/components/scene-variants-view";
 import { sceneViewLabels } from "@/features/scene/components/scene-view-labels";
 import { normalizePhraseText } from "@/lib/shared/phrases";
@@ -37,14 +46,6 @@ import {
   startScenePracticeRunFromApi,
   startSceneVariantRunFromApi,
 } from "@/lib/utils/learning-api";
-import {
-  APPLE_BUTTON_BASE,
-  APPLE_BUTTON_DANGER,
-  APPLE_META_TEXT,
-  APPLE_PANEL_RAISED,
-  APPLE_BUTTON_TEXT_LG,
-  APPLE_BUTTON_TEXT_SM,
-} from "@/lib/ui/apple-style";
 import { cancelScheduledIdleAction, scheduleIdleAction } from "@/lib/utils/resource-actions";
 import { useSceneDetailActions } from "./use-scene-detail-actions";
 import { SceneBaseView } from "./scene-base-view";
@@ -74,9 +75,9 @@ import { useSceneDetailRouteState } from "./use-scene-detail-route-state";
 import { useSceneLearningSync } from "./use-scene-learning-sync";
 import { SceneVariantStudyView } from "./scene-variant-study-view";
 
-const appleButtonSmClassName = `${APPLE_BUTTON_BASE} ${APPLE_BUTTON_TEXT_SM}`;
-const appleButtonLgClassName = `${APPLE_BUTTON_BASE} ${APPLE_BUTTON_TEXT_LG}`;
-const appleDangerButtonSmClassName = `${APPLE_BUTTON_DANGER} ${APPLE_BUTTON_TEXT_SM}`;
+const appleButtonSmClassName = SCENE_ACTION_BUTTON_SM_CLASSNAME;
+const appleButtonLgClassName = SCENE_ACTION_BUTTON_LG_CLASSNAME;
+const appleDangerButtonSmClassName = SCENE_DANGER_ACTION_BUTTON_SM_CLASSNAME;
 const PRACTICE_PREWARM_FAILURE_LIMIT = 3;
 const PRACTICE_PREWARM_FAILURE_WINDOW_MS = 60_000;
 const PRACTICE_RUN_START_DEDUP_MS = 30_000;
@@ -892,9 +893,9 @@ export default function SceneDetailClientPage({
 
   if (!baseLesson) {
     return (
-      <div className="p-[var(--mobile-adapt-space-sheet)]">
-        <div className={`p-[var(--mobile-adapt-space-sheet)] ${APPLE_PANEL_RAISED}`}>
-          <p className={APPLE_META_TEXT}>{sceneDetailMessages.notFound}</p>
+      <div className={SCENE_PAGE_SHEET_PADDING_CLASSNAME}>
+        <div className={SCENE_PAGE_RAISED_SECTION_CLASSNAME}>
+          <p className={SCENE_PAGE_MUTED_TEXT_CLASSNAME}>{sceneDetailMessages.notFound}</p>
         </div>
       </div>
     );
@@ -1170,7 +1171,7 @@ export default function SceneDetailClientPage({
         </button>
         <button
           type="button"
-          className={`${APPLE_BUTTON_DANGER} ${APPLE_BUTTON_TEXT_LG} px-3 py-1.5`}
+          className={`${SCENE_DANGER_ACTION_BUTTON_LG_CLASSNAME} px-3 py-1.5`}
           onClick={() => handleDeleteVariantItem(activeVariantItem?.id ?? activeVariantLesson.id)}
         >
           删除变体

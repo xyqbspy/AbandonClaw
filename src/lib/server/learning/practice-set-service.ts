@@ -43,6 +43,19 @@ const toPracticeSet = (row: UserScenePracticeSetRow): PracticeSet => {
   return row.practice_set_json;
 };
 
+const requirePracticeSetRow = (
+  context: string,
+  row: UserScenePracticeSetRow | null,
+): UserScenePracticeSetRow => {
+  if (row === null) {
+    throwPracticeSetQueryError(context, {
+      message: "unknown error",
+    });
+    throw new Error("Unreachable practice set row state.");
+  }
+  return row;
+};
+
 const createPracticeSetClient = () => createSupabaseServerClient();
 
 export async function getLatestScenePracticeSet(userId: string, sceneSlug: string) {
@@ -155,15 +168,16 @@ export async function saveScenePracticeSet(
     .select("*")
     .single<UserScenePracticeSetRow>();
 
-  if (error || !data) {
+  if (error) {
     throwPracticeSetQueryError("upsert user_scene_practice_sets", {
-      message: error?.message ?? "unknown error",
-      code: error?.code,
+      message: error.message,
+      code: error.code,
     });
   }
+  const savedRow = requirePracticeSetRow("upsert user_scene_practice_sets", data);
 
   return {
-    practiceSet: toPracticeSet(data!),
+    practiceSet: toPracticeSet(savedRow),
   };
 }
 
@@ -209,14 +223,15 @@ export async function markScenePracticeSetCompleted(params: {
     .select("*")
     .single<UserScenePracticeSetRow>();
 
-  if (error || !data) {
+  if (error) {
     throwPracticeSetQueryError("complete user_scene_practice_sets", {
-      message: error?.message ?? "unknown error",
-      code: error?.code,
+      message: error.message,
+      code: error.code,
     });
   }
+  const completedRow = requirePracticeSetRow("complete user_scene_practice_sets", data);
 
   return {
-    practiceSet: toPracticeSet(data!),
+    practiceSet: toPracticeSet(completedRow),
   };
 }
