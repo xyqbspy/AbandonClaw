@@ -317,6 +317,25 @@ function ChunksSentenceSourceField({
   );
 }
 
+function ChunksManualSourceNote({
+  labels,
+  sourceNote,
+}: {
+  labels: Pick<ChunksListViewLabels, "manualRecorded" | "sourceNoteDisplay">;
+  sourceNote?: string | null;
+}) {
+  return (
+    <div className={INFO_FIELD_CLASS}>
+      <p className={APPLE_META_TEXT}>{labels.manualRecorded}</p>
+      {sourceNote ? (
+        <p className={`line-clamp-1 ${APPLE_META_TEXT}`}>
+          {labels.sourceNoteDisplay}：{sourceNote}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 type ChunksListViewLabels = {
   sentenceUnit: string;
   expressionUnit: string;
@@ -699,14 +718,7 @@ export function ChunksListView({
                   </>
                 )}
                 {item.sourceType === "manual" ? (
-                  <div className="space-y-0.5">
-                    <p className={APPLE_META_TEXT}>{labels.manualRecorded}</p>
-                    {item.sourceNote ? (
-                      <p className={`line-clamp-1 ${APPLE_META_TEXT}`}>
-                        {labels.sourceNoteDisplay}：{item.sourceNote}
-                      </p>
-                    ) : null}
-                  </div>
+                  <ChunksManualSourceNote labels={labels} sourceNote={item.sourceNote} />
                 ) : null}
                 <ChunksInfoField label={labels.reviewStage} bodyClassName={APPLE_META_TEXT}>
                   {getReviewActionHint(item.reviewStatus)}

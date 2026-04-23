@@ -326,6 +326,7 @@
   - 将句子卡片里的表达 chips 与保存按钮收为文件内 `ChunksSentenceExpressionTags`，保留原保存状态与 key 计算。
   - 将表达卡片里的来源句子字段收为文件内 `ChunksSourceSentenceField`，保留 TTS、例句渲染与 fallback 逻辑。
   - 将句子卡片里的来源场景字段收为文件内 `ChunksSentenceSourceField`，保留原来源 slug 与 fallback 文案。
+  - 将 manual 来源备注块收为文件内 `ChunksManualSourceNote`，保留“无 note 时只显示来源标签”的现状。
   - 保持卡片展开、相似项展开、句子记录、TTS、表达地图、来源场景和 AI 补全重试逻辑不变。
 
 明确不收：
