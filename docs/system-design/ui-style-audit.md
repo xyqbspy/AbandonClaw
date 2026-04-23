@@ -294,12 +294,15 @@
   - 将 Review 页面外壳、hero、进度条、来源入口、来源不可用提示、底部固定操作栏和 footer button class 从 `page.tsx` 收到 Review 私有样式入口。
   - 保留 hero 渐变、`rounded-[32px]` 和强阴影作为 Review 页面私有视觉语义，不提升到 `apple-style.ts`。
   - 将底部三按钮中的主按钮全宽样式收成固定常量，减少页面 JSX 内的额外 `className` 拼接。
+- `src/app/(app)/review/review-page-stage-panel.tsx`
+  - 将 stage panel 固定的 shell、block、label、scene text、feedback pill 等 class 迁入 `review-page-styles.ts`。
+  - 保留动态 assessment、mode、status 色判断在组件内，不改变 Review 队列、阶段推进或提交逻辑。
 - `src/app/(app)/review/page.tsx`
   - 保持页面结构、队列加载、阶段推进、提交逻辑、source scene 跳转和 inline practice 回写不变。
 
 明确不收：
 
 - 不调整 Review hero 的视觉风格。
-- 不继续拆 `review-page-stage-panel.tsx`。
+- 不继续拆 `review-page-stage-panel.tsx` 的业务分支或 props 契约。
 - 不处理已知空队列测试前置状态语义问题。
 - 不新增全局 token 或 shared 页面骨架。
