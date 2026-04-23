@@ -155,6 +155,36 @@
 - 不把 `FocusDetailSheet`、`SelectionDetailPanel` 这类强业务容器误迁到公共层
 - 不为了追求“目录整齐”而把 feature 内组装组件抽空
 
+## 3.1 当前公共语义候选池
+
+候选池用于记录“可能值得公共化”的 UI 语义，不等于立即待办。只有当候选满足跨页面稳定复用、props 语义清晰、迁移后测试可覆盖时，才进入实现。
+
+优先评估：
+
+| 候选语义 | 当前信号 | 建议方向 | 当前结论 |
+| --- | --- | --- | --- |
+| 区块加载反馈 | `LoadingState` 已被 today、chunks、review、focus detail 等使用 | 继续沿用 `src/components/shared/action-loading.tsx` | 已是 shared，新增 loading 不应自写 |
+| 空态展示 | `EmptyState` 已用于 chunks，admin 有 `AdminEmptyState` 子域变体 | 保持 `EmptyState` 与 admin 子域分离 | 已是 shared，但不强行统一 admin |
+| 详情信息块 | `DetailInfoBlock` / `DetailStageBlock` 已被 chunks 与 lesson 使用 | 继续作为详情/浮层信息块基元 | 已是 shared |
+| 统计卡片 | `StatCard` 已存在，但不同页面统计密度和语义仍不完全一致 | 新增跨页面统计区时优先评估复用 | 候选，不主动迁移旧页面 |
+| 页面标题区 | `PageHeader` 已存在，适合工作台/管理页标题 | 新增页面优先复用，再按页面角色微调 | 候选，不替代学习流程主任务标题 |
+
+继续观察：
+
+| 候选语义 | 当前信号 | 暂不抽原因 |
+| --- | --- | --- |
+| section header | Today、Review、Scene 都有标题行，但 icon、密度、页面角色差异明显 | 先保留 feature-private styles，等出现稳定 props 再抽 |
+| status / info pill | Today、Review、Scene、Chunks 都有 pill，但 tone、尺寸、交互差异较多 | 优先使用 `Badge` 或私有 styles，不直接抽全局 pill |
+| step index / progress dot | Today task index、Scene training step、Review stage step 都类似 | 语义分别是任务序号、训练步骤、复习阶段，不宜只因外观相似合并 |
+| fixed footer action | Review footer、detail sheet footer、scene floating action 都有底部动作 | 动作层级和容器上下文不同，先遵守各自 stable spec |
+
+明确不抽：
+
+- `TODAY_TASK_INDEX_BADGE_CLASSNAME` 这类 feature 私有常量：当前只表达 Today 任务序号，不是公共 step 组件。
+- `ReviewStagePanel`：阶段推进、评估、回写强依赖 Review 队列语义。
+- `SceneTrainingCoachFloatingEntry`：强依赖 scene 训练状态、移动端 overlay 和当前步骤动作。
+- `FocusDetailSheet` / `SelectionDetailPanel`：都像详情容器，但业务模型和交互职责不同。
+
 ## 4. 新增组件时怎么判断
 
 新增组件前，先确认它所在页面和动作层级是否符合 [ui-style-guidelines.md](/d:/WorkCode/AbandonClaw/docs/system-design/ui-style-guidelines.md)。再按下面顺序判断组件落点。
