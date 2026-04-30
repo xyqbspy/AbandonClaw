@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Flame, Sparkles } from "lucide-react";
 import { ProgressSummary } from "@/lib/types";
 import { StatCard } from "@/components/shared/stat-card";
@@ -51,7 +52,7 @@ function ProgressSkillBreakdownCard({
 }
 
 export function ProgressOverview({ summary }: { summary: ProgressSummary }) {
-  const statCards = [
+  const statCards: Array<{ title: string; value: string; icon?: ReactNode }> = [
     {
       title: "连续学习",
       value: `${summary.streakDays} 天`,
