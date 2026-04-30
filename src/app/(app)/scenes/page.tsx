@@ -56,6 +56,8 @@ const sceneStatusClassName =
   "mb-[var(--mobile-adapt-space-2xs)] text-[length:var(--mobile-adapt-font-meta)] font-extrabold tracking-[-0.01em]";
 const sceneProgressClassName =
   "text-[length:clamp(1.5rem,7vw,1.75rem)] leading-none font-extrabold tracking-[-0.04em] text-[var(--app-scene-card-progress)]";
+const sceneRandomReviewStatusClassName =
+  "mt-[calc(-1*var(--mobile-adapt-space-xs))] min-h-[18px] text-right text-[length:var(--mobile-adapt-font-caption)] font-bold text-[var(--app-foreground-muted)]";
 
 export default function ScenesPage() {
   const {
@@ -113,6 +115,20 @@ export default function ScenesPage() {
               : reviewPackPrepareStatus === "failed"
                 ? "循环播放准备失败，点击后会重试"
                 : `可播放 ${eligibleScenes.length} 个场景`;
+  const randomReviewStatusText =
+    eligibleScenes.length === 0
+      ? null
+      : currentScene
+        ? `正在播放：${currentScene.title}`
+        : reviewPackPrepareStatus === "preparing"
+          ? "循环音频准备中"
+          : reviewPackPrepareStatus === "ready"
+            ? "循环音频已准备好"
+            : reviewPackPrepareStatus === "skipped"
+              ? "点击后准备循环音频"
+              : reviewPackPrepareStatus === "failed"
+                ? "准备失败，点击重试"
+                : `可循环 ${eligibleScenes.length} 个场景`;
 
   useEffect(() => {
     if (process.env.NODE_ENV !== "development") return;
@@ -260,55 +276,62 @@ export default function ScenesPage() {
 
   return (
     <div className="space-y-[var(--mobile-adapt-space-md)]">
-      <div className="grid grid-cols-[1fr_1fr_auto] gap-[var(--mobile-adapt-space-sm)] pb-[var(--mobile-adapt-space-md)]">
-        <Button
-          type="button"
-          radius="lg"
-          className={sceneActionButtonClassName}
-          onClick={() => setGenerateSheetOpen(true)}
-        >
-          <Sparkles className="size-[clamp(14px,4vw,16px)]" />
-          生成场景
-        </Button>
-        <Button
-          type="button"
-          variant="secondary"
-          radius="lg"
-          className={sceneSecondaryActionButtonClassName}
-          onClick={() => setDialogOpen(true)}
-        >
-          <Plus className="size-[clamp(14px,4vw,16px)]" />
-          导入自定义
-        </Button>
-        <Button
-          type="button"
-          variant="secondary"
-          radius="lg"
-          className={`${sceneRandomReviewButtonClassName} ${isRandomReviewActive ? "border-primary/20 text-primary ring-2 ring-primary/10 hover:text-primary" : ""}`}
-          disabled={!isRandomReviewActive && eligibleScenes.length === 0}
-          title={randomReviewTitle}
-          aria-label={
-            isRandomReviewActive
-              ? "停止循环播放"
-              : eligibleScenes.length === 0
-                ? "暂无可循环播放的场景"
-                : "循环播放场景"
-          }
-          onClick={toggleRandomReview}
-        >
-          {isRandomReviewActive && randomReviewStatus === "playing" ? (
-            <AudioStateIcon
-              family="loop"
-              state="playing"
-              className="size-[clamp(14px,4.2vw,17px)]"
-            />
-          ) : (
-            <Repeat2
-              data-random-review-icon="loop"
-              className="size-[clamp(14px,4.2vw,17px)]"
-            />
-          )}
-        </Button>
+      <div className="pb-[var(--mobile-adapt-space-md)]">
+        <div className="grid grid-cols-[1fr_1fr_auto] gap-[var(--mobile-adapt-space-sm)]">
+          <Button
+            type="button"
+            radius="lg"
+            className={sceneActionButtonClassName}
+            onClick={() => setGenerateSheetOpen(true)}
+          >
+            <Sparkles className="size-[clamp(14px,4vw,16px)]" />
+            生成场景
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            radius="lg"
+            className={sceneSecondaryActionButtonClassName}
+            onClick={() => setDialogOpen(true)}
+          >
+            <Plus className="size-[clamp(14px,4vw,16px)]" />
+            导入自定义
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            radius="lg"
+            className={`${sceneRandomReviewButtonClassName} ${isRandomReviewActive ? "border-primary/20 text-primary ring-2 ring-primary/10 hover:text-primary" : ""}`}
+            disabled={!isRandomReviewActive && eligibleScenes.length === 0}
+            title={randomReviewTitle}
+            aria-label={
+              isRandomReviewActive
+                ? "停止循环播放"
+                : eligibleScenes.length === 0
+                  ? "暂无可循环播放的场景"
+                  : "循环播放场景"
+            }
+            onClick={toggleRandomReview}
+          >
+            {isRandomReviewActive && randomReviewStatus === "playing" ? (
+              <AudioStateIcon
+                family="loop"
+                state="playing"
+                className="size-[clamp(14px,4.2vw,17px)]"
+              />
+            ) : (
+              <Repeat2
+                data-random-review-icon="loop"
+                className="size-[clamp(14px,4.2vw,17px)]"
+              />
+            )}
+          </Button>
+        </div>
+        {randomReviewStatusText ? (
+          <div className={sceneRandomReviewStatusClassName} data-random-review-status="true">
+            {randomReviewStatusText}
+          </div>
+        ) : null}
       </div>
 
       {topTask ? (
