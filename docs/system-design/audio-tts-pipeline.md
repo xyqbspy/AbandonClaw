@@ -722,11 +722,11 @@ block 音频继续复用 sentence TTS 通道，但事件中仍保持：
 - 不把 scene full 自动降级为逐句串播；如需逐句降级，应作为新的行为变更单独评估。
 ### 16.2 固定顺序 review pack 优先与回退队列
 
-当前 scenes 复习播放的后台稳定性主路径是同日稳定 `scene review pack`：页面识别出合格场景后，会用本地日期作为 seed 对合格场景做稳定排序，并取少量场景提前准备同一个 pack。同一天内同一组场景会命中同一 pack，便于复用浏览器 TTS 缓存；跨天顺序会自然变化，避免长期总从同一个场景开始。准备过程优先读本地 scene detail cache，未命中时再请求详情接口并异步写回缓存；随后把这些 lesson 的 scene full segments 合并成一个 pack payload，复用现有 scene full TTS 通道预取一个 loop 音频。
+当前 scenes 复习播放的后台稳定性主路径是同日稳定 `scene review pack`：页面识别出合格场景后，会用本地日期作为 seed 对合格场景做稳定排序，并取少量场景提前准备同一个 pack。同一天内同一组场景会命中同一 pack，便于复用浏览器 TTS 缓存；跨天顺序会自然变化，避免长期总从同一个场景开始。准备过程优先读本地 scene detail cache，未命中时再请求详情接口并异步写回缓存；随后把这些 lesson 通过 `buildSceneFullSegmentsFromLesson()` 转成 scene full segments，再把多个场景的 segments 合并成一个 pack payload，复用现有 scene full TTS 通道预取一个 loop 音频。
 
 用户点击“循环播放场景”时，页面播放的仍是同一个固定顺序 pack payload。这样后台预准备、浏览器 Cache Storage 和点击播放之间能稳定命中同一资源，不再因为随机起点导致提前准备失效。本轮播放中已经加载过的 scene detail 会在内存里复用，避免 pack 失败回退时重复读取。
 
-review pack 组包采用最佳努力策略：单个候选场景详情加载失败时跳过该候选，继续使用其他已加载且可构建 segments 的场景；只有所有候选都无法提供可播放片段，才进入逐场景回退。
+review pack 组包采用最佳努力策略：单个候选场景详情加载失败时跳过该候选，继续使用其他已加载且可构建 segments 的场景；只有所有候选都无法提供可播放片段，才进入逐场景回退。这里的“组包”不是音频文件级拼接，不依赖 ffmpeg，也不会把新场景热插入正在播放的旧音频尾部；它是在播放前合并 TTS segments，并让现有 scene full TTS 通道生成新的整体音频资源。
 
 自动准备会复用 `resource-actions.ts` 的弱网 / 省流量判断：当浏览器报告 `saveData = true` 或 `effectiveType = slow-2g / 2g` 时，页面会跳过后台自动准备，避免在不适合的网络环境里主动拉取详情与完整音频。用户明确点击循环播放时仍会尝试准备并播放，因为这是用户主动发起的听力复习需求。
 
@@ -750,6 +750,7 @@ review pack 链路会通过现有本地 `client-events` 记录：
 边界：
 - 首次未缓存的 scene detail 或 review pack 音频仍需要联网。
 - pack 复用现有 scene full TTS 通道，不引入 ffmpeg 或新的音频拼接服务。
+- 候选场景变化后需要准备新的 pack；当前不会把新增场景增量拼接到正在播放的音频末尾。
 - 同日稳定顺序优先于完全随机；如后续要恢复更强随机性，应先保证随机包也能提前准备并命中同一资源。
 - 不承诺所有浏览器在锁屏或后台状态下都允许启动新音频；本优化关注的是音频启动后的连续播放。
 - 不把 scene full 自动降级为逐句串播；如需逐句降级，应作为新的行为变更单独评估。
