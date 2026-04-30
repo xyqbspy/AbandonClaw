@@ -15,6 +15,8 @@ import {
   prefetchSceneFullAudio,
   stopTtsPlayback,
 } from "@/lib/utils/tts-api";
+import { recordClientEvent } from "@/lib/utils/client-events";
+import { shouldAvoidHeavyAudioWarmup } from "@/lib/utils/resource-actions";
 
 export const SCENE_RANDOM_REVIEW_PROGRESS_THRESHOLD = 60;
 const SCENE_RANDOM_REVIEW_PREPARE_WINDOW = 4;
@@ -22,6 +24,7 @@ const SCENE_RANDOM_REVIEW_PACK_LIMIT = 8;
 const SCENE_RANDOM_REVIEW_PACK_SLUG = "scene-random-review-pack";
 
 type PlaybackStatus = "idle" | "loading" | "playing";
+export type ReviewPackPrepareStatus = "idle" | "preparing" | "ready" | "skipped" | "failed";
 type ReviewPackPayload = {
   firstScene: PlaybackQueueItem;
   segments: Array<{ text: string; speaker?: string }>;
@@ -50,6 +53,37 @@ const buildReviewPackQueueKey = (queue: PlaybackQueueItem[]) =>
     .map((scene) => normalizeSceneSlug(scene.slug))
     .join("|");
 
+const buildDailyReviewSeed = (date = new Date()) => {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const hashStableString = (value: string) => {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+};
+
+const buildDailyStableReviewQueue = (queue: PlaybackQueueItem[]) => {
+  const seed = buildDailyReviewSeed();
+  return queue
+    .map((scene, index) => ({
+      scene,
+      index,
+      score: hashStableString(`${seed}:${normalizeSceneSlug(scene.slug)}:${scene.id}`),
+    }))
+    .sort((left, right) => left.score - right.score || left.index - right.index)
+    .map(({ scene }) => scene);
+};
+
+const getErrorMessage = (error: unknown) =>
+  error instanceof Error ? error.message : "unknown";
+
 export function useSceneRandomReviewPlayback(allScenes: SceneListItemResponse[]) {
   const eligibleScenes = useMemo(
     () =>
@@ -58,7 +92,13 @@ export function useSceneRandomReviewPlayback(allScenes: SceneListItemResponse[])
       ),
     [allScenes],
   );
+  const reviewQueue = useMemo(
+    () => buildDailyStableReviewQueue(eligibleScenes),
+    [eligibleScenes],
+  );
   const [status, setStatus] = useState<PlaybackStatus>("idle");
+  const [reviewPackPrepareStatus, setReviewPackPrepareStatusState] =
+    useState<ReviewPackPrepareStatus>("idle");
   const [currentScene, setCurrentScene] = useState<PlaybackQueueItem | null>(null);
   const runningRef = useRef(false);
   const queueRef = useRef<PlaybackQueueItem[]>([]);
@@ -68,6 +108,12 @@ export function useSceneRandomReviewPlayback(allScenes: SceneListItemResponse[])
   const preparedSceneFullSlugSetRef = useRef(new Set<string>());
   const reviewPackPrepareKeyRef = useRef<string | null>(null);
   const reviewPackPrepareTaskRef = useRef<Promise<ReviewPackPayload | null> | null>(null);
+  const reviewPackPrepareStatusRef = useRef<ReviewPackPrepareStatus>("idle");
+
+  const setReviewPackPrepareStatus = useCallback((nextStatus: ReviewPackPrepareStatus) => {
+    reviewPackPrepareStatusRef.current = nextStatus;
+    setReviewPackPrepareStatusState(nextStatus);
+  }, []);
 
   const loadSceneDetailForPlayback = useCallback((scene: PlaybackQueueItem) => {
     const slug = normalizeSceneSlug(scene.slug);
@@ -155,29 +201,73 @@ export function useSceneRandomReviewPlayback(allScenes: SceneListItemResponse[])
   );
 
   const prepareReviewPack = useCallback(
-    (queue: PlaybackQueueItem[]) => {
+    (queue: PlaybackQueueItem[], options?: { auto?: boolean }) => {
       const reviewPackKey = buildReviewPackQueueKey(queue);
-      if (!reviewPackKey) return null;
-      if (reviewPackPrepareKeyRef.current === reviewPackKey && reviewPackPrepareTaskRef.current) {
+      const auto = options?.auto === true;
+      if (!reviewPackKey) {
+        setReviewPackPrepareStatus("idle");
+        return null;
+      }
+      if (auto && shouldAvoidHeavyAudioWarmup()) {
+        reviewPackPrepareKeyRef.current = reviewPackKey;
+        reviewPackPrepareTaskRef.current = null;
+        setReviewPackPrepareStatus("skipped");
+        recordClientEvent("scene_review_pack_prepare_skipped", {
+          queueKey: reviewPackKey,
+          candidateCount: queue.length,
+          reason: "weak_network_or_save_data",
+        });
+        return null;
+      }
+      if (
+        reviewPackPrepareKeyRef.current === reviewPackKey &&
+        reviewPackPrepareTaskRef.current &&
+        (reviewPackPrepareStatusRef.current === "preparing" ||
+          reviewPackPrepareStatusRef.current === "ready")
+      ) {
         return reviewPackPrepareTaskRef.current;
       }
 
       reviewPackPrepareKeyRef.current = reviewPackKey;
+      setReviewPackPrepareStatus("preparing");
+      recordClientEvent("scene_review_pack_prepare_started", {
+        queueKey: reviewPackKey,
+        candidateCount: queue.length,
+        auto,
+      });
       const task = (async () => {
         const payload = await buildReviewPackPayload(queue);
-        if (!payload) return null;
+        if (!payload) {
+          throw new Error("当前复习音频包没有可播放内容。");
+        }
         await prefetchSceneFullAudio({
           sceneSlug: SCENE_RANDOM_REVIEW_PACK_SLUG,
           sceneType: "dialogue",
           segments: payload.segments,
         });
+        setReviewPackPrepareStatus("ready");
+        recordClientEvent("scene_review_pack_prepare_ready", {
+          queueKey: reviewPackKey,
+          candidateCount: queue.length,
+          segmentCount: payload.segments.length,
+          auto,
+        });
         return payload;
-      })().catch(() => null);
+      })().catch((error) => {
+        setReviewPackPrepareStatus("failed");
+        recordClientEvent("scene_review_pack_prepare_failed", {
+          queueKey: reviewPackKey,
+          candidateCount: queue.length,
+          auto,
+          message: getErrorMessage(error),
+        });
+        return null;
+      });
 
       reviewPackPrepareTaskRef.current = task;
       return task;
     },
-    [buildReviewPackPayload],
+    [buildReviewPackPayload, setReviewPackPrepareStatus],
   );
 
   const playReviewPackFromQueue = useCallback(
@@ -187,7 +277,10 @@ export function useSceneRandomReviewPlayback(allScenes: SceneListItemResponse[])
         reviewPackPrepareKeyRef.current === reviewPackKey
           ? await reviewPackPrepareTaskRef.current?.catch(() => null)
           : null;
-      const payload = preparedPayload ?? (await buildReviewPackPayload(queue));
+      const payload =
+        preparedPayload ??
+        (await prepareReviewPack(queue, { auto: false })?.catch(() => null)) ??
+        (await buildReviewPackPayload(queue));
 
       if (!runningRef.current) return false;
       if (!payload) {
@@ -196,6 +289,11 @@ export function useSceneRandomReviewPlayback(allScenes: SceneListItemResponse[])
 
       setCurrentScene(payload.firstScene);
       setStatus("playing");
+      recordClientEvent("scene_review_pack_play_started", {
+        queueKey: reviewPackKey,
+        candidateCount: queue.length,
+        segmentCount: payload.segments.length,
+      });
       await playSceneLoopAudio({
         sceneSlug: SCENE_RANDOM_REVIEW_PACK_SLUG,
         sceneType: "dialogue",
@@ -203,7 +301,7 @@ export function useSceneRandomReviewPlayback(allScenes: SceneListItemResponse[])
       });
       return true;
     },
-    [buildReviewPackPayload],
+    [buildReviewPackPayload, prepareReviewPack],
   );
 
   const stopRandomReview = useCallback(() => {
@@ -268,7 +366,7 @@ export function useSceneRandomReviewPlayback(allScenes: SceneListItemResponse[])
   }, [loadSceneDetailForPlayback, prepareQueueWindow]);
 
   const playQueueFromStart = useCallback(async () => {
-    const queue = eligibleScenes;
+    const queue = reviewQueue;
     if (queue.length === 0) {
       toast.message("完成 60% 以上的场景后可播放。");
       return;
@@ -284,14 +382,19 @@ export function useSceneRandomReviewPlayback(allScenes: SceneListItemResponse[])
     try {
       const startedPack = await playReviewPackFromQueue(queue);
       if (startedPack) return;
-    } catch {
+    } catch (error) {
       if (!runningRef.current) return;
+      recordClientEvent("scene_review_pack_fallback_to_queue", {
+        queueKey: buildReviewPackQueueKey(queue),
+        candidateCount: queue.length,
+        message: getErrorMessage(error),
+      });
       stopTtsPlayback();
     }
 
     if (!runningRef.current) return;
     await playPerSceneQueueFromIndex(queue, 0);
-  }, [eligibleScenes, playPerSceneQueueFromIndex, playReviewPackFromQueue]);
+  }, [playPerSceneQueueFromIndex, playReviewPackFromQueue, reviewQueue]);
 
   const toggleRandomReview = useCallback(() => {
     if (runningRef.current) {
@@ -302,9 +405,13 @@ export function useSceneRandomReviewPlayback(allScenes: SceneListItemResponse[])
   }, [playQueueFromStart, stopRandomReview]);
 
   useEffect(() => {
-    if (eligibleScenes.length === 0 || runningRef.current) return;
-    void prepareReviewPack(eligibleScenes);
-  }, [eligibleScenes, prepareReviewPack]);
+    if (reviewQueue.length === 0) {
+      setReviewPackPrepareStatus("idle");
+      return;
+    }
+    if (runningRef.current) return;
+    void prepareReviewPack(reviewQueue, { auto: true });
+  }, [prepareReviewPack, reviewQueue, setReviewPackPrepareStatus]);
 
   useEffect(
     () => () => {
@@ -319,6 +426,7 @@ export function useSceneRandomReviewPlayback(allScenes: SceneListItemResponse[])
     currentScene,
     isRandomReviewActive: status !== "idle",
     randomReviewStatus: status,
+    reviewPackPrepareStatus,
     toggleRandomReview,
   };
 }

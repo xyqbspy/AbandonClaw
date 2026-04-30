@@ -47,7 +47,7 @@ export const SCENE_IDLE_WARMUP_MAX_ROUNDS = 4;
 
 const isClient = () => typeof window !== "undefined";
 
-const isWeakNetwork = () => {
+export const shouldAvoidHeavyAudioWarmup = () => {
   if (!isClient()) return false;
   const nav = navigator as Navigator & {
     connection?: {
@@ -192,7 +192,7 @@ export const scheduleLessonAudioWarmup = (
 ) => {
   const sentenceLimit = options?.sentenceLimit ?? 2;
   const chunkLimit = options?.chunkLimit ?? 2;
-  const includeSceneFull = options?.includeSceneFull === true && !isWeakNetwork();
+  const includeSceneFull = options?.includeSceneFull === true && !shouldAvoidHeavyAudioWarmup();
   const key =
     options?.key ??
     buildLessonAudioWarmupKey(lesson, {
@@ -222,7 +222,7 @@ export const scheduleSceneIdleAudioWarmup = (
     key?: string;
   },
 ) => {
-  if (!isClient() || isWeakNetwork()) return false;
+  if (!isClient() || shouldAvoidHeavyAudioWarmup()) return false;
 
   const initialSentenceOffset = Math.max(
     0,
@@ -256,7 +256,7 @@ export const scheduleSceneIdleAudioWarmup = (
 
   const shouldPauseRound = () =>
     isPageHidden() ||
-    isWeakNetwork() ||
+    shouldAvoidHeavyAudioWarmup() ||
     hasImmediatePlaybackDemand() ||
     hasRecentSceneIdleInteraction(interactionQuietWindowMs);
 

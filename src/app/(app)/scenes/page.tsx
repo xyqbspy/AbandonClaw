@@ -95,8 +95,24 @@ export default function ScenesPage() {
     eligibleScenes,
     isRandomReviewActive,
     randomReviewStatus,
+    reviewPackPrepareStatus,
     toggleRandomReview,
   } = useSceneRandomReviewPlayback(allScenes);
+
+  const randomReviewTitle =
+    eligibleScenes.length === 0
+      ? "完成 60% 以上的场景后可循环播放"
+      : currentScene
+        ? `正在播放：${currentScene.title}`
+        : reviewPackPrepareStatus === "preparing"
+          ? "循环播放音频准备中"
+          : reviewPackPrepareStatus === "ready"
+            ? `循环播放已准备好，可播放 ${eligibleScenes.length} 个场景`
+            : reviewPackPrepareStatus === "skipped"
+              ? "弱网或省流量下将于点击后再准备"
+              : reviewPackPrepareStatus === "failed"
+                ? "循环播放准备失败，点击后会重试"
+                : `可播放 ${eligibleScenes.length} 个场景`;
 
   useEffect(() => {
     if (process.env.NODE_ENV !== "development") return;
@@ -270,13 +286,7 @@ export default function ScenesPage() {
           radius="lg"
           className={`${sceneRandomReviewButtonClassName} ${isRandomReviewActive ? "border-primary/20 text-primary ring-2 ring-primary/10 hover:text-primary" : ""}`}
           disabled={!isRandomReviewActive && eligibleScenes.length === 0}
-          title={
-            eligibleScenes.length === 0
-              ? "完成 60% 以上的场景后可循环播放"
-              : currentScene
-                ? `正在播放：${currentScene.title}`
-                : `可播放 ${eligibleScenes.length} 个场景`
-          }
+          title={randomReviewTitle}
           aria-label={
             isRandomReviewActive
               ? "停止循环播放"

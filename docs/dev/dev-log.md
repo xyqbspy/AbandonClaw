@@ -135,6 +135,41 @@ scenes 列表随机复习播放原本依赖逐场景播放结束后由页面 JS 
   - `git diff --check` 仅提示工作区 CRLF warning。
   - archive 后 `pnpm run maintenance:check` 通过。
 
+### [2026-04-30] 强化 scenes review pack 准备态与弱网策略
+- 类型：Spec-Driven / 音频播放链路
+- 状态：已完成并归档 `enhance-scene-review-pack-readiness`
+
+#### 背景
+scenes 循环复习已经通过 review pack 降低后台切歌依赖，但自动准备状态不可见、弱网下仍会主动准备较重音频，且 pack 准备和回退缺少本地事件，后续排查不够直接。
+
+#### 本次改动
+- review pack 队列改为同日稳定顺序：同一天内 pack key 和 payload 稳定，跨天自然变化。
+- 导出并复用统一弱网 / 省流量判断；弱网下跳过自动准备，用户点击后仍可尝试准备并播放。
+- hook 暴露 `reviewPackPrepareStatus`，scenes 循环播放按钮通过 title 展示准备中、已准备好、弱网跳过或准备失败状态。
+- 新增本地事件记录 review pack 准备开始、准备完成、准备跳过、准备失败、播放开始和回退逐场景队列。
+
+#### 明确不收项
+- 不做 Media Session。
+- 不做完整离线 / PWA / Service Worker。
+- 不新增服务端专用 review pack API。
+- 不改变 `/api/tts` 协议或浏览器 Cache Storage 容量策略。
+- 不接跨设备或服务端 BI。
+
+#### 验证
+- 已运行：
+  - `node --import tsx --import ./src/test/setup-dom.ts --test "src/app/(app)/scenes/page.interaction.test.tsx"`
+  - `node --import tsx --test "src/lib/utils/tts-api.scene-loop.test.ts"`
+  - `pnpm exec openspec validate enhance-scene-review-pack-readiness --strict`
+  - `pnpm exec openspec validate --all --strict`
+  - `git diff --check`
+  - `pnpm run build`
+- 结果：
+  - scenes 交互测试 18 条通过。
+  - scene loop TTS 测试 5 条通过。
+  - OpenSpec 单 change 与全量校验通过。
+  - `git diff --check` 仅提示工作区 CRLF warning。
+  - Next.js 构建通过。
+
 ### [2026-04-30] 同步较大改动到产品与技术总览
 - 类型：Spec-Driven / 维护规范与 meta 文档
 - 状态：已完成并归档 `sync-major-change-meta-docs`

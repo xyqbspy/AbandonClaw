@@ -12,6 +12,12 @@ export type ClientEventName =
   | "scene_full_play_ready"
   | "scene_full_play_wait_fetch"
   | "scene_full_play_cooling_down"
+  | "scene_review_pack_prepare_started"
+  | "scene_review_pack_prepare_ready"
+  | "scene_review_pack_prepare_skipped"
+  | "scene_review_pack_prepare_failed"
+  | "scene_review_pack_play_started"
+  | "scene_review_pack_fallback_to_queue"
   | "tts_scene_loop_fallback_clicked";
 
 export type ClientFailureName = "tts_scene_loop_failed" | "scene_full_play_fallback";
