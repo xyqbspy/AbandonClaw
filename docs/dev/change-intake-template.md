@@ -14,6 +14,7 @@
 - 风险与影响范围：
 - 最小测试方案：
 - 是否需要更新文档：
+- 是否需要同步产品/技术总览：
 - 本轮收口项 / 明确不收项：
 
 ## 1. 任务分流速查
@@ -89,6 +90,7 @@
 ## 7. 收尾要求
 
 - 是否更新 `docs/dev/dev-log.md`？
+- 是否需要同步 `docs/meta/product-overview.md` / `docs/meta/technical-overview.md`？
 - 是否需要同步 stable spec？
 - 是否需要 archive？
 - 是否运行 `pnpm run maintenance:check`？

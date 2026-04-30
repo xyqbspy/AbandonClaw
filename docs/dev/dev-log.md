@@ -135,6 +135,35 @@ scenes 列表随机复习播放原本依赖逐场景播放结束后由页面 JS 
   - `git diff --check` 仅提示工作区 CRLF warning。
   - archive 后 `pnpm run maintenance:check` 通过。
 
+### [2026-04-30] 同步较大改动到产品与技术总览
+- 类型：Spec-Driven / 维护规范与 meta 文档
+- 状态：已完成并归档 `sync-major-change-meta-docs`
+
+#### 背景
+scenes 循环复习后台播放已经同步到 CHANGELOG、音频 system-design 和 audio stable spec，但它同时属于产品能力亮点和音频技术链路变化，也需要进入 `docs/meta/product-overview.md` 与 `docs/meta/technical-overview.md`。否则后续对外介绍或新维护者读取 meta 文档时，会继续看到旧现状。
+
+#### 本次改动
+- 在产品总览补充 scenes 循环复习后台播放的用户价值、关键能力和稳定性优化口径。
+- 在技术总览补充 deterministic review pack、浏览器音频缓存命中、后台预准备和单个 `<audio loop>` 连续播放的技术口径。
+- 在 project-maintenance stable spec 中新增“较大改动必须同步产品与技术总览”规则。
+- 在接需求模板增加产品/技术总览同步检查项。
+
+#### 明确不收项
+- 不重写整份产品总览或技术总览。
+- 不清理历史 dev-log 和历史 archive。
+- 不新增自动检测脚本；先通过 stable spec 与接入模板约束。
+
+#### 验证
+- 已运行：
+  - `pnpm exec openspec validate sync-major-change-meta-docs --strict`
+  - `pnpm exec openspec validate --all --strict`
+  - `pnpm run maintenance:check`
+  - `git diff --check`
+- 结果：
+  - OpenSpec 单 change 与全量校验通过。
+  - archive 后 `pnpm run maintenance:check` 通过。
+  - `git diff --check` 仅提示工作区 CRLF warning。
+
 ### [2026-04-20] 收紧完成态提交与正式 CHANGELOG 收口规则
 - 类型：文档 / 规范治理
 - 状态：已完成
