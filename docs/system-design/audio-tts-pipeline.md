@@ -709,3 +709,32 @@ block 音频继续复用 sentence TTS 通道，但事件中仍保持：
 - 某个场景详情获取失败、无可播放 segments 或 scene full 失败时，页面队列可以跳过当前场景并尝试下一个合格场景。
 - 如果一轮内所有合格场景都失败，页面应停止随机复习播放并给出受控提示。
 - 本能力不把 scene full 自动降级为逐句串播；如果后续要做逐句降级，需要作为新的行为变更单独评估。
+
+### 16.1 缓存优先与播放前准备
+
+当前 scenes 随机复习播放在队列内消费 scene full 音频。为了减少后台切换到下一场景时的联网依赖，播放链路现在先按 slug 读取本地 scene detail cache；命中时直接用缓存 lesson 组装 `scene full` segments，不再为了该场景详情请求 `/api/scenes/{slug}`。未命中时才走网络详情接口，并在成功后异步写回 scene cache。
+
+随机播放启动后，页面会准备当前起点及后续少量合格场景：读取/写入 scene detail cache，组装 scene full segments，并调用 `prefetchSceneFullAudio()` 让现有 TTS 链路把音频落到浏览器 Cache Storage。该准备失败不阻断当前播放；实际播放仍复用 `playSceneFullAudioOnce()`、scene full 冷却、fallback 摘要和现有跳过策略。
+
+边界：
+- 这不是完整离线 / PWA 能力；首次未缓存的 scene detail 或 scene full 音频仍需要联网。
+- 不承诺所有浏览器在锁屏或后台状态下都允许启动下一段新音频。
+- 不把 scene full 自动降级为逐句串播；如需逐句降级，应作为新的行为变更单独评估。
+### 16.2 固定顺序 review pack 优先与回退队列
+
+当前 scenes 复习播放的后台稳定性主路径是固定顺序 `scene review pack`：页面识别出合格场景后，会按当前列表顺序取少量场景提前准备同一个 pack。准备过程优先读本地 scene detail cache，未命中时再请求详情接口并异步写回缓存；随后把这些 lesson 的 scene full segments 合并成一个 pack payload，复用现有 scene full TTS 通道预取一个 loop 音频。
+
+用户点击“循环播放场景”时，页面播放的仍是同一个固定顺序 pack payload。这样后台预准备、浏览器 Cache Storage 和点击播放之间能稳定命中同一资源，不再因为随机起点导致提前准备失效。本轮播放中已经加载过的 scene detail 会在内存里复用，避免 pack 失败回退时重复读取。
+
+review pack 组包采用最佳努力策略：单个候选场景详情加载失败时跳过该候选，继续使用其他已加载且可构建 segments 的场景；只有所有候选都无法提供可播放片段，才进入逐场景回退。
+
+这条路径的目标不是完整离线，而是让“播放开始之前”尽量完成详情与音频准备，让“播放开始之后”尽量变成浏览器原生音频资源持续播放：pack 一旦开始，后续不再依赖每个场景结束后的 `onended -> 切换 src -> play()`。这比逐场景队列更适合后台或锁屏场景。
+
+如果 review pack 生成或播放失败，页面会回退到逐场景队列。回退队列仍会提前准备当前起点及后续少量合格场景：读取/写入 scene detail cache，组装 scene full segments，并调用 `prefetchSceneFullAudio()` 让现有 TTS 链路把音频落到浏览器 Cache Storage。该准备失败不阻断当前播放；实际播放继续复用 `playSceneFullAudioOnce()`、scene full 冷却、fallback 摘要和现有跳过策略。
+
+边界：
+- 首次未缓存的 scene detail 或 review pack 音频仍需要联网。
+- pack 复用现有 scene full TTS 通道，不引入 ffmpeg 或新的音频拼接服务。
+- 固定顺序优先于随机性；如后续要恢复随机，应先保证随机包也能提前准备并命中同一资源。
+- 不承诺所有浏览器在锁屏或后台状态下都允许启动新音频；本优化关注的是音频启动后的连续播放。
+- 不把 scene full 自动降级为逐句串播；如需逐句降级，应作为新的行为变更单独评估。

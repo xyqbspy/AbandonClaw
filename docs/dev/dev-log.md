@@ -37,7 +37,103 @@
   - `pnpm run text:check-mojibake`
   - `git diff --check`
   - `pnpm run maintenance:check`
+
+### [2026-04-30] 强化 AI 协作中文输出规则
+- 类型：Spec-Driven / 维护规范
+- 状态：已完成并归档 `enforce-chinese-ai-output`
+
+#### 背景
+本轮发现“所有输出使用中文”虽然已经写在 `AGENTS.md`，但 stable spec 和接需求模板没有形成同等清晰的长期契约，后续模型只读取部分项目规范时仍可能输出纯英文回答或生成英文任务项。
+
+#### 本次改动
+- 在 `AGENTS.md` 明确不得在用户未要求时输出纯英文回答。
+- 在 `docs/dev/change-intake-template.md` 增加“输出语言”检查项。
+- 在 `openspec/specs/project-maintenance/spec.md` 新增 AI 协作输出默认中文的 requirement。
+- 新增并归档 `openspec/changes/archive/2026-04-30-enforce-chinese-ai-output/`，记录本轮收口项、不收项和风险边界。
+
+#### 明确不收项
+- 不批量重写历史 archive、历史 dev-log 或既有英文技术术语。
+- 不做全量文档乱码清理。
+
+#### 验证
+- 已运行：
+  - `rg -n "不得.*纯英文|默认使用中文|输出语言|AI 协作输出" AGENTS.md docs/dev/change-intake-template.md openspec/specs/project-maintenance/spec.md openspec/changes/archive/2026-04-30-enforce-chinese-ai-output`
+  - `git diff --check`
+  - `pnpm run maintenance:check`
+- 结果：
+  - OpenSpec 全量校验通过。
+  - `git diff --check` 仅提示工作区 CRLF warning。
+  - `pnpm run maintenance:check` 仍因上一轮 `prepare-scene-random-review-audio` 已完成但未归档而失败；本轮 `enforce-chinese-ai-output` 已归档。
   - `pnpm exec openspec list --json`
+
+### [2026-04-30] scenes 随机复习播放改为 review pack 优先
+- 类型：Spec-Driven / 音频播放链路
+- 状态：已完成并归档 `prepare-scene-random-review-audio`
+
+#### 背景
+scenes 列表随机复习播放原本依赖逐场景播放结束后由页面 JS 切到下一段。后台、锁屏或移动端省电策略下，当前音频可以继续播，但下一段切换和重新 `play()` 不稳定。用户目标是让场景列表复习尽量支持后台连续播放。
+
+#### 本次改动
+- scenes 随机复习播放优先组装少量合格场景为单个 `scene review pack`，通过一个 loop 音频播放。
+- review pack 详情加载优先读 scene detail cache，未命中再请求接口并写回缓存。
+- 本轮播放内复用已加载 scene detail，减少 pack 失败回退后的重复读取。
+- review pack 组包改为最佳努力策略，单个候选详情加载失败时跳过该候选，其他可用场景仍可继续组包。
+- review pack 失败时回退逐场景 scene full 队列，并保留失败跳过和整轮失败停止提示。
+
+#### 明确不收项
+- 不做完整离线 / PWA。
+- 不承诺所有浏览器锁屏或后台状态下都允许启动新音频。
+- 不引入 ffmpeg 或新的音频拼接服务。
+- 不把 scene full 自动降级为逐句串播。
+
+#### 验证
+- 已运行：
+  - `node --import tsx --import ./src/test/setup-dom.ts --test "src/app/(app)/scenes/page.interaction.test.tsx"`
+  - `node --import tsx --test "src/lib/utils/tts-api.scene-loop.test.ts"`
+  - `pnpm exec openspec validate prepare-scene-random-review-audio --strict`
+  - `pnpm exec openspec validate --all --strict`
+  - `git diff --check`
+- 结果：
+  - scenes 交互测试 17 条通过。
+  - scene loop TTS 测试 5 条通过。
+  - OpenSpec 单 change 与全量校验通过。
+  - `git diff --check` 仅提示工作区 CRLF warning。
+
+### [2026-04-30] scenes review pack 改为固定顺序预准备
+- 类型：Spec-Driven / 音频播放链路
+- 状态：已完成并归档 `prepare-deterministic-scene-review-pack`
+
+#### 背景
+上一轮 review pack 已经把“播放开始后依赖 JS 切下一段”的问题降到最低，但仍保留随机起点。随机起点会让页面难以提前准备用户马上要播放的 pack，点击后仍可能等待 scene detail 或 `/api/tts`。用户目标是后台连续播放，随机不是必须。
+
+#### 本次改动
+- scenes 复习入口从“随机播放”收敛为“循环播放”。
+- 合格场景按当前列表顺序取前几个，生成 deterministic review pack。
+- 页面识别出合格场景后，会后台预准备同一个 review pack。
+- 用户点击时优先播放同一 pack payload，从而最大化 scene detail cache、浏览器 Cache Storage 和内存 URL 命中。
+- review pack 失败时仍保留逐场景 scene full 回退队列。
+
+#### 明确不收项
+- 不做完整离线 / PWA。
+- 不引入 Media Session。
+- 不新增服务端专用音频包 API。
+- 不引入 ffmpeg 或新的音频拼接服务。
+- 不承诺所有浏览器锁屏或后台状态下都允许启动新音频。
+
+#### 验证
+- 已运行：
+  - `node --import tsx --import ./src/test/setup-dom.ts --test "src/app/(app)/scenes/page.interaction.test.tsx"`
+  - `node --import tsx --test "src/lib/utils/tts-api.scene-loop.test.ts"`
+  - `pnpm exec openspec validate prepare-deterministic-scene-review-pack --strict`
+  - `pnpm exec openspec validate --all --strict`
+  - `git diff --check`
+  - `pnpm run maintenance:check`
+- 结果：
+  - scenes 交互测试 17 条通过。
+  - scene loop TTS 测试 5 条通过。
+  - OpenSpec change 与全量校验通过。
+  - `git diff --check` 仅提示工作区 CRLF warning。
+  - archive 后 `pnpm run maintenance:check` 通过。
 
 ### [2026-04-20] 收紧完成态提交与正式 CHANGELOG 收口规则
 - 类型：文档 / 规范治理

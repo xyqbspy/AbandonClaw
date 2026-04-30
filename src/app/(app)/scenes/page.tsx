@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { Clock3, MessageSquareText, Plus, Shuffle, Sparkles } from "lucide-react";
+import { Clock3, MessageSquareText, Plus, Repeat2, Sparkles } from "lucide-react";
 import { AudioStateIcon } from "@/components/audio/audio-state-icon";
 import { GenerateSceneSheet } from "@/components/scenes/generate-scene-sheet";
 import {
@@ -272,17 +272,17 @@ export default function ScenesPage() {
           disabled={!isRandomReviewActive && eligibleScenes.length === 0}
           title={
             eligibleScenes.length === 0
-              ? "完成 60% 以上的场景后可随机播放"
+              ? "完成 60% 以上的场景后可循环播放"
               : currentScene
                 ? `正在播放：${currentScene.title}`
                 : `可播放 ${eligibleScenes.length} 个场景`
           }
           aria-label={
             isRandomReviewActive
-              ? "停止随机播放"
+              ? "停止循环播放"
               : eligibleScenes.length === 0
-                ? "暂无可随机播放的场景"
-                : "随机播放场景"
+                ? "暂无可循环播放的场景"
+                : "循环播放场景"
           }
           onClick={toggleRandomReview}
         >
@@ -293,8 +293,8 @@ export default function ScenesPage() {
               className="size-[clamp(14px,4.2vw,17px)]"
             />
           ) : (
-            <Shuffle
-              data-random-review-icon="shuffle"
+            <Repeat2
+              data-random-review-icon="loop"
               className="size-[clamp(14px,4.2vw,17px)]"
             />
           )}

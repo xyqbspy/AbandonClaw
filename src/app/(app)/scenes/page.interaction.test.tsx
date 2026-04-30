@@ -3,7 +3,9 @@ import { createRequire } from "node:module";
 import test, { afterEach } from "node:test";
 import React from "react";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import type { SceneCacheRecord } from "@/lib/cache/scene-cache";
 import type { SceneListCacheRecord } from "@/lib/cache/scene-list-cache";
+import type { Lesson } from "@/lib/types";
 import type { SceneListItemResponse } from "@/lib/utils/scenes-api";
 
 const localRequire = createRequire(import.meta.url);
@@ -28,7 +30,12 @@ let deleteSceneCalls = 0;
 let generatedSceneCalls = 0;
 const sceneDetailCalls: string[] = [];
 const sceneFullPlaybackCalls: Array<{ sceneSlug: string; segmentCount: number }> = [];
+const sceneFullPrefetchCalls: Array<{ sceneSlug: string; segmentCount: number }> = [];
+const sceneReviewPackPlaybackCalls: Array<{ sceneSlug: string; segmentCount: number }> = [];
+const setSceneCacheCalls: string[] = [];
+const failSceneDetailSlugs = new Set<string>();
 let stopTtsPlaybackCalls = 0;
+let failSceneReviewPackPlayback = false;
 let importSceneError: Error | null = null;
 let deleteSceneError: Error | null = null;
 let sceneFullPlaybackResolvers: Array<() => void> = [];
@@ -52,6 +59,43 @@ let detailPrefetchImpl = async (slug: string) => {
   detailPrefetchCalls.push(slug);
   return true;
 };
+let getSceneCacheImpl: (slug: string) => Promise<{
+  found: boolean;
+  isExpired: boolean;
+  record: SceneCacheRecord<Lesson> | null;
+}> = async () => ({ found: false, isExpired: false, record: null });
+
+const buildSceneDetail = (slug: string): Lesson => ({
+  id: slug,
+  slug,
+  title: slug,
+  subtitle: "detail subtitle",
+  difficulty: "Beginner",
+  estimatedMinutes: 5,
+  completionRate: 0,
+  tags: [],
+  sceneType: slug === "imported-scene" ? "monologue" : "dialogue",
+  sections: [
+    {
+      id: "section-1",
+      blocks: [
+        {
+          id: "block-1",
+          speaker: "A",
+          sentences: [
+            {
+              id: "sentence-1",
+              text: "Hello there.",
+              translation: "你好。",
+              chunks: [],
+            },
+          ],
+        },
+      ],
+    },
+  ],
+  explanations: [],
+});
 
 const sceneList: SceneListItemResponse[] = [
   {
@@ -136,37 +180,10 @@ const mockedModules = {
     getScenesFromApi: async (options?: { noStore?: boolean }) => getScenesFromApiImpl(options),
     getSceneDetailBySlugFromApi: async (slug: string) => {
       sceneDetailCalls.push(slug);
-      return {
-        id: slug,
-        slug,
-        title: slug,
-        subtitle: "detail subtitle",
-        difficulty: "Beginner",
-        estimatedMinutes: 5,
-        completionRate: 0,
-        tags: [],
-        sceneType: slug === "imported-scene" ? "monologue" : "dialogue",
-        sections: [
-          {
-            id: "section-1",
-            blocks: [
-              {
-                id: "block-1",
-                speaker: "A",
-                sentences: [
-                  {
-                    id: "sentence-1",
-                    text: "Hello there.",
-                    translation: "你好。",
-                    chunks: [],
-                  },
-                ],
-              },
-            ],
-          },
-        ],
-        explanations: [],
-      };
+      if (failSceneDetailSlugs.has(slug)) {
+        throw new Error("scene detail failed");
+      }
+      return buildSceneDetail(slug);
     },
     importSceneFromApi: async () => {
       importSceneCalls += 1;
@@ -185,11 +202,27 @@ const mockedModules = {
     getSceneListCacheSnapshotSync: () => getSceneListCacheSnapshotSyncImpl(),
     setSceneListCache: async () => undefined,
   },
+  "@/lib/cache/scene-cache": {
+    getSceneCache: async (slug: string) => getSceneCacheImpl(slug),
+    normalizeSceneSlug: (slug: string) => slug.trim().toLowerCase(),
+    setSceneCache: async (slug: string) => {
+      setSceneCacheCalls.push(slug);
+    },
+  },
   "@/lib/cache/scene-prefetch": {
     prefetchSceneDetail: (slug: string) => detailPrefetchImpl(slug),
     scheduleScenePrefetch: () => undefined,
   },
   "@/lib/utils/tts-api": {
+    prefetchSceneFullAudio: async ({
+      sceneSlug,
+      segments,
+    }: {
+      sceneSlug: string;
+      segments: Array<{ text: string; speaker?: string }>;
+    }) => {
+      sceneFullPrefetchCalls.push({ sceneSlug, segmentCount: segments.length });
+    },
     playSceneFullAudioOnce: async ({
       sceneSlug,
       segments,
@@ -202,6 +235,19 @@ const mockedModules = {
         sceneFullPlaybackResolvers.push(resolve);
       });
       return { ok: true, url: "blob:scene-full", stopped: false };
+    },
+    playSceneLoopAudio: async ({
+      sceneSlug,
+      segments,
+    }: {
+      sceneSlug: string;
+      segments: Array<{ text: string; speaker?: string }>;
+    }) => {
+      sceneReviewPackPlaybackCalls.push({ sceneSlug, segmentCount: segments.length });
+      if (failSceneReviewPackPlayback) {
+        throw new Error("pack failed");
+      }
+      return { ok: true, url: "blob:scene-review-pack", stopped: false };
     },
     stopTtsPlayback: () => {
       stopTtsPlaybackCalls += 1;
@@ -246,7 +292,12 @@ afterEach(() => {
   generatedSceneCalls = 0;
   sceneDetailCalls.length = 0;
   sceneFullPlaybackCalls.length = 0;
+  sceneFullPrefetchCalls.length = 0;
+  sceneReviewPackPlaybackCalls.length = 0;
+  setSceneCacheCalls.length = 0;
+  failSceneDetailSlugs.clear();
   stopTtsPlaybackCalls = 0;
+  failSceneReviewPackPlayback = false;
   for (const resolve of sceneFullPlaybackResolvers) {
     resolve();
   }
@@ -263,6 +314,7 @@ afterEach(() => {
     detailPrefetchCalls.push(slug);
     return true;
   };
+  getSceneCacheImpl = async () => ({ found: false, isExpired: false, record: null });
   ScenesPageModule = null;
 });
 
@@ -290,30 +342,28 @@ test("ScenesPage 的生成与导入入口保持主次按钮层级一致", async 
 
   const generateButton = await screen.findByRole("button", { name: "生成场景" });
   const importButton = screen.getByRole("button", { name: "导入自定义" });
-  const randomButton = screen.getByRole("button", { name: "暂无可随机播放的场景" });
+  const randomButton = screen.getByRole("button", { name: "暂无可循环播放的场景" });
 
   assert.ok(generateButton.className.includes("app-button-primary"));
   assert.ok(importButton.className.includes("app-button-secondary"));
   assert.ok(randomButton.className.includes("app-button-secondary"));
   assert.ok(randomButton.className.includes("bg-white"));
-  assert.equal(randomButton.querySelector('[data-random-review-icon="shuffle"]') !== null, true);
+  assert.equal(randomButton.querySelector('[data-random-review-icon="loop"]') !== null, true);
   assert.equal(randomButton.querySelector("[data-audio-loop-spin]"), null);
 });
 
-test("ScenesPage 没有 60% 以上场景时随机播放入口不可启动", async () => {
+test("ScenesPage 没有 60% 以上场景时循环播放入口不可启动", async () => {
   const ScenesPage = getScenesPage();
   render(<ScenesPage />);
 
   await screen.findByText("Coffee Chat");
-  const randomButton = screen.getByRole("button", { name: "暂无可随机播放的场景" });
+  const randomButton = screen.getByRole("button", { name: "暂无可循环播放的场景" });
 
   assert.equal(randomButton.hasAttribute("disabled"), true);
-  assert.equal(randomButton.getAttribute("title"), "完成 60% 以上的场景后可随机播放");
+  assert.equal(randomButton.getAttribute("title"), "完成 60% 以上的场景后可循环播放");
 });
 
-test("ScenesPage 随机播放会从合格场景中随机起点并播放 scene full", async () => {
-  const originalRandom = Math.random;
-  Math.random = () => 0.6;
+test("ScenesPage 循环播放会按固定顺序预准备并优先播放 review pack", async () => {
   getScenesFromApiImpl = async (options?: { noStore?: boolean }) => {
     getScenesCallOptions.push(options);
     return [
@@ -328,36 +378,158 @@ test("ScenesPage 随机播放会从合格场景中随机起点并播放 scene fu
     ];
   };
 
-  try {
-    const ScenesPage = getScenesPage();
-    render(<ScenesPage />);
+  const ScenesPage = getScenesPage();
+  render(<ScenesPage />);
 
-    await screen.findByText("Coffee Chat");
-    fireEvent.click(screen.getByRole("button", { name: "随机播放场景" }));
+  await screen.findByText("Coffee Chat");
 
-    await waitFor(() => {
-      assert.deepEqual(sceneDetailCalls, ["coffee-chat", "imported-scene"]);
-      assert.deepEqual(sceneFullPlaybackCalls, [
-        {
-          sceneSlug: "imported-scene",
-          segmentCount: 1,
-        },
-      ]);
-    });
+  await waitFor(() => {
+    assert.deepEqual(sceneDetailCalls, ["coffee-chat", "imported-scene"]);
+    assert.deepEqual(sceneFullPrefetchCalls, [
+      {
+        sceneSlug: "scene-random-review-pack",
+        segmentCount: 2,
+      },
+    ]);
+  });
 
-    const activeRandomButton = screen.getByRole("button", { name: "停止随机播放" });
-    assert.ok(activeRandomButton.className.includes("app-button-secondary"));
-    assert.ok(activeRandomButton.className.includes("bg-white"));
-    assert.equal(
-      activeRandomButton.querySelector('[data-audio-icon-family="loop"][data-audio-loop-spin="true"]') !== null,
-      true,
-    );
+  fireEvent.click(screen.getByRole("button", { name: "循环播放场景" }));
 
-    fireEvent.click(activeRandomButton);
-    assert.equal(stopTtsPlaybackCalls > 0, true);
-  } finally {
-    Math.random = originalRandom;
-  }
+  await waitFor(() => {
+    assert.deepEqual(sceneReviewPackPlaybackCalls, [
+      {
+        sceneSlug: "scene-random-review-pack",
+        segmentCount: 2,
+      },
+    ]);
+    assert.deepEqual(sceneFullPlaybackCalls, []);
+  });
+
+  const activeRandomButton = screen.getByRole("button", { name: "停止循环播放" });
+  assert.ok(activeRandomButton.className.includes("app-button-secondary"));
+  assert.ok(activeRandomButton.className.includes("bg-white"));
+  assert.equal(
+    activeRandomButton.querySelector('[data-audio-icon-family="loop"][data-audio-loop-spin="true"]') !== null,
+    true,
+  );
+
+  fireEvent.click(activeRandomButton);
+  assert.equal(stopTtsPlaybackCalls > 0, true);
+});
+
+test("ScenesPage review pack 失败时会回退逐场景 scene full 播放", async () => {
+  failSceneReviewPackPlayback = true;
+  getScenesFromApiImpl = async (options?: { noStore?: boolean }) => {
+    getScenesCallOptions.push(options);
+    return [
+      {
+        ...sceneList[0],
+        progressPercent: 65,
+      },
+      {
+        ...sceneList[1],
+        progressPercent: 80,
+      },
+    ];
+  };
+
+  const ScenesPage = getScenesPage();
+  render(<ScenesPage />);
+
+  await screen.findByText("Coffee Chat");
+  fireEvent.click(screen.getByRole("button", { name: "循环播放场景" }));
+
+  await waitFor(() => {
+    assert.deepEqual(sceneReviewPackPlaybackCalls, [
+      {
+        sceneSlug: "scene-random-review-pack",
+        segmentCount: 2,
+      },
+    ]);
+    assert.deepEqual(sceneFullPlaybackCalls, [
+      {
+        sceneSlug: "coffee-chat",
+        segmentCount: 1,
+      },
+    ]);
+  });
+});
+
+test("ScenesPage review pack 会跳过详情加载失败的候选场景继续组包", async () => {
+  failSceneDetailSlugs.add("imported-scene");
+  getScenesFromApiImpl = async (options?: { noStore?: boolean }) => {
+    getScenesCallOptions.push(options);
+    return [
+      {
+        ...sceneList[0],
+        progressPercent: 65,
+      },
+      {
+        ...sceneList[1],
+        progressPercent: 80,
+      },
+    ];
+  };
+
+  const ScenesPage = getScenesPage();
+  render(<ScenesPage />);
+
+  await screen.findByText("Coffee Chat");
+  fireEvent.click(screen.getByRole("button", { name: "循环播放场景" }));
+
+  await waitFor(() => {
+    assert.deepEqual(sceneDetailCalls, ["coffee-chat", "imported-scene"]);
+    assert.deepEqual(sceneReviewPackPlaybackCalls, [
+      {
+        sceneSlug: "scene-random-review-pack",
+        segmentCount: 1,
+      },
+    ]);
+    assert.deepEqual(sceneFullPlaybackCalls, []);
+  });
+});
+
+test("ScenesPage 循环播放命中场景详情缓存时不请求详情接口", async () => {
+  getScenesFromApiImpl = async (options?: { noStore?: boolean }) => {
+    getScenesCallOptions.push(options);
+    return [
+      {
+        ...sceneList[0],
+        progressPercent: 80,
+      },
+    ];
+  };
+  getSceneCacheImpl = async (slug: string) => ({
+    found: true,
+    isExpired: false,
+    record: {
+      schemaVersion: "scene-cache-v3",
+      key: `scene:${slug}`,
+      type: "scene",
+      slug,
+      data: buildSceneDetail(slug),
+      cachedAt: 1,
+      lastAccessedAt: 1,
+      expiresAt: Number.MAX_SAFE_INTEGER,
+    },
+  });
+
+  const ScenesPage = getScenesPage();
+  render(<ScenesPage />);
+
+  await screen.findByText("Coffee Chat");
+  fireEvent.click(screen.getByRole("button", { name: "循环播放场景" }));
+
+  await waitFor(() => {
+    assert.deepEqual(sceneDetailCalls, []);
+    assert.deepEqual(setSceneCacheCalls, []);
+    assert.deepEqual(sceneReviewPackPlaybackCalls, [
+      {
+        sceneSlug: "scene-random-review-pack",
+        segmentCount: 1,
+      },
+    ]);
+  });
 });
 
 test("ScenesPage 点击场景卡片时会给详情预热一个短暂完成窗口再跳转", async () => {

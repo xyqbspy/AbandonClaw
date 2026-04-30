@@ -182,3 +182,41 @@ scene detail 页 MUST 继续以 block 为主播放单元，scene full 作为 sec
 - **THEN** 系统 MUST 复用现有客户端本地事件链路
 - **AND** 不得新增服务端事件表
 - **AND** 不得修改 `/api/tts` 协议
+### Requirement: scenes 随机复习播放必须优先消费已准备资源
+scenes 列表的复习播放 MUST 优先消费本地 scene detail cache 与浏览器 TTS 音频缓存，避免播放时默认依赖网络请求。为了最大化后台播放稳定性，系统 SHOULD 使用固定顺序的 deterministic review pack，而不是为了随机起点牺牲提前准备命中率。
+
+#### Scenario: scenes 复习播放提前准备固定顺序 review pack
+- **GIVEN** scenes 列表中存在多个合格场景
+- **WHEN** 页面完成列表加载并识别出合格场景
+- **THEN** 系统 SHOULD 按当前列表顺序取少量合格场景预准备单个可循环播放的 scene review pack 音频
+- **AND** 预准备 MUST 使用 scene detail cache 优先策略
+- **AND** 单个候选场景详情加载失败时，系统 SHOULD 跳过该候选并继续使用其他可用场景组包
+- **AND** 预准备失败不得阻断页面使用
+
+#### Scenario: 用户启动 scenes 复习播放
+- **GIVEN** deterministic review pack 已经准备或正在准备
+- **WHEN** 用户启动 scenes 复习播放
+- **THEN** 系统 SHOULD 优先播放同一个固定顺序 review pack
+- **AND** 播放开始后不应依赖每个场景结束时的 JS 切歌来继续后台播放
+
+#### Scenario: review pack 失败后回退逐场景播放
+- **WHEN** review pack 无法生成或无法开始播放
+- **THEN** 系统 MAY 回退到逐场景 scene full 队列播放
+- **AND** 回退队列 MUST 继续遵守 scene detail cache 优先、本轮已加载详情复用、失败跳过和整轮失败停止提示规则
+
+#### Scenario: scenes 复习播放命中 scene detail 缓存
+- **GIVEN** 合格场景已经存在有效 scene detail cache
+- **WHEN** 系统准备或启动 scenes 复习播放
+- **THEN** 系统 MUST 使用缓存中的 scene detail 构建 scene full segments
+- **AND** 不得为了该缓存命中的 scene detail 再请求 `/api/scenes/{slug}`
+
+#### Scenario: scenes 复习播放启动时准备后续场景
+- **GIVEN** scenes 列表中存在多个合格场景
+- **WHEN** review pack 需要回退为逐场景播放
+- **THEN** 系统 SHOULD 对当前场景及后续少量候选场景准备 scene detail 与 scene full 音频
+- **AND** 准备失败不得中断当前播放队列
+
+#### Scenario: 准备资源仍不可用
+- **WHEN** 某个随机复习队列项无法读取 scene detail、无法构建可播放 segments 或 scene full 播放失败
+- **THEN** 系统 MAY 跳过该场景并尝试下一个合格场景
+- **AND** 若一轮内所有合格场景都失败，系统 MUST 停止随机复习播放并给出受控提示
