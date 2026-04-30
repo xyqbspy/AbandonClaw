@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect } from "react";
-import { Clock3, MessageSquareText, Plus, Repeat2, Sparkles } from "lucide-react";
+import { useEffect, useState } from "react";
+import { CircleHelp, Clock3, MessageSquareText, Plus, Repeat2, Sparkles } from "lucide-react";
 import { AudioStateIcon } from "@/components/audio/audio-state-icon";
 import { GenerateSceneSheet } from "@/components/scenes/generate-scene-sheet";
 import {
@@ -57,9 +57,14 @@ const sceneStatusClassName =
 const sceneProgressClassName =
   "text-[length:clamp(1.5rem,7vw,1.75rem)] leading-none font-extrabold tracking-[-0.04em] text-[var(--app-scene-card-progress)]";
 const sceneRandomReviewStatusClassName =
-  "min-h-[18px] text-right text-[length:var(--mobile-adapt-font-caption)] font-bold text-[var(--app-foreground-muted)]";
+  "flex min-h-[18px] items-center justify-end gap-[var(--mobile-adapt-space-2xs)] text-right text-[length:var(--mobile-adapt-font-caption)] font-bold text-[var(--app-foreground-muted)]";
+const sceneRandomReviewInfoButtonClassName =
+  "inline-flex size-[18px] shrink-0 items-center justify-center rounded-full text-[var(--app-foreground-muted)] transition-colors hover:bg-[var(--app-scene-card-meta-bg)] hover:text-[var(--app-foreground)]";
+const sceneRandomReviewPackListClassName =
+  "ml-auto mt-[var(--mobile-adapt-space-2xs)] w-fit max-w-full rounded-[var(--app-radius-card)] border border-[var(--border)] bg-white px-[var(--mobile-adapt-space-sm)] py-[var(--mobile-adapt-space-xs)] text-right text-[length:var(--mobile-adapt-font-caption)] font-bold text-[var(--app-foreground-muted)] shadow-[0_8px_20px_rgba(15,23,42,0.08)]";
 
 export default function ScenesPage() {
+  const [reviewPackListOpen, setReviewPackListOpen] = useState(false);
   const {
     dialogOpen,
     setDialogOpen,
@@ -93,9 +98,9 @@ export default function ScenesPage() {
     getRowGestureHandlers,
   } = useSceneSwipeActions();
   const {
-    currentScene,
     eligibleScenes,
     isRandomReviewActive,
+    reviewPackScenes,
     randomReviewStatus,
     reviewPackPrepareStatus,
     toggleRandomReview,
@@ -104,31 +109,36 @@ export default function ScenesPage() {
   const randomReviewTitle =
     eligibleScenes.length === 0
       ? "完成 60% 以上的场景后可循环播放"
-      : currentScene
-        ? `正在播放：${currentScene.title}`
+      : isRandomReviewActive
+        ? `循环播放中：${eligibleScenes.length} 个场景`
         : reviewPackPrepareStatus === "preparing"
           ? "循环播放音频准备中"
           : reviewPackPrepareStatus === "ready"
-            ? `循环播放已准备好，可播放 ${eligibleScenes.length} 个场景`
+            ? `已准备好，可后台循环 ${reviewPackScenes.length} 个场景`
             : reviewPackPrepareStatus === "skipped"
-              ? "弱网或省流量下将于点击后再准备"
+              ? "点击后准备音频"
               : reviewPackPrepareStatus === "failed"
-                ? "循环播放准备失败，点击后会重试"
-                : `可播放 ${eligibleScenes.length} 个场景`;
+                ? "准备失败，点击仍可播放"
+                : `可循环 ${eligibleScenes.length} 个场景`;
   const randomReviewStatusText =
     eligibleScenes.length === 0
       ? null
-      : currentScene
-        ? `正在播放：${currentScene.title}`
+      : isRandomReviewActive
+        ? `循环播放中：${eligibleScenes.length} 个场景`
         : reviewPackPrepareStatus === "preparing"
           ? "循环音频准备中"
           : reviewPackPrepareStatus === "ready"
-            ? "循环音频已准备好"
+            ? "已准备好，可后台循环"
             : reviewPackPrepareStatus === "skipped"
-              ? "点击后准备循环音频"
+              ? "点击后准备音频"
               : reviewPackPrepareStatus === "failed"
-                ? "准备失败，点击重试"
+                ? "准备失败，点击仍可播放"
                 : `可循环 ${eligibleScenes.length} 个场景`;
+
+  useEffect(() => {
+    if (reviewPackScenes.length > 0) return;
+    setReviewPackListOpen(false);
+  }, [reviewPackScenes.length]);
 
   useEffect(() => {
     if (process.env.NODE_ENV !== "development") return;
@@ -328,9 +338,45 @@ export default function ScenesPage() {
           </Button>
         </div>
         {randomReviewStatusText ? (
-          <div className={sceneRandomReviewStatusClassName} data-random-review-status="true">
-            {randomReviewStatusText}
-          </div>
+          <>
+            <div className={sceneRandomReviewStatusClassName} data-random-review-status="true">
+              <span>{randomReviewStatusText}</span>
+              {reviewPackScenes.length > 0 ? (
+                <button
+                  type="button"
+                  className={sceneRandomReviewInfoButtonClassName}
+                  aria-label="查看循环播放内容"
+                  aria-expanded={reviewPackListOpen}
+                  aria-controls="scene-review-pack-list"
+                  title="查看循环播放内容"
+                  onClick={() => setReviewPackListOpen((open) => !open)}
+                >
+                  <CircleHelp className="size-[14px]" />
+                </button>
+              ) : null}
+            </div>
+            {reviewPackListOpen ? (
+              <div
+                id="scene-review-pack-list"
+                className={sceneRandomReviewPackListClassName}
+                data-random-review-pack-list="true"
+              >
+                <div className="mb-[var(--mobile-adapt-space-2xs)] text-[var(--app-foreground)]">
+                  本次循环包含
+                </div>
+                <ol className="space-y-[var(--mobile-adapt-space-2xs)]">
+                  {reviewPackScenes.map((scene, index) => (
+                    <li key={scene.id} className="flex justify-end gap-[var(--mobile-adapt-space-xs)]">
+                      <span className="text-[var(--app-foreground-muted)]">{index + 1}.</span>
+                      <span className="max-w-[min(72vw,320px)] truncate text-[var(--app-foreground)]">
+                        {scene.title}
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            ) : null}
+          </>
         ) : null}
       </div>
 

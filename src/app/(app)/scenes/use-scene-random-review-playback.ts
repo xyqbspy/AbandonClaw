@@ -424,6 +424,7 @@ export function useSceneRandomReviewPlayback(allScenes: SceneListItemResponse[])
   return {
     eligibleScenes,
     currentScene,
+    reviewPackScenes: getQueueWindow(reviewQueue, 0, SCENE_RANDOM_REVIEW_PACK_LIMIT),
     isRandomReviewActive: status !== "idle",
     randomReviewStatus: status,
     reviewPackPrepareStatus,
