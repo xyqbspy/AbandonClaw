@@ -57,7 +57,7 @@ const sceneStatusClassName =
 const sceneProgressClassName =
   "text-[length:clamp(1.5rem,7vw,1.75rem)] leading-none font-extrabold tracking-[-0.04em] text-[var(--app-scene-card-progress)]";
 const sceneRandomReviewStatusClassName =
-  "mt-[calc(-1*var(--mobile-adapt-space-xs))] min-h-[18px] text-right text-[length:var(--mobile-adapt-font-caption)] font-bold text-[var(--app-foreground-muted)]";
+  "min-h-[18px] text-right text-[length:var(--mobile-adapt-font-caption)] font-bold text-[var(--app-foreground-muted)]";
 
 export default function ScenesPage() {
   const {
@@ -276,7 +276,7 @@ export default function ScenesPage() {
 
   return (
     <div className="space-y-[var(--mobile-adapt-space-md)]">
-      <div className="pb-[var(--mobile-adapt-space-md)]">
+      <div className="space-y-[calc(var(--mobile-adapt-space-md)/2)] pb-[var(--mobile-adapt-space-md)]">
         <div className="grid grid-cols-[1fr_1fr_auto] gap-[var(--mobile-adapt-space-sm)]">
           <Button
             type="button"
