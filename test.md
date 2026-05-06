@@ -1,4 +1,4 @@
-# Testing Guide
+# 测试指南
 
 这份文档定义当前仓库的测试分层、命名规则、补测标准和最小验证流程。
 
@@ -248,7 +248,7 @@ pnpm run test:all
 pnpm run build
 ```
 
-## 13. 关键入口测试基线
+## 9. 关键入口测试基线
 
 涉及 `middleware`、`review`、`learning` 关键入口时，至少补齐下面这组最小回归：
 
@@ -283,7 +283,7 @@ node --import tsx --import ./src/test/setup-dom.ts --test src/features/scene/com
 - Windows PowerShell 下包含 `[` `]` 的路径，必要时用引号包起来
 - 如果命令行通配行为不稳定，优先直接跑 `pnpm run test:unit` 或 `pnpm run test:interaction`
 
-## 9. 当前仓库推荐分层
+## 10. 当前仓库推荐分层
 
 目前仓库已经形成比较稳定的测试分层：
 
@@ -305,7 +305,7 @@ node --import tsx --import ./src/test/setup-dom.ts --test src/features/scene/com
 - 新增公共规则文件时，优先补同层单元测试
 - 新增页面流程变化时，优先补交互回归测试
 
-## 10. 什么时候必须补回归测试
+## 11. 什么时候必须补回归测试
 
 出现下面这些情况时，建议补一条 `*.test.tsx` 回归测试：
 
@@ -322,7 +322,7 @@ node --import tsx --import ./src/test/setup-dom.ts --test src/features/scene/com
 - practice 从单题型变成多模块
 - 当前训练句切换后按钮文案同步更新
 
-## 11. 当前规则还可以继续优化的方向
+## 12. 当前规则还可以继续优化的方向
 
 这次补文档后，后面建议继续收紧两点：
 
@@ -330,7 +330,7 @@ node --import tsx --import ./src/test/setup-dom.ts --test src/features/scene/com
   - 例如 `scene / today / review / chunks`
 - 把 `lint` 纳入大改动后的默认验证步骤
 
-## 12. 当前基线
+## 13. 当前基线
 
 更新这份文档时，下面命令已经通过：
 

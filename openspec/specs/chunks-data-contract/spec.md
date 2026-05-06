@@ -55,7 +55,7 @@
 
 #### Scenario: 维护者调整表达删除链路
 - **WHEN** 维护者修改 `chunks` 表达删除的接口、service、副作用或详情回退逻辑
-- **THEN** 必须同步更新 `docs/chunks-data-mapping.md`
+- **THEN** 必须同步更新 `docs/system-design/chunks-data-mapping.md`
 - **AND** 必须通过回归测试覆盖主表达补位、空 cluster 清理和 related rows 刷新
 
 ### Requirement: Chunks 表达删除不得误删共享音频资源

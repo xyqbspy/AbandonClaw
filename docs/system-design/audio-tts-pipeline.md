@@ -692,29 +692,29 @@ block 音频继续复用 sentence TTS 通道，但事件中仍保持：
 - 老事件没有 `wasWarmed` 时按 cold 处理。
 - registry 是内存态，刷新页面后 registry 会重置；事件记录仍按 `client-events` 的本地存储保留。
 
-## 16. scenes 随机复习播放
+## 16. scenes 循环复习播放
 
-`scenes` 列表页的随机复习播放复用 scene full TTS 资源，但播放语义不同于 scene detail 内的完整场景循环。
+`scenes` 列表页的循环复习播放复用 scene full TTS 资源，但播放语义不同于 scene detail 内的完整场景循环。当前主路径是同日稳定 review pack，逐场景 scene full 队列只作为回退路径。
 
 边界：
 
 - `playSceneLoopAudio()` 继续表示单个场景的完整音频循环，会设置 `audio.loop = true`。
 - `playSceneFullAudioOnce()` 表示完整场景播放一次，播放结束后由页面级队列决定是否进入下一个场景。
-- 随机复习播放只在页面层维护队列，不新增全局后台播放器。
-- 队列项播放前通过 `getSceneDetailBySlugFromApi(slug)` 获取完整 lesson，再由 `buildSceneFullSegmentsFromLesson()` 组装 scene full segments。
+- 循环复习播放只在页面层维护队列，不新增全局后台播放器。
+- 回退队列项播放前优先读 scene detail cache；未命中时再通过 `getSceneDetailBySlugFromApi(slug)` 获取完整 lesson，并由 `buildSceneFullSegmentsFromLesson()` 组装 scene full segments。
 - scene full 的生成、Storage 命中、浏览器 Cache Storage、失败冷却和可观测事件继续复用现有链路。
 
 失败处理：
 
 - 某个场景详情获取失败、无可播放 segments 或 scene full 失败时，页面队列可以跳过当前场景并尝试下一个合格场景。
-- 如果一轮内所有合格场景都失败，页面应停止随机复习播放并给出受控提示。
+- 如果一轮内所有合格场景都失败，页面应停止循环复习播放并给出受控提示。
 - 本能力不把 scene full 自动降级为逐句串播；如果后续要做逐句降级，需要作为新的行为变更单独评估。
 
 ### 16.1 缓存优先与播放前准备
 
-当前 scenes 随机复习播放在队列内消费 scene full 音频。为了减少后台切换到下一场景时的联网依赖，播放链路现在先按 slug 读取本地 scene detail cache；命中时直接用缓存 lesson 组装 `scene full` segments，不再为了该场景详情请求 `/api/scenes/{slug}`。未命中时才走网络详情接口，并在成功后异步写回 scene cache。
+当前 scenes 循环复习播放在回退队列内消费 scene full 音频。为了减少后台切换到下一场景时的联网依赖，播放链路现在先按 slug 读取本地 scene detail cache；命中时直接用缓存 lesson 组装 `scene full` segments，不再为了该场景详情请求 `/api/scenes/{slug}`。未命中时才走网络详情接口，并在成功后异步写回 scene cache。
 
-随机播放启动后，页面会准备当前起点及后续少量合格场景：读取/写入 scene detail cache，组装 scene full segments，并调用 `prefetchSceneFullAudio()` 让现有 TTS 链路把音频落到浏览器 Cache Storage。该准备失败不阻断当前播放；实际播放仍复用 `playSceneFullAudioOnce()`、scene full 冷却、fallback 摘要和现有跳过策略。
+回退队列启动后，页面会准备当前起点及后续少量合格场景：读取/写入 scene detail cache，组装 scene full segments，并调用 `prefetchSceneFullAudio()` 让现有 TTS 链路把音频落到浏览器 Cache Storage。该准备失败不阻断当前播放；实际播放仍复用 `playSceneFullAudioOnce()`、scene full 冷却、fallback 摘要和现有跳过策略。
 
 边界：
 - 这不是完整离线 / PWA 能力；首次未缓存的 scene detail 或 scene full 音频仍需要联网。
