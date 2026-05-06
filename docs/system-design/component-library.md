@@ -203,6 +203,20 @@
 | `src/features/progress/components/progress-overview.tsx` | 收出 `ProgressWeeklyMinutesCard`、`ProgressSkillBreakdownCard`，并整理 `statCards` 配置 | 目前仍是 progress 页私有统计区，暂未形成跨页面稳定复用的统计面板契约 |
 | `src/features/review/components/review-card.tsx` | 收出 `ReviewCardContextBlock`、`ReviewCardMasteryBlock` | review 卡片虽然是独立展示卡，但仍然绑定 review item 的 due/mastery 语义 |
 
+### Chunks 工作台的动作层级边界
+
+`chunks` 工作台的详情、relation、cluster、expression map、候选保存和来源场景回流都依赖表达资产语义。收口页面复杂度时，优先在 `src/app/(app)/chunks` 或 `src/features/chunks/components` 内按动作域拆分 hook、selector、view-model 或 feature 组件，不因为视觉形态相似就迁到 `src/components/shared`。
+
+明确继续留在 Chunks feature 内：
+
+- `FocusDetailSheet`
+- `ExpressionMapSheet`
+- `MoveIntoClusterSheet`
+- `ClusterFocusList`
+- `ExpressionSummaryCard`
+
+只有纯视觉壳或基础控件逻辑，并且脱离 Chunks 数据写入、review session、relation、cluster、source scene 语义后仍然清晰时，才允许评估抽成 shared primitive。
+
 ### 这轮同时验证出的一个规则
 
 如果一个文件已经出现下面两种信号，可以优先做“文件内私有展示单元收口”：

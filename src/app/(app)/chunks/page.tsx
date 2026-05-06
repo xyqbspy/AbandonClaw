@@ -881,6 +881,15 @@ export default function ChunksPage() {
     notifyChunksExpressionComposerOpened();
   };
 
+  const openExpressionDetailFromCard = (item: UserPhraseItemResponse) => {
+    setFocusExpressionId(resolveFocusMainExpressionIdForRow(item.userPhraseId));
+    void openFocusDetail({
+      text: item.text,
+      kind: "current",
+      chainMode: "reset",
+    });
+  };
+
   const saveExpressionFromSentence = async (item: UserPhraseItemResponse, expression: string) => {
     const normalized = normalizePhraseText(expression);
     if (!normalized) return;
@@ -1980,6 +1989,7 @@ export default function ChunksPage() {
             inThisSentence: zh.inThisSentence,
             commonUsage: zh.commonUsage,
             sentenceRecordExpression: zh.sentenceRecordExpression,
+            detailPrimaryAction: zh.detailPrimaryAction,
             mapUnavailable: zh.mapUnavailable,
             mapPending: zh.mapPending,
             openMap: zh.openMap,
@@ -2000,9 +2010,10 @@ export default function ChunksPage() {
           handlePronounceSentence={handlePronounceSentence}
           saveExpressionFromSentence={saveExpressionFromSentence}
           openExpressionComposerFromSentence={openExpressionComposerFromSentence}
+          openExpressionDetail={openExpressionDetailFromCard}
           startReviewFromCard={startReviewFromCard}
           openExpressionMap={openExpressionMap}
-            openSourceScene={openSourceScene}
+          openSourceScene={openSourceScene}
           retryAiEnrichment={retryAiEnrichment}
           applyClusterFilter={applyClusterFilter}
           openGenerateSimilarSheet={openGenerateSimilarSheet}

@@ -14,7 +14,7 @@ const labels = {
   candidateBadge: "候选",
   noTranslation: "暂无翻译",
   loading: "加载中",
-  enriching: "补全当前chunk...",
+  enriching: "补全当前表达...",
   tabInfo: "详情",
   tabSimilar: "同类",
   tabContrast: "对照",

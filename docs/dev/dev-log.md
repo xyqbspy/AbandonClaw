@@ -1,5 +1,41 @@
 ﻿# Dev Log
 
+### [2026-05-06] 收口 Chunks 工作台用户动作层级
+- 类型：Spec-Driven / Chunks 工作台体验收口
+- 状态：已完成并归档 `streamline-chunks-workbench`
+
+#### 背景
+Chunks 页面同时承载表达库、句子沉淀、relation / cluster、expression map、AI 候选和 review 入口，普通用户的学习主路径容易被高级整理动作稀释。本轮按产品北极星收口为“表达资产用于回忆、使用、迁移”。
+
+#### 本次改动
+- 表达卡片补上“查看详情”主入口，并让表达复习、来源场景回流优先于 expression map 等整理动作。
+- 句子卡片补上来源场景回流，保留句中表达提取，不再把 sentence 当成 expression review 入口展示。
+- 将“查看详情”和“查看整组”文案分开，避免同一层级动作含义混淆。
+- 把“补全当前 chunk”改为“补全当前表达”，减少用户可见技术名词。
+- 同步 `chunks-data-mapping`、`component-library` 和 stable spec，明确入口层级调整不得改变保存、relation、cluster、map、review session 与缓存失效副作用。
+
+#### 本轮收口项
+- 新增 `chunks-workbench-user-path` stable spec。
+- 为 `chunks-data-contract` 增加“入口层级调整不得破坏数据副作用契约”。
+- 明确 Chunks 详情、expression map、cluster 操作容器继续留在 feature 私有边界。
+
+#### 明确不收项
+- 不改数据模型、后端 relation / cluster 语义、review 调度算法或 AI 生成策略。
+- 不删除 expression map、AI 候选、cluster 维护、move / detach / merge 等高级能力。
+- 不把 `FocusDetailSheet`、`ExpressionMapSheet`、`MoveIntoClusterSheet` 上移到 shared。
+
+#### 验证
+- 已运行：
+  - `node --import tsx --import ./src/test/setup-dom.ts --test "src/app/(app)/chunks/chunks-list-view.interaction.test.tsx" "src/app/(app)/chunks/page.interaction.test.tsx" "src/app/(app)/chunks/use-manual-sentence-composer.test.tsx"`
+  - `node --import tsx --import ./src/test/setup-dom.ts --test "src/features/chunks/components/focus-detail-actions.interaction.test.tsx" "src/features/chunks/components/focus-detail-content.interaction.test.tsx"`
+  - `node --import tsx --import ./src/test/setup-dom.ts --test "src/app/(app)/chunks/use-generated-similar-sheet.test.tsx" "src/app/(app)/chunks/use-expression-cluster-actions.test.tsx" "src/features/chunks/components/expression-map-sheet.interaction.test.tsx"`
+  - `node --import tsx --test "src/app/(app)/chunks/chunks-page-logic.test.ts" "src/app/(app)/chunks/chunks-save-contract.test.ts" "src/app/(app)/chunks/chunks-focus-detail-presenters.test.ts"`
+  - `pnpm exec openspec validate --changes "streamline-chunks-workbench" --strict`
+  - `pnpm exec openspec validate --specs --strict --no-interactive`
+  - `pnpm run text:check-mojibake`
+  - `pnpm run maintenance:check`
+  - `git diff --check`
+
 ### [2026-04-22] 瘦身核心维护入口文档
 - 类型：Spec-Driven / 核心维护文档瘦身
 - 状态：已完成

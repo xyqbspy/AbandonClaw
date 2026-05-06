@@ -61,6 +61,8 @@
 
 - 文件：[page.tsx](/d:/WorkCode/AbandonClaw/src/app/(app)/chunks/page.tsx)
 - 负责 sheet 开关、toast、列表刷新、focus detail 交互、map / cluster / review 入口
+- 工作台首屏优先承载表达详情、表达复习、来源场景回流、句中表达提取等学习闭环动作；relation、cluster、expression map、AI 候选生成、移动、合并、删除等整理动作应从详情上下文、展开态或更多操作进入。
+- 调整入口层级不得改变本文件定义的数据副作用：保存、relation、cluster、expression map、review session、cache invalidation 与页面反馈必须保持可追踪。
 
 ### 3.2 动作 hook
 
@@ -137,6 +139,7 @@
 入口：
 
 - [use-manual-sentence-composer.ts](/d:/WorkCode/AbandonClaw/src/app/(app)/chunks/use-manual-sentence-composer.ts)
+- `chunks` 工作台句子条目主路径：回到来源场景继续巩固，或从句中提取表达；句子条目不得伪装成 expression review 条目。
 
 前端行为：
 
@@ -224,6 +227,7 @@
 入口：
 
 - `page.tsx` 里的 `saveExpressionFromSentence`
+- `chunks` 句子卡片里的“记录句中表达”与候选表达保存按钮
 
 前端行为：
 
@@ -241,6 +245,7 @@
 入口：
 
 - `page.tsx` 里的 `handleAddClusterToReview`
+- 工作台入口层级：expression map 属于表达整理能力，应从表达卡展开态、详情上下文或更多操作进入，不作为普通表达条目的唯一主 CTA。
 
 前端行为：
 

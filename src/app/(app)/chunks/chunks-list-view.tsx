@@ -375,6 +375,7 @@ type ChunksListViewLabels = {
   inThisSentence: string;
   commonUsage: string;
   sentenceRecordExpression: string;
+  detailPrimaryAction: string;
   mapUnavailable: string;
   mapPending: string;
   openMap: string;
@@ -423,6 +424,7 @@ type ChunksListViewProps = {
   handlePronounceSentence: (text?: string | null) => void;
   saveExpressionFromSentence: (item: UserPhraseItemResponse, expression: string) => Promise<void>;
   openExpressionComposerFromSentence: () => void;
+  openExpressionDetail: (item: UserPhraseItemResponse) => void;
   startReviewFromCard: (item: UserPhraseItemResponse) => void;
   openExpressionMap: (item: UserPhraseItemResponse) => Promise<void>;
   openSourceScene: (slug: string) => void;
@@ -463,6 +465,7 @@ export function ChunksListView({
   handlePronounceSentence,
   saveExpressionFromSentence,
   openExpressionComposerFromSentence,
+  openExpressionDetail,
   startReviewFromCard,
   openExpressionMap,
   openSourceScene,
@@ -512,7 +515,7 @@ export function ChunksListView({
                     ? `🔗 ${labels.similarExpressions} · ${similarPreview.length}`
                     : `🔗 ${labels.similarExpressions}`
                 }
-                actionLabel="查看详情"
+                actionLabel={labels.viewAllSimilar}
                 onAction={() =>
                   item.expressionClusterId
                     ? applyClusterFilter(item.expressionClusterId, item.text)
@@ -577,10 +580,32 @@ export function ChunksListView({
                       size="sm"
                       variant="ghost"
                       className={appleButtonClassName}
+                      onClick={() => openExpressionDetail(item)}
+                    >
+                      {labels.detailPrimaryAction}
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className={appleButtonClassName}
                       onClick={() => startReviewFromCard(item)}
                     >
                       {getPrimaryActionLabel(item)}
                     </Button>
+                    {item.sourceSceneSlug ? (
+                      <LoadingButton
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className={appleButtonClassName}
+                        loading={openingSourceSceneSlug === item.sourceSceneSlug}
+                        loadingText="进入场景中..."
+                        onClick={() => openSourceScene(item.sourceSceneSlug!)}
+                      >
+                        {labels.sourceScene}
+                      </LoadingButton>
+                    ) : null}
                     <LoadingButton
                       type="button"
                       size="sm"
@@ -715,6 +740,18 @@ export function ChunksListView({
                       openGenerateSimilarSheet={openGenerateSimilarSheet}
                       buildDifferenceNote={buildDifferenceNote}
                     />
+                    <LoadingButton
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className={`h-7 text-xs ${appleButtonClassName}`}
+                      disabled={!item.expressionClusterId}
+                      loading={mapOpeningForId === item.userPhraseId}
+                      loadingText={labels.mapPending}
+                      onClick={() => void openExpressionMap(item)}
+                    >
+                      {!item.expressionClusterId ? labels.mapUnavailable : labels.openMap}
+                    </LoadingButton>
                   </>
                 )}
                 {item.sourceType === "manual" ? (
@@ -747,17 +784,41 @@ export function ChunksListView({
               </CardContent>
               <CardFooter className="flex flex-wrap gap-2 px-3 py-2.5 [@media(max-height:760px)]:gap-1.5 [@media(max-height:760px)]:px-2.5 [@media(max-height:760px)]:py-2">
                 {item.learningItemType === "sentence" ? (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    className={appleButtonClassName}
-                    onClick={() => openExpressionComposerFromSentence()}
-                  >
-                    {labels.sentenceRecordExpression}
-                  </Button>
+                  <>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className={appleButtonClassName}
+                      onClick={() => openExpressionComposerFromSentence()}
+                    >
+                      {labels.sentenceRecordExpression}
+                    </Button>
+                    {item.sourceSceneSlug ? (
+                      <LoadingButton
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className={appleButtonClassName}
+                        loading={openingSourceSceneSlug === item.sourceSceneSlug}
+                        loadingText="进入场景中..."
+                        onClick={() => openSourceScene(item.sourceSceneSlug!)}
+                      >
+                        {labels.sourceScene}
+                      </LoadingButton>
+                    ) : null}
+                  </>
                 ) : (
                   <>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className={appleButtonClassName}
+                      onClick={() => openExpressionDetail(item)}
+                    >
+                      {labels.detailPrimaryAction}
+                    </Button>
                     <Button
                       type="button"
                       size="sm"
@@ -767,18 +828,6 @@ export function ChunksListView({
                     >
                       {getPrimaryActionLabel(item)}
                     </Button>
-                    <LoadingButton
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      className={appleButtonClassName}
-                      disabled={!item.expressionClusterId}
-                      loading={mapOpeningForId === item.userPhraseId}
-                      loadingText={labels.mapPending}
-                      onClick={() => void openExpressionMap(item)}
-                    >
-                      {!item.expressionClusterId ? labels.mapUnavailable : labels.openMap}
-                    </LoadingButton>
                     {item.sourceSceneSlug ? (
                       <LoadingButton
                         type="button"
