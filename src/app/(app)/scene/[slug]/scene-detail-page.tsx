@@ -28,6 +28,7 @@ import { SceneVariantsView } from "@/features/scene/components/scene-variants-vi
 import { sceneViewLabels } from "@/features/scene/components/scene-view-labels";
 import { normalizePhraseText } from "@/lib/shared/phrases";
 import { Lesson } from "@/lib/types";
+import type { PracticeAssessmentLevel, PracticeMode } from "@/lib/types/learning-flow";
 import { recordClientEvent } from "@/lib/utils/client-events";
 import { savePhraseFromApi } from "@/lib/utils/phrases-api";
 import { hydrateVariantSetFromRun, savePracticeSet } from "@/lib/utils/scene-learning-flow-storage";
@@ -102,6 +103,26 @@ type SavePhrasePayload = {
   sourceSentenceText?: string;
   sourceChunkText?: string;
 };
+type PracticeRunStartPayload = {
+  practiceSetId: string;
+  mode: PracticeMode;
+  sourceType: "original" | "variant";
+  sourceVariantId?: string | null;
+};
+type PracticeAttemptPayload = PracticeRunStartPayload & {
+  exerciseId: string;
+  sentenceId?: string | null;
+  userAnswer: string;
+  assessmentLevel: PracticeAssessmentLevel;
+  isCorrect: boolean;
+  metadata?: Record<string, unknown>;
+};
+type PracticeModeCompletePayload = {
+  practiceSetId: string;
+  mode: PracticeMode;
+  nextMode?: PracticeMode;
+};
+
 export default function SceneDetailClientPage({
   initialLesson = null,
 }: {
@@ -540,12 +561,7 @@ export default function SceneDetailClientPage({
   }, [handleRegeneratePractice, resetPracticePrewarmFailures]);
 
   const handlePracticeRunStart = useCallback(
-    (payload: {
-      practiceSetId: string;
-      mode: "cloze" | "guided_recall" | "sentence_recall" | "full_dictation";
-      sourceType: "original" | "variant";
-      sourceVariantId?: string | null;
-    }) => {
+    (payload: PracticeRunStartPayload) => {
       if (!baseLesson) return;
       const runKey = [
         baseLesson.slug,
@@ -623,6 +639,145 @@ export default function SceneDetailClientPage({
       latestPracticeSet,
       trainingState?.session?.practicedSentenceCount,
     ],
+  );
+
+  const handlePracticeComplete = useCallback(() => {
+    if (!baseLesson) return;
+    const shouldNotifyMilestone = !sceneRawCompletedMap.scene_practice;
+    if (!latestPracticeSet) {
+      if (shouldNotifyMilestone) {
+        notifySceneMilestone("scene_practice", baseLesson.title);
+      }
+      handleMarkPracticeComplete();
+      return;
+    }
+    void completeScenePracticeRunFromApi(baseLesson.slug, {
+      practiceSetId: latestPracticeSet.id,
+    })
+      .then((result) => {
+        setPracticeSnapshot((current) => {
+          const next =
+            current
+              ? {
+                  ...current,
+                  run: result.run,
+                }
+              : {
+                  run: result.run,
+                  latestAttempt: null,
+                  summary: {
+                    completedModeCount: result.run.completedModes.length,
+                    totalAttemptCount: 0,
+                    correctAttemptCount: 0,
+                    latestAssessmentLevel: null,
+                  },
+                };
+          void setScenePracticeSnapshotCache(baseLesson.slug, latestPracticeSet.id, next).catch(() => {
+            // Ignore cache failures.
+          });
+          return next;
+        });
+      })
+      .catch(() => {
+        // Non-blocking.
+      });
+    if (shouldNotifyMilestone) {
+      notifySceneMilestone("scene_practice", baseLesson.title);
+    }
+    handleMarkPracticeComplete();
+  }, [
+    baseLesson,
+    handleMarkPracticeComplete,
+    latestPracticeSet,
+    sceneRawCompletedMap.scene_practice,
+  ]);
+
+  const handlePracticeAttempt = useCallback(
+    (payload: PracticeAttemptPayload) => {
+      if (!baseLesson || !payload.practiceSetId) return;
+      void recordScenePracticeAttemptFromApi(baseLesson.slug, payload)
+        .then((result) => {
+          if (result.learningState) {
+            handleLearningStateChange(result.learningState);
+          }
+          setPracticeSnapshot((current) => {
+            const next = {
+              run: result.run,
+              latestAttempt: result.attempt,
+              summary: {
+                completedModeCount: current?.summary.completedModeCount ?? result.run.completedModes.length,
+                totalAttemptCount: (current?.summary.totalAttemptCount ?? 0) + 1,
+                correctAttemptCount:
+                  (current?.summary.correctAttemptCount ?? 0) + (result.attempt.isCorrect ? 1 : 0),
+                latestAssessmentLevel: result.attempt.assessmentLevel,
+              },
+            };
+            void setScenePracticeSnapshotCache(baseLesson.slug, payload.practiceSetId, next).catch(() => {
+              // Ignore cache failures.
+            });
+            return next;
+          });
+        })
+        .catch(() => {
+          // Non-blocking.
+        });
+    },
+    [baseLesson, handleLearningStateChange],
+  );
+
+  const handlePracticeModeComplete = useCallback(
+    (payload: PracticeModeCompletePayload) => {
+      if (!baseLesson) return;
+      void markScenePracticeModeCompleteFromApi(baseLesson.slug, payload)
+        .then((result) => {
+          setPracticeSnapshot((current) => {
+            const next = {
+              run: result.run,
+              latestAttempt: current?.latestAttempt ?? null,
+              summary: {
+                completedModeCount: result.run.completedModes.length,
+                totalAttemptCount: current?.summary.totalAttemptCount ?? 0,
+                correctAttemptCount: current?.summary.correctAttemptCount ?? 0,
+                latestAssessmentLevel: current?.summary.latestAssessmentLevel ?? null,
+              },
+            };
+            void setScenePracticeSnapshotCache(baseLesson.slug, payload.practiceSetId, next).catch(() => {
+              // Ignore cache failures.
+            });
+            return next;
+          });
+        })
+        .catch(() => {
+          // Non-blocking.
+        });
+    },
+    [baseLesson],
+  );
+
+  const handleBackToSceneView = useCallback(() => {
+    setViewModeWithRoute("scene");
+  }, [setViewModeWithRoute]);
+
+  const handleOpenVariantsView = useCallback(() => {
+    setViewModeWithRoute("variants");
+  }, [setViewModeWithRoute]);
+
+  const handleRegeneratePracticeFromView = useCallback(() => {
+    void handleRegeneratePracticeManually();
+  }, [handleRegeneratePracticeManually]);
+
+  const handleOpenExpressionMapView = useCallback(() => {
+    void handleOpenExpressionMap();
+  }, [handleOpenExpressionMap]);
+
+  const handleTogglePracticeAnswer = useCallback(
+    (exerciseId: string) => {
+      setShowAnswerMap((prev) => ({
+        ...prev,
+        [exerciseId]: !prev[exerciseId],
+      }));
+    },
+    [setShowAnswerMap],
   );
 
   const handleTrainingListenStep = useCallback(() => {
@@ -942,168 +1097,67 @@ export default function SceneDetailClientPage({
   if (viewMode === "practice") {
     return (
       <ScenePracticeView
-          practiceSet={latestPracticeSet}
-          practiceSnapshot={practiceSnapshot}
-          showAnswerMap={showAnswerMap}
-          appleButtonSmClassName={appleButtonSmClassName}
-          appleDangerButtonSmClassName={appleDangerButtonSmClassName}
-          labels={{
-            ...sceneViewLabels.practice,
-            complete: "完成本轮练习",
-          }}
-          regenerating={practiceLoading}
-          onBack={() => setViewModeWithRoute("scene")}
-          onDelete={handleDeletePracticeSet}
-          onRegenerate={() => void handleRegeneratePracticeManually()}
-          onComplete={() => {
-            const shouldNotifyMilestone = !sceneRawCompletedMap.scene_practice;
-            if (!latestPracticeSet) {
-              if (shouldNotifyMilestone) {
-                notifySceneMilestone("scene_practice", baseLesson.title);
-              }
-              handleMarkPracticeComplete();
-              return;
-            }
-            void completeScenePracticeRunFromApi(baseLesson.slug, {
-              practiceSetId: latestPracticeSet.id,
-            })
-              .then((result) => {
-                setPracticeSnapshot((current) => {
-                  const next =
-                    current
-                      ? {
-                          ...current,
-                          run: result.run,
-                        }
-                      : {
-                          run: result.run,
-                          latestAttempt: null,
-                          summary: {
-                            completedModeCount: result.run.completedModes.length,
-                            totalAttemptCount: 0,
-                            correctAttemptCount: 0,
-                            latestAssessmentLevel: null,
-                          },
-                        };
-                  void setScenePracticeSnapshotCache(baseLesson.slug, latestPracticeSet.id, next).catch(() => {
-                    // Ignore cache failures.
-                  });
-                  return next;
-                });
-              })
-              .catch(() => {
-              // Non-blocking.
-              });
-            if (shouldNotifyMilestone) {
-              notifySceneMilestone("scene_practice", baseLesson.title);
-            }
-            handleMarkPracticeComplete();
-          }}
-          onSentenceCompleted={handleSentenceCompleted}
-          onPracticeRunStart={handlePracticeRunStart}
-          onPracticeAttempt={(payload) => {
-            if (!payload.practiceSetId) return;
-            void recordScenePracticeAttemptFromApi(baseLesson.slug, payload)
-              .then((result) => {
-                if (result.learningState) {
-                  handleLearningStateChange(result.learningState);
-                }
-                setPracticeSnapshot((current) => {
-                  const next = {
-                    run: result.run,
-                    latestAttempt: result.attempt,
-                    summary: {
-                      completedModeCount: current?.summary.completedModeCount ?? result.run.completedModes.length,
-                      totalAttemptCount: (current?.summary.totalAttemptCount ?? 0) + 1,
-                      correctAttemptCount:
-                        (current?.summary.correctAttemptCount ?? 0) + (result.attempt.isCorrect ? 1 : 0),
-                      latestAssessmentLevel: result.attempt.assessmentLevel,
-                    },
-                  };
-                  void setScenePracticeSnapshotCache(baseLesson.slug, payload.practiceSetId, next).catch(() => {
-                    // Ignore cache failures.
-                  });
-                  return next;
-                });
-              })
-              .catch(() => {
-                // Non-blocking.
-              });
-          }}
-          onPracticeModeComplete={(payload) => {
-            void markScenePracticeModeCompleteFromApi(baseLesson.slug, payload)
-              .then((result) => {
-                setPracticeSnapshot((current) => {
-                  const next = {
-                    run: result.run,
-                    latestAttempt: current?.latestAttempt ?? null,
-                    summary: {
-                      completedModeCount: result.run.completedModes.length,
-                      totalAttemptCount: current?.summary.totalAttemptCount ?? 0,
-                      correctAttemptCount: current?.summary.correctAttemptCount ?? 0,
-                      latestAssessmentLevel: current?.summary.latestAssessmentLevel ?? null,
-                    },
-                  };
-                  void setScenePracticeSnapshotCache(baseLesson.slug, payload.practiceSetId, next).catch(() => {
-                    // Ignore cache failures.
-                  });
-                  return next;
-                });
-              })
-              .catch(() => {
-                // Non-blocking.
-              });
-          }}
-          onReviewScene={() => setViewModeWithRoute("scene")}
-          onRepeatPractice={() => {
-            handleRepeatPractice();
-          }}
-          onOpenVariants={() => setViewModeWithRoute("variants")}
-          onToggleAnswer={(exerciseId) =>
-            setShowAnswerMap((prev) => ({
-              ...prev,
-              [exerciseId]: !prev[exerciseId],
-            }))
-          }
-        />
+        practiceSet={latestPracticeSet}
+        practiceSnapshot={practiceSnapshot}
+        showAnswerMap={showAnswerMap}
+        appleButtonSmClassName={appleButtonSmClassName}
+        appleDangerButtonSmClassName={appleDangerButtonSmClassName}
+        labels={{
+          ...sceneViewLabels.practice,
+          complete: "完成本轮练习",
+        }}
+        regenerating={practiceLoading}
+        onBack={handleBackToSceneView}
+        onDelete={handleDeletePracticeSet}
+        onRegenerate={handleRegeneratePracticeFromView}
+        onComplete={handlePracticeComplete}
+        onSentenceCompleted={handleSentenceCompleted}
+        onPracticeRunStart={handlePracticeRunStart}
+        onPracticeAttempt={handlePracticeAttempt}
+        onPracticeModeComplete={handlePracticeModeComplete}
+        onReviewScene={handleBackToSceneView}
+        onRepeatPractice={handleRepeatPractice}
+        onOpenVariants={handleOpenVariantsView}
+        onToggleAnswer={handleTogglePracticeAnswer}
+      />
     );
   }
 
   if (viewMode === "variants") {
     return (
       <SceneVariantsView
-          baseLesson={baseLesson}
-          variantSet={latestVariantSet}
-          expressionMapLoading={expressionMapLoading}
-          appleButtonSmClassName={appleButtonSmClassName}
-          appleDangerButtonSmClassName={appleDangerButtonSmClassName}
-          labels={sceneViewLabels.variants}
-          onBack={() => setViewModeWithRoute("scene")}
-          onComplete={handleMarkVariantSetComplete}
-          onRepeatVariants={handleRepeatVariants}
-          onDeleteSet={handleDeleteVariantSet}
-          onOpenExpressionMap={() => void handleOpenExpressionMap()}
-          onOpenChunk={handleOpenVariantChunk}
-          onOpenVariant={handleOpenVariant}
-          onDeleteVariant={handleDeleteVariantItem}
-          toVariantTitle={toVariantTitle}
-          toVariantStatusLabel={toVariantStatusLabel}
-          chunkDetailSheet={chunkDetailSheet}
-        />
+        baseLesson={baseLesson}
+        variantSet={latestVariantSet}
+        expressionMapLoading={expressionMapLoading}
+        appleButtonSmClassName={appleButtonSmClassName}
+        appleDangerButtonSmClassName={appleDangerButtonSmClassName}
+        labels={sceneViewLabels.variants}
+        onBack={handleBackToSceneView}
+        onComplete={handleMarkVariantSetComplete}
+        onRepeatVariants={handleRepeatVariants}
+        onDeleteSet={handleDeleteVariantSet}
+        onOpenExpressionMap={handleOpenExpressionMapView}
+        onOpenChunk={handleOpenVariantChunk}
+        onOpenVariant={handleOpenVariant}
+        onDeleteVariant={handleDeleteVariantItem}
+        toVariantTitle={toVariantTitle}
+        toVariantStatusLabel={toVariantStatusLabel}
+        chunkDetailSheet={chunkDetailSheet}
+      />
     );
   }
 
   if (viewMode === "expression-map") {
     return (
       <SceneExpressionMapView
-          clusters={expressionMap?.clusters ?? []}
-          error={expressionMapError}
-          appleButtonSmClassName={appleButtonSmClassName}
-          labels={sceneViewLabels.expressionMap}
-          onBack={() => setViewModeWithRoute("variants")}
-          onOpenExpressionDetail={handleOpenExpressionDetail}
-          chunkDetailSheet={chunkDetailSheet}
-        />
+        clusters={expressionMap?.clusters ?? []}
+        error={expressionMapError}
+        appleButtonSmClassName={appleButtonSmClassName}
+        labels={sceneViewLabels.expressionMap}
+        onBack={handleOpenVariantsView}
+        onOpenExpressionDetail={handleOpenExpressionDetail}
+        chunkDetailSheet={chunkDetailSheet}
+      />
     );
   }
 
@@ -1135,46 +1189,46 @@ export default function SceneDetailClientPage({
 
     return (
       <SceneVariantStudyView
-          lesson={activeVariantLesson}
-          topRightTool={
-            <button
-              type="button"
-              className={`${appleButtonLgClassName} px-3 py-1.5`}
-              onClick={() => setViewModeWithRoute("variants")}
-            >
-              返回
-            </button>
-          }
-          headerTools={variantStudyHeaderTools}
-          savedPhraseTexts={Array.from(savedPhraseTextSet)}
-          onSavePhrase={savePhraseForScene}
-          onReviewPhrase={savePhraseForScene}
-          onBlockPlayback={handleBlockPlaybackWarmup}
-          onSentencePlayback={handleSentencePlaybackWarmup}
-        />
+        lesson={activeVariantLesson}
+        topRightTool={
+          <button
+            type="button"
+            className={`${appleButtonLgClassName} px-3 py-1.5`}
+            onClick={handleOpenVariantsView}
+          >
+            返回
+          </button>
+        }
+        headerTools={variantStudyHeaderTools}
+        savedPhraseTexts={Array.from(savedPhraseTextSet)}
+        onSavePhrase={savePhraseForScene}
+        onReviewPhrase={savePhraseForScene}
+        onBlockPlayback={handleBlockPlaybackWarmup}
+        onSentencePlayback={handleSentencePlaybackWarmup}
+      />
     );
   }
 
   return (
-      <SceneBaseView
-        lesson={baseLesson}
-        practiceError={practiceRetryError ?? practiceError}
-        variantsError={variantsError}
-        trainingPanel={trainingPanel}
-        headerTools={null}
-        headerTitle={baseLesson.subtitle?.trim() || baseLesson.sections[0]?.summary?.trim() || baseLesson.title}
-        onBackToList={() => router.push("/scenes")}
-        interactionMode="training"
-        savedPhraseTexts={Array.from(savedPhraseTextSet)}
-        onSavePhrase={savePhraseForScene}
-        onReviewPhrase={savePhraseForScene}
-        onSceneLoopPlayback={handleSceneFullPlay}
-        onBlockPlayback={handleBlockPlaybackWarmup}
-        onSentencePlayback={handleSentencePlaybackWarmup}
-        onChunkEncounter={handleBaseChunkEncounter}
-        onSentencePracticeComplete={handleSentenceCompleted}
-        chunkDetailSheet={chunkDetailSheet}
-      />
+    <SceneBaseView
+      lesson={baseLesson}
+      practiceError={practiceRetryError ?? practiceError}
+      variantsError={variantsError}
+      trainingPanel={trainingPanel}
+      headerTools={null}
+      headerTitle={baseLesson.subtitle?.trim() || baseLesson.sections[0]?.summary?.trim() || baseLesson.title}
+      onBackToList={() => router.push("/scenes")}
+      interactionMode="training"
+      savedPhraseTexts={Array.from(savedPhraseTextSet)}
+      onSavePhrase={savePhraseForScene}
+      onReviewPhrase={savePhraseForScene}
+      onSceneLoopPlayback={handleSceneFullPlay}
+      onBlockPlayback={handleBlockPlaybackWarmup}
+      onSentencePlayback={handleSentencePlaybackWarmup}
+      onChunkEncounter={handleBaseChunkEncounter}
+      onSentencePracticeComplete={handleSentenceCompleted}
+      chunkDetailSheet={chunkDetailSheet}
+    />
   );
 }
 
