@@ -153,7 +153,7 @@ export const chunksPageMessages = {
   continueReview: "\u7ee7\u7eed\u590d\u4e60",
   revisitOne: "\u518d\u770b\u4e00\u904d",
   reviewFamily: "\u590d\u4e60\u8fd9\u7ec4",
-  sentenceReviewPending: "\u53e5\u5b50\u590d\u4e60\u5f85\u5f00\u653e",
+  sentenceReviewPending: "\u53e5\u5b50\u5df2\u4fdd\u5b58\uff0c\u53ef\u56de\u5230\u6765\u6e90\u573a\u666f\u7ee7\u7eed\u5de9\u56fa",
   openMap: "\u76f8\u5173\u8868\u8fbe",
   mapPending: "\u76f8\u5173\u8868\u8fbe\u751f\u6210\u4e2d",
   mapUnavailable: "\u6682\u65e0\u76f8\u5173\u8868\u8fbe",

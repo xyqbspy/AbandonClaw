@@ -76,7 +76,7 @@ export const REVIEW_STAGE_DASHED_BLOCK_CLASSNAME =
 export const REVIEW_STAGE_STRONG_DASHED_BLOCK_CLASSNAME =
   "rounded-[20px] border-2 border-dashed border-slate-200 bg-slate-50 p-4";
 
-export const REVIEW_STAGE_TODO_TITLE_CLASSNAME = "text-sm font-semibold text-slate-900";
+export const REVIEW_STAGE_GUIDANCE_TITLE_CLASSNAME = "text-sm font-semibold text-slate-900";
 
 export const REVIEW_STAGE_PROMPT_TITLE_CLASSNAME = "text-sm font-medium text-slate-700";
 

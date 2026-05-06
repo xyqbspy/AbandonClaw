@@ -157,7 +157,7 @@ export default function SceneDetailClientPage({
     if (nextDone && !sessionDoneRef.current) {
       const nextStepHint = nextState.progress.variantUnlockedAt
         ? "下一步可以直接打开变体训练。"
-        : "下一步可以回到 today 做一轮主动回忆。";
+        : "下一步可以回到今日学习做一轮主动回忆。";
       notifySceneSessionCompleted({
         savedPhraseCount: nextState.progress.savedPhraseCount,
         nextStepHint,

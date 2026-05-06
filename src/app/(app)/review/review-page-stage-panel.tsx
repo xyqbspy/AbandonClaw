@@ -38,7 +38,7 @@ import {
   REVIEW_STAGE_STEP_TAG_CLASSNAME,
   REVIEW_STAGE_STRONG_DASHED_BLOCK_CLASSNAME,
   REVIEW_STAGE_TITLE_CLASSNAME,
-  REVIEW_STAGE_TODO_TITLE_CLASSNAME,
+  REVIEW_STAGE_GUIDANCE_TITLE_CLASSNAME,
   REVIEW_STAGE_WARNING_BLOCK_CLASSNAME,
   REVIEW_STAGE_WARNING_LABEL_CLASSNAME,
 } from "./review-page-styles";
@@ -265,8 +265,8 @@ export function ReviewPageStagePanel({
                 </p>
               </div>
               <div className={REVIEW_STAGE_DASHED_BLOCK_CLASSNAME}>
-                <p className={REVIEW_STAGE_TODO_TITLE_CLASSNAME}>{labels.sceneTodoTitle}</p>
-                <p className={`mt-2 text-sm ${APPLE_META_TEXT}`}>{labels.sceneTodoBody}</p>
+                <p className={REVIEW_STAGE_GUIDANCE_TITLE_CLASSNAME}>{labels.sceneFeedbackGuidanceTitle}</p>
+                <p className={`mt-2 text-sm ${APPLE_META_TEXT}`}>{labels.sceneFeedbackGuidanceBody}</p>
               </div>
             </div>
           ) : null}
@@ -399,8 +399,8 @@ export function ReviewPageStagePanel({
                 />
               </div>
               <div className={REVIEW_STAGE_DASHED_BLOCK_CLASSNAME}>
-                <p className={REVIEW_STAGE_TODO_TITLE_CLASSNAME}>{labels.phraseRewriteTodoTitle}</p>
-                <p className={`mt-2 text-sm ${APPLE_META_TEXT}`}>{labels.phraseRewriteTodoBody}</p>
+                <p className={REVIEW_STAGE_GUIDANCE_TITLE_CLASSNAME}>{labels.phraseRewriteGuidanceTitle}</p>
+                <p className={`mt-2 text-sm ${APPLE_META_TEXT}`}>{labels.phraseRewriteGuidanceBody}</p>
               </div>
             </div>
           ) : null}
@@ -454,8 +454,8 @@ export function ReviewPageStagePanel({
                 </p>
               </div>
               <div className={REVIEW_STAGE_DASHED_BLOCK_CLASSNAME}>
-                <p className={REVIEW_STAGE_TODO_TITLE_CLASSNAME}>{labels.phraseFeedbackTodoTitle}</p>
-                <p className={`mt-2 text-sm ${APPLE_META_TEXT}`}>{labels.phraseFeedbackTodoBody}</p>
+                <p className={REVIEW_STAGE_GUIDANCE_TITLE_CLASSNAME}>{labels.phraseFeedbackGuidanceTitle}</p>
+                <p className={`mt-2 text-sm ${APPLE_META_TEXT}`}>{labels.phraseFeedbackGuidanceBody}</p>
               </div>
             </div>
           ) : null}

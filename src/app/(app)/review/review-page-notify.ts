@@ -22,7 +22,7 @@ const getPhraseReviewSubmittedDescription = (summary?: ReviewSummaryResponse) =>
   if (summary.dueReviewCount > 0) {
     return `已完成 ${summary.reviewedTodayCount} 条，继续下一条会更稳。`;
   }
-  return `已完成 ${summary.reviewedTodayCount} 条，可以回到 today 继续推进场景。`;
+  return `已完成 ${summary.reviewedTodayCount} 条，可以回到今日学习继续推进场景。`;
 };
 
 export const notifyPhraseReviewSubmitted = (

@@ -47,7 +47,7 @@ export function ReviewCard({ item }: { item: ReviewItem }) {
         <Button
           size="sm"
           className="cursor-pointer"
-          onClick={() => toast.message("复习流程待接入（示例交互已补齐）")}
+          onClick={() => toast.message("请从复习页开始正式回忆训练。")}
         >
           开始复习
         </Button>
@@ -55,7 +55,7 @@ export function ReviewCard({ item }: { item: ReviewItem }) {
           size="sm"
           variant="outline"
           className="cursor-pointer"
-          onClick={() => toast.success("已标记稍后再学（示例）")}
+          onClick={() => toast.success("已标记稍后再学。")}
         >
           稍后再学
         </Button>

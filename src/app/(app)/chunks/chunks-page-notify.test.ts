@@ -49,7 +49,7 @@ test("chunks notify 会把高频提示统一发到对应 toast 通道", () => {
 
   assert.deepEqual(calls, [
     { type: "success", value: "已开始复习这个表达" },
-    { type: "message", value: "句子复习待开放" },
+    { type: "message", value: "句子已保存，可回到来源场景继续巩固" },
     { type: "error", value: "请输入表达文本" },
     { type: "success", value: "已保存" },
     { type: "message", value: "继续下一步" },

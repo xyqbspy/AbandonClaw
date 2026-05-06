@@ -139,9 +139,9 @@ export function SettingsPageClient({ canAccessAdmin }: { canAccessAdmin: boolean
             <CardTitle>管理员入口</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
-            <p>当前账号具备管理员权限，可以进入后台查看内容数据、AI 缓存和 TTS 本地缓存。</p>
+            <p>当前账号具备管理员权限，可以进入管理后台查看内容数据、AI 缓存和 TTS 本地缓存。</p>
             <Link href="/admin" className={`${appleButtonClassName} px-3 py-1.5 text-foreground`}>
-              进入 Admin
+              进入管理后台
             </Link>
           </CardContent>
         </Card>
@@ -152,7 +152,7 @@ export function SettingsPageClient({ canAccessAdmin }: { canAccessAdmin: boolean
         disabled={!isDirty}
         onClick={() => {
           initialDraftRef.current = draft;
-          toast.success("设置已保存到本地草稿。");
+          toast.success("设置已保存。");
         }}
       >
         保存设置

@@ -387,9 +387,7 @@ export default function ReviewPage() {
         setPhraseRewriteDraft={setPhraseRewriteDraft}
         setPhraseDraft={setPhraseDraft}
         setScenePracticeAnswer={setScenePracticeAnswer}
-
       />
-      {/* onOpenToday={() => router.push("/today")} todu 报错了需要修复 */}
       {activeTaskKind === "scene_practice" && currentScenePracticeItem ? (
         <div className={REVIEW_SOURCE_ACTIONS_CLASSNAME}>
           <LoadingButton
@@ -434,7 +432,17 @@ export default function ReviewPage() {
 
       <div className={REVIEW_FOOTER_CLASSNAME}>
         <div className={REVIEW_FOOTER_INNER_CLASSNAME}>
-          {activeTaskKind === "phrase_review" && taskStage === "feedback" ? (
+          {activeTaskKind === null ? (
+            <LoadingButton
+              type="button"
+              className={REVIEW_FOOTER_PRIMARY_BUTTON_CLASSNAME}
+              loading={openingSceneHref === "/today"}
+              loadingText="返回今日学习中..."
+              onClick={() => openScene("/today")}
+            >
+              {zh.queueDoneReturnCta}
+            </LoadingButton>
+          ) : activeTaskKind === "phrase_review" && taskStage === "feedback" ? (
             <div className={REVIEW_FOOTER_REVIEW_GRID_CLASSNAME}>
               <button
                 type="button"

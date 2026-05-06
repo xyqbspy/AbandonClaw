@@ -39,7 +39,7 @@ export function FocusDetailSheetHeader({
           variant="ghost"
           className={`${appleButtonClassName} h-[var(--mobile-button-height)] w-[var(--mobile-button-height)] rounded-[14px] border border-[var(--app-chunks-sheet-card-border)] bg-[var(--app-chunks-sheet-card-bg)] px-0 text-[var(--app-chunks-sheet-info-text)] shadow-[var(--app-chunks-hero-shadow)] hover:bg-[var(--app-chunks-sheet-info-soft)] [@media(max-height:760px)]:h-[var(--mobile-icon-button)] [@media(max-height:760px)]:w-[var(--mobile-icon-button)] [@media(max-height:760px)]:rounded-[11px]`}
           onClick={trailLength > 1 ? onReopenPrevTrail : onClose}
-          aria-label={trailLength > 1 ? backToCurrentLabel : "杩斿洖"}
+          aria-label={trailLength > 1 ? backToCurrentLabel : "返回"}
         >
           <ChevronLeft className="size-5" />
         </Button>

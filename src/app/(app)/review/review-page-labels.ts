@@ -43,16 +43,16 @@ export type ReviewPageLabels = {
   phraseOutputConfidenceLow: string;
   phraseRewriteLabel: string;
   phraseRewritePlaceholder: string;
-  phraseRewriteTodoTitle: string;
-  phraseRewriteTodoBody: string;
+  phraseRewriteGuidanceTitle: string;
+  phraseRewriteGuidanceBody: string;
   phraseRewritePromptLabel: string;
   phraseOutputLabel: string;
   phraseOutputPlaceholder: string;
   phraseDraftLabel: string;
   phraseDraftPlaceholder: string;
   phraseFeedbackLabel: string;
-  phraseFeedbackTodoTitle: string;
-  phraseFeedbackTodoBody: string;
+  phraseFeedbackGuidanceTitle: string;
+  phraseFeedbackGuidanceBody: string;
   phraseRevealCta: string;
   phraseConfidenceCta: string;
   phraseRewriteCta: string;
@@ -68,8 +68,8 @@ export type ReviewPageLabels = {
   sceneRecallCta: string;
   scenePracticeLabel: string;
   sceneFeedbackLabel: string;
-  sceneTodoTitle: string;
-  sceneTodoBody: string;
+  sceneFeedbackGuidanceTitle: string;
+  sceneFeedbackGuidanceBody: string;
   sceneNextCta: string;
   sceneRetryCta: string;
   showReference: string;
@@ -113,7 +113,7 @@ export const reviewPageLabels: ReviewPageLabels = {
   loadFailed: "加载复习数据失败。",
   submitFailed: "提交复习结果失败。",
   submitOk: "已记录这次复习结果。",
-  eyebrow: "Review",
+  eyebrow: "复习",
   title: "沉浸式复习",
   desc: "把今天需要回顾的表达和场景句子重新拉回到真实语境里，先唤醒，再输出，最后给出明确判断。",
   streakSummary: "连续 12 天复习",
@@ -153,17 +153,17 @@ export const reviewPageLabels: ReviewPageLabels = {
   phraseOutputConfidenceHigh: "能主动说出来",
   phraseOutputConfidenceLow: "还需要提示",
   phraseRewriteLabel: "STEP 3. 变体改写",
-  phraseRewritePlaceholder: "根据改写提示，先写一个局部变体。这里先保留为本地草稿，后续再补正式评估。",
-  phraseRewriteTodoTitle: "TODO：变体改写评估待接入",
-  phraseRewriteTodoBody: "后续这里会补人称、时态、对象变化后的命中率和自然度反馈。",
+  phraseRewritePlaceholder: "根据改写提示，先写一个局部变体。先把自己的版本写下来，再对照语境判断是否自然。",
+  phraseRewriteGuidanceTitle: "先完成这次改写",
+  phraseRewriteGuidanceBody: "把这次改写当作本地草稿保存，先用自己的判断确认是否更自然、更贴近当前语境。",
   phraseRewritePromptLabel: "本次改写方向",
   phraseOutputLabel: "STEP 4. 场景完整输出",
-  phraseOutputPlaceholder: "不用填空，直接写出一整句或两整句。这里先保留为本地草稿，后续再补 chunks 命中率和自然度分析。",
+  phraseOutputPlaceholder: "不用填空，直接写出一整句或两整句。先把完整输出写下来，再对照参考句检查表达是否到位。",
   phraseDraftLabel: "STEP 2. 自己试着说一句",
-  phraseDraftPlaceholder: "用这条表达写一句你自己的话。这里先保留为本地草稿，后续再补 AI 点评。",
+  phraseDraftPlaceholder: "用这条表达写一句你自己的话。写完后先根据参考句判断这次是否能主动用出来。",
   phraseFeedbackLabel: "STEP 3. 给这次复习一个判断",
-  phraseFeedbackTodoTitle: "TODO：AI 反馈待接入",
-  phraseFeedbackTodoBody: "后续这里会补自然度点评、替代表达建议和更细的输出反馈。",
+  phraseFeedbackGuidanceTitle: "先给自己一个复习判断",
+  phraseFeedbackGuidanceBody: "对照参考句和自己的输出，选择最贴近当前掌握程度的结果，这次记录会用于后续复习节奏。",
   phraseRevealCta: "想好了，查看参考",
   phraseConfidenceCta: "进入熟悉度判断",
   phraseRewriteCta: "继续做变体改写",
@@ -179,8 +179,8 @@ export const reviewPageLabels: ReviewPageLabels = {
   sceneRecallCta: "我准备好了，进入复现",
   scenePracticeLabel: "STEP 2. 当场再练一次",
   sceneFeedbackLabel: "STEP 3. 结果反馈",
-  sceneTodoTitle: "TODO：场景复现反馈增强",
-  sceneTodoBody: "后续这里会补更强的 AI 点评、错因归纳和下一题推荐策略。",
+  sceneFeedbackGuidanceTitle: "先看这次复现结果",
+  sceneFeedbackGuidanceBody: "根据当场练习的反馈决定继续下一项，或回到原场景再巩固一次。",
   sceneNextCta: "进入下一项复习",
   sceneRetryCta: "继续回到场景练习",
   showReference: "展开参考",
@@ -216,6 +216,6 @@ export const reviewPageLabels: ReviewPageLabels = {
   practiceInlineRecorded: "已记录这次回补结果。",
   practiceInlineFailed: "提交场景回补失败。",
   queueDoneTitle: "这轮回忆先收住了",
-  queueDoneBody: "当前没有新的复习任务了，可以回到 today 继续推进场景或表达沉淀。",
-  queueDoneReturnCta: "返回 today",
+  queueDoneBody: "当前没有新的复习任务了，可以回到今日学习继续推进场景或表达沉淀。",
+  queueDoneReturnCta: "返回今日学习",
 };
