@@ -231,6 +231,9 @@ export default function SceneDetailClientPage({
 
   const latestPracticeSet = generatedState.latestPracticeSet;
   const latestVariantSet = generatedState.latestVariantSet;
+  const latestPracticeSetId = latestPracticeSet?.id ?? null;
+  const latestVariantSetId = latestVariantSet?.id ?? null;
+  const latestVariantSetStatus = latestVariantSet?.status ?? null;
   const activeVariantItem =
     latestVariantSet?.variants.find((variant) => variant.id === activeVariantId) ?? null;
   const activeVariantLesson = activeVariantItem?.lesson ?? null;
@@ -333,7 +336,7 @@ export default function SceneDetailClientPage({
   }, [resetChunkDetailState, resetRouteScopedState]);
 
   useEffect(() => {
-    if (!baseLesson || !latestPracticeSet) {
+    if (!baseLesson || !latestPracticeSetId) {
       let cancelled = false;
       void Promise.resolve().then(() => {
         if (!cancelled) {
@@ -346,18 +349,18 @@ export default function SceneDetailClientPage({
     }
     let cancelled = false;
     void (async () => {
-      const cache = await getScenePracticeSnapshotCache(baseLesson.slug, latestPracticeSet.id);
+      const cache = await getScenePracticeSnapshotCache(baseLesson.slug, latestPracticeSetId);
       if (!cancelled && cache.found && cache.record && !cache.isExpired) {
         setPracticeSnapshot(cache.record.data.snapshot);
       }
 
       try {
         const result = await getScenePracticeSnapshotFromApi(baseLesson.slug, {
-          practiceSetId: latestPracticeSet.id,
+          practiceSetId: latestPracticeSetId,
         });
         if (cancelled) return;
         setPracticeSnapshot(result);
-        void setScenePracticeSnapshotCache(baseLesson.slug, latestPracticeSet.id, result).catch(() => {
+        void setScenePracticeSnapshotCache(baseLesson.slug, latestPracticeSetId, result).catch(() => {
           // Ignore cache failures.
         });
       } catch {
@@ -368,7 +371,7 @@ export default function SceneDetailClientPage({
     return () => {
       cancelled = true;
     };
-  }, [baseLesson, latestPracticeSet?.id]);
+  }, [baseLesson, latestPracticeSetId]);
 
   const variantUnlocked = Boolean(trainingState?.progress.variantUnlockedAt);
 
@@ -965,20 +968,20 @@ export default function SceneDetailClientPage({
   ]);
 
   useEffect(() => {
-    if (!baseLesson || !latestVariantSet) return;
+    if (!baseLesson || !latestVariantSetId) return;
     let cancelled = false;
 
     void (async () => {
       const applyVariantRun = (result: SceneVariantRunResponse) => {
         if (!result.run) return;
-        hydrateVariantSetFromRun(baseLesson.id, latestVariantSet.id, result.run);
+        hydrateVariantSetFromRun(baseLesson.id, latestVariantSetId, result.run);
         refreshGeneratedState(baseLesson.id);
         if (!activeVariantId && !searchParams.get("variant") && result.run.activeVariantId) {
           setActiveVariantId(result.run.activeVariantId);
         }
       };
 
-      const cache = await getSceneVariantRunCache(baseLesson.slug, latestVariantSet.id);
+      const cache = await getSceneVariantRunCache(baseLesson.slug, latestVariantSetId);
       if (!cancelled && cache.found && cache.record && !cache.isExpired) {
         applyVariantRun(cache.record.data.snapshot);
         return;
@@ -986,11 +989,11 @@ export default function SceneDetailClientPage({
 
       try {
         const result = await getSceneVariantRunSnapshotFromApi(baseLesson.slug, {
-          variantSetId: latestVariantSet.id,
+          variantSetId: latestVariantSetId,
         });
         if (cancelled) return;
         applyVariantRun(result);
-        void setSceneVariantRunCache(baseLesson.slug, latestVariantSet.id, result).catch(() => {
+        void setSceneVariantRunCache(baseLesson.slug, latestVariantSetId, result).catch(() => {
           // Ignore cache failures.
         });
       } catch {
@@ -1004,7 +1007,7 @@ export default function SceneDetailClientPage({
   }, [
     activeVariantId,
     baseLesson,
-    latestVariantSet?.id,
+    latestVariantSetId,
     refreshGeneratedState,
     searchParams,
     setActiveVariantId,
@@ -1014,24 +1017,24 @@ export default function SceneDetailClientPage({
     if (
       !baseLesson ||
       viewMode !== "variants" ||
-      !latestVariantSet ||
-      latestVariantSet.status !== "generated"
+      !latestVariantSetId ||
+      latestVariantSetStatus !== "generated"
     ) {
       return;
     }
 
     void startSceneVariantRunFromApi(baseLesson.slug, {
-      variantSetId: latestVariantSet.id,
+      variantSetId: latestVariantSetId,
     })
       .then((result) => {
-        void setSceneVariantRunCache(baseLesson.slug, latestVariantSet.id, result).catch(() => {
+        void setSceneVariantRunCache(baseLesson.slug, latestVariantSetId, result).catch(() => {
           // Ignore cache failures.
         });
       })
       .catch(() => {
         // Non-blocking.
       });
-  }, [baseLesson, latestVariantSet?.id, latestVariantSet?.status, viewMode]);
+  }, [baseLesson, latestVariantSetId, latestVariantSetStatus, viewMode]);
 
   if (sceneLoading) {
     return <SceneDetailSkeleton />;
