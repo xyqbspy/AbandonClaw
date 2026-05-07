@@ -189,7 +189,7 @@
 - **AND** `docs/dev/change-intake-template.md` MUST 负责接需求阶段的问题分析骨架
 
 ### Requirement: 完成态维护检查必须可通过本地脚本执行
-维护流程 MUST 提供一个本地可运行的维护检查入口，用于在完成态提交前发现常见 OpenSpec 和发布收尾遗漏。
+维护流程 MUST 提供一个本地可运行的维护检查入口，用于在完成态提交前发现常见 OpenSpec、归档文本可读性和发布收尾遗漏。
 
 #### Scenario: 存在 completed 但未归档的 active change
 - **WHEN** 维护者运行完成态维护检查
@@ -205,6 +205,13 @@
 - **WHEN** 维护者运行完成态维护检查
 - **AND** `openspec validate --all --strict` 失败
 - **THEN** 检查 MUST 失败并保留原始校验输出
+
+#### Scenario: 本轮新建或修改的归档文档存在高置信度乱码
+- **WHEN** 维护者运行完成态维护检查
+- **AND** 当前工作区、暂存区或未跟踪文件中存在新建或修改的 `openspec/changes/archive/` 文本文档
+- **AND** 这些文档包含高置信度乱码片段
+- **THEN** 检查 MUST 失败并报告具体文件与行号
+- **AND** 不得因为 archive 目录属于历史归档而跳过本轮触碰的归档文档
 
 ### Requirement: 维护入口文档必须避免重复承载同一长规则
 维护流程 MUST 保持 AGENTS、文档索引、stable spec、维护手册和接入模板之间的职责分层，避免多个入口重复展开同一长规则。
@@ -258,7 +265,7 @@
 - **AND** 不得默认继续扩写 `AGENTS.md`
 
 ### Requirement: 核心文档入口必须保持干净可读
-维护流程 MUST 保持 `docs/README.md`、`docs/dev/project-maintenance-playbook.md` 和 `CHANGELOG.md` 的核心入口为可读 UTF-8 文档，避免核心入口被乱码、重复规则或过程性记录污染。
+维护流程 MUST 保持 `docs/README.md`、`docs/dev/project-maintenance-playbook.md`、`CHANGELOG.md`、当前 active OpenSpec change 文档和本轮新建或修改的 OpenSpec archive 文档为可读 UTF-8 文档，避免核心入口、临时变更记录或归档证据被乱码、重复规则或过程性记录污染。
 
 #### Scenario: 维护者定位文档
 - **WHEN** 维护者打开 `docs/README.md`
@@ -269,6 +276,11 @@
 - **WHEN** 维护者打开 `CHANGELOG.md`
 - **THEN** 文档 MUST 只记录用户可感知变化
 - **AND** 开发过程、验证记录或维护收口过程 MUST 记录到 `docs/dev/dev-log.md`
+
+#### Scenario: 维护者归档或修改 OpenSpec archive 文档
+- **WHEN** 维护者在本轮新建、归档或修改 `openspec/changes/archive/` 下的文本文档
+- **THEN** 这些归档文档 MUST 保持可读 UTF-8
+- **AND** 必须通过乱码检查或在验证记录中明确说明未覆盖原因
 
 ### Requirement: CHANGELOG 条件检查必须保守提示而非替代人工判断
 维护检查 MUST 对当前分支为 `main` 且存在可能用户可感知文件变更的情况给出 CHANGELOG 保守提示，但不得把这种提示伪装成完整语义判断。

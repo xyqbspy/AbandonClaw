@@ -56,6 +56,18 @@ const runOpenSpecValidate = (): CheckResult => {
   };
 };
 
+const runMojibakeCheck = (): CheckResult => {
+  const result = run("node", ["--import", "tsx", "scripts/check-mojibake.ts"]);
+  return {
+    name: "text:check-mojibake",
+    ok: result.status === 0,
+    messages:
+      result.status === 0
+        ? ["未发现高置信度乱码片段。"]
+        : ["发现疑似乱码。", result.stdout.trim(), result.stderr.trim()].filter(Boolean),
+  };
+};
+
 const getActiveChanges = () => {
   const result = run("pnpm", ["exec", "openspec", "list", "--json"]);
   if (result.status !== 0) {
@@ -143,6 +155,7 @@ const results: CheckResult[] = [];
 
 try {
   results.push(runOpenSpecValidate());
+  results.push(runMojibakeCheck());
   results.push(checkActiveChanges());
 } catch (error) {
   results.push({

@@ -1,5 +1,31 @@
 ﻿# Dev Log
 
+### [2026-05-07] 收口 OpenSpec archive 乱码防护
+- 类型：Spec-Driven / 维护规则与归档文本防护
+- 状态：已完成并归档 `guard-openspec-archive-mojibake`
+
+#### 背景
+`clarify-scene-review-next-step` 归档后的 `tasks.md` 出现乱码，而 `text:check-mojibake` 对 `openspec/changes/archive/` 整体跳过，导致归档证据链没有被完成态检查覆盖。
+
+#### 本次改动
+- 修复当前已发现的归档 `tasks.md`，恢复可读 UTF-8。
+- `text:check-mojibake` 保留历史 archive 默认跳过，但额外扫描本轮新建、暂存、修改或未跟踪的 archive 文本文档。
+- `maintenance:check` 纳入乱码扫描，完成态维护检查不再只依赖人工单独运行文本检查。
+- 同步 `project-maintenance` stable spec，明确本轮触碰的 OpenSpec archive 文档必须保持可读 UTF-8。
+
+#### 明确不收项
+- 不全量清理历史 archive 目录。
+- 不引入新的编码检测依赖。
+- 不改变 OpenSpec CLI 行为、产品功能、API、数据库或学习主链路。
+
+#### 验证
+- 已运行：
+  - `pnpm run text:check-mojibake`
+  - `pnpm exec openspec validate guard-openspec-archive-mojibake --strict`
+  - `pnpm exec openspec validate --all --strict`
+  - `git diff --check`
+  - `pnpm run maintenance:check`
+
 ### [2026-05-07] 收口 Scene / Review 下一步主路径
 - 类型：Spec-Driven / Scene 与 Review 用户动作层级
 - 状态：已完成并归档 `clarify-scene-review-next-step`

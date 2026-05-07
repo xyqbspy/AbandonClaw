@@ -1,9 +1,11 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import { extname, join, relative } from "node:path";
 
 const ROOT_DIR = process.cwd();
 const TARGET_DIRS = ["src", "scripts", "docs", "openspec"];
 const ROOT_FILES = ["AGENTS.md", "CHANGELOG.md", "README.md", "test.md"];
+const ARCHIVE_RELATIVE_PREFIX = "openspec/changes/archive/";
 
 const TEXT_FILE_EXTENSIONS = new Set([
   ".ts",
@@ -21,7 +23,6 @@ const TEXT_FILE_EXTENSIONS = new Set([
 ]);
 
 const IGNORED_RELATIVE_PATHS = new Set(["scripts/check-mojibake.ts"]);
-const IGNORED_RELATIVE_PREFIXES = ["openspec/changes/archive/"];
 const IGNORED_LINE_PATTERNS = [
   "优先拦截 `馃`、`鐐瑰嚮`、`�` 这类高置信度乱码片段。",
 ];
@@ -52,6 +53,12 @@ type MatchRecord = {
   pattern: string;
 };
 
+type ScanOptions = {
+  includeArchive?: boolean;
+};
+
+const normalizePath = (value: string) => value.replaceAll("\\", "/");
+
 function isTextFile(filePath: string) {
   return TEXT_FILE_EXTENSIONS.has(extname(filePath).toLowerCase());
 }
@@ -74,12 +81,19 @@ function walk(dirPath: string, visitor: (filePath: string) => void) {
   }
 }
 
-function scanFile(filePath: string) {
-  const relativePath = relative(ROOT_DIR, filePath).replaceAll("\\", "/");
+function shouldSkipFile(relativePath: string, options: ScanOptions) {
   if (IGNORED_RELATIVE_PATHS.has(relativePath)) {
-    return [];
+    return true;
   }
-  if (IGNORED_RELATIVE_PREFIXES.some((prefix) => relativePath.startsWith(prefix))) {
+  if (!options.includeArchive && relativePath.startsWith(ARCHIVE_RELATIVE_PREFIX)) {
+    return true;
+  }
+  return false;
+}
+
+function scanFile(filePath: string, options: ScanOptions = {}) {
+  const relativePath = normalizePath(relative(ROOT_DIR, filePath));
+  if (shouldSkipFile(relativePath, options)) {
     return [];
   }
 
@@ -107,6 +121,41 @@ function scanFile(filePath: string) {
   return matches;
 }
 
+function runGit(args: string[]) {
+  const result = spawnSync("git", args, {
+    cwd: ROOT_DIR,
+    encoding: "utf8",
+  });
+
+  if (result.status !== 0) {
+    return [];
+  }
+
+  return result.stdout
+    .split(/\r?\n/)
+    .map((line) => normalizePath(line.trim()))
+    .filter(Boolean);
+}
+
+function getTouchedArchiveFiles() {
+  const candidates = new Set<string>();
+
+  for (const filePath of runGit(["diff", "--name-only"])) {
+    candidates.add(filePath);
+  }
+  for (const filePath of runGit(["diff", "--name-only", "--cached"])) {
+    candidates.add(filePath);
+  }
+  for (const filePath of runGit(["ls-files", "--others", "--exclude-standard"])) {
+    candidates.add(filePath);
+  }
+
+  return [...candidates]
+    .filter((filePath) => filePath.startsWith(ARCHIVE_RELATIVE_PREFIX))
+    .map((filePath) => join(ROOT_DIR, filePath))
+    .filter((filePath) => existsSync(filePath) && statSync(filePath).isFile() && isTextFile(filePath));
+}
+
 function main() {
   const allMatches: MatchRecord[] = [];
 
@@ -131,6 +180,10 @@ function main() {
     const fullPath = join(ROOT_DIR, rootFile);
     if (!existsSync(fullPath)) continue;
     allMatches.push(...scanFile(fullPath));
+  }
+
+  for (const archiveFile of getTouchedArchiveFiles()) {
+    allMatches.push(...scanFile(archiveFile, { includeArchive: true }));
   }
 
   if (allMatches.length === 0) {
