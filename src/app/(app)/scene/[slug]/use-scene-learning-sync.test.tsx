@@ -381,6 +381,8 @@ test("useSceneLearningSync short view switches coalesce progress flushes", () =>
     }) => Boolean(hasBaseLesson && learningStarted && (studySecondsDelta > 0 || withPause)),
     buildSceneLearningUpdatePayload: ({ viewMode }) => ({
       progressPercent: viewMode === "variant-study" ? 65 : 20,
+      lastVariantIndex: undefined,
+      withPause: false,
     }),
     now: () => now,
     setTimeoutFn: (callback: () => void) => {

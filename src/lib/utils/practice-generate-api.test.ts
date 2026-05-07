@@ -4,8 +4,9 @@ import {
   practiceGenerateFromApi,
   resetPracticeGenerateFailureGuardsForTests,
 } from "./practice-generate-api";
+import type { PracticeGenerateRequest } from "@/lib/types/scene-parser";
 
-const payload = {
+const payload: PracticeGenerateRequest = {
   scene: {
     id: "scene-1",
     slug: "scene-1",
@@ -14,7 +15,7 @@ const payload = {
     sections: [],
   },
   exerciseCount: 8,
-} as const;
+};
 
 test.afterEach(() => {
   resetPracticeGenerateFailureGuardsForTests();

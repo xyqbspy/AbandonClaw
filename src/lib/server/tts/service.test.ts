@@ -26,7 +26,7 @@ test("regenerateChunkTtsAudioBatch 使用有界并发执行批量任务", async 
         return {
           url: "https://cdn.test/chunk.mp3",
           cached: false,
-          source: "fresh-upload" as const,
+          source: "inline-fallback" as const,
         };
       },
     },
@@ -71,7 +71,7 @@ test("regenerateChunkTtsAudioBatch 会汇总失败项并在最后统一抛错", 
             return {
               url: "https://cdn.test/chunk.mp3",
               cached: false,
-              source: "fresh-upload" as const,
+              source: "inline-fallback" as const,
             };
           },
         },

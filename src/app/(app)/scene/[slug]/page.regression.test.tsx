@@ -1013,11 +1013,13 @@ test("SceneDetailPage 点击训练浮层遮罩后会关闭面板", async () => {
 });
 
 test("SceneDetailPage 在首屏数据未就绪时会先展示场景骨架", async () => {
-  let resolveLoad: (() => void) | null = null;
+  let releaseLoad: () => void = () => {
+    throw new Error("releaseLoad was not initialized");
+  };
   loadSceneDetailImpl = async ({ callbacks }) => {
     callbacks.onStart();
     await new Promise<void>((resolve) => {
-      resolveLoad = resolve;
+      releaseLoad = resolve;
     });
     callbacks.onHydrateLesson(baseLesson, "network");
     callbacks.onStopLoading();
@@ -1031,10 +1033,7 @@ test("SceneDetailPage 在首屏数据未就绪时会先展示场景骨架", asyn
   });
   assert.equal(screen.queryByText("lesson-reader"), null);
 
-  if (!resolveLoad) {
-    throw new Error("resolveLoad was not initialized");
-  }
-  resolveLoad();
+  releaseLoad();
 
   await waitFor(() => {
     screen.getByText("lesson-reader");
