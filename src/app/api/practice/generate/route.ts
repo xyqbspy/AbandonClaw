@@ -10,10 +10,7 @@ import {
   buildPracticeGenerateUserPrompt,
   PRACTICE_GENERATE_SYSTEM_PROMPT,
 } from "@/lib/server/prompts/practice-generate-prompt";
-import {
-  parseJsonWithFallback,
-  isValidParsedScene,
-} from "@/lib/server/scene-json";
+import { parseJsonWithFallback } from "@/lib/server/scene-json";
 import {
   normalizePracticeGeneratePayload,
   parsePracticeGenerateRequest,
@@ -26,17 +23,6 @@ import {
 import { buildExerciseSpecsFromScene } from "@/lib/server/exercises/spec-builder";
 const PRACTICE_GENERATE_RATE_LIMIT = 5;
 const RATE_LIMIT_WINDOW_MS = 60_000;
-const PRACTICE_MAX_SECTIONS = 12;
-const PRACTICE_MAX_BLOCKS = 80;
-const PRACTICE_MAX_SENTENCES = 400;
-const PRACTICE_MAX_CHUNKS = 1200;
-const PRACTICE_MAX_TEXT_LENGTH = 40000;
-
-const sanitizeExerciseCount = (value: unknown) => {
-  if (typeof value !== "number" || Number.isNaN(value)) return 6;
-  return Math.min(12, Math.max(3, Math.round(value)));
-};
-
 const PRACTICE_GENERATE_FALLBACK_MESSAGE = "生成练习题失败，请稍后重试。";
 
 const isValidExerciseType = (value: unknown): value is PracticeExerciseType =>
@@ -109,94 +95,6 @@ const parseWithDiagnostics = (rawText: string) => {
   return {
     jsonCandidate: rawText,
     parsed: parseJsonWithFallback(rawText),
-  };
-};
-
-const measureScenePayload = (scene: PracticeGenerateRequest["scene"]) => {
-  let blockCount = 0;
-  let sentenceCount = 0;
-  let chunkCount = 0;
-  let textLength = 0;
-
-  textLength += scene.title.length;
-  textLength += scene.subtitle?.length ?? 0;
-  textLength += scene.description?.length ?? 0;
-
-  for (const section of scene.sections) {
-    textLength += section.title?.length ?? 0;
-    textLength += section.summary?.length ?? 0;
-    blockCount += section.blocks.length;
-
-    for (const block of section.blocks) {
-      textLength += block.translation?.length ?? 0;
-      textLength += block.tts?.length ?? 0;
-      sentenceCount += block.sentences.length;
-
-      for (const sentence of block.sentences) {
-        textLength += sentence.text.length;
-        textLength += sentence.translation?.length ?? 0;
-        textLength += sentence.tts?.length ?? 0;
-        chunkCount += sentence.chunks.length;
-
-        for (const chunk of sentence.chunks) {
-          textLength += chunk.text.length;
-          textLength += chunk.translation?.length ?? 0;
-          textLength += chunk.grammarLabel?.length ?? 0;
-          textLength += chunk.meaningInSentence?.length ?? 0;
-          textLength += chunk.usageNote?.length ?? 0;
-          textLength += chunk.pronunciation?.length ?? 0;
-          textLength += (chunk.notes ?? []).reduce((sum, item) => sum + item.length, 0);
-          textLength += (chunk.examples ?? []).reduce(
-            (sum, item) => sum + item.en.length + item.zh.length,
-            0,
-          );
-        }
-      }
-    }
-  }
-
-  return {
-    sections: scene.sections.length,
-    blocks: blockCount,
-    sentences: sentenceCount,
-    chunks: chunkCount,
-    textLength,
-  };
-};
-
-// eslint-disable-next-line @typescript-eslint/no-unused-vars -- Legacy validator kept while practice-generate request parsing is centralized in request-schemas.
-const toValidPayload = (
-  payload: Partial<PracticeGenerateRequest>,
-):
-  | { ok: true; value: { scene: PracticeGenerateRequest["scene"]; exerciseCount: number } }
-  | { ok: false; error: string } => {
-  if (!isValidParsedScene(payload.scene)) {
-    return { ok: false, error: "练习题生成请求无效。" };
-  }
-
-  const metrics = measureScenePayload(payload.scene);
-  if (metrics.sections > PRACTICE_MAX_SECTIONS) {
-    return { ok: false, error: `场景分段数超过上限 ${PRACTICE_MAX_SECTIONS}。` };
-  }
-  if (metrics.blocks > PRACTICE_MAX_BLOCKS) {
-    return { ok: false, error: `场景块数超过上限 ${PRACTICE_MAX_BLOCKS}。` };
-  }
-  if (metrics.sentences > PRACTICE_MAX_SENTENCES) {
-    return { ok: false, error: `场景句子数超过上限 ${PRACTICE_MAX_SENTENCES}。` };
-  }
-  if (metrics.chunks > PRACTICE_MAX_CHUNKS) {
-    return { ok: false, error: `场景表达块数超过上限 ${PRACTICE_MAX_CHUNKS}。` };
-  }
-  if (metrics.textLength > PRACTICE_MAX_TEXT_LENGTH) {
-    return { ok: false, error: `场景文本长度超过上限 ${PRACTICE_MAX_TEXT_LENGTH}。` };
-  }
-
-  return {
-    ok: true,
-    value: {
-      scene: payload.scene,
-      exerciseCount: sanitizeExerciseCount(payload.exerciseCount),
-    },
   };
 };
 
