@@ -1,5 +1,32 @@
 ﻿# Dev Log
 
+### [2026-05-07] 收口维护检查阻塞与 practice generate 死代码
+- 类型：Fast Track / Cleanup / 测试维护
+- 状态：已完成
+
+#### 背景
+Review 递进式练习收尾后，仓库仍有两类维护尾巴：`tsc --noEmit` 被旧测试夹具类型阻塞，`lint` 被 React hooks 新规则和 unused 代码阻塞；同时 `practice/generate` 在迁入统一 `request-schemas` 后仍残留旧本地校验 helper。
+
+#### 本次改动
+- 补齐 chunks、scene、TTS、practice generate 相关测试夹具类型，让 `pnpm exec tsc --noEmit` 恢复通过。
+- 收口 `pnpm run lint` 的 error / warning：删除未用 import 与变量，补齐安全的 hook dependency，保留必要的 URL / 训练态同步说明。
+- 删除 [src/app/api/practice/generate/route.ts](/d:/WorkCode/AbandonClaw/src/app/api/practice/generate/route.ts) 中已不被 handler 使用的旧 `toValidPayload`、`measureScenePayload`、体积限制常量和 `sanitizeExerciseCount`；请求校验继续由 `src/lib/server/request-schemas.ts` 承接。
+
+#### 影响范围
+- 影响模块：测试夹具、lint 维护、`practice/generate` 死代码清理。
+- 是否影响主链路：否。
+- 是否影响用户可感知行为：否。
+- 是否需要同步正式 CHANGELOG：否。
+
+#### 验证
+- 已运行：
+  - `pnpm exec tsc --noEmit`
+  - `pnpm run lint`
+  - `node --import tsx --test src/app/api/practice/generate/route.test.ts src/lib/server/request-schemas.test.ts src/lib/utils/practice-generate-api.test.ts`
+  - `pnpm run maintenance:check`
+  - `pnpm run text:check-mojibake`
+  - `git diff --check`
+
 ### [2026-05-07] Review 递进式练习正式信号收口
 - 类型：Spec-Driven / Review 递进式练习正式化
 - 状态：已完成并归档 `formalize-review-progressive-practice`
