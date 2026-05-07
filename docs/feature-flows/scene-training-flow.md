@@ -19,6 +19,13 @@
 5. 完成 practice 后解锁 variants
 6. scene 状态回写到 learning service
 
+### 3.1 下一步入口层级
+
+- Scene 主学习视图必须直接展示“当前下一步”任务条，内容来自现有 scene training session、practice snapshot 与 variant unlock 状态，不新增学习状态语义。
+- 任务条只承载当前步骤、下一步说明和一个主动作；它用于让用户不打开浮动入口也能知道现在该做什么。
+- 右下角 `SceneTrainingCoachFloatingEntry` 继续承载完整训练进度、步骤列表、统计摘要和快捷入口；它不是唯一的下一步提示。
+- variant-study 页以“基于此变体生成练习 / 继续学习”为主动作；删除变体属于辅助危险操作，不能与学习主动作同层级展示。
+
 ## 4. 关键状态/回写节点
 
 ### 4.1 关键节点

@@ -1,5 +1,41 @@
 ﻿# Dev Log
 
+### [2026-05-07] 收口 Scene / Review 下一步主路径
+- 类型：Spec-Driven / Scene 与 Review 用户动作层级
+- 状态：已完成并归档 `clarify-scene-review-next-step`
+
+#### 背景
+Scene 与 Review 主链路已经能完成训练、练习、变体和复习写回，但用户可见层仍容易被浮动入口、来源回看和管理动作稀释。本轮只调整展示层级，把“当前该做什么”放回主路径，不改变后端状态、调度或 AI 评分语义。
+
+#### 本次改动
+- Scene 主学习视图新增“当前下一步”任务条，复用现有 training session、practice snapshot 与 variant unlock 状态。
+- 右下角训练浮动入口保留完整进度、步骤列表和快捷入口，不再作为唯一下一步提示。
+- variant-study 页保留“基于此变体生成练习”为学习主动作，将“删除变体”降为辅助危险操作。
+- Review 来源场景入口增加“辅助回看”分区，继续保留查看原场景 / 回到场景继续练，但不抢底部主 CTA。
+
+#### 本轮收口项
+- Scene 主视图能直接看到当前下一步与主动作。
+- Scene 变体学习页的学习动作与删除管理动作分层。
+- Review 来源回看与场景回补入口明确为辅助路径。
+
+#### 明确不收项
+- 不新增数据库字段、API 字段或 AI 评分。
+- 不改变 scene session、practice run / attempt / complete、review submit 或 Review 调度算法。
+- 不重写 Scene practice / variant 生成策略。
+- 不抽全局页面骨架，不做全站视觉重构。
+
+#### 验证
+- 已运行：
+  - `pnpm exec tsc --noEmit`
+  - `pnpm run test:interaction:scene-detail`
+  - `node --import tsx --import ./src/test/setup-dom.ts --test "src/app/(app)/review/page.interaction.test.tsx"`
+  - `node --import tsx --test "src/app/(app)/review/review-page-selectors.test.ts" "src/app/(app)/review/review-page-messages.test.ts"`
+  - `pnpm run lint`
+  - `pnpm exec openspec validate --all --strict`
+  - `pnpm run maintenance:check`
+  - `pnpm run text:check-mojibake`
+  - `git diff --check`
+
 ### [2026-05-07] 收口维护检查阻塞与 practice generate 死代码
 - 类型：Fast Track / Cleanup / 测试维护
 - 状态：已完成

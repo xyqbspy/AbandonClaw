@@ -17,6 +17,7 @@ export function SceneVariantStudyView({
   lesson,
   topRightTool,
   headerTools,
+  auxiliaryTools,
   savedPhraseTexts,
   onSavePhrase,
   onReviewPhrase,
@@ -26,6 +27,7 @@ export function SceneVariantStudyView({
   lesson: Lesson;
   topRightTool: ReactNode;
   headerTools: ReactNode;
+  auxiliaryTools?: ReactNode;
   savedPhraseTexts: string[];
   onSavePhrase: (payload: SavePhrasePayload) => Promise<{ created: boolean }>;
   onReviewPhrase: (payload: SavePhrasePayload) => Promise<{ created: boolean }>;
@@ -45,6 +47,11 @@ export function SceneVariantStudyView({
         onBlockPlayback={onBlockPlayback}
         onSentencePlayback={onSentencePlayback}
       />
+      {auxiliaryTools ? (
+        <div className="flex justify-end" aria-label="变体辅助操作">
+          {auxiliaryTools}
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -67,6 +67,7 @@ import {
   REVIEW_PROGRESS_HEADER_CLASSNAME,
   REVIEW_PROGRESS_TRACK_CLASSNAME,
   REVIEW_SOURCE_ACTIONS_CLASSNAME,
+  REVIEW_SOURCE_ACTIONS_LABEL_CLASSNAME,
   REVIEW_SOURCE_UNAVAILABLE_CLASSNAME,
   REVIEW_SOURCE_UNAVAILABLE_HINT_CLASSNAME,
 } from "./review-page-styles";
@@ -399,6 +400,7 @@ export default function ReviewPage() {
       />
       {activeTaskKind === "scene_practice" && currentScenePracticeItem ? (
         <div className={REVIEW_SOURCE_ACTIONS_CLASSNAME}>
+          <p className={REVIEW_SOURCE_ACTIONS_LABEL_CLASSNAME}>辅助回看</p>
           <LoadingButton
             type="button"
             variant="outline"
@@ -420,6 +422,7 @@ export default function ReviewPage() {
         </div>
       ) : currentPhraseItem?.sourceSceneSlug ? (
         <div className={REVIEW_SOURCE_ACTIONS_CLASSNAME}>
+          <p className={REVIEW_SOURCE_ACTIONS_LABEL_CLASSNAME}>辅助回看</p>
           {currentPhraseItem.sourceSceneAvailable ? (
             <LoadingButton
               type="button"

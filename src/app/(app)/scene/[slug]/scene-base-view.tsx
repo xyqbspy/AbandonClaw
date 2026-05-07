@@ -23,6 +23,7 @@ export function SceneBaseView({
   practiceError,
   variantsError,
   trainingPanel,
+  trainingNextStep,
   headerTools,
   headerTitle,
   onBackToList,
@@ -41,6 +42,7 @@ export function SceneBaseView({
   practiceError: string | null;
   variantsError: string | null;
   trainingPanel?: ReactNode;
+  trainingNextStep?: ReactNode;
   headerTools: ReactNode;
   headerTitle?: string;
   onBackToList?: () => void;
@@ -71,6 +73,7 @@ export function SceneBaseView({
       {variantsError ? <p className={SCENE_PAGE_ERROR_TEXT_CLASSNAME}>{variantsError}</p> : null}
 
       {trainingPanel}
+      {trainingNextStep}
       <div className={SCENE_PAGE_CONTENT_ANCHOR_CLASSNAME}>
         <LessonReader
           lesson={lesson}

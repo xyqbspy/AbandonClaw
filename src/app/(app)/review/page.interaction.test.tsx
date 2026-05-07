@@ -321,6 +321,7 @@ test("ReviewPage 普通表达有可访问来源场景时展示跳转入口", asy
   render(<ReviewPage />);
 
   await screen.findByRole("button", { name: "查看原场景" });
+  assert.ok(screen.getByText("辅助回看"));
   assert.equal(screen.queryByText("来源场景已不可用"), null);
 });
 
@@ -355,6 +356,7 @@ test("ReviewPage 普通表达来源场景失效时只展示降级提示", async 
   render(<ReviewPage />);
 
   await screen.findByText("来源场景已不可用");
+  assert.ok(screen.getByText("辅助回看"));
   assert.ok(screen.getByText("这条表达仍可继续复习，但原始场景当前已无法访问。"));
   assert.equal(screen.queryByRole("button", { name: "查看原场景" }), null);
 });
@@ -497,6 +499,8 @@ test("ReviewPage 场景回补会进入阶段式复现并在完成后刷新列表
   render(<ReviewPage />);
 
   await screen.findByRole("button", { name: "我准备好了，进入复现" });
+  assert.ok(screen.getByText("辅助回看"));
+  assert.ok(screen.getByRole("button", { name: "回到场景继续练" }));
   fireEvent.click(screen.getByRole("button", { name: "我准备好了，进入复现" }));
 
   await screen.findByRole("button", { name: "检查这次复现" });

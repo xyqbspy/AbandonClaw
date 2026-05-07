@@ -25,7 +25,11 @@ export const REVIEW_HINT_STACK_CLASSNAME = "space-y-2";
 
 export const REVIEW_HINT_SOURCE_CLASSNAME = `text-xs ${APPLE_META_TEXT}`;
 
-export const REVIEW_SOURCE_ACTIONS_CLASSNAME = "flex flex-wrap gap-3";
+export const REVIEW_SOURCE_ACTIONS_CLASSNAME =
+  "flex flex-wrap items-center gap-3 rounded-[18px] border border-dashed border-slate-200 bg-slate-50/80 p-4";
+
+export const REVIEW_SOURCE_ACTIONS_LABEL_CLASSNAME =
+  "w-full text-xs font-semibold uppercase tracking-[0.16em] text-slate-500";
 
 export const REVIEW_SOURCE_UNAVAILABLE_CLASSNAME =
   "rounded-full border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-700";

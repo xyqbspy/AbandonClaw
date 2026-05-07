@@ -2,7 +2,7 @@
 import { createRequire } from "node:module";
 import test, { afterEach } from "node:test";
 import React from "react";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { toast } from "sonner";
 import { resetSceneDetailToastDedupForTests } from "./scene-detail-notify";
 import type { Lesson } from "@/lib/types";
@@ -980,6 +980,11 @@ test("SceneDetailPage 主场景页默认只显示折叠入口，展开后才显�
   const SceneDetailPage = getSceneDetailPage();
   render(<SceneDetailPage initialLesson={baseLesson} />);
 
+  const nextStep = await screen.findByRole("region", { name: "当前下一步" });
+  assert.ok(within(nextStep).getByText("当前下一步"));
+  assert.ok(within(nextStep).getByRole("button", { name: "执行当前下一步" }));
+  assert.match(nextStep.textContent ?? "", /开始听整段/);
+  assert.match(nextStep.textContent ?? "", /下一步/);
   const fab = await screen.findByTestId("scene-training-fab");
   assert.ok(screen.getAllByText("本轮训练").length >= 1);
   screen.getAllByText("听熟这段");
@@ -1072,7 +1077,7 @@ test("SceneDetailPage 记录整段播放和打开表达后，会更新入口步�
     ]);
   });
   await waitFor(() => {
-    screen.getByText("开始练习");
+    assert.ok(screen.getAllByText("开始练习").length >= 1);
   });
 
   fireEvent.pointerDown(fab, { pointerId: 2, clientX: 20, clientY: 20 });
@@ -1818,6 +1823,9 @@ test("SceneDetailPage 删除当前激活变体后会回退到 variants 视图", 
 
   await screen.findByText("variants-view");
   fireEvent.click(screen.getByRole("button", { name: "open-variant" }));
+  assert.ok(screen.getByRole("button", { name: "基于此变体生成练习" }));
+  const auxiliaryActions = screen.getByLabelText("变体辅助操作");
+  assert.ok(within(auxiliaryActions).getByRole("button", { name: /delete-variant|删除变体/ }));
   fireEvent.click(screen.getByRole("button", { name: /delete-variant|删除变体/ }));
 
   assert.deepEqual(deleteVariantItemCalls, [

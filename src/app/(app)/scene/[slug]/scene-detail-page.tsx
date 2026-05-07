@@ -18,7 +18,6 @@ import { SceneDetailSkeleton } from "@/features/scene/components/scene-detail-sk
 import {
   SCENE_ACTION_BUTTON_LG_CLASSNAME,
   SCENE_ACTION_BUTTON_SM_CLASSNAME,
-  SCENE_DANGER_ACTION_BUTTON_LG_CLASSNAME,
   SCENE_DANGER_ACTION_BUTTON_SM_CLASSNAME,
   SCENE_PAGE_MUTED_TEXT_CLASSNAME,
   SCENE_PAGE_RAISED_SECTION_CLASSNAME,
@@ -70,6 +69,7 @@ import {
   deriveSceneTrainingState,
 } from "./scene-detail-selectors";
 import { SceneTrainingCoachFloatingEntry } from "./scene-training-coach-floating-entry";
+import { SceneTrainingNextStepStrip } from "./scene-training-next-step-strip";
 import { useSceneDetailData } from "./use-scene-detail-data";
 import { useSceneDetailPlayback } from "./use-scene-detail-playback";
 import { useSceneDetailRouteState } from "./use-scene-detail-route-state";
@@ -1066,6 +1066,19 @@ export default function SceneDetailClientPage({
     />
   );
 
+  const trainingNextStep = (
+    <SceneTrainingNextStepStrip
+      trainingState={trainingState}
+      variantUnlocked={variantUnlocked}
+      practiceSetStatus={generatedState.practiceStatus}
+      practiceSnapshot={practiceSnapshot}
+      currentStepActionLabel={currentStepAction.label}
+      currentStepActionLoading={currentStepAction.loading}
+      onCurrentStepAction={currentStepAction.onClick}
+      currentStepActionDisabled={currentStepAction.disabled}
+    />
+  );
+
   const chunkDetailSheet = (
     <SelectionDetailSheet
       currentSentence={variantChunkSentence}
@@ -1166,28 +1179,28 @@ export default function SceneDetailClientPage({
 
   if (viewMode === "variant-study" && activeVariantLesson) {
     const variantStudyHeaderTools = (
-      <>
-        <button
-          type="button"
-          className={`${appleButtonLgClassName} px-3 py-1.5 disabled:opacity-60`}
-          disabled={!canGeneratePractice}
-          onClick={() => void handleGeneratePracticeManually(activeVariantLesson)}
+      <button
+        type="button"
+        className={`${appleButtonLgClassName} px-3 py-1.5 disabled:opacity-60`}
+        disabled={!canGeneratePractice}
+        onClick={() => void handleGeneratePracticeManually(activeVariantLesson)}
+      >
+        <LoadingContent
+          loading={practiceLoading}
+          loadingText={formatLoadingText("场景练习准备中...", "中...")}
         >
-          <LoadingContent
-            loading={practiceLoading}
-            loadingText={formatLoadingText("场景练习准备中...", "中...")}
-          >
-            基于此变体生成练习
-          </LoadingContent>
-        </button>
-        <button
-          type="button"
-          className={`${SCENE_DANGER_ACTION_BUTTON_LG_CLASSNAME} px-3 py-1.5`}
-          onClick={() => handleDeleteVariantItem(activeVariantItem?.id ?? activeVariantLesson.id)}
-        >
-          删除变体
-        </button>
-      </>
+          基于此变体生成练习
+        </LoadingContent>
+      </button>
+    );
+    const variantStudyAuxiliaryTools = (
+      <button
+        type="button"
+        className={`${SCENE_DANGER_ACTION_BUTTON_SM_CLASSNAME} px-3 py-1.5`}
+        onClick={() => handleDeleteVariantItem(activeVariantItem?.id ?? activeVariantLesson.id)}
+      >
+        删除变体
+      </button>
     );
 
     return (
@@ -1203,6 +1216,7 @@ export default function SceneDetailClientPage({
           </button>
         }
         headerTools={variantStudyHeaderTools}
+        auxiliaryTools={variantStudyAuxiliaryTools}
         savedPhraseTexts={Array.from(savedPhraseTextSet)}
         onSavePhrase={savePhraseForScene}
         onReviewPhrase={savePhraseForScene}
@@ -1218,6 +1232,7 @@ export default function SceneDetailClientPage({
       practiceError={practiceRetryError ?? practiceError}
       variantsError={variantsError}
       trainingPanel={trainingPanel}
+      trainingNextStep={trainingNextStep}
       headerTools={null}
       headerTitle={baseLesson.subtitle?.trim() || baseLesson.sections[0]?.summary?.trim() || baseLesson.title}
       onBackToList={() => router.push("/scenes")}
