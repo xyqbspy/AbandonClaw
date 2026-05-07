@@ -1058,10 +1058,6 @@ export default function SceneDetailClientPage({
       practiceSetStatus={generatedState.practiceStatus}
       practiceSnapshot={practiceSnapshot}
       practiceModuleCount={latestPracticeSet?.modules?.length ?? 0}
-      currentStepActionLabel={currentStepAction.label}
-      currentStepActionLoading={currentStepAction.loading}
-      onCurrentStepAction={currentStepAction.onClick}
-      currentStepActionDisabled={currentStepAction.disabled}
       practiceStepAction={practiceStepAction}
     />
   );

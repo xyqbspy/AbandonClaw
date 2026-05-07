@@ -1,5 +1,31 @@
 ﻿# Dev Log
 
+### [2026-05-07] 收口 Scene 任务条与训练悬浮入口职责
+- 类型：Spec-Driven / Scene 用户动作层级修正
+- 状态：已完成并归档 `separate-scene-training-entry-roles`
+
+#### 背景
+Scene 主学习视图新增“当前下一步”任务条后，右下角训练悬浮框仍保留当前步骤主 CTA 与“下一步”提示，导致两个入口表达同一行动指令。
+
+#### 本次改动
+- 任务条保留为唯一“当前下一步 + 主 CTA”入口。
+- 训练悬浮入口收口为完整进度、步骤列表、统计摘要和已完成步骤辅助快捷入口。
+- 移除悬浮面板底部重复的当前步骤主 CTA 与“下一步”提示。
+- 同步 `scene-training-flow` 和 `learning-loop-overview` 稳定规范。
+
+#### 明确不收项
+- 不改变训练步骤推导、学习状态、写回、完成判定、practice / variant 生成策略或浮层拖拽定位。
+
+#### 验证
+- 已运行：
+  - `pnpm exec node --import tsx --import ./src/test/setup-dom.ts --test "src/app/(app)/scene/[[]slug[]]/scene-training-coach-floating-entry.test.tsx" "src/app/(app)/scene/[[]slug[]]/page.regression.test.tsx"`
+  - `pnpm exec tsc --noEmit`
+  - `pnpm exec openspec validate separate-scene-training-entry-roles --strict`
+  - `pnpm exec openspec validate --all --strict`
+  - `pnpm run text:check-mojibake`
+  - `pnpm run maintenance:check`
+  - `git diff --check`
+
 ### [2026-05-07] 收口 OpenSpec archive 乱码防护
 - 类型：Spec-Driven / 维护规则与归档文本防护
 - 状态：已完成并归档 `guard-openspec-archive-mojibake`

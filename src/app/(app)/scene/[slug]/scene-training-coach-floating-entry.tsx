@@ -9,7 +9,7 @@ import {
   deriveSceneTrainingState,
   deriveSceneTrainingStatsSummary,
 } from "./scene-detail-selectors";
-import { getSceneTrainingNextStep, getSceneTrainingStepTitle, sceneDetailMessages } from "./scene-detail-messages";
+import { getSceneTrainingStepTitle, sceneDetailMessages } from "./scene-detail-messages";
 import { useSceneTrainingFloatingPosition } from "./use-scene-training-floating-position";
 
 export function SceneTrainingCoachFloatingEntry({
@@ -19,10 +19,6 @@ export function SceneTrainingCoachFloatingEntry({
   practiceSetStatus,
   practiceSnapshot,
   practiceModuleCount,
-  currentStepActionLabel,
-  currentStepActionLoading,
-  onCurrentStepAction,
-  currentStepActionDisabled,
   practiceStepAction,
 }: {
   sceneId: string;
@@ -31,10 +27,6 @@ export function SceneTrainingCoachFloatingEntry({
   practiceSetStatus: "idle" | "generated" | "completed";
   practiceSnapshot: ScenePracticeSnapshotResponse | null;
   practiceModuleCount: number;
-  currentStepActionLabel: string | null;
-  currentStepActionLoading?: boolean;
-  onCurrentStepAction?: (() => void) | null;
-  currentStepActionDisabled?: boolean;
   practiceStepAction?: {
     label: string;
     onClick: () => void;
@@ -59,21 +51,9 @@ export function SceneTrainingCoachFloatingEntry({
   );
 
   const normalizedTrainingState = useMemo(() => {
-    const derived = deriveSceneTrainingState(rawCompletedMap);
-    return {
-      ...derived,
-      nextStep: getSceneTrainingNextStep(derived.currentStep),
-    };
+    return deriveSceneTrainingState(rawCompletedMap);
   }, [rawCompletedMap]);
 
-  const nextStepLabel =
-    normalizedTrainingState.nextStep === "done"
-      ? getSceneTrainingStepTitle("done")
-      : normalizedTrainingState.nextStep
-        ? getSceneTrainingStepTitle(normalizedTrainingState.nextStep)
-        : rawCompletedMap.done
-          ? "本轮训练已完成"
-          : "继续当前步骤";
   const collapsedStepLabel = getSceneTrainingStepTitle(normalizedTrainingState.currentStep);
 
   const statsSummary = useMemo(
@@ -276,28 +256,6 @@ export function SceneTrainingCoachFloatingEntry({
                 </div>
               </div>
 
-              <div className="shrink-0 px-[var(--mobile-adapt-space-sheet)] pb-[var(--mobile-adapt-space-sheet)]">
-                {currentStepActionLabel && onCurrentStepAction ? (
-                  <button
-                    type="button"
-                    className="inline-flex min-h-[var(--mobile-adapt-button-height)] w-full items-center justify-center rounded-[14px] border-0 bg-[var(--app-scene-panel-accent)] px-[var(--mobile-adapt-space-xl)] py-[var(--mobile-adapt-space-md)] text-[length:var(--mobile-adapt-font-sheet-body)] font-semibold text-white shadow-[0_4px_15px_color-mix(in_srgb,var(--app-scene-panel-accent)_30%,transparent)] transition-all duration-200 active:scale-[0.96] active:opacity-80 disabled:cursor-not-allowed disabled:bg-[var(--app-scene-panel-cta-disabled)] disabled:text-white/80 disabled:shadow-none"
-                    disabled={currentStepActionDisabled}
-                    onClick={() => {
-                      onCurrentStepAction();
-                    }}
-                  >
-                    <LoadingContent
-                      loading={Boolean(currentStepActionLoading)}
-                      loadingText={formatLoadingText(currentStepActionLabel, "中...")}
-                    >
-                      {currentStepActionLabel}
-                    </LoadingContent>
-                  </button>
-                ) : null}
-                <p className="mt-[var(--mobile-adapt-space-sm)] text-center text-[length:var(--mobile-adapt-font-meta)] text-[var(--app-scene-panel-muted)]">
-                  下一步：{nextStepLabel}
-                </p>
-              </div>
             </div>
           ) : null}
         </div>

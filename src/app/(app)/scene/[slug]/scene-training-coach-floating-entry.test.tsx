@@ -59,9 +59,7 @@ function createTrainingState(
   };
 }
 
-test("SceneTrainingCoachFloatingEntry 会展开训练面板并触发当前步骤动作", () => {
-  let actionCount = 0;
-
+test("SceneTrainingCoachFloatingEntry 只承载训练进度总览，不重复当前步骤主动作", () => {
   render(
     <SceneTrainingCoachFloatingEntry
       sceneId="scene-1"
@@ -70,10 +68,6 @@ test("SceneTrainingCoachFloatingEntry 会展开训练面板并触发当前步骤
       practiceSetStatus="generated"
       practiceSnapshot={null}
       practiceModuleCount={1}
-      currentStepActionLabel="继续当前步骤"
-      onCurrentStepAction={() => {
-        actionCount += 1;
-      }}
     />,
   );
 
@@ -82,9 +76,7 @@ test("SceneTrainingCoachFloatingEntry 会展开训练面板并触发当前步骤
   fireEvent.pointerUp(fab, { pointerId: 1, clientX: 20, clientY: 20 });
 
   assert.ok(screen.getByRole("button", { name: "收起训练面板" }));
-  assert.ok(screen.getByText(/下一步：继续完成整段练习|下一步：/));
-
-  fireEvent.click(screen.getByRole("button", { name: "继续当前步骤" }));
-
-  assert.equal(actionCount, 1);
+  assert.ok(screen.getByText("2. 看 1 个重点表达"));
+  assert.equal(screen.queryByRole("button", { name: "继续当前步骤" }), null);
+  assert.equal(screen.queryByText(/下一步：/), null);
 });
