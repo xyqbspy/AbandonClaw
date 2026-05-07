@@ -30,6 +30,9 @@
 - `recognition_state`
 - `output_confidence`
 - `full_output_status`
+- `variant_rewrite_status`
+- `variant_rewrite_prompt_id`
+- `full_output_coverage`
 
 它们和原有正式信号并存：
 
@@ -56,6 +59,19 @@
 - `full_output_status`
   - `completed`
   - `not_started`
+- `variant_rewrite_status`
+  - `completed`
+  - `not_started`
+- `variant_rewrite_prompt_id`
+  - `self`
+  - `colleague`
+  - `past`
+- `full_output_coverage`
+  - `contains_target`
+  - `missing_target`
+  - `not_started`
+
+`full_output_coverage` 是确定性目标表达覆盖结果，只表示完整输出是否用进目标表达，不表示语法、自然度或 AI 质量评分。
 
 ### 3.3 事件层挂载策略
 
@@ -78,6 +94,9 @@
 
 - `confidentOutputCountToday`
 - `fullOutputCountToday`
+- `variantRewriteCountToday`
+- `targetCoverageCountToday`
+- `targetCoverageMissCountToday`
 
 含义：
 
@@ -85,6 +104,12 @@
   - 今天的 review 日志里，有多少条记录了 `output_confidence = high`
 - `fullOutputCountToday`
   - 今天的 review 日志里，有多少条记录了 `full_output_status = completed`
+- `variantRewriteCountToday`
+  - 今天的 review 日志里，有多少条记录了 `variant_rewrite_status = completed`
+- `targetCoverageCountToday`
+  - 今天的 review 日志里，有多少条记录了 `full_output_coverage = contains_target`
+- `targetCoverageMissCountToday`
+  - 今天的 review 日志里，有多少条记录了 `full_output_coverage = missing_target`
 
 这些字段当前属于：
 
@@ -100,6 +125,11 @@
 - `recognitionState`
 - `outputConfidence`
 - `fullOutputStatus`
+- `variantRewriteStatus`
+- `variantRewritePromptId`
+- `fullOutputText`
+
+服务端根据 `fullOutputText` 与目标表达确定 `fullOutputCoverage`，但不把用户完整输出全文写入长期资产字段。
 
 对应文件：
 
@@ -113,7 +143,9 @@
 当前用法：
 
 - 当今日 review 已完成且存在完整输出记录时，会在任务说明里显示“其中 X 条进入完整输出”
+- 当今日 review 已完成且存在目标表达覆盖记录时，会优先显示“其中 X 条把目标表达用进完整输出”
 - 当今日仍有待复习内容且已有主动输出信号时，会在任务说明里显示“今天已有 X 条进入主动输出”
+- 当今日仍有待复习内容且存在目标表达未覆盖记录时，会优先提示“X 条完整输出还没用进目标表达”
 
 这样可以保证：
 
@@ -147,6 +179,7 @@
 - 变体改写的评估结果
 - chunks 命中率
 - 自然度评分
+- 用户改写草稿或完整输出全文的长期资产化
 - 基于正式信号调整后的新调度算法
 
 这些能力后续如果要接入正式语义，需要继续扩这个文档和对应 OpenSpec 规范。
@@ -160,7 +193,7 @@
 
 ## 8. 建议回归
 
-- `review` 最终提交时会带上熟悉度、输出信心和完整输出状态
+- `review` 最终提交时会带上熟悉度、输出信心、变体改写状态和完整输出状态
 - 服务端能在 `phrase_review_logs` 中写入新增字段
-- `getReviewSummary()` 会正确聚合当天主动输出和完整输出数量
+- `getReviewSummary()` 会正确聚合当天主动输出、完整输出、迁移改写和目标表达覆盖数量
 - `today` 只消费摘要字段，不直接解释 review 原始事件

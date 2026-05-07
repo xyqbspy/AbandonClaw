@@ -39,6 +39,9 @@ export const toDueItemFromSavedPhrase = (
     recognitionState: null,
     outputConfidence: null,
     fullOutputStatus: null,
+    variantRewriteStatus: null,
+    variantRewritePromptId: null,
+    fullOutputCoverage: null,
     schedulingFocus: null,
   };
 };
@@ -249,8 +252,14 @@ export const getReviewSchedulingReason = (
   if (item.schedulingFocus === "low_output_confidence") {
     return "这条会优先出现，因为你上次还缺少主动输出信心。";
   }
+  if (item.schedulingFocus === "missing_target_coverage") {
+    return "这条会优先出现，因为上次完整输出还没用进目标表达。";
+  }
   if (item.schedulingFocus === "missing_full_output") {
     return "这条会优先出现，因为你还没完成过完整输出。";
+  }
+  if (item.schedulingFocus === "missing_variant_rewrite") {
+    return "这条会优先出现，因为你还没完成迁移改写。";
   }
   if (item.schedulingFocus === "recognition_only") {
     return "这条会优先出现，因为它还停留在识别层。";

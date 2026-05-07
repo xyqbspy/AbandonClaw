@@ -147,6 +147,9 @@ export interface TodayLearningTasks {
     dueReviewCount: number;
     confidentOutputCountToday: number;
     fullOutputCountToday: number;
+    variantRewriteCountToday: number;
+    targetCoverageCountToday: number;
+    targetCoverageMissCountToday: number;
   };
   outputTask: {
     done: boolean;
@@ -1119,6 +1122,9 @@ export async function getTodayLearningTasks(userId: string): Promise<TodayLearni
       dueReviewCount: reviewSummary.dueReviewCount,
       confidentOutputCountToday: reviewSummary.confidentOutputCountToday,
       fullOutputCountToday: reviewSummary.fullOutputCountToday,
+      variantRewriteCountToday: reviewSummary.variantRewriteCountToday,
+      targetCoverageCountToday: reviewSummary.targetCoverageCountToday,
+      targetCoverageMissCountToday: reviewSummary.targetCoverageMissCountToday,
     },
     outputTask: {
       done: phrasesSaved >= 1,

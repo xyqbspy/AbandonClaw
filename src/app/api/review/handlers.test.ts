@@ -109,6 +109,9 @@ test("review submit handler 会裁剪 payload 并返回 item 与 summary", async
       recognitionState: "recognized",
       outputConfidence: "high",
       fullOutputStatus: "completed",
+      variantRewriteStatus: "completed",
+      variantRewritePromptId: "self",
+      fullOutputText: " We should call it a day now. ",
     }),
     {
       requireCurrentProfile: async () => ({ user: { id: "user-1" } } as never),
@@ -136,8 +139,32 @@ test("review submit handler 会裁剪 payload 并返回 item 与 summary", async
     recognitionState: "recognized",
     outputConfidence: "high",
     fullOutputStatus: "completed",
+    variantRewriteStatus: "completed",
+    variantRewritePromptId: "self",
+    fullOutputCoverage: undefined,
+    fullOutputText: "We should call it a day now.",
   });
   assert.equal(summaryUserId, "user-1");
+});
+
+test("review submit handler 在新增正式信号非法时返回 400", async () => {
+  const response = await handleReviewSubmitPost(
+    createJsonRequest("http://localhost/api/review/submit", {
+      userPhraseId: "phrase-1",
+      reviewResult: "good",
+      variantRewriteStatus: "done",
+    }),
+    {
+      requireCurrentProfile: async () => ({ user: { id: "user-1" } } as never),
+      submitPhraseReview: async () => ({}) as never,
+      getReviewSummary: async () => ({}) as never,
+    },
+  );
+
+  const body = await response.json();
+  assert.equal(response.status, 400);
+  assert.equal(body.code, "VALIDATION_ERROR");
+  assert.equal(typeof body.requestId, "string");
 });
 
 test("review submit handler 在 reviewResult 非法时返回 400 与 requestId", async () => {

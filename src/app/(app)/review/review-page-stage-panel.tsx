@@ -439,12 +439,12 @@ export function ReviewPageStagePanel({
                   ) : null}
                   {phraseRewriteDraft.trim() ? (
                     <span className={REVIEW_STAGE_FEEDBACK_PILL_WARNING_CLASSNAME}>
-                      {currentRewritePrompt?.title}
+                      已完成迁移改写：{currentRewritePrompt?.title}
                     </span>
                   ) : null}
                   {phraseDraft.trim() ? (
                     <span className={REVIEW_STAGE_FEEDBACK_PILL_SUCCESS_CLASSNAME}>
-                      已完成完整输出草稿
+                      已完成完整输出
                     </span>
                   ) : null}
                 </div>

@@ -108,6 +108,9 @@ test("mergePrioritizedReviewItems 会优先插入 session 项并避免重复", (
         recognitionState: null,
         outputConfidence: null,
         fullOutputStatus: null,
+        variantRewriteStatus: null,
+        variantRewritePromptId: null,
+        fullOutputCoverage: null,
         schedulingFocus: null,
       },
     ],
@@ -230,8 +233,16 @@ test("getReviewSchedulingReason 会返回稳定的调度解释", () => {
     "这条会优先出现，因为你上次还缺少主动输出信心。",
   );
   assert.equal(
+    getReviewSchedulingReason({ schedulingFocus: "missing_target_coverage" }),
+    "这条会优先出现，因为上次完整输出还没用进目标表达。",
+  );
+  assert.equal(
     getReviewSchedulingReason({ schedulingFocus: "missing_full_output" }),
     "这条会优先出现，因为你还没完成过完整输出。",
+  );
+  assert.equal(
+    getReviewSchedulingReason({ schedulingFocus: "missing_variant_rewrite" }),
+    "这条会优先出现，因为你还没完成迁移改写。",
   );
   assert.equal(
     getReviewSchedulingReason({ schedulingFocus: "recognition_only" }),

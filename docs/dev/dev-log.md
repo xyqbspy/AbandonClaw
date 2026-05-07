@@ -1,5 +1,47 @@
 ﻿# Dev Log
 
+### [2026-05-07] Review 递进式练习正式信号收口
+- 类型：Spec-Driven / Review 递进式练习正式化
+- 状态：已完成并归档 `formalize-review-progressive-practice`
+
+#### 背景
+Review 已经具备微回忆、熟悉度、变体改写、完整输出和最终反馈阶段，但迁移改写与完整输出覆盖此前缺少稳定后端信号。本轮按产品北极星“回忆、使用、迁移”收口，不把页面训练位继续停留在本地草稿语义。
+
+#### 本次改动
+- 为 `phrase_review_logs` 增加 `variant_rewrite_status`、`variant_rewrite_prompt_id`、`full_output_coverage` nullable 字段与约束。
+- 普通表达 review submit 会写入变体改写完成状态、固定改写方向和完整输出目标表达覆盖结果。
+- 新增确定性目标表达覆盖 helper，只判断完整输出是否包含目标表达，不调用 AI。
+- due 排序和下一次复习节奏保守消费新增信号，继续保留 `again / hard / good` 主方向。
+- `getReviewSummary()` / learning dashboard 增加迁移改写、目标表达覆盖和未覆盖摘要字段，Today 只消费服务端摘要。
+- 更新 Review 页面提交 payload、调度提示和阶段文案，明确新增结果是正式训练信号但不是 AI 质量评分。
+- 同步 review progressive practice、practice signals、scheduling rules 和 writeback 文档。
+
+#### 本轮收口项
+- 变体改写完成状态进入正式事件层。
+- 完整输出是否覆盖目标表达进入正式事件层。
+- 新增信号的 API schema、服务端写入、summary、调度解释、页面提交与文档边界同步。
+
+#### 明确不收项
+- 不引入 AI 评分、语法评分、自然度评分或语气评分。
+- 不把用户改写草稿或完整输出全文沉淀为长期表达资产字段。
+- 不重写 `again / hard / good` 主调度算法。
+- 不让 `today` 直接解释原始 `phrase_review_logs`。
+- 不改变 scene practice 回补正式链路。
+
+#### 验证
+- 已运行：
+  - `node --import tsx --test src/app/api/review/handlers.test.ts src/lib/server/review/service.logic.test.ts "src/app/(app)/review/review-page-selectors.test.ts" src/features/today/components/today-page-selectors.test.ts`
+  - `node --import tsx --import ./src/test/setup-dom.ts --test "src/app/(app)/review/page.interaction.test.tsx" src/features/today/components/today-page-client.test.tsx`
+  - `pnpm exec eslint "src/app/(app)/review/page.tsx" "src/app/(app)/review/review-page-stage-panel.tsx" "src/app/(app)/review/review-page-selectors.ts" "src/app/(app)/review/use-review-page-data.ts" src/app/api/review/handlers.ts src/lib/server/review/service.ts src/lib/server/request-schemas.ts src/lib/utils/review-api.ts src/lib/utils/learning-api.ts src/features/today/components/today-page-selectors.ts src/features/today/components/today-page-client.tsx`
+  - `node_modules\.bin\openspec.CMD validate formalize-review-progressive-practice --strict`
+  - `node_modules\.bin\openspec.CMD archive formalize-review-progressive-practice --yes`
+  - `node_modules\.bin\openspec.CMD validate --all --strict`
+  - `pnpm run maintenance:check`
+  - `pnpm run text:check-mojibake`
+  - `git diff --check`
+- 已尝试：
+  - `pnpm exec tsc --noEmit`，当前被既有 unrelated 测试类型问题阻塞，已确认其中本轮相关的 Today 默认 dashboard 缺字段问题已修复；剩余阻塞来自 chunks / scene / tts / practice-generate 旧测试类型。
+
 ### [2026-05-06] 收口 Chunks 工作台用户动作层级
 - 类型：Spec-Driven / Chunks 工作台体验收口
 - 状态：已完成并归档 `streamline-chunks-workbench`

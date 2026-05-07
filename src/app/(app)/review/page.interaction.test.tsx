@@ -23,6 +23,9 @@ const setReviewPageCacheCalls: Array<{
         masteredPhraseCount: number;
         confidentOutputCountToday: number;
         fullOutputCountToday: number;
+        variantRewriteCountToday: number;
+        targetCoverageCountToday: number;
+        targetCoverageMissCountToday: number;
       };
   };
   limit: number | undefined;
@@ -51,7 +54,16 @@ let currentDueRows: Array<{
   recognitionState: "recognized" | "unknown" | null;
   outputConfidence: "high" | "low" | null;
   fullOutputStatus: "completed" | "not_started" | null;
-  schedulingFocus: "low_output_confidence" | "missing_full_output" | "recognition_only" | null;
+  variantRewriteStatus: "completed" | "not_started" | null;
+  variantRewritePromptId: "self" | "colleague" | "past" | null;
+  fullOutputCoverage: "contains_target" | "missing_target" | "not_started" | null;
+  schedulingFocus:
+    | "low_output_confidence"
+    | "missing_target_coverage"
+    | "missing_full_output"
+    | "missing_variant_rewrite"
+    | "recognition_only"
+    | null;
 }> = [
   {
     userPhraseId: "p1",
@@ -71,6 +83,9 @@ let currentDueRows: Array<{
     recognitionState: null,
     outputConfidence: null,
     fullOutputStatus: null,
+    variantRewriteStatus: null,
+    variantRewritePromptId: null,
+    fullOutputCoverage: null,
     schedulingFocus: null,
   },
 ];
@@ -96,6 +111,9 @@ let currentSummary = {
   masteredPhraseCount: 0,
   confidentOutputCountToday: 0,
   fullOutputCountToday: 0,
+  variantRewriteCountToday: 0,
+  targetCoverageCountToday: 0,
+  targetCoverageMissCountToday: 0,
 };
 
 const mockedModules = {
@@ -128,6 +146,9 @@ const mockedModules = {
           masteredPhraseCount: number;
           confidentOutputCountToday: number;
           fullOutputCountToday: number;
+          variantRewriteCountToday: number;
+          targetCoverageCountToday: number;
+          targetCoverageMissCountToday: number;
         };
       },
       limit?: number,
@@ -159,6 +180,9 @@ const mockedModules = {
         masteredPhraseCount: 0,
         confidentOutputCountToday: 1,
         fullOutputCountToday: 1,
+        variantRewriteCountToday: 1,
+        targetCoverageCountToday: 1,
+        targetCoverageMissCountToday: 0,
       },
     };
     },
@@ -242,10 +266,13 @@ afterEach(() => {
       correctCount: 0,
       incorrectCount: 0,
       nextReviewAt: null,
-      recognitionState: null,
-      outputConfidence: null,
-      fullOutputStatus: null,
-      schedulingFocus: null,
+    recognitionState: null,
+    outputConfidence: null,
+    fullOutputStatus: null,
+    variantRewriteStatus: null,
+    variantRewritePromptId: null,
+    fullOutputCoverage: null,
+    schedulingFocus: null,
     },
   ];
   currentScenePracticeRows = [];
@@ -256,6 +283,9 @@ afterEach(() => {
     masteredPhraseCount: 0,
     confidentOutputCountToday: 0,
     fullOutputCountToday: 0,
+    variantRewriteCountToday: 0,
+    targetCoverageCountToday: 0,
+    targetCoverageMissCountToday: 0,
   };
   ReviewPageModule = null;
 });
@@ -280,6 +310,9 @@ test("ReviewPage 普通表达有可访问来源场景时展示跳转入口", asy
       recognitionState: null,
       outputConfidence: null,
       fullOutputStatus: null,
+      variantRewriteStatus: null,
+      variantRewritePromptId: null,
+      fullOutputCoverage: null,
       schedulingFocus: null,
     },
   ];
@@ -311,6 +344,9 @@ test("ReviewPage 普通表达来源场景失效时只展示降级提示", async 
       recognitionState: null,
       outputConfidence: null,
       fullOutputStatus: null,
+      variantRewriteStatus: null,
+      variantRewritePromptId: null,
+      fullOutputCoverage: null,
       schedulingFocus: null,
     },
   ];
@@ -391,6 +427,12 @@ test("ReviewPage 普通表达复习会按微回忆 -> 熟悉度 -> 改写 -> 输
     assert.equal(submitPhraseReviewPayloads[0]?.recognitionState, "recognized");
     assert.equal(submitPhraseReviewPayloads[0]?.outputConfidence, "high");
     assert.equal(submitPhraseReviewPayloads[0]?.fullOutputStatus, "completed");
+    assert.equal(submitPhraseReviewPayloads[0]?.variantRewriteStatus, "completed");
+    assert.equal(submitPhraseReviewPayloads[0]?.variantRewritePromptId, "self");
+    assert.equal(
+      submitPhraseReviewPayloads[0]?.fullOutputText,
+      "We should call it a day now. Let's pick it up again tomorrow.",
+    );
     assert.equal(toastSuccessCalls.at(-1)?.message, "已记录这次复习结果。 今天这轮回忆先收住了。");
     assert.equal(toastSuccessCalls.at(-1)?.description, "已完成 1 条，可以回到今日学习继续推进场景。");
     assert.equal(clientEventCalls.at(-1)?.name, "review_submitted");
@@ -418,6 +460,9 @@ test("ReviewPage 会展示正式信号带来的调度提示", async () => {
       recognitionState: "recognized",
       outputConfidence: "low",
       fullOutputStatus: "not_started",
+      variantRewriteStatus: "not_started",
+      variantRewritePromptId: null,
+      fullOutputCoverage: "not_started",
       schedulingFocus: "low_output_confidence",
     },
   ];
@@ -532,6 +577,9 @@ test("ReviewPage 队列清空后会展示收束反馈并提供返回今日学习
     masteredPhraseCount: 0,
     confidentOutputCountToday: 1,
     fullOutputCountToday: 1,
+    variantRewriteCountToday: 1,
+    targetCoverageCountToday: 1,
+    targetCoverageMissCountToday: 0,
   };
 
   const ReviewPage = getReviewPage();

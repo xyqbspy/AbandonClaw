@@ -32,6 +32,9 @@ export type ReviewSummary = {
   masteredPhraseCount: number;
   confidentOutputCountToday: number;
   fullOutputCountToday: number;
+  variantRewriteCountToday: number;
+  targetCoverageCountToday: number;
+  targetCoverageMissCountToday: number;
 };
 
 export function useReviewPageData(params: {

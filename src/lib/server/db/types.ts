@@ -292,6 +292,12 @@ export type PhraseReviewResult = "again" | "hard" | "good";
 export type PhraseReviewRecognitionState = "recognized" | "unknown";
 export type PhraseReviewOutputConfidence = "high" | "low";
 export type PhraseReviewFullOutputStatus = "completed" | "not_started";
+export type PhraseReviewVariantRewriteStatus = "completed" | "not_started";
+export type PhraseReviewVariantRewritePromptId = "self" | "colleague" | "past";
+export type PhraseReviewFullOutputCoverage =
+  | "contains_target"
+  | "missing_target"
+  | "not_started";
 
 export interface PhraseReviewLogRow {
   id: string;
@@ -302,6 +308,9 @@ export interface PhraseReviewLogRow {
   recognition_state: PhraseReviewRecognitionState | null;
   output_confidence: PhraseReviewOutputConfidence | null;
   full_output_status: PhraseReviewFullOutputStatus | null;
+  variant_rewrite_status: PhraseReviewVariantRewriteStatus | null;
+  variant_rewrite_prompt_id: PhraseReviewVariantRewritePromptId | null;
+  full_output_coverage: PhraseReviewFullOutputCoverage | null;
   was_correct: boolean;
   reviewed_at: string;
   scheduled_next_review_at: string | null;

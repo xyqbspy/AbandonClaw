@@ -26,6 +26,8 @@
 - `recognition_state`
 - `output_confidence`
 - `full_output_status`
+- `variant_rewrite_status`
+- `full_output_coverage`
 
 这保证了：
 
@@ -42,9 +44,11 @@
 当前前置优先级从高到低是：
 
 1. `low_output_confidence`
-2. `missing_full_output`
-3. `recognition_only`
-4. `null`
+2. `missing_target_coverage`
+3. `missing_full_output`
+4. `missing_variant_rewrite`
+5. `recognition_only`
+6. `null`
 
 对应含义：
 
@@ -54,6 +58,12 @@
 - `missing_full_output`
   - 已经能识别，但还没完成过完整输出
   - 需要尽快补上整句输出
+- `missing_target_coverage`
+  - 已经进入完整输出，但上次没有确定性用进目标表达
+  - 需要尽快补一次真正覆盖目标表达的完整输出
+- `missing_variant_rewrite`
+  - 还没完成过固定方向的迁移改写
+  - 需要补一次换对象、时态或视角的迁移训练
 - `recognition_only`
   - 还停留在识别层，没有进入更稳定的输出层
 - `null`
@@ -72,14 +82,14 @@
 
 #### `again`
 
-- 如果同时表现出低输出信心、仅识别或未完成完整输出：
+- 如果同时表现出低输出信心、仅识别、未完成完整输出、未覆盖目标表达或未完成迁移改写：
   - 下次约 `12 小时` 后
 - 否则：
   - 下次约 `1 天` 后
 
 #### `hard`
 
-- 如果仍然缺少完整输出或主动输出信心：
+- 如果仍然缺少完整输出、目标表达覆盖、迁移改写或主动输出信心：
   - 下次约 `2 天` 后
 - 否则：
   - 下次约 `3 天` 后
@@ -88,12 +98,14 @@
 
 - 如果这次已经达到 `mastered`：
   - 不再安排 `next_review_at`
-- 如果已经识别稳定、输出信心高且完成完整输出：
+- 如果已经识别稳定、输出信心高、完成变体改写、完成完整输出且覆盖目标表达：
   - 下次约 `10 天` 后
 - 如果仍然低信心或还停留在识别层：
   - 下次约 `4 天` 后
-- 如果只是还没完成完整输出：
+- 如果只是还没完成完整输出，或完整输出未覆盖目标表达：
   - 下次约 `5 天` 后
+- 如果只是还没完成迁移改写：
+  - 下次约 `6 天` 后
 - 其他中性情况：
   - 下次约 `7 天` 后
 
@@ -106,6 +118,8 @@
 - `recognition_state`
 - `output_confidence`
 - `full_output_status`
+- `variant_rewrite_status`
+- `full_output_coverage`
 
 当前兼容策略是保守中性解释：
 
@@ -147,6 +161,8 @@
 
 - due 列表里低输出信心条目会排到更前
 - `good` + 高信心 + 完整输出 会比中性 `good` 拉得更远
+- `good` + 完整输出未覆盖目标表达 不会被安排到和已覆盖目标表达同等远
+- 未完成迁移改写的条目能展示稳定调度提示
 - `good` + 低信心 不会被错误放到太远
 - 历史空值记录不会被误判成高优先级或低优先级
 - `review` 页面能稳定展示调度提示

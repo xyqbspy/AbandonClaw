@@ -570,6 +570,9 @@ export interface LearningDashboardTasksResponse {
     dueReviewCount: number;
     confidentOutputCountToday: number;
     fullOutputCountToday: number;
+    variantRewriteCountToday: number;
+    targetCoverageCountToday: number;
+    targetCoverageMissCountToday: number;
   };
   outputTask: {
     done: boolean;

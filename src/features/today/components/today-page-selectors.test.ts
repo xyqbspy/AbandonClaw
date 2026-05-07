@@ -61,6 +61,9 @@ const dashboard: LearningDashboardResponse = {
       dueReviewCount: 6,
       confidentOutputCountToday: 0,
       fullOutputCountToday: 0,
+      variantRewriteCountToday: 0,
+      targetCoverageCountToday: 0,
+      targetCoverageMissCountToday: 0,
     },
     outputTask: { done: true, phrasesSavedToday: 4 },
   },
@@ -395,6 +398,9 @@ test("buildTodayTasks 在回炉练习时不会把 output 和 review 重新锁住
         dueReviewCount: 3,
         confidentOutputCountToday: 0,
         fullOutputCountToday: 0,
+        variantRewriteCountToday: 0,
+        targetCoverageCountToday: 0,
+        targetCoverageMissCountToday: 0,
       },
       outputTask: { done: false, phrasesSavedToday: 0 },
     },
@@ -428,6 +434,9 @@ test("buildTodayTasks 会把 review 正式信号摘要写进说明文案", () =>
         dueReviewCount: 0,
         confidentOutputCountToday: 2,
         fullOutputCountToday: 1,
+        variantRewriteCountToday: 1,
+        targetCoverageCountToday: 1,
+        targetCoverageMissCountToday: 0,
       },
     },
   };
@@ -443,7 +452,7 @@ test("buildTodayTasks 会把 review 正式信号摘要写进说明文案", () =>
     },
   });
 
-  assert.match(tasks[2]?.description ?? "", /其中 1 条进入完整输出/);
+  assert.match(tasks[2]?.description ?? "", /其中 1 条把目标表达用进完整输出/);
 });
 
 test("resolveTodayPrimaryTaskExplanation 会稳定解释 today 首要任务来源", () => {

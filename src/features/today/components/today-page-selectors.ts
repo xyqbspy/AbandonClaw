@@ -382,13 +382,17 @@ export const buildTodayTasks = ({
     title: labels.taskReviewTitle,
     description: reviewDone
       ? dashboard.todayTasks.reviewTask.reviewItemsCompleted > 0
-        ? dashboard.todayTasks.reviewTask.fullOutputCountToday > 0
+        ? dashboard.todayTasks.reviewTask.targetCoverageCountToday > 0
+          ? `今天已完成 ${dashboard.todayTasks.reviewTask.reviewItemsCompleted} 条回忆练习，其中 ${dashboard.todayTasks.reviewTask.targetCoverageCountToday} 条把目标表达用进完整输出。`
+          : dashboard.todayTasks.reviewTask.fullOutputCountToday > 0
           ? `今天已完成 ${dashboard.todayTasks.reviewTask.reviewItemsCompleted} 条回忆练习，其中 ${dashboard.todayTasks.reviewTask.fullOutputCountToday} 条进入完整输出。`
           : `今天已完成 ${dashboard.todayTasks.reviewTask.reviewItemsCompleted} 条回忆练习。`
         : "今天没有待复习内容。"
       : sceneReadyForDownstream
         ? dashboard.todayTasks.reviewTask.dueReviewCount > 0
-          ? dashboard.todayTasks.reviewTask.confidentOutputCountToday > 0
+          ? dashboard.todayTasks.reviewTask.targetCoverageMissCountToday > 0
+            ? `当前待回忆 ${dashboard.todayTasks.reviewTask.dueReviewCount} 条，今天有 ${dashboard.todayTasks.reviewTask.targetCoverageMissCountToday} 条完整输出还没用进目标表达。`
+            : dashboard.todayTasks.reviewTask.confidentOutputCountToday > 0
             ? `当前待回忆 ${dashboard.todayTasks.reviewTask.dueReviewCount} 条，今天已有 ${dashboard.todayTasks.reviewTask.confidentOutputCountToday} 条进入主动输出。`
             : `当前待回忆 ${dashboard.todayTasks.reviewTask.dueReviewCount} 条，做一轮把输入变成可提取能力。`
           : "今天先做一轮短回忆，帮助刚学过的表达真正留下来。"

@@ -175,6 +175,8 @@ export default function ReviewPage() {
     phraseRecognition != null && phraseOutputConfidence != null;
   const phraseCanContinueFromRewrite = phraseRewriteDraft.trim().length > 0;
   const phraseCanContinueFromPractice = phraseDraft.trim().length > 0;
+  const phraseVariantRewriteStatus = phraseRewriteDraft.trim() ? "completed" : "not_started";
+  const phraseFullOutputStatus = phraseDraft.trim() ? "completed" : "not_started";
 
   const refreshAfterScenePractice = useCallback(async () => {
     resetTaskState();
@@ -202,7 +204,11 @@ export default function ReviewPage() {
             : phraseOutputConfidence === "low"
               ? "low"
               : undefined,
-        fullOutputStatus: phraseDraft.trim() ? "completed" : "not_started",
+        fullOutputStatus: phraseFullOutputStatus,
+        variantRewriteStatus: phraseVariantRewriteStatus,
+        variantRewritePromptId:
+          phraseVariantRewriteStatus === "completed" ? phraseRewritePromptId : undefined,
+        fullOutputText: phraseDraft,
       });
       const nextItems = items.filter((item) => item.userPhraseId !== currentPhraseItem.userPhraseId);
       resetTaskState();
@@ -223,7 +229,10 @@ export default function ReviewPage() {
         reviewedTodayCount: response.summary.reviewedTodayCount,
         recognitionState: phraseRecognition,
         outputConfidence: phraseOutputConfidence,
-        fullOutputStatus: phraseDraft.trim() ? "completed" : "not_started",
+        fullOutputStatus: phraseFullOutputStatus,
+        variantRewriteStatus: phraseVariantRewriteStatus,
+        variantRewritePromptId:
+          phraseVariantRewriteStatus === "completed" ? phraseRewritePromptId : null,
       });
       notifyPhraseReviewSubmitted(zh, response.summary);
     } catch (error) {

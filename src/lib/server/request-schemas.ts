@@ -8,8 +8,11 @@ import {
   parseOptionalNonNegativeDelta,
   parseOptionalNonNegativeInt,
   parseOptionalReviewFullOutputStatus,
+  parseOptionalReviewFullOutputCoverage,
   parseOptionalReviewOutputConfidence,
   parseOptionalReviewRecognitionState,
+  parseOptionalReviewVariantRewritePromptId,
+  parseOptionalReviewVariantRewriteStatus,
   parseOptionalTrimmedString,
   parseProgressPercent,
   parseRequiredStringArray,
@@ -50,6 +53,10 @@ interface ReviewSubmitPayload extends Record<string, unknown> {
   recognitionState?: unknown;
   outputConfidence?: unknown;
   fullOutputStatus?: unknown;
+  variantRewriteStatus?: unknown;
+  variantRewritePromptId?: unknown;
+  fullOutputCoverage?: unknown;
+  fullOutputText?: unknown;
 }
 
 interface UpdateProgressPayload extends Record<string, unknown> {
@@ -275,6 +282,12 @@ export const normalizeReviewSubmitPayload = (payload: ReviewSubmitPayload) => ({
   recognitionState: parseOptionalReviewRecognitionState(payload.recognitionState),
   outputConfidence: parseOptionalReviewOutputConfidence(payload.outputConfidence),
   fullOutputStatus: parseOptionalReviewFullOutputStatus(payload.fullOutputStatus),
+  variantRewriteStatus: parseOptionalReviewVariantRewriteStatus(payload.variantRewriteStatus),
+  variantRewritePromptId: parseOptionalReviewVariantRewritePromptId(
+    payload.variantRewritePromptId,
+  ),
+  fullOutputCoverage: parseOptionalReviewFullOutputCoverage(payload.fullOutputCoverage),
+  fullOutputText: parseOptionalTrimmedString(payload.fullOutputText, "fullOutputText", 2000),
 });
 
 export const parseReviewSubmitRequest = (request: Request) =>

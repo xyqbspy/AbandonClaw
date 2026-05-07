@@ -4,9 +4,17 @@ export type ReviewResult = "again" | "hard" | "good";
 export type ReviewRecognitionState = "recognized" | "unknown";
 export type ReviewOutputConfidence = "high" | "low";
 export type ReviewFullOutputStatus = "completed" | "not_started";
+export type ReviewVariantRewriteStatus = "completed" | "not_started";
+export type ReviewVariantRewritePromptId = "self" | "colleague" | "past";
+export type ReviewFullOutputCoverage =
+  | "contains_target"
+  | "missing_target"
+  | "not_started";
 export type ReviewSchedulingFocus =
   | "low_output_confidence"
+  | "missing_target_coverage"
   | "missing_full_output"
+  | "missing_variant_rewrite"
   | "recognition_only"
   | null;
 
@@ -28,6 +36,9 @@ export interface DueReviewItemResponse {
   recognitionState: ReviewRecognitionState | null;
   outputConfidence: ReviewOutputConfidence | null;
   fullOutputStatus: ReviewFullOutputStatus | null;
+  variantRewriteStatus: ReviewVariantRewriteStatus | null;
+  variantRewritePromptId: ReviewVariantRewritePromptId | null;
+  fullOutputCoverage: ReviewFullOutputCoverage | null;
   schedulingFocus: ReviewSchedulingFocus;
 }
 
@@ -54,6 +65,9 @@ export interface ReviewSummaryResponse {
   masteredPhraseCount: number;
   confidentOutputCountToday: number;
   fullOutputCountToday: number;
+  variantRewriteCountToday: number;
+  targetCoverageCountToday: number;
+  targetCoverageMissCountToday: number;
 }
 
 const toApiError = async (response: Response, fallback: string) => {
@@ -87,6 +101,10 @@ export async function submitPhraseReviewFromApi(payload: {
   recognitionState?: ReviewRecognitionState;
   outputConfidence?: ReviewOutputConfidence;
   fullOutputStatus?: ReviewFullOutputStatus;
+  variantRewriteStatus?: ReviewVariantRewriteStatus;
+  variantRewritePromptId?: ReviewVariantRewritePromptId;
+  fullOutputCoverage?: ReviewFullOutputCoverage;
+  fullOutputText?: string;
 }) {
   const response = await fetch("/api/review/submit", {
     method: "POST",

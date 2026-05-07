@@ -20,7 +20,7 @@
 ## 4. 关键状态/回写节点
 
 - review result
-- output confidence / full output 等正式信号
+- output confidence / full output / variant rewrite / target coverage 等正式信号
 - review scheduling 相关字段
 
 ## 5. 失败与降级
@@ -63,4 +63,18 @@
   - `recognitionState`
   - `outputConfidence`
   - `fullOutputStatus`
+  - `variantRewriteStatus`
+  - `variantRewritePromptId`
+  - `fullOutputCoverage`
 - 作用是让“页面提交成功但用户不知道还剩多少、当时做了什么判断”这类排查更直接
+
+## 9. 递进式练习正式信号补充
+
+- 普通表达 review 最终提交时，会把变体改写完成状态写入 `phrase_review_logs`：
+  - `variant_rewrite_status`
+  - `variant_rewrite_prompt_id`
+- 完整输出会由服务端做确定性目标表达覆盖判断：
+  - `full_output_coverage = contains_target / missing_target / not_started`
+- `full_output_coverage` 不是 AI 质量评分，只表示完整输出是否用进目标表达。
+- 用户改写草稿和完整输出全文不沉淀为长期表达资产字段。
+- scene practice 回补继续走原有 practice run / attempt / complete 链路，不混入普通表达 review submit。

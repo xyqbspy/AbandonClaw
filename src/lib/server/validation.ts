@@ -213,6 +213,12 @@ export type ReviewResult = "again" | "hard" | "good";
 export type ReviewRecognitionState = "recognized" | "unknown";
 export type ReviewOutputConfidence = "high" | "low";
 export type ReviewFullOutputStatus = "completed" | "not_started";
+export type ReviewVariantRewriteStatus = "completed" | "not_started";
+export type ReviewVariantRewritePromptId = "self" | "colleague" | "past";
+export type ReviewFullOutputCoverage =
+  | "contains_target"
+  | "missing_target"
+  | "not_started";
 
 export const parseReviewResult = (value: unknown): ReviewResult => {
   if (value === "again" || value === "hard" || value === "good") {
@@ -243,6 +249,38 @@ export const parseOptionalReviewFullOutputStatus = (
   if (value == null) return undefined;
   if (value === "completed" || value === "not_started") return value;
   throw new ValidationError("fullOutputStatus must be one of completed/not_started.");
+};
+
+export const parseOptionalReviewVariantRewriteStatus = (
+  value: unknown,
+): ReviewVariantRewriteStatus | undefined => {
+  if (value == null) return undefined;
+  if (value === "completed" || value === "not_started") return value;
+  throw new ValidationError("variantRewriteStatus must be one of completed/not_started.");
+};
+
+export const parseOptionalReviewVariantRewritePromptId = (
+  value: unknown,
+): ReviewVariantRewritePromptId | undefined => {
+  if (value == null) return undefined;
+  if (value === "self" || value === "colleague" || value === "past") return value;
+  throw new ValidationError("variantRewritePromptId must be one of self/colleague/past.");
+};
+
+export const parseOptionalReviewFullOutputCoverage = (
+  value: unknown,
+): ReviewFullOutputCoverage | undefined => {
+  if (value == null) return undefined;
+  if (
+    value === "contains_target" ||
+    value === "missing_target" ||
+    value === "not_started"
+  ) {
+    return value;
+  }
+  throw new ValidationError(
+    "fullOutputCoverage must be one of contains_target/missing_target/not_started.",
+  );
 };
 
 export const parsePracticeMode = (value: unknown) => {

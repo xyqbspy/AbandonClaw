@@ -1,8 +1,11 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
   PhraseReviewFullOutputStatus,
+  PhraseReviewFullOutputCoverage,
   PhraseReviewOutputConfidence,
   PhraseReviewRecognitionState,
+  PhraseReviewVariantRewritePromptId,
+  PhraseReviewVariantRewriteStatus,
   PhraseReviewLogRow,
   PhraseReviewResult,
   PhraseRow,
@@ -34,7 +37,9 @@ async function createUserScopedReviewClient() {
 
 export type ReviewSchedulingFocus =
   | "low_output_confidence"
+  | "missing_target_coverage"
   | "missing_full_output"
+  | "missing_variant_rewrite"
   | "recognition_only"
   | null;
 
@@ -42,6 +47,9 @@ export interface ReviewLatestSignals {
   recognitionState: PhraseReviewRecognitionState | null;
   outputConfidence: PhraseReviewOutputConfidence | null;
   fullOutputStatus: PhraseReviewFullOutputStatus | null;
+  variantRewriteStatus: PhraseReviewVariantRewriteStatus | null;
+  variantRewritePromptId: PhraseReviewVariantRewritePromptId | null;
+  fullOutputCoverage: PhraseReviewFullOutputCoverage | null;
   schedulingFocus: ReviewSchedulingFocus;
 }
 
@@ -63,6 +71,9 @@ export interface DueReviewItem {
   recognitionState: PhraseReviewRecognitionState | null;
   outputConfidence: PhraseReviewOutputConfidence | null;
   fullOutputStatus: PhraseReviewFullOutputStatus | null;
+  variantRewriteStatus: PhraseReviewVariantRewriteStatus | null;
+  variantRewritePromptId: PhraseReviewVariantRewritePromptId | null;
+  fullOutputCoverage: PhraseReviewFullOutputCoverage | null;
   schedulingFocus: ReviewSchedulingFocus;
 }
 
@@ -73,6 +84,10 @@ export interface SubmitPhraseReviewInput {
   recognitionState?: PhraseReviewRecognitionState;
   outputConfidence?: PhraseReviewOutputConfidence;
   fullOutputStatus?: PhraseReviewFullOutputStatus;
+  variantRewriteStatus?: PhraseReviewVariantRewriteStatus;
+  variantRewritePromptId?: PhraseReviewVariantRewritePromptId;
+  fullOutputCoverage?: PhraseReviewFullOutputCoverage;
+  fullOutputText?: string;
 }
 
 export interface ReviewSummary {
@@ -82,6 +97,9 @@ export interface ReviewSummary {
   masteredPhraseCount: number;
   confidentOutputCountToday: number;
   fullOutputCountToday: number;
+  variantRewriteCountToday: number;
+  targetCoverageCountToday: number;
+  targetCoverageMissCountToday: number;
 }
 
 export interface DueScenePracticeReviewItem {
@@ -174,6 +192,9 @@ const mapDueItem = (
   recognitionState: latestSignals?.recognitionState ?? null,
   outputConfidence: latestSignals?.outputConfidence ?? null,
   fullOutputStatus: latestSignals?.fullOutputStatus ?? null,
+  variantRewriteStatus: latestSignals?.variantRewriteStatus ?? null,
+  variantRewritePromptId: latestSignals?.variantRewritePromptId ?? null,
+  fullOutputCoverage: latestSignals?.fullOutputCoverage ?? null,
   schedulingFocus: latestSignals?.schedulingFocus ?? null,
 });
 
@@ -274,22 +295,30 @@ export const resolveReviewSchedulingFocus = ({
   recognitionState,
   outputConfidence,
   fullOutputStatus,
+  variantRewriteStatus,
+  fullOutputCoverage,
 }: {
   recognitionState: PhraseReviewRecognitionState | null;
   outputConfidence: PhraseReviewOutputConfidence | null;
   fullOutputStatus: PhraseReviewFullOutputStatus | null;
+  variantRewriteStatus: PhraseReviewVariantRewriteStatus | null;
+  fullOutputCoverage: PhraseReviewFullOutputCoverage | null;
 }): ReviewSchedulingFocus => {
   if (outputConfidence === "low") return "low_output_confidence";
+  if (fullOutputCoverage === "missing_target") return "missing_target_coverage";
   if (fullOutputStatus === "not_started") return "missing_full_output";
+  if (variantRewriteStatus === "not_started") return "missing_variant_rewrite";
   if (recognitionState === "unknown") return "recognition_only";
   return null;
 };
 
 export const getReviewSchedulingUrgencyRank = (focus: ReviewSchedulingFocus) => {
   if (focus === "low_output_confidence") return 0;
-  if (focus === "missing_full_output") return 1;
-  if (focus === "recognition_only") return 2;
-  return 3;
+  if (focus === "missing_target_coverage") return 1;
+  if (focus === "missing_full_output") return 2;
+  if (focus === "missing_variant_rewrite") return 3;
+  if (focus === "recognition_only") return 4;
+  return 5;
 };
 
 export const resolveNextReviewAt = ({
@@ -297,19 +326,28 @@ export const resolveNextReviewAt = ({
   recognitionState,
   outputConfidence,
   fullOutputStatus,
+  variantRewriteStatus,
+  fullOutputCoverage,
   reachesMastered,
 }: {
   reviewResult: PhraseReviewResult;
   recognitionState: PhraseReviewRecognitionState | null;
   outputConfidence: PhraseReviewOutputConfidence | null;
   fullOutputStatus: PhraseReviewFullOutputStatus | null;
+  variantRewriteStatus: PhraseReviewVariantRewriteStatus | null;
+  fullOutputCoverage: PhraseReviewFullOutputCoverage | null;
   reachesMastered: boolean;
 }) => {
+  const missingProgressiveOutput =
+    fullOutputStatus === "not_started" ||
+    fullOutputCoverage === "missing_target" ||
+    variantRewriteStatus === "not_started";
+
   if (reviewResult === "again") {
     if (
       outputConfidence === "low" ||
       recognitionState === "unknown" ||
-      fullOutputStatus === "not_started"
+      missingProgressiveOutput
     ) {
       return addHours(12);
     }
@@ -317,7 +355,7 @@ export const resolveNextReviewAt = ({
   }
 
   if (reviewResult === "hard") {
-    if (outputConfidence === "low" || fullOutputStatus === "not_started") {
+    if (outputConfidence === "low" || missingProgressiveOutput) {
       return addDays(2);
     }
     return addDays(3);
@@ -327,17 +365,49 @@ export const resolveNextReviewAt = ({
   if (
     recognitionState === "recognized" &&
     outputConfidence === "high" &&
-    fullOutputStatus === "completed"
+    fullOutputStatus === "completed" &&
+    variantRewriteStatus === "completed" &&
+    fullOutputCoverage === "contains_target"
   ) {
     return addDays(10);
   }
   if (outputConfidence === "low" || recognitionState === "unknown") {
     return addDays(4);
   }
-  if (fullOutputStatus === "not_started") {
+  if (fullOutputStatus === "not_started" || fullOutputCoverage === "missing_target") {
     return addDays(5);
   }
+  if (variantRewriteStatus === "not_started") {
+    return addDays(6);
+  }
   return addDays(7);
+};
+
+const normalizeReviewCoverageText = (value: string) =>
+  value
+    .toLowerCase()
+    .normalize("NFKC")
+    .replace(/[’‘]/g, "'")
+    .replace(/[“”]/g, '"')
+    .replace(/[^a-z0-9'\s]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+export const resolveFullOutputCoverage = ({
+  targetText,
+  fullOutputText,
+  fullOutputStatus,
+}: {
+  targetText: string | null;
+  fullOutputText: string | null;
+  fullOutputStatus: PhraseReviewFullOutputStatus | null;
+}): PhraseReviewFullOutputCoverage => {
+  if (fullOutputStatus !== "completed") return "not_started";
+  const normalizedTarget = normalizeReviewCoverageText(targetText ?? "");
+  const normalizedOutput = normalizeReviewCoverageText(fullOutputText ?? "");
+  if (!normalizedTarget) return "not_started";
+  if (!normalizedOutput) return "missing_target";
+  return normalizedOutput.includes(normalizedTarget) ? "contains_target" : "missing_target";
 };
 
 async function loadLatestReviewSignalsByUserPhraseId(userId: string, userPhraseIds: string[]) {
@@ -347,7 +417,9 @@ async function loadLatestReviewSignalsByUserPhraseId(userId: string, userPhraseI
   const client = await createUserScopedReviewClient();
   const { data, error } = await client
     .from("phrase_review_logs")
-    .select("user_phrase_id, recognition_state, output_confidence, full_output_status, reviewed_at")
+    .select(
+      "user_phrase_id, recognition_state, output_confidence, full_output_status, variant_rewrite_status, variant_rewrite_prompt_id, full_output_coverage, reviewed_at",
+    )
     .eq("user_id", userId)
     .in("user_phrase_id", uniqueIds)
     .order("reviewed_at", { ascending: false });
@@ -365,16 +437,24 @@ async function loadLatestReviewSignalsByUserPhraseId(userId: string, userPhraseI
     recognition_state: PhraseReviewRecognitionState | null;
     output_confidence: PhraseReviewOutputConfidence | null;
     full_output_status: PhraseReviewFullOutputStatus | null;
+    variant_rewrite_status: PhraseReviewVariantRewriteStatus | null;
+    variant_rewrite_prompt_id: PhraseReviewVariantRewritePromptId | null;
+    full_output_coverage: PhraseReviewFullOutputCoverage | null;
   }>) {
     if (result.has(row.user_phrase_id)) continue;
     result.set(row.user_phrase_id, {
       recognitionState: row.recognition_state,
       outputConfidence: row.output_confidence,
       fullOutputStatus: row.full_output_status,
+      variantRewriteStatus: row.variant_rewrite_status,
+      variantRewritePromptId: row.variant_rewrite_prompt_id,
+      fullOutputCoverage: row.full_output_coverage,
       schedulingFocus: resolveReviewSchedulingFocus({
         recognitionState: row.recognition_state,
         outputConfidence: row.output_confidence,
         fullOutputStatus: row.full_output_status,
+        variantRewriteStatus: row.variant_rewrite_status,
+        fullOutputCoverage: row.full_output_coverage,
       }),
     });
   }
@@ -500,10 +580,13 @@ const isReviewSignalsQueryError = (error: { message: string; code?: string | nul
   error.code === "42703" ||
   error.message.includes("recognition_state") ||
   error.message.includes("output_confidence") ||
-  error.message.includes("full_output_status");
+  error.message.includes("full_output_status") ||
+  error.message.includes("variant_rewrite_status") ||
+  error.message.includes("variant_rewrite_prompt_id") ||
+  error.message.includes("full_output_coverage");
 
 const toReviewSchemaErrorMessage = (context: string, originalMessage: string) =>
-  `Review schema is not up to date (${context}): ${originalMessage}. Run supabase/sql/20260317_phase6_review_loop_mvp.sql and supabase/sql/20260331_phase20_review_practice_signals.sql after earlier review migrations.`;
+  `Review schema is not up to date (${context}): ${originalMessage}. Run supabase/sql/20260317_phase6_review_loop_mvp.sql, supabase/sql/20260331_phase20_review_practice_signals.sql, and supabase/sql/20260506_phase22_review_progressive_signals.sql after earlier review migrations.`;
 
 export async function submitPhraseReview(userId: string, input: SubmitPhraseReviewInput) {
   const client = await createUserScopedReviewClient();
@@ -530,14 +613,30 @@ export async function submitPhraseReview(userId: string, input: SubmitPhraseRevi
   const nextIncorrectCount =
     (existing.incorrect_count ?? 0) + (input.reviewResult === "again" ? 1 : 0);
   const reachesMastered = input.reviewResult === "good" && nextCorrectCount >= 3;
+  const fullOutputStatus = input.fullOutputStatus ?? null;
+  const variantRewriteStatus = input.variantRewriteStatus ?? null;
+  const variantRewritePromptId =
+    variantRewriteStatus === "completed" ? (input.variantRewritePromptId ?? null) : null;
+  const fullOutputCoverage =
+    input.fullOutputCoverage ??
+    resolveFullOutputCoverage({
+      targetText: existing.source_chunk_text,
+      fullOutputText: input.fullOutputText ?? null,
+      fullOutputStatus,
+    });
   const latestSignals: ReviewLatestSignals = {
     recognitionState: input.recognitionState ?? null,
     outputConfidence: input.outputConfidence ?? null,
-    fullOutputStatus: input.fullOutputStatus ?? null,
+    fullOutputStatus,
+    variantRewriteStatus,
+    variantRewritePromptId,
+    fullOutputCoverage,
     schedulingFocus: resolveReviewSchedulingFocus({
       recognitionState: input.recognitionState ?? null,
       outputConfidence: input.outputConfidence ?? null,
-      fullOutputStatus: input.fullOutputStatus ?? null,
+      fullOutputStatus,
+      variantRewriteStatus,
+      fullOutputCoverage,
     }),
   };
 
@@ -556,6 +655,8 @@ export async function submitPhraseReview(userId: string, input: SubmitPhraseRevi
       recognitionState: latestSignals.recognitionState,
       outputConfidence: latestSignals.outputConfidence,
       fullOutputStatus: latestSignals.fullOutputStatus,
+      variantRewriteStatus: latestSignals.variantRewriteStatus,
+      fullOutputCoverage: latestSignals.fullOutputCoverage,
       reachesMastered,
     });
     masteredAt = null;
@@ -590,7 +691,10 @@ export async function submitPhraseReview(userId: string, input: SubmitPhraseRevi
     review_result: input.reviewResult,
     recognition_state: input.recognitionState ?? null,
     output_confidence: input.outputConfidence ?? null,
-    full_output_status: input.fullOutputStatus ?? null,
+    full_output_status: fullOutputStatus,
+    variant_rewrite_status: variantRewriteStatus,
+    variant_rewrite_prompt_id: variantRewritePromptId,
+    full_output_coverage: fullOutputCoverage,
     was_correct: input.reviewResult !== "again",
     reviewed_at: now,
     scheduled_next_review_at: nextReviewAt,
@@ -647,7 +751,7 @@ export async function getReviewSummary(userId: string): Promise<ReviewSummary> {
       .eq("review_status", "mastered"),
     client
       .from("phrase_review_logs")
-      .select("output_confidence,full_output_status")
+      .select("output_confidence,full_output_status,variant_rewrite_status,full_output_coverage")
       .eq("user_id", userId)
       .gte("reviewed_at", `${today}T00:00:00.000Z`)
       .lt("reviewed_at", `${today}T23:59:59.999Z`),
@@ -666,7 +770,13 @@ export async function getReviewSummary(userId: string): Promise<ReviewSummary> {
 
   const accuracyRows = (accuracyRes.data ?? []) as Array<Pick<PhraseReviewLogRow, "was_correct">>;
   const signalRows = (todaySignalsRes.data ?? []) as Array<
-    Pick<PhraseReviewLogRow, "output_confidence" | "full_output_status">
+    Pick<
+      PhraseReviewLogRow,
+      | "output_confidence"
+      | "full_output_status"
+      | "variant_rewrite_status"
+      | "full_output_coverage"
+    >
   >;
   const totalLogs = accuracyRows.length;
   const correctLogs = accuracyRows.filter((row) => row.was_correct).length;
@@ -677,6 +787,15 @@ export async function getReviewSummary(userId: string): Promise<ReviewSummary> {
   const fullOutputCountToday = signalRows.filter(
     (row) => row.full_output_status === "completed",
   ).length;
+  const variantRewriteCountToday = signalRows.filter(
+    (row) => row.variant_rewrite_status === "completed",
+  ).length;
+  const targetCoverageCountToday = signalRows.filter(
+    (row) => row.full_output_coverage === "contains_target",
+  ).length;
+  const targetCoverageMissCountToday = signalRows.filter(
+    (row) => row.full_output_coverage === "missing_target",
+  ).length;
 
   return {
     dueReviewCount: dueRes.count ?? 0,
@@ -685,5 +804,8 @@ export async function getReviewSummary(userId: string): Promise<ReviewSummary> {
     masteredPhraseCount: masteredRes.count ?? 0,
     confidentOutputCountToday,
     fullOutputCountToday,
+    variantRewriteCountToday,
+    targetCoverageCountToday,
+    targetCoverageMissCountToday,
   };
 }
