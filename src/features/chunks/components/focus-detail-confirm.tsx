@@ -25,7 +25,6 @@ export function FocusDetailConfirm({
   confirmLabel,
   cancelLabel,
   submitting,
-  appleButtonClassName: _appleButtonClassName,
   onClose,
   onConfirm,
 }: FocusDetailConfirmProps) {

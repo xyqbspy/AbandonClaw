@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import test, { afterEach } from "node:test";
-import React from "react";
 import { act, cleanup, renderHook } from "@testing-library/react";
 
 import { useFocusDetailController } from "./use-focus-detail-controller";

@@ -75,7 +75,7 @@ function createBaseProps() {
       open: true,
       onOpenChange: () => undefined,
       itemType: "expression" as "expression" | "sentence",
-      onItemTypeChange: (_value: "expression" | "sentence") => undefined,
+      onItemTypeChange: () => undefined,
       text: "",
       onTextChange: () => undefined,
       sentence: "",

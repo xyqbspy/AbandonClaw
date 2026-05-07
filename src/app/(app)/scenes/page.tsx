@@ -137,6 +137,8 @@ export default function ScenesPage() {
 
   useEffect(() => {
     if (reviewPackScenes.length > 0) return;
+    // Keep the disclosure closed when the random review pack becomes unavailable.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setReviewPackListOpen(false);
   }, [reviewPackScenes.length]);
 

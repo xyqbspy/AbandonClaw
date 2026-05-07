@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 
 import { normalizePhraseText } from "@/lib/shared/phrases";
-import { ManualExpressionAssistResponse, UserPhraseItemResponse } from "@/lib/utils/phrases-api";
+import { UserPhraseItemResponse } from "@/lib/utils/phrases-api";
 
 import {
   buildFocusDetailState,

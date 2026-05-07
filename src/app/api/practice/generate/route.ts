@@ -164,6 +164,7 @@ const measureScenePayload = (scene: PracticeGenerateRequest["scene"]) => {
   };
 };
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- Legacy validator kept while practice-generate request parsing is centralized in request-schemas.
 const toValidPayload = (
   payload: Partial<PracticeGenerateRequest>,
 ):

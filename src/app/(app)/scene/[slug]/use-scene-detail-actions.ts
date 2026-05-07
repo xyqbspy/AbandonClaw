@@ -338,6 +338,7 @@ export function useSceneDetailActions({
     [
       baseLesson,
       canGenerateVariants,
+      latestVariantSet,
       refreshGeneratedState,
       setActiveVariantId,
       setViewModeWithRoute,

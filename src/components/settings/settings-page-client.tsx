@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
@@ -50,17 +50,13 @@ const loadDraft = (): SettingsDraft => {
 };
 
 export function SettingsPageClient({ canAccessAdmin }: { canAccessAdmin: boolean }) {
-  const initialDraftRef = useRef<SettingsDraft | null>(null);
-  if (!initialDraftRef.current) {
-    initialDraftRef.current = loadDraft();
-  }
-
-  const [draft, setDraft] = useState<SettingsDraft>(() => initialDraftRef.current ?? loadDraft());
+  const [initialDraft, setInitialDraft] = useState<SettingsDraft>(() => loadDraft());
+  const [draft, setDraft] = useState<SettingsDraft>(initialDraft);
   const appleButtonClassName = `${APPLE_BUTTON_BASE} ${APPLE_BUTTON_TEXT_SM}`;
 
   const isDirty = useMemo(() => {
-    return JSON.stringify(initialDraftRef.current) !== JSON.stringify(draft);
-  }, [draft]);
+    return JSON.stringify(initialDraft) !== JSON.stringify(draft);
+  }, [draft, initialDraft]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -151,7 +147,7 @@ export function SettingsPageClient({ canAccessAdmin }: { canAccessAdmin: boolean
         className="cursor-pointer"
         disabled={!isDirty}
         onClick={() => {
-          initialDraftRef.current = draft;
+          setInitialDraft(draft);
           toast.success("设置已保存。");
         }}
       >

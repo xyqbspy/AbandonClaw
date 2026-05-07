@@ -250,7 +250,6 @@ const trainingEventCalls: Array<{
 const originalConfirm = window.confirm;
 const originalToastError = toast.error;
 const originalToastSuccess = toast.success;
-const originalToastMessage = toast.message;
 const mockToastMessage = ((message: string) => {
   toastMessageCalls.push(message);
   return 1;
@@ -373,7 +372,7 @@ const mockedModules = {
             mode: "cloze",
             sourceType: "original",
           });
-        }, [practiceSet?.id]);
+        }, [onPracticeRunStart, practiceSet]);
 
         return (
           <div>

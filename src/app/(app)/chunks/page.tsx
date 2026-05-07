@@ -12,7 +12,7 @@ import {
   regenerateChunkAudioBatch,
 } from "@/lib/utils/tts-api";
 import { scheduleChunkAudioWarmup } from "@/lib/utils/resource-actions";
-import { ExpressionCluster, ExpressionMapResponse } from "@/lib/types/expression-map";
+import { ExpressionMapResponse } from "@/lib/types/expression-map";
 import {
   enrichSimilarExpressionFromApi,
   ManualExpressionAssistResponse,
@@ -24,7 +24,7 @@ import { startReviewSession } from "@/lib/utils/review-session";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/shared/empty-state";
-import { formatLoadingText, LoadingButton, LoadingState } from "@/components/shared/action-loading";
+import { LoadingState } from "@/components/shared/action-loading";
 import { SegmentedControl } from "@/components/shared/segmented-control";
 import { ExampleSentenceCards } from "@/components/shared/example-sentence-cards";
 import { buildExpressionMapViewModel } from "@/features/chunks/components/expression-map-selectors";
@@ -64,7 +64,6 @@ import {
   buildMoveIntoClusterSheetState,
   buildClusterFilterChange,
   buildChunksSummary,
-  resolveDeleteFocusDetailSuccessState,
   resolveClusterFilterExpressionLabel,
   resolveFocusExpressionId,
 } from "./chunks-page-logic";

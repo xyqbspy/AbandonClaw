@@ -34,10 +34,12 @@ export const useChunksRouteState = ({
 
   useEffect(() => {
     const nextRouteState = parseChunksRouteState(searchParams);
+    /* eslint-disable react-hooks/set-state-in-effect -- URL search params are the external source for the local filter controls. */
     setQuery(nextRouteState.query);
     setReviewFilter(nextRouteState.reviewFilter);
     setContentFilter(nextRouteState.contentFilter);
     setExpressionClusterFilterId(nextRouteState.clusterId);
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, [searchParams]);
 
   useEffect(() => {

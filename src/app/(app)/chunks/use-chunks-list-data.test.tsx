@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import test, { afterEach } from "node:test";
-import React from "react";
 import { cleanup, renderHook, waitFor } from "@testing-library/react";
 
 import { useChunksListData } from "./use-chunks-list-data";

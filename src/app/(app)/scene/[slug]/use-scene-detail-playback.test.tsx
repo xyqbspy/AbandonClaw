@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import test, { afterEach } from "node:test";
-import React from "react";
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 
 import type { Lesson, LessonSentence, SelectionChunkLayer } from "@/lib/types";
@@ -245,7 +244,7 @@ test("useSceneDetailPlayback 会打开 chunk detail 并支持重置", async () =
 test("useSceneDetailPlayback 会按当前上下文播放 chunk 和 sentence", async () => {
   const useSceneDetailPlayback = getUseSceneDetailPlayback();
 
-  const { result, rerender } = renderHook(() =>
+  const { result } = renderHook(() =>
     useSceneDetailPlayback({
       sceneSlug: "scene-1",
       viewMode: "scene",

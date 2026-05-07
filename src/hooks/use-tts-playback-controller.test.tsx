@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import test, { afterEach } from "node:test";
-import React from "react";
 import { act, cleanup, renderHook } from "@testing-library/react";
 
 const localRequire = createRequire(import.meta.url);

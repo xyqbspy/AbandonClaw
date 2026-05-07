@@ -34,10 +34,7 @@ import {
   getSectionSentences,
 } from "@/lib/shared/lesson-content";
 import {
-  APPLE_BUTTON_BASE,
-  APPLE_BUTTON_TEXT_LG,
   APPLE_META_TEXT,
-  APPLE_PANEL,
   APPLE_SURFACE,
 } from "@/lib/ui/apple-style";
 import {
@@ -50,7 +47,6 @@ import { useLessonReaderController } from "./use-lesson-reader-controller";
 import { LessonReaderDialogueContent } from "./lesson-reader-dialogue-content";
 import { LessonReaderMobileSections } from "./lesson-reader-mobile-sections";
 
-const appleButtonLgClassName = `${APPLE_BUTTON_BASE} ${APPLE_BUTTON_TEXT_LG}`;
 const sceneLoopButtonClassName =
   "size-9 cursor-pointer px-0 transition-all duration-150";
 const sceneLoopMobileButtonClassName =
@@ -72,7 +68,6 @@ export function LessonReader({
   onBlockPlayback,
   onSentencePlayback,
   onChunkEncounter,
-  onSentencePracticeComplete,
 }: {
   lesson: Lesson;
   headerTools?: ReactNode;
@@ -206,6 +201,8 @@ export function LessonReader({
       block.sentences.some((sentence) => sentence.id === state.activeSentenceId),
     );
     if (ownerBlock && ownerBlock.id !== activeBlockId) {
+      // Keep the active dialogue block aligned with the active sentence selected by reader actions.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setActiveBlockId(ownerBlock.id);
     }
   }, [activeBlockId, blockOrder, isDialogueScene, state.activeSentenceId]);
@@ -213,13 +210,18 @@ export function LessonReader({
   useEffect(() => {
     if (!isDialogueScene) return;
     if (!activeBlockId && firstBlock?.id) {
+      // Seed the first dialogue block once scene metadata is available.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setActiveBlockId(firstBlock.id);
     }
   }, [activeBlockId, firstBlock?.id, isDialogueScene]);
 
   useEffect(() => {
+    // Reset training-only UI state whenever the reader mode or lesson changes.
+    /* eslint-disable react-hooks/set-state-in-effect */
     setDetailVisible(interactionMode !== "training");
     setTrainingSentenceId(null);
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, [interactionMode, lesson.id]);
 
   const currentSection = useMemo(() => {

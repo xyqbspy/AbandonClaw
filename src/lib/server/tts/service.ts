@@ -6,7 +6,6 @@ import { MsEdgeTTS, OUTPUT_FORMAT } from "msedge-tts";
 import { TtsGenerationError, ValidationError } from "@/lib/server/errors";
 import { logServerEvent } from "@/lib/server/logger";
 import {
-  createTtsStorageSignedUrl,
   getTtsStorageSignedUrlIfExists,
   removeTtsStorageFiles,
   uploadTtsAudioToStorage,
@@ -172,27 +171,6 @@ const cacheSignedUrl = (storagePath: string, url: string) => {
     expiresAt: Date.now() + signedUrlCacheTtlMs,
   });
   return url;
-};
-
-const createStorageSignedUrl = async (storagePath: string) => {
-  const cached = getCachedSignedUrl(storagePath);
-  if (cached) {
-    return cached;
-  }
-
-  const pending = pendingSignedUrlRequests.get(storagePath);
-  if (pending) {
-    return pending;
-  }
-
-  const task = createTtsStorageSignedUrl(storagePath)
-    .then((url) => cacheSignedUrl(storagePath, url))
-    .finally(() => {
-      pendingSignedUrlRequests.delete(storagePath);
-    });
-
-  pendingSignedUrlRequests.set(storagePath, task);
-  return task;
 };
 
 const getStorageSignedUrlIfExists = async (storagePath: string) => {

@@ -1,6 +1,15 @@
 "use client";
 
-import { Dispatch, RefObject, SetStateAction, useCallback, useEffect, useRef, useState } from "react";
+import {
+  Dispatch,
+  RefObject,
+  SetStateAction,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { toast } from "sonner";
 import { findMatchingChunkInSentence, getSentenceById } from "@/lib/data/mock-lessons";
 import { Lesson, LessonBlock, LessonSentence, SelectionChunkLayer } from "@/lib/types";
@@ -99,11 +108,15 @@ export function useLessonReaderController({
   const [mobileActiveGroup, setMobileActiveGroup] = useState<MobileSentenceGroup | null>(null);
   const suppressSelectionClearRef = useRef(false);
   const trackedEncounterKeysRef = useRef<Set<string>>(new Set());
-  const relatedChunks = isMobile && !isDialogueScene
-    ? (mobileActiveGroup?.relatedChunks ?? currentSentence?.chunks ?? [])
-    : isDialogueScene && currentBlock
-      ? Array.from(new Set(currentBlock.sentences.flatMap((sentence) => sentence.chunks)))
-      : (currentSentence?.chunks ?? []);
+  const relatedChunks = useMemo(
+    () =>
+      isMobile && !isDialogueScene
+        ? (mobileActiveGroup?.relatedChunks ?? currentSentence?.chunks ?? [])
+        : isDialogueScene && currentBlock
+          ? Array.from(new Set(currentBlock.sentences.flatMap((sentence) => sentence.chunks)))
+          : (currentSentence?.chunks ?? []),
+    [currentBlock, currentSentence?.chunks, isDialogueScene, isMobile, mobileActiveGroup],
+  );
 
   const findSentenceById = useCallback(
     (sentenceId: string) => getSentenceById(lesson, sentenceId),

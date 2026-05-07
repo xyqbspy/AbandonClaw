@@ -50,8 +50,10 @@ export const useSceneDetailRouteState = ({
       return;
     }
     pendingRouteStateRef.current = null;
+    /* eslint-disable react-hooks/set-state-in-effect -- Route changes must hydrate the local scene view controls from URL state. */
     setViewMode(nextRouteState.viewMode);
     setActiveVariantId(nextRouteState.activeVariantId);
+    /* eslint-enable react-hooks/set-state-in-effect */
     onRouteChange?.(nextRouteState);
   }, [onRouteChange, sceneSlug, searchParams]);
 

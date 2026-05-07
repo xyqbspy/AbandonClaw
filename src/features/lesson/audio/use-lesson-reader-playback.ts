@@ -103,7 +103,7 @@ export function useLessonReaderPlayback({
         },
       });
     },
-    [lesson, lesson.slug, onBlockPlayback, playbackController, stopAudio],
+    [lesson, onBlockPlayback, playbackController, stopAudio],
   );
 
   useEffect(
@@ -190,7 +190,7 @@ export function useLessonReaderPlayback({
         },
       });
     },
-    [lesson, lesson.slug, onSentencePlayback, playbackController, sentenceOrder, speakingText, stopAudio],
+    [lesson, onSentencePlayback, playbackController, sentenceOrder, speakingText, stopAudio],
   );
 
   const handleLoopSentence = useCallback(

@@ -73,13 +73,17 @@ const mockedModules = {
   "@/components/shared/action-loading": {
     LoadingButton: ({
       children,
-      loading: _loading,
-      loadingText: _loadingText,
+      loading,
+      loadingText,
       ...props
     }: React.ButtonHTMLAttributes<HTMLButtonElement> & {
       loading?: boolean;
       loadingText?: string;
-    }) => <button {...props}>{children}</button>,
+    }) => (
+      <button {...props} data-loading={loading ? "true" : "false"} data-loading-text={loadingText}>
+        {children}
+      </button>
+    ),
     LoadingState: ({ text }: { text?: string }) => <div>{text ?? "loading"}</div>,
     formatLoadingText: (text?: string) => text ?? "",
   },

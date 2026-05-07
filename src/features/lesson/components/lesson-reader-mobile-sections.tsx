@@ -3,7 +3,7 @@
 import { RefObject, useState } from "react";
 import { Languages } from "lucide-react";
 import { TtsActionButton } from "@/components/audio/tts-action-button";
-import { Lesson, LessonSentence } from "@/lib/types";
+import { Lesson } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { getSectionSentences } from "@/lib/shared/lesson-content";
 import { APPLE_META_TEXT, APPLE_PANEL } from "@/lib/ui/apple-style";

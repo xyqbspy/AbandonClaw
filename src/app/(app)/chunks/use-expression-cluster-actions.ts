@@ -182,6 +182,7 @@ export const useExpressionClusterActions = ({
     deps,
     focusDetailSavedItem,
     focusExpression?.userPhraseId,
+    labels.deleteExpressionSuccess,
     labels.loadFailed,
     loadPhrases,
     onClearDetailConfirm,

@@ -1,10 +1,3 @@
-import {
-  PRACTICE_ASSESSMENT_FEEDBACK,
-  PRACTICE_SENTENCE_MILESTONE_LABELS,
-  PRACTICE_SENTENCE_UPGRADE_MESSAGES,
-  SCENE_PRACTICE_STAGE_TITLE,
-} from "@/lib/shared/scene-training-copy";
-
 export type ScenePracticeViewLabels = {
   back: string;
   delete: string;
