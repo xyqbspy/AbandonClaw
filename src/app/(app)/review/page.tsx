@@ -24,7 +24,6 @@ import {
 } from "@/lib/utils/review-api";
 import { submitPhraseReviewFromApi } from "@/lib/utils/review-api";
 import { reviewPageLabels as zh } from "./review-page-labels";
-import { buildReviewInlinePracticeSetId } from "./review-page-messages";
 import {
   notifyInlinePracticeCompleted,
   notifyInlinePracticeFailed,
@@ -265,7 +264,11 @@ export default function ReviewPage() {
         answer,
         acceptedAnswers: buildAcceptedPracticeAnswers(expectedAnswer),
       });
-      const practiceSetId = buildReviewInlinePracticeSetId(currentScenePracticeItem);
+      const practiceSetId = currentScenePracticeItem.practiceSetId?.trim();
+      if (!practiceSetId) {
+        notifyInlinePracticeFailed("这条回补练习缺少题目来源，请回到原场景重新练习。");
+        return;
+      }
 
       await startScenePracticeRunFromApi(currentScenePracticeItem.sceneSlug, {
         practiceSetId,

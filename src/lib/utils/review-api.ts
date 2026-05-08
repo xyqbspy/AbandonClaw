@@ -45,6 +45,7 @@ export interface DueReviewItemResponse {
 export interface DueScenePracticeReviewItemResponse {
   sceneSlug: string;
   sceneTitle: string;
+  practiceSetId: string;
   exerciseId: string;
   sentenceId: string | null;
   sourceMode: "cloze" | "guided_recall" | "sentence_recall" | "full_dictation";

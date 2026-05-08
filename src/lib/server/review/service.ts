@@ -105,6 +105,7 @@ export interface ReviewSummary {
 export interface DueScenePracticeReviewItem {
   sceneSlug: string;
   sceneTitle: string;
+  practiceSetId: string;
   exerciseId: string;
   sentenceId: string | null;
   sourceMode: ScenePracticeMode;
@@ -510,6 +511,7 @@ export async function getDueScenePracticeReviewItems(
     candidates.push({
       sceneSlug: scene.slug,
       sceneTitle: scene.title,
+      practiceSetId: row.practice_set_id,
       exerciseId: row.exercise_id,
       sentenceId: row.sentence_id,
       sourceMode: row.mode,

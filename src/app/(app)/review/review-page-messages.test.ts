@@ -3,7 +3,6 @@ import test from "node:test";
 import { reviewPageLabels } from "./review-page-labels";
 import {
   assessmentLabelMap,
-  buildReviewInlinePracticeSetId,
   getInlinePracticeFeedback,
   getInlinePracticePlaceholder,
   getReviewModeAccentClassName,
@@ -24,15 +23,7 @@ test("review page messages 会复用统一的题型与评估文案", () => {
   });
 });
 
-test("review inline helper 会生成稳定的 set id、placeholder 与反馈文案", () => {
-  assert.equal(
-    buildReviewInlinePracticeSetId({
-      sceneSlug: "coffee-chat",
-      exerciseId: "exercise-1",
-      recommendedMode: "sentence_recall",
-    } as never),
-    "review-inline:coffee-chat:exercise-1:sentence_recall",
-  );
+test("review inline helper 会生成稳定的 placeholder 与反馈文案", () => {
   assert.equal(
     getInlinePracticePlaceholder("full_dictation", reviewPageLabels),
     reviewPageLabels.practiceFullDictationPlaceholder,

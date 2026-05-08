@@ -35,6 +35,10 @@ let startScenePracticeRunCalls = 0;
 let recordScenePracticeAttemptCalls = 0;
 let markScenePracticeModeCompleteCalls = 0;
 let completeScenePracticeRunCalls = 0;
+const startScenePracticeRunPayloads: Array<Record<string, unknown>> = [];
+const recordScenePracticeAttemptPayloads: Array<Record<string, unknown>> = [];
+const markScenePracticeModeCompletePayloads: Array<Record<string, unknown>> = [];
+const completeScenePracticeRunPayloads: Array<Record<string, unknown>> = [];
 let startScenePracticeRunError: Error | null = null;
 let currentDueRows: Array<{
   userPhraseId: string;
@@ -92,6 +96,7 @@ let currentDueRows: Array<{
 let currentScenePracticeRows: Array<{
   sceneSlug: string;
   sceneTitle: string;
+  practiceSetId: string;
   exerciseId: string;
   sentenceId: string | null;
   sourceMode: "cloze" | "guided_recall" | "sentence_recall" | "full_dictation";
@@ -194,17 +199,21 @@ const mockedModules = {
     readReviewSession: () => null,
   },
   "@/lib/utils/learning-api": {
-    completeScenePracticeRunFromApi: async () => {
+    completeScenePracticeRunFromApi: async (_sceneSlug: string, payload: Record<string, unknown>) => {
       completeScenePracticeRunCalls += 1;
+      completeScenePracticeRunPayloads.push(payload);
     },
-    markScenePracticeModeCompleteFromApi: async () => {
+    markScenePracticeModeCompleteFromApi: async (_sceneSlug: string, payload: Record<string, unknown>) => {
       markScenePracticeModeCompleteCalls += 1;
+      markScenePracticeModeCompletePayloads.push(payload);
     },
-    recordScenePracticeAttemptFromApi: async () => {
+    recordScenePracticeAttemptFromApi: async (_sceneSlug: string, payload: Record<string, unknown>) => {
       recordScenePracticeAttemptCalls += 1;
+      recordScenePracticeAttemptPayloads.push(payload);
     },
-    startScenePracticeRunFromApi: async () => {
+    startScenePracticeRunFromApi: async (_sceneSlug: string, payload: Record<string, unknown>) => {
       startScenePracticeRunCalls += 1;
+      startScenePracticeRunPayloads.push(payload);
       if (startScenePracticeRunError) throw startScenePracticeRunError;
       currentScenePracticeRows = [];
     },
@@ -249,6 +258,10 @@ afterEach(() => {
   recordScenePracticeAttemptCalls = 0;
   markScenePracticeModeCompleteCalls = 0;
   completeScenePracticeRunCalls = 0;
+  startScenePracticeRunPayloads.length = 0;
+  recordScenePracticeAttemptPayloads.length = 0;
+  markScenePracticeModeCompletePayloads.length = 0;
+  completeScenePracticeRunPayloads.length = 0;
   startScenePracticeRunError = null;
   currentDueRows = [
     {
@@ -481,6 +494,7 @@ test("ReviewPage 场景回补会进入阶段式复现并在完成后刷新列表
     {
       sceneSlug: "coffee-chat",
       sceneTitle: "Coffee Chat",
+      practiceSetId: "practice-set-1",
       exerciseId: "exercise-1",
       sentenceId: "sentence-1",
       sourceMode: "cloze",
@@ -519,6 +533,10 @@ test("ReviewPage 场景回补会进入阶段式复现并在完成后刷新列表
     assert.equal(recordScenePracticeAttemptCalls, 1);
     assert.equal(markScenePracticeModeCompleteCalls, 1);
     assert.equal(completeScenePracticeRunCalls, 1);
+    assert.equal(startScenePracticeRunPayloads[0]?.practiceSetId, "practice-set-1");
+    assert.equal(recordScenePracticeAttemptPayloads[0]?.practiceSetId, "practice-set-1");
+    assert.equal(markScenePracticeModeCompletePayloads[0]?.practiceSetId, "practice-set-1");
+    assert.equal(completeScenePracticeRunPayloads[0]?.practiceSetId, "practice-set-1");
     assert.equal(clearReviewPageCacheCalls, 1);
     assert.equal(dueRequestCount, 2);
     assert.equal(summaryRequestCount, 2);
@@ -531,6 +549,7 @@ test("ReviewPage 场景回补提交失败时不会误刷新列表", async () => 
     {
       sceneSlug: "coffee-chat",
       sceneTitle: "Coffee Chat",
+      practiceSetId: "practice-set-1",
       exerciseId: "exercise-1",
       sentenceId: "sentence-1",
       sourceMode: "cloze",
@@ -568,6 +587,47 @@ test("ReviewPage 场景回补提交失败时不会误刷新列表", async () => 
     assert.equal(clearReviewPageCacheCalls, 0);
     assert.equal(dueRequestCount, 1);
     assert.equal(summaryRequestCount, 1);
+  });
+});
+
+test("ReviewPage 场景回补缺少 practiceSetId 时不会调用练习写入", async () => {
+  currentScenePracticeRows = [
+    {
+      sceneSlug: "coffee-chat",
+      sceneTitle: "Coffee Chat",
+      practiceSetId: "",
+      exerciseId: "exercise-1",
+      sentenceId: "sentence-1",
+      sourceMode: "cloze",
+      recommendedMode: "cloze",
+      assessmentLevel: "complete",
+      expectedAnswer: "call it a day",
+      promptText: "补全句子",
+      displayText: "Let's ____.",
+      hint: "结束今天的工作",
+      latestAnswer: "",
+      reviewedAt: "2026-03-30T00:00:00.000Z",
+    },
+  ];
+
+  const ReviewPage = getReviewPage();
+  render(<ReviewPage />);
+
+  await screen.findByRole("button", { name: "我准备好了，进入复现" });
+  fireEvent.click(screen.getByRole("button", { name: "我准备好了，进入复现" }));
+  await screen.findByRole("button", { name: "检查这次复现" });
+  fireEvent.change(screen.getByPlaceholderText("直接在这里补全这条表达或句子"), {
+    target: { value: "call it a day" },
+  });
+
+  fireEvent.click(screen.getByRole("button", { name: "检查这次复现" }));
+
+  await waitFor(() => {
+    assert.equal(startScenePracticeRunCalls, 0);
+    assert.equal(recordScenePracticeAttemptCalls, 0);
+    assert.equal(markScenePracticeModeCompleteCalls, 0);
+    assert.equal(completeScenePracticeRunCalls, 0);
+    assert.equal(clearReviewPageCacheCalls, 0);
   });
 });
 

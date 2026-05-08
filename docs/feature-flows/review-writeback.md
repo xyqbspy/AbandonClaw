@@ -78,3 +78,11 @@
 - `full_output_coverage` 不是 AI 质量评分，只表示完整输出是否用进目标表达。
 - 用户改写草稿和完整输出全文不沉淀为长期表达资产字段。
 - scene practice 回补继续走原有 practice run / attempt / complete 链路，不混入普通表达 review submit。
+
+### 9.1 Scene practice 回补的 practice set 锚点
+
+- scene practice 回补任务来自历史 `user_scene_practice_attempts`。
+- due item 必须携带该 attempt 的真实 `practice_set_id`，前端字段为 `practiceSetId`。
+- Review 页提交回补答案时必须复用该 `practiceSetId` 调用 scene practice run / attempt / complete。
+- 前端不得再构造 `review-inline:*` 这类临时 practice set id；这类 ID 无法通过服务端 `user_scene_practice_sets` 归属校验。
+- 如果历史异常数据缺少 `practiceSetId`，Review 页应给出受控失败，引导回到原场景重新练习，不应静默创建新的 run。

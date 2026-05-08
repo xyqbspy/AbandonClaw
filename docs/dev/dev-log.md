@@ -1,5 +1,32 @@
 # Dev Log
 
+### [2026-05-08] 修复 Review 场景回补 practice set 锚点
+- 类型：Spec-Driven / Review 场景回补写回链路
+- 状态：已完成并归档 `fix-review-scene-practice-set-id`
+
+#### 背景
+Review 场景回补任务来自历史 `user_scene_practice_attempts`，但 due item 没有暴露真实 `practice_set_id`。前端用 `review-inline:*` 合成 `practiceSetId` 后调用 scene practice run / attempt API，会和服务端 `user_scene_practice_sets` 归属校验冲突。
+
+#### 本次改动
+- Review due scene practice item 新增 `practiceSetId`，由服务端从 attempt 的 `practice_set_id` 映射。
+- Review 页提交场景回补时复用真实 `practiceSetId`，不再生成临时 inline ID。
+- 缺失 `practiceSetId` 时阻断提交并给出受控失败，不调用 scene practice mutation。
+- 同步 `review-practice-signals`、`scene-practice-generation` stable spec 和 `review-writeback` 文档。
+
+#### 明确不收项
+- 不迁移历史缺失 `practice_set_id` 的异常数据。
+- 不重写 Review 场景回补候选生成、排序或题目来源策略。
+- 不放宽 scene practice set 服务端归属校验。
+
+#### 验证
+- 已运行：
+  - `node --import tsx --import ./src/test/setup-dom.ts --test "src/app/(app)/review/page.interaction.test.tsx"`
+  - `node --import tsx --test "src/app/(app)/review/review-page-messages.test.ts"`
+  - `pnpm exec tsc --noEmit`
+  - `pnpm exec eslint "src/app/(app)/review/page.tsx" "src/app/(app)/review/review-page-messages.ts" "src/app/(app)/review/page.interaction.test.tsx" "src/app/(app)/review/review-page-messages.test.ts" "src/lib/server/review/service.ts" "src/lib/utils/review-api.ts"`
+  - `pnpm exec openspec validate fix-review-scene-practice-set-id --strict --no-interactive`
+  - `pnpm run maintenance:check`
+
 ### [2026-05-08] 收口 Scene 主控区布局与训练入口形态
 - 类型：Spec-Driven / Scene 主学习视图交互层级调整
 - 状态：已完成并归档 `refine-scene-primary-controls-layout`

@@ -1,9 +1,8 @@
 import { PracticeAssessmentLevel, PracticeMode } from "@/lib/types/learning-flow";
-import { DueScenePracticeReviewItemResponse } from "@/lib/utils/review-api";
 import { ReviewPageLabels } from "./review-page-labels";
 
 export const reviewModeLabelMap: Record<
-  DueScenePracticeReviewItemResponse["recommendedMode"],
+  PracticeMode,
   string
 > = {
   cloze: "填空复现",
@@ -13,16 +12,13 @@ export const reviewModeLabelMap: Record<
 };
 
 export const assessmentLabelMap: Record<
-  Exclude<DueScenePracticeReviewItemResponse["assessmentLevel"], "complete">,
+  Exclude<PracticeAssessmentLevel, "complete">,
   string
 > = {
   incorrect: "还不稳",
   keyword: "抓到关键词",
   structure: "骨架对上了",
 };
-
-export const buildReviewInlinePracticeSetId = (item: DueScenePracticeReviewItemResponse) =>
-  `review-inline:${item.sceneSlug}:${item.exerciseId}:${item.recommendedMode}`;
 
 export const getInlinePracticeFeedback = (
   assessment: PracticeAssessmentLevel | null | undefined,
