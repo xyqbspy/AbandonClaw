@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { ArrowLeft, ChevronDown } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import type { ReactNode } from "react";
+import { ArrowLeft } from "lucide-react";
 import { LoopActionButton } from "@/components/audio/loop-action-button";
 import { formatLoadingText, LoadingContent } from "@/components/shared/action-loading";
 import type {
@@ -28,6 +29,7 @@ type SceneTrainingNextStepStripProps = {
   currentStepActionLoading?: boolean;
   onCurrentStepAction?: (() => void) | null;
   currentStepActionDisabled?: boolean;
+  progressEntry?: ReactNode;
 };
 
 const nextStepSupportText = {
@@ -52,8 +54,10 @@ export function SceneTrainingNextStepStrip({
   currentStepActionLoading,
   onCurrentStepAction,
   currentStepActionDisabled,
+  progressEntry,
 }: SceneTrainingNextStepStripProps) {
-  const [expanded, setExpanded] = useState(false);
+  const [cardLifted, setCardLifted] = useState(false);
+  const cardLiftTimerRef = useRef<number | null>(null);
   const completedMap = deriveSceneTrainingCompletedMap({
     session: trainingState?.session,
     practiceSetStatus,
@@ -63,96 +67,102 @@ export function SceneTrainingNextStepStrip({
   const trainingStateModel = deriveSceneTrainingState(completedMap);
   const currentStep = trainingStateModel.currentStep;
   const nextStep = getSceneTrainingNextStep(currentStep);
-  const currentStepLabel = getSceneTrainingStepTitle(currentStep);
   const nextStepLabel = nextStep ? getSceneTrainingStepTitle(nextStep) : getSceneTrainingStepTitle("done");
   const supportText = nextStepSupportText[currentStep] ?? nextStepSupportText.listen;
+
+  useEffect(() => {
+    return () => {
+      if (cardLiftTimerRef.current !== null) {
+        window.clearTimeout(cardLiftTimerRef.current);
+      }
+    };
+  }, []);
+
+  const handleCurrentStepAction = () => {
+    setCardLifted(true);
+    if (cardLiftTimerRef.current !== null) {
+      window.clearTimeout(cardLiftTimerRef.current);
+    }
+    cardLiftTimerRef.current = window.setTimeout(() => {
+      setCardLifted(false);
+      cardLiftTimerRef.current = null;
+    }, 220);
+    onCurrentStepAction?.();
+  };
 
   return (
     <section
       aria-label="当前下一步"
-      className="rounded-[22px] border border-[var(--app-border-soft)] bg-[var(--app-scene-panel-bg)] p-[var(--mobile-adapt-space-lg)] shadow-[var(--app-shadow-soft)]"
+      className={`rounded-[24px] border border-white/30 bg-[var(--app-scene-panel-bg)] p-[var(--mobile-adapt-space-xl)] shadow-[0_8px_32px_rgba(0,0,0,0.05)] backdrop-blur-[10px] transition-transform duration-200 ease-out ${
+        cardLifted ? "-translate-y-1" : "translate-y-0"
+      }`}
     >
-      <div className="mb-[var(--mobile-adapt-space-md)] flex min-h-[var(--mobile-adapt-button-height)] items-start gap-[var(--mobile-adapt-space-sm)]">
+      <div className="mb-[var(--mobile-adapt-space-sm)] grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-[var(--mobile-adapt-space-sm)]">
         {onBack ? (
           <button
             type="button"
             aria-label="返回场景列表"
-            className="inline-flex size-[var(--mobile-adapt-button-height)] shrink-0 items-center justify-center rounded-full border border-[var(--app-button-secondary-border)] bg-[var(--app-button-secondary-bg)] text-[var(--app-button-secondary-text)] transition-colors hover:bg-[var(--app-surface-hover)]"
+            className="-ml-2 inline-flex size-8 items-center justify-center rounded-full border-0 bg-transparent text-[var(--app-scene-panel-muted)] transition-colors hover:bg-[var(--app-button-secondary-bg)]/55 hover:text-foreground"
             onClick={onBack}
           >
             <ArrowLeft className="size-4" />
           </button>
-        ) : null}
-        <div className="min-w-0 flex-1 pt-1">
-          <h1 className="truncate text-[length:var(--mobile-adapt-font-title-sm)] font-semibold text-foreground">
+        ) : (
+          <span className="size-4" aria-hidden="true" />
+        )}
+        <div className="min-w-0 text-center">
+          <h1 className="truncate text-[length:var(--mobile-adapt-font-title-sm)] font-bold text-foreground">
             {title}
           </h1>
         </div>
-        <button
-          type="button"
-          aria-label={expanded ? "折叠当前任务" : "展开当前任务"}
-          aria-expanded={expanded}
-          className="inline-flex size-[var(--mobile-adapt-button-height)] shrink-0 items-center justify-center rounded-full border border-[var(--app-button-secondary-border)] bg-[var(--app-button-secondary-bg)] text-[var(--app-button-secondary-text)] transition-colors hover:bg-[var(--app-surface-hover)]"
-          onClick={() => setExpanded((value) => !value)}
-        >
-          <ChevronDown className={`size-4 transition-transform duration-200 ${expanded ? "rotate-180" : ""}`} />
-        </button>
+        {progressEntry ? (
+          <span className="-mr-2 inline-flex size-8 items-center justify-center text-[var(--app-scene-panel-muted)]">
+            {progressEntry}
+          </span>
+        ) : (
+          <span className="size-4" aria-hidden="true" />
+        )}
       </div>
 
-      <div className="flex flex-col gap-[var(--mobile-adapt-space-md)] sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0 space-y-[var(--mobile-adapt-space-xs)]">
-          <p className="text-[length:var(--mobile-adapt-font-meta)] font-semibold text-[var(--app-scene-panel-muted)]">
-            当前下一步
-          </p>
-          <h2 className="text-[length:var(--mobile-adapt-font-title-sm)] font-bold text-foreground">
-            {currentStepLabel}
-          </h2>
-          {expanded ? (
-            <p className="text-[length:var(--mobile-adapt-font-body-sm)] leading-6 text-[var(--app-scene-panel-muted)]">
-              {supportText} 下一步：{nextStepLabel}
-            </p>
-          ) : null}
-        </div>
-        <div className="flex shrink-0 flex-col gap-[var(--mobile-adapt-space-sm)] sm:flex-row sm:items-center">
-          <LoopActionButton
-            active={isSceneLooping}
-            loading={isSceneLoopLoading}
-            label="循环播放"
-            activeLabel="循环播放"
-            loadingLabel="循环播放"
-            variant="secondary"
-            size="default"
-            surface="soft"
-            icon="loop"
-            iconOnly={false}
-            className="inline-flex min-h-[var(--mobile-adapt-button-height)] flex-row-reverse items-center justify-center gap-[var(--mobile-adapt-space-sm)] rounded-[14px] px-[var(--mobile-adapt-space-lg)] py-[var(--mobile-adapt-space-md)] text-[length:var(--mobile-adapt-font-body-sm)] font-semibold"
-            iconClassName="size-4"
-            onClick={onSceneLoopPlayback}
-          />
-          {currentStepActionLabel && onCurrentStepAction ? (
-            <button
-              type="button"
-              aria-label="执行当前下一步"
-              className="inline-flex min-h-[var(--mobile-adapt-button-height)] items-center justify-center rounded-[14px] border-0 bg-[var(--app-scene-panel-accent)] px-[var(--mobile-adapt-space-xl)] py-[var(--mobile-adapt-space-md)] text-[length:var(--mobile-adapt-font-body-sm)] font-semibold text-white shadow-[0_4px_15px_color-mix(in_srgb,var(--app-scene-panel-accent)_26%,transparent)] transition-all duration-200 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-[var(--app-scene-panel-cta-disabled)] disabled:text-white/80 disabled:shadow-none"
-              disabled={currentStepActionDisabled}
-              onClick={onCurrentStepAction}
+      <p className="mb-[var(--mobile-adapt-space-xl)] text-[length:var(--mobile-adapt-font-body-sm)] leading-6 text-[var(--app-scene-panel-muted)]">
+        {supportText}
+        <br />
+        <strong className="font-semibold text-foreground">下一步：</strong> {nextStepLabel}
+      </p>
+
+      <div className="grid grid-cols-2 gap-[var(--mobile-adapt-space-sm)]">
+        <LoopActionButton
+          active={isSceneLooping}
+          loading={isSceneLoopLoading}
+          label="循环播放"
+          activeLabel="循环播放"
+          loadingLabel="循环播放"
+          variant="secondary"
+          size="default"
+          surface="soft"
+          icon="loop"
+          iconOnly={false}
+          className="inline-flex min-h-[var(--mobile-adapt-button-height)] w-full items-center justify-center gap-[var(--mobile-adapt-space-sm)] rounded-[14px] border-0 bg-[#E5E5EA] px-[var(--mobile-adapt-space-lg)] py-[var(--mobile-adapt-space-md)] text-[length:var(--mobile-adapt-font-body-sm)] font-semibold text-foreground transition-transform active:scale-[0.97]"
+          iconClassName="size-4"
+          onClick={onSceneLoopPlayback}
+        />
+        {currentStepActionLabel && onCurrentStepAction ? (
+          <button
+            type="button"
+            aria-label="执行当前下一步"
+            className="inline-flex min-h-[var(--mobile-adapt-button-height)] w-full items-center justify-center rounded-[14px] border-0 bg-[var(--app-scene-panel-accent)] px-[var(--mobile-adapt-space-lg)] py-[var(--mobile-adapt-space-md)] text-[length:var(--mobile-adapt-font-body-sm)] font-semibold text-white shadow-[0_4px_12px_color-mix(in_srgb,var(--app-scene-panel-accent)_30%,transparent)] transition-transform active:scale-[0.97] disabled:cursor-not-allowed disabled:bg-[var(--app-scene-panel-cta-disabled)] disabled:text-white/80 disabled:shadow-none"
+            disabled={currentStepActionDisabled}
+            onClick={handleCurrentStepAction}
+          >
+            <LoadingContent
+              loading={Boolean(currentStepActionLoading)}
+              loadingText={formatLoadingText(currentStepActionLabel, "中...")}
             >
-              <LoadingContent
-                loading={Boolean(currentStepActionLoading)}
-                loadingText={formatLoadingText(currentStepActionLabel, "中...")}
-              >
-                {currentStepActionLabel}
-              </LoadingContent>
-            </button>
-          ) : null}
-        </div>
+              {currentStepActionLabel}
+            </LoadingContent>
+          </button>
+        ) : null}
       </div>
-
-      {expanded ? (
-        <p className="mt-[var(--mobile-adapt-space-sm)] text-[length:var(--mobile-adapt-font-meta)] text-[var(--app-scene-panel-muted)]">
-          完整进度和快捷入口保留在右下角训练入口。
-        </p>
-      ) : null}
     </section>
   );
 }

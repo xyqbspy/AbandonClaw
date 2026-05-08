@@ -9,14 +9,12 @@ import {
   LoadingState,
 } from "@/components/shared/action-loading";
 import { Button } from "@/components/ui/button";
-import { SCENE_STATUS_TEXT_CLASSNAME } from "@/features/scene/scene-status-theme";
 import {
   APPLE_BANNER_DANGER,
   APPLE_BANNER_INFO,
   APPLE_BANNER_SUCCESS,
   APPLE_BUTTON_TEXT_MD,
   APPLE_CARD_INTERACTIVE,
-  APPLE_META_TEXT,
 } from "@/lib/ui/apple-style";
 import { SceneDeleteDialog } from "./scene-delete-dialog";
 import { SceneImportDialog } from "./scene-import-dialog";
@@ -37,25 +35,32 @@ const learningStatusLabel = {
   paused: "已暂停",
 } as const;
 
+const sceneStatusBadgeToneClassName = {
+  not_started: "bg-[#F1F1F1] text-[#71717A]",
+  in_progress: "bg-[#E3F9E5] text-[#22C55E]",
+  completed: "bg-[#E3F9E5] text-[#22C55E]",
+  paused: "bg-[#F1F1F1] text-[#71717A]",
+} as const;
+
 const sceneActionButtonClassName = `h-[var(--mobile-adapt-button-height)] gap-[var(--mobile-adapt-space-sm)] text-[length:var(--mobile-adapt-font-body-sm)] ${APPLE_BUTTON_TEXT_MD}`;
 const sceneSecondaryActionButtonClassName =
   `${sceneActionButtonClassName} bg-[var(--app-button-secondary-bg)] text-[var(--app-button-secondary-text)] border-[var(--app-button-secondary-border)]`;
 const sceneRandomReviewButtonClassName =
   "size-[var(--mobile-adapt-button-height)] rounded-full border-[var(--border)] bg-white px-0 text-[var(--app-foreground-muted)] shadow-[0_8px_20px_rgba(15,23,42,0.08)] hover:bg-white hover:text-[var(--app-foreground)]";
 const sceneCardClassName =
-  `${APPLE_CARD_INTERACTIVE} relative z-10 flex cursor-pointer justify-between gap-[var(--mobile-adapt-space-md)] rounded-[var(--app-radius-card)] bg-[var(--app-scene-card-bg)] p-[var(--mobile-adapt-space-sheet)] will-change-transform transition-[transform,box-shadow,opacity] duration-[280ms]`;
+  `${APPLE_CARD_INTERACTIVE} relative z-10 flex cursor-pointer items-center justify-between gap-[var(--mobile-adapt-space-md)] rounded-[20px] border border-[rgba(226,232,240,0.5)] bg-white p-[var(--mobile-adapt-space-sheet)] shadow-[0_4px_6px_rgba(0,0,0,0.01)] will-change-transform transition-[transform,box-shadow,opacity] duration-[280ms]`;
 const sceneMetaPillClassName =
-  "inline-flex min-h-[clamp(24px,6vw,28px)] items-center rounded-full bg-[var(--app-scene-card-meta-bg)] px-[var(--mobile-adapt-space-md)] text-[length:var(--mobile-adapt-font-caption)] font-bold whitespace-nowrap text-[var(--app-scene-card-meta-text)]";
+  "inline-flex min-h-[clamp(22px,5.5vw,26px)] items-center rounded-[6px] bg-[var(--app-scene-card-meta-bg)] px-[var(--mobile-adapt-space-sm)] text-[length:var(--mobile-adapt-font-caption)] font-semibold whitespace-nowrap text-[var(--app-scene-card-meta-text)]";
 const sceneMetaTextClassName =
-  `inline-flex items-center gap-[var(--mobile-adapt-space-2xs)] text-[length:var(--mobile-adapt-font-caption)] font-bold whitespace-nowrap ${APPLE_META_TEXT}`;
+  `inline-flex items-center gap-[var(--mobile-adapt-space-2xs)] text-[length:var(--mobile-adapt-font-caption)] font-medium whitespace-nowrap text-[#94A3B8]`;
 const sceneTitleClassName =
-  "mb-[var(--mobile-adapt-space-2xs)] text-[length:clamp(0.98rem,4.4vw,1.05rem)] leading-[1.35] font-extrabold tracking-[-0.025em] text-[#1D1D1F]";
+  "min-w-0 truncate text-[length:clamp(1rem,4.4vw,1.0625rem)] leading-[1.3] font-bold text-[#1E293B]";
 const sceneSubtitleClassName =
-  "mb-[var(--mobile-adapt-space-lg)] text-[length:var(--mobile-adapt-font-body-sm)] leading-[1.45] text-[var(--app-scene-card-subtitle)]";
+  "mt-[6px] line-clamp-2 text-[length:var(--mobile-adapt-font-caption)] leading-[1.45] text-[#64748B]";
 const sceneStatusClassName =
-  "mb-[var(--mobile-adapt-space-2xs)] text-[length:var(--mobile-adapt-font-meta)] font-extrabold tracking-[-0.01em]";
+  "inline-flex shrink-0 items-center rounded-[8px] px-[10px] py-[4px] text-[12px] font-normal leading-none";
 const sceneProgressClassName =
-  "text-[length:clamp(1.5rem,7vw,1.75rem)] leading-none font-extrabold tracking-[-0.04em] text-[var(--app-scene-card-progress)]";
+  "text-[length:clamp(1.1rem,5.5vw,1.25rem)] leading-none font-bold text-[#1E293B]";
 const sceneRandomReviewStatusClassName =
   "flex min-h-[18px] items-center justify-end gap-[var(--mobile-adapt-space-2xs)] text-right text-[length:var(--mobile-adapt-font-caption)] font-bold text-[var(--app-foreground-muted)]";
 const sceneRandomReviewInfoButtonClassName =
@@ -163,7 +168,7 @@ export default function ScenesPage() {
     }
 
     return (
-      <div className="space-y-4">
+      <div className="space-y-[15px]">
         {allScenes.map((scene) => {
           const isImported = scene.sourceType === "imported";
           const isOpeningScene = openingSceneTarget?.startsWith(`/scene/${scene.slug}`) ?? false;
@@ -181,7 +186,7 @@ export default function ScenesPage() {
             <div
               key={scene.id}
               data-swipe-row="true"
-              className={`relative mb-4 overflow-hidden rounded-[24px] bg-[var(--app-scene-card-bg)] transition-[max-height,margin,opacity] duration-250 ease-out ${removingSceneId === scene.id ? "mb-0 max-h-0 opacity-0" : "max-h-[180px]"}`}
+              className={`relative overflow-hidden rounded-[20px] bg-white transition-[max-height,margin,opacity] duration-250 ease-out ${removingSceneId === scene.id ? "mb-0 max-h-0 opacity-0" : "max-h-[200px]"}`}
             >
               {isImported ? (
                 <div className="absolute inset-y-0 right-0 z-0 flex w-24 items-stretch justify-stretch">
@@ -227,16 +232,23 @@ export default function ScenesPage() {
               >
                 <LoadingOverlay loading={isOpeningScene} loadingText="进入场景中..." />
                 <div className="min-w-0 flex-1">
-                  <div className={sceneTitleClassName}>{scene.title}</div>
+                  <div className="flex min-w-0 items-center gap-[var(--mobile-adapt-space-sm)]">
+                    <div className={sceneTitleClassName}>{scene.title}</div>
+                    <div className={`${sceneStatusClassName} ${sceneStatusBadgeToneClassName[scene.learningStatus]}`}>
+                      {learningStatusLabel[scene.learningStatus]}
+                    </div>
+                  </div>
                   <div className={sceneSubtitleClassName}>{scene.subtitle}</div>
-                  <div className="flex flex-wrap items-center gap-x-[var(--mobile-adapt-space-sm)] gap-y-[var(--mobile-adapt-space-sm)]">
-                    <span className={sceneMetaPillClassName}>
+                  <div className="mt-[var(--mobile-adapt-space-sm)] flex flex-wrap items-center gap-x-[var(--mobile-adapt-space-xs)] gap-y-[var(--mobile-adapt-space-xs)]">
+                    <span className={sceneMetaTextClassName}>
                       {difficultyLabel[scene.difficulty] ?? "Intermediate"}
                     </span>
+                    <span className="text-[length:var(--mobile-adapt-font-caption)] text-[#CBD5E1]">·</span>
                     <span className={sceneMetaTextClassName}>
                       <Clock3 className="size-[clamp(12px,3.6vw,14px)]" />
                       {scene.estimatedMinutes} 分钟
                     </span>
+                    <span className="text-[length:var(--mobile-adapt-font-caption)] text-[#CBD5E1]">·</span>
                     <span className={sceneMetaTextClassName}>
                       <MessageSquareText className="size-[clamp(12px,3.6vw,14px)]" />
                       {scene.sentenceCount} 句
@@ -268,14 +280,9 @@ export default function ScenesPage() {
                   </div>
                 </div>
 
-                <div className="flex min-w-[clamp(68px,18vw,84px)] shrink-0 flex-col text-right">
-                  <div className={`${sceneStatusClassName} ${SCENE_STATUS_TEXT_CLASSNAME[scene.learningStatus]}`}>
-                    {learningStatusLabel[scene.learningStatus]}
-                  </div>
-                  <div className="mt-auto flex justify-end">
-                    <div className={sceneProgressClassName}>
-                      {Math.round(scene.progressPercent)}%
-                    </div>
+                <div className="flex min-w-[clamp(48px,14vw,64px)] shrink-0 justify-end text-right">
+                  <div className={sceneProgressClassName}>
+                    {Math.round(scene.progressPercent)}%
                   </div>
                 </div>
               </article>

@@ -71,11 +71,33 @@ test("SceneTrainingCoachFloatingEntry 只承载训练进度总览，不重复当
   );
 
   const fab = screen.getByTestId("scene-training-fab");
+  assert.ok(fab.querySelector('[data-progress-icon="info-circle"]'));
   assert.ok(screen.getByRole("button", { name: "训练进度入口" }));
   fireEvent.click(fab);
 
-  assert.ok(screen.getByRole("button", { name: "收起训练面板" }));
+  assert.ok(screen.getByRole("button", { name: "收起训练面板" }).querySelector(".lucide-chevron-down"));
   assert.ok(screen.getByText("2. 看 1 个重点表达"));
   assert.equal(screen.queryByRole("button", { name: "继续当前步骤" }), null);
   assert.equal(screen.queryByText(/下一步：/), null);
+});
+
+test("SceneTrainingCoachFloatingEntry inline 面板固定在视口内展开", () => {
+  render(
+    <SceneTrainingCoachFloatingEntry
+      placement="inline"
+      trainingState={createTrainingState()}
+      variantUnlocked={false}
+      practiceSetStatus="generated"
+      practiceSnapshot={null}
+      practiceModuleCount={1}
+    />,
+  );
+
+  fireEvent.click(screen.getByTestId("scene-training-fab"));
+
+  const panel = screen.getByText("本轮训练").closest("[data-placement='inline']");
+  assert.ok(panel);
+  assert.match(panel.className, /fixed/);
+  assert.equal((panel as HTMLElement).style.left.length > 0, true);
+  assert.equal((panel as HTMLElement).style.top.length > 0, true);
 });

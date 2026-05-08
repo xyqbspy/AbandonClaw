@@ -1050,8 +1050,9 @@ export default function SceneDetailClientPage({
     );
   }
 
-  const trainingPanel = (
+  const trainingProgressEntry = (
     <SceneTrainingCoachFloatingEntry
+      placement="inline"
       trainingState={trainingState}
       variantUnlocked={variantUnlocked}
       practiceSetStatus={generatedState.practiceStatus}
@@ -1084,6 +1085,7 @@ export default function SceneDetailClientPage({
       currentStepActionLoading={currentStepAction.loading}
       onCurrentStepAction={currentStepAction.onClick}
       currentStepActionDisabled={currentStepAction.disabled}
+      progressEntry={trainingProgressEntry}
     />
   );
 
@@ -1239,7 +1241,6 @@ export default function SceneDetailClientPage({
       lesson={baseLesson}
       practiceError={practiceRetryError ?? practiceError}
       variantsError={variantsError}
-      trainingPanel={trainingPanel}
       trainingNextStep={trainingNextStep}
       headerTools={null}
       headerTitle={baseLesson.subtitle?.trim() || baseLesson.sections[0]?.summary?.trim() || baseLesson.title}
