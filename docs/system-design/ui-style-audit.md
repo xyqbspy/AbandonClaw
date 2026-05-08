@@ -236,7 +236,7 @@
 
 待办：
 
-- `review-page-stage-panel.tsx` 仍有若干字段标题、正文强弱层级使用 `text-slate-*` 局部 class。
+- `review-page-styles.ts` 已将 Review stage panel 的字段标题、正文强弱层级、柔和边框与背景色收为 Review 私有语义常量。
 - `review/page.tsx` 顶部 hero 仍有 `rounded-[32px]`、局部渐变和强阴影。
 - 这些会影响 review 页面整体气质，后续应单独做 review 页面视觉收口，不在本轮继续扩大。
 
@@ -262,6 +262,9 @@
   - 将空队列标题、场景标题、场景正文、场景期望答案、表达遮罩、表达标题、调度提示、reference toggle、评分提示等固定文字层级抽为同文件局部常量。
   - 将练习模式 pill 和场景反馈结果的固定基础 class 抽为局部常量，动态状态色仍保留原有判断。
   - 保持视觉和交互条件不变；这轮只继续减少 JSX 中散落的文字层级 class，不改变 Review 队列、阶段推进或提交逻辑。
+- `src/app/(app)/review/review-page-styles.ts`
+  - 将剩余 `text-slate-*`、柔和边框、柔和背景和 hero/progress 渐变收为 Review 私有语义常量。
+  - 保持最终 class 输出和视觉语义不变，只降低后续 Review 视觉调整时的搜索面。
 
 明确不收：
 
