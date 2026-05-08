@@ -9,9 +9,12 @@ const HEADER_CLASS = "mb-[10px] flex items-start justify-between gap-3 [@media(m
 const TITLE_CLASS = "text-[clamp(17px,4.8vw,20px)] font-extrabold tracking-[-0.02em] text-[var(--app-chunks-sheet-title)] [@media(max-height:760px)]:text-[length:var(--mobile-font-title)]";
 const MEANING_CLASS = "mb-4 text-[length:var(--mobile-font-sheet-body)] font-medium text-[var(--app-chunks-sheet-muted)] [@media(max-height:760px)]:mb-3 [@media(max-height:760px)]:text-[length:var(--mobile-font-body)]";
 const GROUP_CLASS = "rounded-[16px] bg-[var(--app-chunks-sheet-bg)] p-3 [@media(max-height:760px)]:rounded-[14px] [@media(max-height:760px)]:p-2.5";
+const GROUP_COLLAPSED_CLASS =
+  "flex min-h-[44px] items-center px-3 py-0 [@media(max-height:760px)]:px-2.5 [@media(max-height:760px)]:py-0";
 const GROUP_HEADER_CLASS = "mb-[10px] flex items-center justify-between gap-3 px-1 [@media(max-height:760px)]:mb-2 [@media(max-height:760px)]:gap-2";
+const GROUP_HEADER_COLLAPSED_CLASS = "mb-0 h-full w-full px-0";
 const GROUP_LABEL_CLASS = "text-[length:var(--mobile-font-caption)] font-bold text-[var(--app-chunks-sheet-muted)]";
-const GROUP_LINK_CLASS = "text-[length:var(--mobile-font-caption)] font-bold text-[var(--app-feedback-success-text)]";
+const GROUP_LINK_CLASS = "inline-flex items-center text-[length:var(--mobile-font-caption)] font-bold leading-none text-[var(--app-feedback-success-text)]";
 const RELATED_ITEM_CLASS =
   "flex items-center justify-between gap-3 border-b border-[var(--app-chunks-sheet-card-border)] px-1 py-2 last:border-b-0 [@media(max-height:760px)]:gap-2 [@media(max-height:760px)]:py-1.5";
 const RELATED_PRIMARY_CLASS = "text-[length:var(--mobile-font-body)] font-semibold text-[var(--app-chunks-sheet-body)] [@media(max-height:760px)]:text-[length:var(--mobile-font-body-sm)]";
@@ -72,8 +75,8 @@ export function ExpressionSummaryGroup({
   collapsed?: boolean;
 }) {
   return (
-    <div className={cn(GROUP_CLASS, collapsed ? "flex min-h-[44px] flex-col justify-center" : "")}>
-      <div className={cn(GROUP_HEADER_CLASS, collapsed ? "mb-0" : "")}>
+    <div className={cn(GROUP_CLASS, collapsed ? GROUP_COLLAPSED_CLASS : "")}>
+      <div className={cn(GROUP_HEADER_CLASS, collapsed ? GROUP_HEADER_COLLAPSED_CLASS : "")}>
         <span className={GROUP_LABEL_CLASS}>{label}</span>
         {actionLabel && onAction ? (
           <button type="button" className={GROUP_LINK_CLASS} onClick={onAction}>
