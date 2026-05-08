@@ -416,10 +416,17 @@ test("ScenesPage 循环播放会按固定顺序预准备并优先播放 review p
     screen.getByText("已准备好，可后台循环");
   });
   fireEvent.click(screen.getByRole("button", { name: "查看循环播放内容" }));
-  const packList = screen.getByText("本次循环包含").closest("[data-random-review-pack-list]");
+  const packList = screen.getByText("本次循环包含 (2)").closest("[data-random-review-pack-list]");
   assert.ok(packList instanceof HTMLElement);
+  assert.equal(packList.className.includes("absolute"), true);
+  assert.equal(packList.className.includes("z-30"), true);
+  assert.equal(packList.className.includes("text-left"), true);
+  assert.equal(packList.className.includes("rounded-[18px]"), true);
+  assert.equal(packList.className.includes("backdrop-blur-[20px]"), true);
   assert.equal(within(packList).getByText("Coffee Chat") instanceof HTMLElement, true);
   assert.equal(within(packList).getByText("Imported Scene") instanceof HTMLElement, true);
+  assert.equal(within(packList).queryByText("subtitle"), null);
+  assert.equal(within(packList).queryByText("imported subtitle"), null);
 
   fireEvent.click(randomButton);
 

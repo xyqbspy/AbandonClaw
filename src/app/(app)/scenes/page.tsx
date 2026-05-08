@@ -66,7 +66,15 @@ const sceneRandomReviewStatusClassName =
 const sceneRandomReviewInfoButtonClassName =
   "inline-flex size-[18px] shrink-0 items-center justify-center rounded-full text-[var(--app-foreground-muted)] transition-colors hover:bg-[var(--app-scene-card-meta-bg)] hover:text-[var(--app-foreground)]";
 const sceneRandomReviewPackListClassName =
-  "ml-auto mt-[var(--mobile-adapt-space-2xs)] w-fit max-w-full rounded-[var(--app-radius-card)] border border-[var(--border)] bg-white px-[var(--mobile-adapt-space-sm)] py-[var(--mobile-adapt-space-xs)] text-right text-[length:var(--mobile-adapt-font-caption)] font-bold text-[var(--app-foreground-muted)] shadow-[0_8px_20px_rgba(15,23,42,0.08)]";
+  "absolute right-0 top-[calc(100%+var(--mobile-adapt-space-2xs))] z-30 w-[min(320px,calc(100vw-32px))] rounded-[18px] border border-[rgba(0,0,0,0.05)] bg-[rgba(255,255,255,0.98)] p-5 text-left shadow-[0_10px_30px_rgba(0,0,0,0.12)] backdrop-blur-[20px]";
+const sceneRandomReviewPackTitleClassName =
+  "mb-4 flex items-center gap-[6px] text-[14px] font-semibold text-[#86868B]";
+const sceneRandomReviewPackItemClassName =
+  "flex items-start border-b border-[rgba(0,0,0,0.03)] py-2 last:border-b-0";
+const sceneRandomReviewPackIndexClassName =
+  "mr-3 mt-[2px] flex size-5 shrink-0 items-center justify-center rounded-[6px] bg-[rgba(0,122,255,0.1)] text-[12px] font-semibold text-[#007AFF]";
+const sceneRandomReviewPackItemTitleClassName =
+  "truncate text-[15px] font-semibold leading-[1.4] text-[#1D1D1F]";
 
 export default function ScenesPage() {
   const [reviewPackListOpen, setReviewPackListOpen] = useState(false);
@@ -347,7 +355,7 @@ export default function ScenesPage() {
           </Button>
         </div>
         {randomReviewStatusText ? (
-          <>
+          <div className="relative">
             <div className={sceneRandomReviewStatusClassName} data-random-review-status="true">
               <span>{randomReviewStatusText}</span>
               {reviewPackScenes.length > 0 ? (
@@ -370,22 +378,23 @@ export default function ScenesPage() {
                 className={sceneRandomReviewPackListClassName}
                 data-random-review-pack-list="true"
               >
-                <div className="mb-[var(--mobile-adapt-space-2xs)] text-[var(--app-foreground)]">
-                  本次循环包含
+                <div className={sceneRandomReviewPackTitleClassName}>
+                  <Repeat2 className="size-[14px]" strokeWidth={2.5} />
+                  本次循环包含 ({reviewPackScenes.length})
                 </div>
-                <ol className="space-y-[var(--mobile-adapt-space-2xs)]">
+                <ul className="m-0 list-none p-0">
                   {reviewPackScenes.map((scene, index) => (
-                    <li key={scene.id} className="flex justify-end gap-[var(--mobile-adapt-space-xs)]">
-                      <span className="text-[var(--app-foreground-muted)]">{index + 1}.</span>
-                      <span className="max-w-[min(72vw,320px)] truncate text-[var(--app-foreground)]">
+                    <li key={scene.id} className={sceneRandomReviewPackItemClassName}>
+                      <span className={sceneRandomReviewPackIndexClassName}>{index + 1}</span>
+                      <span className={sceneRandomReviewPackItemTitleClassName}>
                         {scene.title}
                       </span>
                     </li>
                   ))}
-                </ol>
+                </ul>
               </div>
             ) : null}
-          </>
+          </div>
         ) : null}
       </div>
 
