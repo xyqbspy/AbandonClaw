@@ -34,6 +34,8 @@
   - 测试策略、最小验证和回归边界。
 - [backend-release-readiness-checklist.md](/d:/WorkCode/AbandonClaw/docs/dev/backend-release-readiness-checklist.md)
   - 服务端上线前检查、运行护栏和真实 HTTP baseline。
+- [public-registration-readiness-plan.md](/d:/WorkCode/AbandonClaw/docs/dev/public-registration-readiness-plan.md)
+  - 公网开放注册、滥用防护、学习数据可信化和运营处置的优先级执行计划。
 - [server-data-boundary-audit.md](/d:/WorkCode/AbandonClaw/docs/dev/server-data-boundary-audit.md)
   - 用户态数据边界、RLS、SQL 映射和服务端白名单审计。
 - [dev-log.md](/d:/WorkCode/AbandonClaw/docs/dev/dev-log.md)
