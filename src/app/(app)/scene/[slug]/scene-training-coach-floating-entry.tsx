@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
-import { Check, ChevronDown } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Check, ChevronDown, CircleHelp } from "lucide-react";
 import { formatLoadingText, LoadingContent } from "@/components/shared/action-loading";
 import type { ScenePracticeSnapshotResponse, SceneLearningProgressResponse } from "@/lib/utils/learning-api";
 import {
@@ -9,11 +9,9 @@ import {
   deriveSceneTrainingState,
   deriveSceneTrainingStatsSummary,
 } from "./scene-detail-selectors";
-import { getSceneTrainingStepTitle, sceneDetailMessages } from "./scene-detail-messages";
-import { useSceneTrainingFloatingPosition } from "./use-scene-training-floating-position";
+import { sceneDetailMessages } from "./scene-detail-messages";
 
 export function SceneTrainingCoachFloatingEntry({
-  sceneId,
   trainingState,
   variantUnlocked,
   practiceSetStatus,
@@ -21,7 +19,6 @@ export function SceneTrainingCoachFloatingEntry({
   practiceModuleCount,
   practiceStepAction,
 }: {
-  sceneId: string;
   trainingState: SceneLearningProgressResponse | null;
   variantUnlocked: boolean;
   practiceSetStatus: "idle" | "generated" | "completed";
@@ -35,7 +32,6 @@ export function SceneTrainingCoachFloatingEntry({
   } | null;
 }) {
   const [panelOpen, setPanelOpen] = useState(false);
-  const overlayDismissBlockedUntilRef = useRef(0);
 
   const session = trainingState?.session;
 
@@ -53,8 +49,6 @@ export function SceneTrainingCoachFloatingEntry({
   const normalizedTrainingState = useMemo(() => {
     return deriveSceneTrainingState(rawCompletedMap);
   }, [rawCompletedMap]);
-
-  const collapsedStepLabel = getSceneTrainingStepTitle(normalizedTrainingState.currentStep);
 
   const statsSummary = useMemo(
     () =>
@@ -74,26 +68,6 @@ export function SceneTrainingCoachFloatingEntry({
     ],
   );
 
-  const {
-    dragActive,
-    fabHeight,
-    handleIconPointerCancel,
-    handleIconPointerDown,
-    handleIconPointerMove,
-    handleIconPointerUp,
-    iconButtonRef,
-    panelLeft,
-    panelMaxHeight,
-    panelTop,
-    panelWidth,
-    position,
-  } = useSceneTrainingFloatingPosition({
-    sceneId,
-    collapsedStepLabel,
-    setPanelOpen,
-    overlayDismissBlockedUntilRef,
-  });
-
   return (
     <>
       {panelOpen ? (
@@ -102,63 +76,28 @@ export function SceneTrainingCoachFloatingEntry({
           aria-label="关闭训练面板遮罩"
           className="fixed inset-0 z-40 border-0 bg-[rgba(242,242,247,0.42)] backdrop-blur-[4px]"
           onClick={() => {
-            if (Date.now() < overlayDismissBlockedUntilRef.current) {
-              return;
-            }
             setPanelOpen(false);
           }}
         />
       ) : null}
       <div
-        className="fixed z-50"
-        style={{
-          left: `${position.x}px`,
-          top: `${position.y}px`,
-        }}
+        className="fixed bottom-[calc(var(--mobile-adapt-space-xl)+env(safe-area-inset-bottom))] right-[var(--mobile-adapt-space-xl)] z-50"
       >
         <div className="relative">
           <button
-            ref={iconButtonRef}
             type="button"
             aria-label="训练进度入口"
             aria-expanded={panelOpen}
             data-testid="scene-training-fab"
-            className="inline-flex min-h-[var(--mobile-adapt-overlay-trigger-height)] min-w-[var(--mobile-adapt-overlay-trigger-width)] items-center gap-[var(--mobile-adapt-space-sm)] rounded-[var(--mobile-adapt-overlay-trigger-radius)] border border-[var(--app-scene-panel-border)] bg-[var(--app-scene-panel-bg)] px-[var(--mobile-adapt-space-md)] py-[var(--mobile-adapt-space-sm)] text-left shadow-[var(--app-scene-panel-shadow)] backdrop-blur-[18px] transition-transform duration-150"
-            style={{
-              minHeight: `${fabHeight}px`,
-              touchAction: "none",
-              transform: dragActive ? "scale(1.08)" : "scale(1)",
-            }}
-            onPointerDown={handleIconPointerDown}
-            onPointerMove={handleIconPointerMove}
-            onPointerUp={handleIconPointerUp}
-            onPointerCancel={handleIconPointerCancel}
+            className="inline-flex size-[var(--mobile-adapt-overlay-close-size)] items-center justify-center rounded-full border border-[var(--app-scene-panel-border)] bg-[var(--app-scene-panel-bg)] text-[var(--app-scene-panel-muted)] shadow-[var(--app-scene-panel-shadow)] backdrop-blur-[18px] transition-colors hover:text-foreground"
+            onClick={() => setPanelOpen((value) => !value)}
           >
-            <span className="inline-flex size-[var(--mobile-adapt-overlay-trigger-dot)] shrink-0 items-center justify-center rounded-full bg-[var(--app-scene-panel-accent-soft)]">
-              <span className="size-[var(--mobile-adapt-overlay-trigger-dot-inner)] rounded-full bg-[var(--app-scene-panel-accent)]" aria-hidden="true" />
-            </span>
-            <span className="flex min-w-0 flex-1 flex-col leading-none">
-              <span className="text-[length:var(--mobile-adapt-overlay-meta)] font-medium text-[var(--app-scene-panel-muted)]">本轮训练</span>
-              <span className="mt-1 truncate text-[length:var(--mobile-adapt-font-body-sm)] font-semibold text-foreground">
-                {collapsedStepLabel}
-              </span>
-            </span>
-            <ChevronDown
-              className={`size-4 shrink-0 text-[var(--app-scene-panel-muted)] transition-transform duration-200 ${
-                panelOpen ? "rotate-180" : ""
-              }`}
-            />
+            <CircleHelp className="size-5" />
           </button>
 
           {panelOpen ? (
             <div
-              className="absolute flex flex-col overflow-hidden rounded-[var(--mobile-adapt-overlay-radius)] border border-[var(--app-scene-panel-border)] bg-[var(--app-scene-panel-bg)] shadow-[var(--app-scene-panel-shadow)] backdrop-blur-[20px] saturate-[1.8]"
-              style={{
-                left: `${panelLeft}px`,
-                top: `${panelTop}px`,
-                width: `${panelWidth}px`,
-                maxHeight: `${panelMaxHeight}px`,
-              }}
+              className="absolute bottom-[calc(100%+var(--mobile-adapt-space-sm))] right-0 flex max-h-[min(664px,calc(100vh-160px))] w-[min(344px,calc(100vw-32px))] flex-col overflow-hidden rounded-[var(--mobile-adapt-overlay-radius)] border border-[var(--app-scene-panel-border)] bg-[var(--app-scene-panel-bg)] shadow-[var(--app-scene-panel-shadow)] backdrop-blur-[20px] saturate-[1.8]"
             >
               <div className="flex shrink-0 items-center justify-between gap-[var(--mobile-adapt-space-md)] px-[var(--mobile-adapt-space-sheet)] pt-[var(--mobile-adapt-space-sheet)]">
                 <p className="text-[length:var(--mobile-adapt-overlay-title)] font-bold text-foreground">

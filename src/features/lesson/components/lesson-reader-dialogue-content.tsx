@@ -1,8 +1,7 @@
 "use client";
 
-import { ReactNode, useState } from "react";
-import { ArrowLeft, Languages } from "lucide-react";
-import { LoopActionButton } from "@/components/audio/loop-action-button";
+import { useState } from "react";
+import { Languages } from "lucide-react";
 import { TtsActionButton } from "@/components/audio/tts-action-button";
 import { LessonBlock } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -12,8 +11,6 @@ const isPrimarySpeaker = (speaker?: string) => normalizeSpeaker(speaker) === "A"
 const speakerLabel = (speaker?: string) => normalizeSpeaker(speaker);
 const dialogueActionButtonClassName =
   "size-[var(--mobile-icon-button)] rounded-full border-transparent bg-transparent text-[var(--app-foreground-muted)] shadow-none transition-colors hover:bg-transparent hover:text-[var(--app-foreground)]";
-const dialogueLoopButtonClassName =
-  "absolute right-0 top-0 size-9 cursor-pointer px-0 transition-all duration-150";
 
 type LessonReaderDialogueContentProps = {
   blockOrder: LessonBlock[];
@@ -21,11 +18,6 @@ type LessonReaderDialogueContentProps = {
   isTrainingMode: boolean;
   activeTrainingSentenceText?: string | null;
   resolvedHeaderTitle: string;
-  topRightTool?: ReactNode;
-  onBackToList?: () => void;
-  isSceneLooping: boolean;
-  isSceneLoopLoading: boolean;
-  toggleSceneLoopPlayback: () => void;
   isSentencePlaying: (sentenceId: string) => boolean;
   playbackState: {
     kind: string | null;
@@ -42,11 +34,6 @@ export function LessonReaderDialogueContent({
   isTrainingMode,
   activeTrainingSentenceText,
   resolvedHeaderTitle,
-  topRightTool,
-  onBackToList,
-  isSceneLooping,
-  isSceneLoopLoading,
-  toggleSceneLoopPlayback,
   isSentencePlaying,
   playbackState,
   handleSentenceTap,
@@ -65,47 +52,8 @@ export function LessonReaderDialogueContent({
       )}
     >
       {isTrainingMode ? (
-        <div className="pb-[var(--mobile-space-2xl)]">
-          <div
-            className="relative flex min-h-[var(--mobile-control-height)] items-start justify-center"
-            data-current-training-sentence={activeTrainingSentenceText}
-          >
-            {onBackToList ? (
-              <button
-                type="button"
-                aria-label="返回场景列表"
-                className="absolute left-0 top-0 inline-flex size-[var(--mobile-icon-button)] items-start justify-start pt-[2px] text-[#2c3e50] transition"
-                onClick={onBackToList}
-              >
-                <ArrowLeft className="size-4" />
-              </button>
-            ) : null}
-            <div className="w-full min-w-0 max-w-full overflow-hidden px-[var(--mobile-header-side)] pt-0.5 text-center">
-              <h1 className="truncate whitespace-nowrap text-[length:var(--mobile-font-title)] font-semibold text-[#333]">
-                {resolvedHeaderTitle}
-              </h1>
-            </div>
-            {topRightTool ? (
-              <div className="absolute right-0 top-0 flex items-center gap-[var(--mobile-space-sm)]">
-                {topRightTool}
-              </div>
-            ) : null}
-            {!topRightTool ? (
-              <LoopActionButton
-                active={isSceneLooping}
-                loading={isSceneLoopLoading}
-                variant="secondary"
-                size="icon-sm"
-                surface="bubble"
-                iconOnly
-                icon="loop"
-                ariaLabel={isSceneLooping ? "停止循环播放" : "循环播放场景"}
-                className={dialogueLoopButtonClassName}
-                iconClassName="size-4"
-                onClick={toggleSceneLoopPlayback}
-              />
-            ) : null}
-          </div>
+        <div className="sr-only" data-current-training-sentence={activeTrainingSentenceText}>
+          {resolvedHeaderTitle}
         </div>
       ) : null}
 

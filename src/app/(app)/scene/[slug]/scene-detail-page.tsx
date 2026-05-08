@@ -1052,7 +1052,6 @@ export default function SceneDetailClientPage({
 
   const trainingPanel = (
     <SceneTrainingCoachFloatingEntry
-      sceneId={baseLesson.id}
       trainingState={trainingState}
       variantUnlocked={variantUnlocked}
       practiceSetStatus={generatedState.practiceStatus}
@@ -1062,12 +1061,25 @@ export default function SceneDetailClientPage({
     />
   );
 
-  const trainingNextStep = (
+  const trainingNextStep = ({
+    isSceneLooping,
+    isSceneLoopLoading,
+    toggleSceneLoopPlayback,
+  }: {
+    isSceneLooping: boolean;
+    isSceneLoopLoading: boolean;
+    toggleSceneLoopPlayback: () => void;
+  }) => (
     <SceneTrainingNextStepStrip
+      title={baseLesson.subtitle?.trim() || baseLesson.sections[0]?.summary?.trim() || baseLesson.title}
+      onBack={() => router.push("/scenes")}
       trainingState={trainingState}
       variantUnlocked={variantUnlocked}
       practiceSetStatus={generatedState.practiceStatus}
       practiceSnapshot={practiceSnapshot}
+      isSceneLooping={isSceneLooping}
+      isSceneLoopLoading={isSceneLoopLoading}
+      onSceneLoopPlayback={toggleSceneLoopPlayback}
       currentStepActionLabel={currentStepAction.label}
       currentStepActionLoading={currentStepAction.loading}
       onCurrentStepAction={currentStepAction.onClick}

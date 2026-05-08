@@ -1,5 +1,35 @@
-﻿# Dev Log
+# Dev Log
 
+### [2026-05-08] 收口 Scene 主控区布局与训练入口形态
+- 类型：Spec-Driven / Scene 主学习视图交互层级调整
+- 状态：已完成并归档 `refine-scene-primary-controls-layout`
+
+#### 背景
+Scene 主学习视图已经有“当前下一步”任务条，但返回、标题和循环播放仍散落在 LessonReader 内部，训练进度入口也仍是默认吸边文本悬浮入口，导致主任务和辅助入口层级不够清晰。
+
+#### 本次改动
+- 当前下一步任务条收口为唯一主控区，统一承载返回、标题、当前步骤、循环播放次级动作和当前步骤主 CTA。
+- 任务条新增顶部折叠按钮，默认折叠，只保留标题、返回、当前步骤与当前操作；展开后再展示辅助说明和右下角训练入口提示。
+- 循环播放按钮迁移到当前步骤主 CTA 左侧，文案固定为“循环播放”，图标位于文字右侧，继续复用既有 `toggleSceneLoopPlayback` 逻辑。
+- LessonReader 训练模式通过 render prop 把循环播放状态暴露给 Scene 任务条，移除训练模式内部重复的返回/标题/循环播放头部。
+- `SceneTrainingCoachFloatingEntry` 改为问号图标按钮点击展开，移除默认吸边/拖拽文本入口，保留展开后的完整训练进度、步骤列表、统计摘要和已完成步骤快捷入口。
+- 同步 `scene-training-flow` 和 `learning-loop-overview` 稳定规范。
+
+#### 明确不收项
+- 不改变音频播放队列、TTS fallback、循环播放底层实现或统计口径。
+- 不改变 Scene training step 推导、学习状态写回、practice / variant 生成策略、API、数据库或完成判定。
+- 不重写训练进度面板内部信息结构。
+
+#### 验证
+- 已运行：
+  - `pnpm exec node --import tsx --import ./src/test/setup-dom.ts --test "src/app/(app)/scene/[[]slug[]]/scene-training-coach-floating-entry.test.tsx"`
+  - `pnpm exec node --import tsx --import ./src/test/setup-dom.ts --test "src/app/(app)/scene/[[]slug[]]/page.regression.test.tsx"`
+  - `pnpm exec tsc --noEmit`
+  - `pnpm exec openspec validate refine-scene-primary-controls-layout --strict`
+  - `pnpm exec openspec validate --all --strict`
+  - `pnpm run text:check-mojibake`
+  - `pnpm run maintenance:check`
+  - `git diff --check`
 ### [2026-05-07] 收口 Scene 任务条与训练悬浮入口职责
 - 类型：Spec-Driven / Scene 用户动作层级修正
 - 状态：已完成并归档 `separate-scene-training-entry-roles`

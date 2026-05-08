@@ -1,7 +1,10 @@
 "use client";
 
 import { ReactNode } from "react";
-import { LessonReader } from "@/features/lesson/components/lesson-reader";
+import {
+  LessonReader,
+  type LessonReaderSceneLoopControls,
+} from "@/features/lesson/components/lesson-reader";
 import {
   SCENE_PAGE_CONTENT_ANCHOR_CLASSNAME,
   SCENE_PAGE_ERROR_TEXT_CLASSNAME,
@@ -42,7 +45,7 @@ export function SceneBaseView({
   practiceError: string | null;
   variantsError: string | null;
   trainingPanel?: ReactNode;
-  trainingNextStep?: ReactNode;
+  trainingNextStep?: (controls: LessonReaderSceneLoopControls) => ReactNode;
   headerTools: ReactNode;
   headerTitle?: string;
   onBackToList?: () => void;
@@ -73,13 +76,13 @@ export function SceneBaseView({
       {variantsError ? <p className={SCENE_PAGE_ERROR_TEXT_CLASSNAME}>{variantsError}</p> : null}
 
       {trainingPanel}
-      {trainingNextStep}
       <div className={SCENE_PAGE_CONTENT_ANCHOR_CLASSNAME}>
         <LessonReader
           lesson={lesson}
           headerTools={headerTools}
           headerTitle={headerTitle}
           onBackToList={onBackToList}
+          trainingTopPanel={trainingNextStep}
           interactionMode={interactionMode}
           savedPhraseTexts={savedPhraseTexts}
           onSavePhrase={onSavePhrase}

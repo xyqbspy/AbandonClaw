@@ -53,11 +53,18 @@ const sceneLoopMobileButtonClassName =
   "size-[var(--mobile-control-height)] cursor-pointer px-0 transition-all duration-150";
 const hasSpeakerTag = (speaker?: string) => /^[A-Z]$/.test((speaker ?? "").trim().toUpperCase());
 
+export type LessonReaderSceneLoopControls = {
+  isSceneLooping: boolean;
+  isSceneLoopLoading: boolean;
+  toggleSceneLoopPlayback: () => void;
+};
+
 export function LessonReader({
   lesson,
   headerTools,
   headerTitle,
   onBackToList,
+  trainingTopPanel,
   topRightTool,
   minimalHeader = false,
   interactionMode = "default",
@@ -73,6 +80,7 @@ export function LessonReader({
   headerTools?: ReactNode;
   headerTitle?: string;
   onBackToList?: () => void;
+  trainingTopPanel?: (controls: LessonReaderSceneLoopControls) => ReactNode;
   topRightTool?: ReactNode;
   minimalHeader?: boolean;
   interactionMode?: "default" | "training";
@@ -285,6 +293,14 @@ export function LessonReader({
     onBlockPlayback,
     onSentencePlayback,
   });
+  const renderedTrainingTopPanel =
+    isTrainingMode && trainingTopPanel
+      ? trainingTopPanel({
+          isSceneLooping,
+          isSceneLoopLoading,
+          toggleSceneLoopPlayback,
+        })
+      : null;
   const {
     mobileActiveGroup,
     handleSentenceTap,
@@ -380,6 +396,7 @@ export function LessonReader({
           isMobile && "space-y-[var(--mobile-space-sm)]",
         )}
       >
+        {renderedTrainingTopPanel}
         {minimalHeader ? (
           <div
             className={cn(
@@ -531,11 +548,6 @@ export function LessonReader({
             isTrainingMode={isTrainingMode}
             activeTrainingSentenceText={activeTrainingSentence?.text}
             resolvedHeaderTitle={resolvedHeaderTitle}
-            topRightTool={topRightTool}
-            onBackToList={onBackToList}
-            isSceneLooping={isSceneLooping}
-            isSceneLoopLoading={isSceneLoopLoading}
-            toggleSceneLoopPlayback={toggleSceneLoopPlayback}
             isSentencePlaying={isSentencePlaying}
             playbackState={playbackState}
             handleSentenceTap={handleSentenceTap}

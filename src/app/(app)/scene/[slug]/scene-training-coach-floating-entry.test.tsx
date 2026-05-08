@@ -62,7 +62,6 @@ function createTrainingState(
 test("SceneTrainingCoachFloatingEntry 只承载训练进度总览，不重复当前步骤主动作", () => {
   render(
     <SceneTrainingCoachFloatingEntry
-      sceneId="scene-1"
       trainingState={createTrainingState()}
       variantUnlocked={false}
       practiceSetStatus="generated"
@@ -72,8 +71,8 @@ test("SceneTrainingCoachFloatingEntry 只承载训练进度总览，不重复当
   );
 
   const fab = screen.getByTestId("scene-training-fab");
-  fireEvent.pointerDown(fab, { pointerId: 1, clientX: 20, clientY: 20 });
-  fireEvent.pointerUp(fab, { pointerId: 1, clientX: 20, clientY: 20 });
+  assert.ok(screen.getByRole("button", { name: "训练进度入口" }));
+  fireEvent.click(fab);
 
   assert.ok(screen.getByRole("button", { name: "收起训练面板" }));
   assert.ok(screen.getByText("2. 看 1 个重点表达"));
