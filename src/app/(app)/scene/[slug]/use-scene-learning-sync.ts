@@ -61,6 +61,7 @@ export const useSceneLearningSync = ({
   activeVariantId,
   initialLearningState,
   hasFreshInitialLearningState = false,
+  deferStartUntilInitialLearningStateResolved = false,
   onLearningStateChange,
   deps = defaultDeps,
 }: {
@@ -69,6 +70,7 @@ export const useSceneLearningSync = ({
   activeVariantId?: string | null;
   initialLearningState?: SceneLearningProgressResponse | null;
   hasFreshInitialLearningState?: boolean;
+  deferStartUntilInitialLearningStateResolved?: boolean;
   onLearningStateChange?: (state: SceneLearningProgressResponse) => void;
   deps?: UseSceneLearningSyncDeps;
 }) => {
@@ -156,6 +158,7 @@ export const useSceneLearningSync = ({
 
   useEffect(() => {
     if (!baseLesson || learningStartedRef.current) return;
+    if (deferStartUntilInitialLearningStateResolved) return;
     if (hasFreshInitialLearningState && initialLearningState) {
       learningStartedRef.current = true;
       lastProgressSyncMsRef.current = deps.now();
@@ -181,7 +184,14 @@ export const useSceneLearningSync = ({
       .catch(() => {
         // Non-blocking: scene reading should still work if progress API fails temporarily.
       });
-  }, [baseLesson, deps, hasFreshInitialLearningState, initialLearningState, onLearningStateChange]);
+  }, [
+    baseLesson,
+    deferStartUntilInitialLearningStateResolved,
+    deps,
+    hasFreshInitialLearningState,
+    initialLearningState,
+    onLearningStateChange,
+  ]);
 
   useEffect(() => {
     currentViewModeRef.current = viewMode;

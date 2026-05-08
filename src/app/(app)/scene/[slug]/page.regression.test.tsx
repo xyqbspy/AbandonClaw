@@ -172,6 +172,9 @@ let expressionMapResult:
   | { expressionMap: ExpressionMapResponse; variantSetId: string; reused: boolean }
   | null = null;
 let currentLearningState = buildLearningState();
+let learningCacheSnapshotFound = true;
+let learningProgressCacheFound = true;
+let sceneLearningStartCount = 0;
 let currentVariantRunSnapshot: {
   run: {
     id: string;
@@ -481,15 +484,30 @@ const mockedModules = {
     setSceneCache: async () => undefined,
   },
   "@/lib/cache/scene-runtime-cache": {
-    getSceneLearningProgressCacheSnapshotSync: () => ({
-      found: true,
-      isExpired: false,
-      record: {
-        data: {
-          state: currentLearningState,
-        },
-      },
-    }),
+    getSceneLearningProgressCache: async () =>
+      learningProgressCacheFound
+        ? {
+            found: true,
+            isExpired: false,
+            record: {
+              data: {
+                state: currentLearningState,
+              },
+            },
+          }
+        : { found: false, isExpired: false, record: null },
+    getSceneLearningProgressCacheSnapshotSync: () =>
+      learningCacheSnapshotFound
+        ? {
+            found: true,
+            isExpired: false,
+            record: {
+              data: {
+                state: currentLearningState,
+              },
+            },
+          }
+        : { found: false, isExpired: false, record: null },
     setSceneLearningProgressCache: async () => undefined,
     getScenePracticeSnapshotCache: async () =>
       cachedPracticeSnapshot
@@ -589,7 +607,10 @@ const mockedModules = {
         learningState: currentLearningState,
       };
     },
-    startSceneLearningFromApi: async () => currentLearningState,
+    startSceneLearningFromApi: async () => {
+      sceneLearningStartCount += 1;
+      return currentLearningState;
+    },
     saveScenePracticeSetFromApi: async (
       slug: string,
       payload: { practiceSet: PracticeSet; replaceExisting?: boolean },
@@ -859,9 +880,6 @@ nodeModule.Module.prototype.require = function patchedRequire(
 
 let SceneDetailPageModule: React.ComponentType<{ initialLesson?: Lesson | null }> | null = null;
 
-const hasTextContent = (text: string) => (_content: string, element: Element | null) =>
-  Boolean(element?.textContent?.includes(text));
-
 function getSceneDetailPage() {
   if (!SceneDetailPageModule) {
     const pageModulePath = localRequire.resolve("./scene-detail-page");
@@ -887,6 +905,9 @@ afterEach(() => {
   };
   currentLearningState = buildLearningState();
   expressionMapResult = null;
+  learningCacheSnapshotFound = true;
+  learningProgressCacheFound = true;
+  sceneLearningStartCount = 0;
   currentVariantRunSnapshot = { run: null };
   currentPracticeSnapshot = null;
   cachedPracticeSnapshot = null;
@@ -1067,6 +1088,36 @@ test("SceneDetailPage 在首屏数据未就绪时会先展示场景骨架", asyn
   await waitFor(() => {
     screen.getByText("lesson-reader");
   });
+});
+
+test("SceneDetailPage 内存缓存未命中但持久缓存命中时，不会重新 start 刷新当前步骤", async () => {
+  learningCacheSnapshotFound = false;
+  learningProgressCacheFound = true;
+  currentLearningState = buildLearningState({
+    progress: {
+      variantUnlockedAt: "2026-03-22T00:00:00.000Z",
+    },
+    session: {
+      currentStep: "done",
+      fullPlayCount: 1,
+      openedExpressionCount: 1,
+      practicedSentenceCount: 1,
+      completedSentenceCount: 1,
+      scenePracticeCompleted: true,
+      isDone: true,
+    },
+  });
+
+  const SceneDetailPage = getSceneDetailPage();
+  render(<SceneDetailPage initialLesson={baseLesson} />);
+
+  await waitFor(() => {
+    assert.match(
+      screen.getByRole("region", { name: "当前下一步" }).textContent ?? "",
+      /下一步：\s*解锁变体/,
+    );
+  });
+  assert.equal(sceneLearningStartCount, 0);
 });
 
 test("SceneDetailPage 点击问号训练入口会展开面板，点击遮罩会关闭", async () => {

@@ -36,6 +36,7 @@
 `scene/[slug]` 的学习进度由 `SceneLearningProgressResponse` 承接，页面会把服务端返回的最新状态写入 `scene-runtime-cache`：
 
 - 缓存 key：`scene-learning-progress:v1:{sceneSlug}`
+- 详情页首屏会先读内存 snapshot；若未命中，会等待一次 IndexedDB 持久缓存恢复。24 小时 TTL 内命中时，当前步骤直接沿用缓存，不主动调用 `/start` 刷新；步骤推进、练习回写或完成动作返回新的 `learningState` 后再更新缓存。
 - TTL：1 天
 - 写入入口：`handleLearningStateChange`
 - 主要来源：开始学习、主动听整段、打开表达、练习 run / attempt / complete 返回的 `learningState`

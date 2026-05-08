@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { formatLoadingText, LoadingContent } from "@/components/shared/action-loading";
 import {
+  getSceneLearningProgressCache,
   getSceneLearningProgressCacheSnapshotSync,
   getScenePracticeSnapshotCache,
   getSceneVariantRunCache,
@@ -141,10 +142,36 @@ export default function SceneDetailClientPage({
     firstFailureAt: null,
   });
   const initialTrainingStateSnapshot = getSceneLearningProgressCacheSnapshotSync(sceneSlug);
-  const [trainingState, setTrainingState] = useState<SceneLearningProgressResponse | null>(
+  const initialTrainingState =
     initialTrainingStateSnapshot.found && initialTrainingStateSnapshot.record
       ? initialTrainingStateSnapshot.record.data.state
-      : null,
+      : null;
+  const initialTrainingStateIsFresh =
+    initialTrainingStateSnapshot.found &&
+    Boolean(initialTrainingStateSnapshot.record) &&
+    !initialTrainingStateSnapshot.isExpired;
+  const [hydratedTrainingCache, setHydratedTrainingCache] = useState<{
+    sceneSlug: string;
+    isResolved: boolean;
+    isFresh: boolean;
+    state: SceneLearningProgressResponse | null;
+  }>(() => ({
+    sceneSlug,
+    isResolved: initialTrainingStateSnapshot.found,
+    isFresh: initialTrainingStateIsFresh,
+    state: initialTrainingState,
+  }));
+  const currentHydratedTrainingCache =
+    hydratedTrainingCache.sceneSlug === sceneSlug
+      ? hydratedTrainingCache
+      : {
+          sceneSlug,
+          isResolved: false,
+          isFresh: false,
+          state: null,
+        };
+  const [trainingState, setTrainingState] = useState<SceneLearningProgressResponse | null>(
+    initialTrainingState,
   );
   const [practiceSnapshot, setPracticeSnapshot] = useState<ScenePracticeSnapshotResponse | null>(null);
   const [viewResetVersion, setViewResetVersion] = useState(0);
@@ -206,8 +233,38 @@ export default function SceneDetailClientPage({
     let cancelled = false;
     void Promise.resolve().then(() => {
       if (cancelled) return;
-      const snapshot = getSceneLearningProgressCacheSnapshotSync(sceneSlug);
-      setTrainingState(snapshot.found && snapshot.record ? snapshot.record.data.state : null);
+      const syncSnapshot = getSceneLearningProgressCacheSnapshotSync(sceneSlug);
+      const syncState = syncSnapshot.found && syncSnapshot.record ? syncSnapshot.record.data.state : null;
+      setHydratedTrainingCache({
+        sceneSlug,
+        isResolved: syncSnapshot.found,
+        isFresh: syncSnapshot.found && Boolean(syncSnapshot.record) && !syncSnapshot.isExpired,
+        state: syncState,
+      });
+      sessionDoneRef.current = Boolean(syncState?.session?.isDone);
+      setTrainingState(syncState);
+
+      void getSceneLearningProgressCache(sceneSlug).then((result) => {
+        if (cancelled) return;
+        const nextState = result.found && result.record ? result.record.data.state : null;
+        setHydratedTrainingCache({
+          sceneSlug,
+          isResolved: true,
+          isFresh: result.found && Boolean(result.record) && !result.isExpired,
+          state: nextState,
+        });
+        sessionDoneRef.current = Boolean(nextState?.session?.isDone);
+        setTrainingState(nextState);
+      }).catch(() => {
+        if (cancelled) return;
+        setHydratedTrainingCache((current) => ({
+          ...current,
+          sceneSlug,
+          isResolved: true,
+        }));
+      });
+    }).catch(() => {
+      // Non-blocking cache hydration.
     });
     return () => {
       cancelled = true;
@@ -218,14 +275,9 @@ export default function SceneDetailClientPage({
     baseLesson,
     viewMode,
     activeVariantId,
-    initialLearningState:
-      initialTrainingStateSnapshot.found && initialTrainingStateSnapshot.record
-        ? initialTrainingStateSnapshot.record.data.state
-        : null,
-    hasFreshInitialLearningState:
-      initialTrainingStateSnapshot.found &&
-      Boolean(initialTrainingStateSnapshot.record) &&
-      !initialTrainingStateSnapshot.isExpired,
+    initialLearningState: currentHydratedTrainingCache.state,
+    hasFreshInitialLearningState: currentHydratedTrainingCache.isFresh,
+    deferStartUntilInitialLearningStateResolved: !currentHydratedTrainingCache.isResolved,
     onLearningStateChange: handleLearningStateChange,
   });
 

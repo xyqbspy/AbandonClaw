@@ -357,6 +357,52 @@ test("useSceneLearningSync 在有新鲜学习态缓存时不会立刻重复 star
   assert.deepEqual(startCalls, []);
   hook.unmount();
 });
+
+test("useSceneLearningSync defers start while persistent cache is restoring", () => {
+  const startCalls: string[] = [];
+
+  const deps: LearningSyncDeps = {
+    startSceneLearningFromApi: async (slug: string) => {
+      startCalls.push(slug);
+      return buildLearningProgressResponse();
+    },
+    pauseSceneLearningFromApi: async () => buildLearningProgressResponse(),
+    updateSceneLearningProgressFromApi: async () => buildLearningProgressResponse(),
+    shouldFlushSceneLearningDelta: () => false,
+    buildSceneLearningUpdatePayload: () => ({
+      progressPercent: 20,
+      lastVariantIndex: undefined,
+      withPause: false,
+    }),
+    now: () => 10_000,
+    setTimeoutFn: () => 1,
+    clearTimeoutFn: () => undefined,
+    setIntervalFn: () => 1,
+    clearIntervalFn: () => undefined,
+    startCooldownMs: 30_000,
+    progressFlushCooldownMs: 30_000,
+  };
+
+  const hook = renderHook(
+    ({ deferStart }: { deferStart: boolean }) =>
+      useSceneLearningSync({
+        baseLesson: lesson,
+        viewMode: "scene",
+        activeVariantId: null,
+        deferStartUntilInitialLearningStateResolved: deferStart,
+        deps,
+      }),
+    { initialProps: { deferStart: true } },
+  );
+
+  assert.deepEqual(startCalls, []);
+
+  hook.rerender({ deferStart: false });
+
+  assert.deepEqual(startCalls, ["scene-1"]);
+  hook.unmount();
+});
+
 test("useSceneLearningSync short view switches coalesce progress flushes", () => {
   let now = 1_000;
   let timeoutId = 0;
