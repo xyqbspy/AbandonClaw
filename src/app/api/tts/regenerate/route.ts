@@ -4,6 +4,7 @@ import { toApiErrorResponse } from "@/lib/server/api-error";
 import { ForbiddenError } from "@/lib/server/errors";
 import { logApiError } from "@/lib/server/logger";
 import { enforceHighCostRateLimit } from "@/lib/server/rate-limit";
+import { markHighCostUsage, reserveHighCostUsage } from "@/lib/server/high-cost-usage";
 import { assertAllowedOrigin } from "@/lib/server/request-guard";
 import {
   parseJsonBody,
@@ -26,11 +27,15 @@ const RATE_LIMIT_WINDOW_MS = 60_000;
 interface RegenerateTtsDependencies {
   requireAdmin: typeof requireAdmin;
   regenerateChunkTtsAudioBatch: typeof regenerateChunkTtsAudioBatch;
+  reserveHighCostUsage: typeof reserveHighCostUsage;
+  markHighCostUsage: typeof markHighCostUsage;
 }
 
 const defaultDependencies: RegenerateTtsDependencies = {
   requireAdmin,
   regenerateChunkTtsAudioBatch,
+  reserveHighCostUsage,
+  markHighCostUsage,
 };
 
 const parseRegenerateItems = (payload: RegenerateTtsPayload) => {
@@ -64,7 +69,19 @@ export async function handleTtsRegeneratePost(
       windowMs: RATE_LIMIT_WINDOW_MS,
     });
     const payload = await parseJsonBody<RegenerateTtsPayload>(request);
-    const result = await dependencies.regenerateChunkTtsAudioBatch(parseRegenerateItems(payload));
+    const items = parseRegenerateItems(payload);
+    const reservation = await dependencies.reserveHighCostUsage({
+      userId: admin.id,
+      capability: "tts_regenerate",
+    });
+    let result;
+    try {
+      result = await dependencies.regenerateChunkTtsAudioBatch(items);
+      await dependencies.markHighCostUsage(reservation, "success");
+    } catch (error) {
+      await dependencies.markHighCostUsage(reservation, "failed");
+      throw error;
+    }
 
     return NextResponse.json(result, {
       status: 200,

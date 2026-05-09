@@ -1,4 +1,5 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import {
   LearningStatus,
   SceneMasteryStage,
@@ -15,6 +16,8 @@ import { NotFoundError } from "@/lib/server/errors";
 
 const nowIso = () => new Date().toISOString();
 const todayDate = () => new Date().toISOString().slice(0, 10);
+const MAX_STUDY_SECONDS_DELTA = 60;
+const MIN_STUDY_SECONDS_INTERVAL_MS = 10_000;
 
 async function createUserScopedLearningClient() {
   return createSupabaseServerClient();
@@ -337,6 +340,82 @@ async function upsertDailyStats(params: {
   }
 }
 
+async function recordStudyTimeAnomaly(params: {
+  userId: string;
+  sceneId: string;
+  reportedDelta: number;
+  reason: "delta_too_large" | "too_frequent";
+}) {
+  const admin = createSupabaseAdminClient();
+  const { error } = await admin.from("learning_study_time_anomalies").insert({
+    user_id: params.userId,
+    scene_id: params.sceneId,
+    reported_delta: params.reportedDelta,
+    reason: params.reason,
+  } as never);
+
+  if (error) {
+    console.warn("[learning] failed to record study time anomaly", error);
+  }
+}
+
+export function resolveStudyTimeDeltaGuard(params: {
+  currentLastStudySecondsAt?: string | null;
+  reportedDelta: number | undefined;
+  timestamp: string;
+}) {
+  const reportedDelta = Math.max(0, Math.floor(params.reportedDelta ?? 0));
+  const currentLastStudySecondsAt = params.currentLastStudySecondsAt ?? null;
+  if (reportedDelta === 0) {
+    return { studyDelta: 0, lastStudySecondsAt: currentLastStudySecondsAt, reason: null };
+  }
+
+  if (reportedDelta > MAX_STUDY_SECONDS_DELTA) {
+    return {
+      studyDelta: 0,
+      lastStudySecondsAt: currentLastStudySecondsAt,
+      reason: "delta_too_large" as const,
+    };
+  }
+
+  if (
+    currentLastStudySecondsAt &&
+    Date.parse(params.timestamp) - Date.parse(currentLastStudySecondsAt) <
+      MIN_STUDY_SECONDS_INTERVAL_MS
+  ) {
+    return {
+      studyDelta: 0,
+      lastStudySecondsAt: currentLastStudySecondsAt,
+      reason: "too_frequent" as const,
+    };
+  }
+
+  return { studyDelta: reportedDelta, lastStudySecondsAt: params.timestamp, reason: null };
+}
+
+async function resolveAcceptedStudyDelta(params: {
+  userId: string;
+  sceneId: string;
+  current: UserSceneProgressRow | null;
+  reportedDelta: number | undefined;
+  timestamp: string;
+}) {
+  const result = resolveStudyTimeDeltaGuard({
+    currentLastStudySecondsAt: params.current?.last_study_seconds_at,
+    reportedDelta: params.reportedDelta,
+    timestamp: params.timestamp,
+  });
+  if (result.reason) {
+    await recordStudyTimeAnomaly({
+      userId: params.userId,
+      sceneId: params.sceneId,
+      reportedDelta: Math.max(0, Math.floor(params.reportedDelta ?? 0)),
+      reason: result.reason,
+    });
+  }
+  return result;
+}
+
 async function upsertProgress(
   userId: string,
   sceneId: string,
@@ -355,6 +434,7 @@ async function upsertProgress(
     last_variant_index: existing?.last_variant_index ?? null,
     started_at: existing?.started_at ?? null,
     last_viewed_at: existing?.last_viewed_at ?? null,
+    last_study_seconds_at: existing?.last_study_seconds_at ?? null,
     completed_at: existing?.completed_at ?? null,
     variant_unlocked_at: existing?.variant_unlocked_at ?? null,
     last_practiced_at: existing?.last_practiced_at ?? null,
@@ -688,7 +768,13 @@ export async function updateSceneProgress(
   const current = await getProgressByUserAndScene(userId, scene.id);
   const session = await ensureActiveSceneSession(userId, scene.id);
   const timestamp = nowIso();
-  const studyDelta = Math.max(0, Math.floor(input.studySecondsDelta ?? 0));
+  const { studyDelta, lastStudySecondsAt } = await resolveAcceptedStudyDelta({
+    userId,
+    sceneId: scene.id,
+    current,
+    reportedDelta: input.studySecondsDelta,
+    timestamp,
+  });
   const phraseDelta = Math.max(0, Math.floor(input.savedPhraseDelta ?? 0));
 
   const nextProgressPercent = clamp(
@@ -711,6 +797,7 @@ export async function updateSceneProgress(
       input.lastVariantIndex ?? current?.last_variant_index ?? null,
     started_at: current?.started_at ?? timestamp,
     last_viewed_at: timestamp,
+    last_study_seconds_at: lastStudySecondsAt,
     total_study_seconds: (current?.total_study_seconds ?? 0) + studyDelta,
     today_study_seconds: (current?.today_study_seconds ?? 0) + studyDelta,
     saved_phrase_count: (current?.saved_phrase_count ?? 0) + phraseDelta,
@@ -896,7 +983,13 @@ export async function completeSceneLearning(
   const scene = await resolveVisibleSceneBySlug(userId, sceneSlug);
   const timestamp = nowIso();
   const current = await getProgressByUserAndScene(userId, scene.id);
-  const studyDelta = Math.max(0, Math.floor(input?.studySecondsDelta ?? 0));
+  const { studyDelta, lastStudySecondsAt } = await resolveAcceptedStudyDelta({
+    userId,
+    sceneId: scene.id,
+    current,
+    reportedDelta: input?.studySecondsDelta,
+    timestamp,
+  });
   const phraseDelta = Math.max(0, Math.floor(input?.savedPhraseDelta ?? 0));
 
   const trainingState = await recordSceneTrainingEvent(userId, sceneSlug, {
@@ -908,6 +1001,7 @@ export async function completeSceneLearning(
     today_study_seconds: (current?.today_study_seconds ?? 0) + studyDelta,
     saved_phrase_count: (current?.saved_phrase_count ?? 0) + phraseDelta,
     last_viewed_at: timestamp,
+    last_study_seconds_at: lastStudySecondsAt,
     last_practiced_at: timestamp,
   });
 

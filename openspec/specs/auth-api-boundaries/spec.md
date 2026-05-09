@@ -4,6 +4,25 @@
 
 ## Requirements
 
+### Requirement: 账号访问状态必须约束主应用、生成与写入
+系统 MUST 使用 profile 级访问状态提供最小封禁和降级能力，避免异常账号只能通过关闭全站入口处理。
+
+#### Scenario: disabled 用户访问主应用或受保护 API
+- **WHEN** `profiles.access_status = disabled`
+- **THEN** 系统 MUST 阻止用户进入主应用和受保护 API
+
+#### Scenario: generation_limited 用户调用高成本入口
+- **WHEN** `profiles.access_status = generation_limited`
+- **AND** 用户调用 AI、TTS 或 generate 类高成本入口
+- **THEN** 系统 MUST 在 daily quota 预占前拒绝请求
+- **AND** 不得触发上游调用或 usage 预占
+
+#### Scenario: readonly 用户执行写入
+- **WHEN** `profiles.access_status = readonly`
+- **AND** 用户尝试写学习进度、保存/删除表达、提交练习或其他学习写入
+- **THEN** 系统 MUST 拒绝请求
+- **AND** 不得执行后续写入
+
 ### Requirement: 登录跳转只允许安全站内目标
 系统 MUST 仅接受站内安全路径作为登录页、注册页与认证中间件的跳转目标。任何缺失、非法、跨站或协议相对的 `redirect` 值都 MUST 回退到默认站内落点，而不能进入前端或服务端跳转链路。
 

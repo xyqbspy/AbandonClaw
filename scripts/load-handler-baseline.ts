@@ -220,6 +220,14 @@ const benchmarkPracticeGenerate = async (requests: number, concurrency: number) 
           }),
         buildExerciseSpecsFromScene: () =>
           [{ id: "fallback-1", type: "typing", prompt: "p", answer: { text: "a" } }] as never,
+        reserveHighCostUsage: async () =>
+          ({
+            userId: `benchmark-user-${index + 1}`,
+            usageDate: "2026-05-09",
+            capability: "practice_generate",
+            limitCount: 20,
+          }) as never,
+        markHighCostUsage: async () => {},
       },
     ),
   );

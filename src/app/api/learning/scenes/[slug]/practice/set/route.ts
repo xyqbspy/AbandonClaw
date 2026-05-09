@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireCurrentProfile } from "@/lib/server/auth";
+import { assertProfileCanWrite, requireCurrentProfile } from "@/lib/server/auth";
 import { toApiErrorResponse } from "@/lib/server/api-error";
 import {
   getLatestScenePracticeSet,
@@ -31,7 +31,8 @@ export async function handleScenePracticeSetGet(
   dependencies: ScenePracticeSetDependencies = scenePracticeSetDependencies,
 ) {
   try {
-    const { user } = await dependencies.requireCurrentProfile();
+    const { user, profile } = await dependencies.requireCurrentProfile();
+    assertProfileCanWrite(profile);
     const { slug } = await context.params;
     const result = await dependencies.getLatestScenePracticeSet(user.id, slug);
     return NextResponse.json(result, { status: 200 });

@@ -3,9 +3,12 @@ export interface ProfileRow {
   username: string | null;
   avatar_url: string | null;
   english_level: string | null;
+  access_status?: UserAccessStatus;
   created_at: string;
   updated_at: string;
 }
+
+export type UserAccessStatus = "active" | "disabled" | "generation_limited" | "readonly";
 
 export interface SceneRow {
   id: string;
@@ -97,6 +100,7 @@ export interface UserSceneProgressRow {
   last_variant_index: number | null;
   started_at: string | null;
   last_viewed_at: string | null;
+  last_study_seconds_at: string | null;
   completed_at: string | null;
   variant_unlocked_at: string | null;
   last_practiced_at: string | null;

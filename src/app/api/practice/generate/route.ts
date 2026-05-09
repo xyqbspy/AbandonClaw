@@ -1,9 +1,17 @@
 import { NextResponse } from "next/server";
 import { toApiErrorResponse } from "@/lib/server/api-error";
-import { requireCurrentProfile, requireVerifiedCurrentProfile } from "@/lib/server/auth";
+import {
+  assertProfileCanGenerate,
+  requireCurrentProfile,
+  requireVerifiedCurrentProfile,
+} from "@/lib/server/auth";
 import { AuthError, ForbiddenError, ValidationError } from "@/lib/server/errors";
 import { logApiError } from "@/lib/server/logger";
 import { enforceHighCostRateLimit } from "@/lib/server/rate-limit";
+import {
+  markHighCostUsage,
+  reserveHighCostUsage,
+} from "@/lib/server/high-cost-usage";
 import { assertAllowedOrigin } from "@/lib/server/request-guard";
 import { callGlmChatCompletion } from "@/lib/server/glm-client";
 import {
@@ -234,12 +242,16 @@ interface PracticeGenerateDependencies {
   requireCurrentProfile: typeof requireCurrentProfile;
   callGlmChatCompletion: typeof callGlmChatCompletion;
   buildExerciseSpecsFromScene: typeof buildExerciseSpecsFromScene;
+  reserveHighCostUsage: typeof reserveHighCostUsage;
+  markHighCostUsage: typeof markHighCostUsage;
 }
 
 const defaultDependencies: PracticeGenerateDependencies = {
   requireCurrentProfile: requireVerifiedCurrentProfile,
   callGlmChatCompletion,
   buildExerciseSpecsFromScene,
+  reserveHighCostUsage,
+  markHighCostUsage,
 };
 
 export async function handlePracticeGeneratePost(
@@ -248,7 +260,8 @@ export async function handlePracticeGeneratePost(
 ) {
   try {
     assertAllowedOrigin(request);
-    const { user } = await dependencies.requireCurrentProfile();
+    const { user, profile } = await dependencies.requireCurrentProfile();
+    assertProfileCanGenerate(profile);
     await enforceHighCostRateLimit({
       request,
       userId: user.id,
@@ -261,6 +274,10 @@ export async function handlePracticeGeneratePost(
     const { scene, exerciseCount } = normalizePracticeGeneratePayload(payload);
 
     const fallbackExercises = dependencies.buildExerciseSpecsFromScene(scene, exerciseCount);
+    const reservation = await dependencies.reserveHighCostUsage({
+      userId: user.id,
+      capability: "practice_generate",
+    });
 
     try {
       const rawModelText = await dependencies.callGlmChatCompletion({
@@ -277,6 +294,7 @@ export async function handlePracticeGeneratePost(
       const parsed = normalizePracticeResponse(parsedJson);
       const validation = validatePracticeGenerateResponse(parsed);
       if (!validation.ok || !isPracticeGenerateResponse(parsed)) {
+        await dependencies.markHighCostUsage(reservation, "failed");
         return NextResponse.json(
           {
             version: "v1",
@@ -287,6 +305,7 @@ export async function handlePracticeGeneratePost(
         );
       }
 
+      await dependencies.markHighCostUsage(reservation, "success");
       return NextResponse.json(
         {
           version: parsed.version,
@@ -296,6 +315,7 @@ export async function handlePracticeGeneratePost(
         { status: 200 },
       );
     } catch {
+      await dependencies.markHighCostUsage(reservation, "failed");
       return NextResponse.json(
         {
           version: "v1",

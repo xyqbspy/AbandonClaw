@@ -11,6 +11,16 @@ const createJsonRequest = (body: unknown) =>
     body: JSON.stringify(body),
   });
 
+const quotaOk = {
+  reserveHighCostUsage: async () => ({
+    userId: "admin-1",
+    usageDate: "2026-05-09",
+    capability: "tts_regenerate" as const,
+    limitCount: 12,
+  }),
+  markHighCostUsage: async () => {},
+};
+
 test("tts regenerate handler 会拒绝未登录请求", async () => {
   clearRateLimitStore();
   const response = await handleTtsRegeneratePost(createJsonRequest({ items: [{ text: "hello" }] }), {
@@ -18,6 +28,7 @@ test("tts regenerate handler 会拒绝未登录请求", async () => {
       throw new AuthError();
     },
     regenerateChunkTtsAudioBatch: async () => ({ regeneratedCount: 0 }),
+    ...quotaOk,
   });
 
   const body = await response.json();
@@ -33,6 +44,7 @@ test("tts regenerate handler 会拒绝非管理员请求", async () => {
       throw new ForbiddenError();
     },
     regenerateChunkTtsAudioBatch: async () => ({ regeneratedCount: 0 }),
+    ...quotaOk,
   });
 
   const body = await response.json();
@@ -47,6 +59,7 @@ test("tts regenerate handler 会拒绝空批量", async () => {
   const response = await handleTtsRegeneratePost(createJsonRequest({ items: [] }), {
     requireAdmin: async () => ({ id: "admin-1" } as never),
     regenerateChunkTtsAudioBatch: async () => ({ regeneratedCount: 0 }),
+    ...quotaOk,
   });
 
   const body = await response.json();
@@ -64,6 +77,7 @@ test("tts regenerate handler 会拒绝超限批量", async () => {
     {
       requireAdmin: async () => ({ id: "admin-1" } as never),
       regenerateChunkTtsAudioBatch: async () => ({ regeneratedCount: 0 }),
+      ...quotaOk,
     },
   );
 
@@ -86,6 +100,7 @@ test("tts regenerate handler 会透传规范化后的批量请求", async () => 
         receivedItems = items;
         return { regeneratedCount: items.length };
       },
+      ...quotaOk,
     },
   );
 

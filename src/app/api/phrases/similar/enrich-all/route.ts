@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
-import { requireCurrentProfile } from "@/lib/server/auth";
+import {
+  assertProfileCanGenerate,
+  assertProfileCanWrite,
+  requireCurrentProfile,
+} from "@/lib/server/auth";
 import { toApiErrorResponse } from "@/lib/server/api-error";
 import { ValidationError } from "@/lib/server/errors";
 import { enrichAiExpressionLearningInfo } from "@/lib/server/phrases/service";
@@ -17,7 +21,9 @@ interface EnrichAllPayload extends Record<string, unknown> {
 
 export async function POST(request: Request) {
   try {
-    const { user } = await requireCurrentProfile();
+    const { user, profile } = await requireCurrentProfile();
+    assertProfileCanGenerate(profile);
+    assertProfileCanWrite(profile);
     const payload = await parseJsonBody<EnrichAllPayload>(request);
     if (!Array.isArray(payload.items)) {
       throw new ValidationError("items must be an array.");

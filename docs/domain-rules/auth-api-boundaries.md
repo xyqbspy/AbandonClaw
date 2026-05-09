@@ -90,3 +90,19 @@
 - `docs/dev/backend-release-readiness-checklist.md`
 - `GET /api/me`、登录后 profile 热路径与相关认证 helper
 - 相关 `supabase/sql` 与服务端仓储入口
+
+## 7. 账号访问状态
+
+公网小范围开放时，账号限制不应只依赖临时关闭入口。`profiles.access_status` 是当前最小降级字段：
+
+- `active`：正常访问、生成和写入。
+- `disabled`：不能进入主应用，也不能调用受保护 API。
+- `generation_limited`：可以查看和写入普通学习数据，但不能调用 AI / TTS / generate 类高成本入口，且不得预占 usage。
+- `readonly`：可以查看数据，但不能写学习进度、保存表达、提交练习/复习写入。
+
+入口约束：
+
+- `requireCurrentProfile()` / `requireVerifiedCurrentProfile()` 负责阻止 `disabled`。
+- 高成本入口必须在 quota 预占前调用 `assertProfileCanGenerate(profile)`。
+- 学习写入、表达保存/删除、表达 enrich 写入和练习写入必须调用 `assertProfileCanWrite(profile)`。
+- middleware 当前不直接读取 profile；因此 `disabled` 的兜底边界在服务端 profile helper 和主应用服务端入口。

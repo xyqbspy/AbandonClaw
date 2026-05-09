@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { requireVerifiedCurrentProfile } from "@/lib/server/auth";
+import { assertProfileCanGenerate, requireVerifiedCurrentProfile } from "@/lib/server/auth";
 import { toApiErrorResponse } from "@/lib/server/api-error";
+import { markHighCostUsage, reserveHighCostUsage } from "@/lib/server/high-cost-usage";
 import { logApiError } from "@/lib/server/logger";
 import { enforceHighCostRateLimit } from "@/lib/server/rate-limit";
 import { assertAllowedOrigin } from "@/lib/server/request-guard";
@@ -13,7 +14,8 @@ const RATE_LIMIT_WINDOW_MS = 60_000;
 export async function POST(request: Request) {
   try {
     assertAllowedOrigin(request);
-    const { user } = await requireVerifiedCurrentProfile();
+    const { user, profile } = await requireVerifiedCurrentProfile();
+    assertProfileCanGenerate(profile);
     await enforceHighCostRateLimit({
       request,
       userId: user.id,
@@ -23,7 +25,18 @@ export async function POST(request: Request) {
       windowMs: RATE_LIMIT_WINDOW_MS,
     });
     const payload = await parseJsonBody<TtsRequestPayload>(request);
-    const result = await generateTtsAudio(payload);
+    const reservation = await reserveHighCostUsage({
+      userId: user.id,
+      capability: "tts_generate",
+    });
+    let result;
+    try {
+      result = await generateTtsAudio(payload);
+      await markHighCostUsage(reservation, "success");
+    } catch (error) {
+      await markHighCostUsage(reservation, "failed");
+      throw error;
+    }
 
     return NextResponse.json(result, {
       status: 200,

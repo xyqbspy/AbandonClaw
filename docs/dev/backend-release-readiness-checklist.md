@@ -73,6 +73,18 @@ pnpm run text:check-mojibake
 pnpm load:api-baseline --dry-run --path=/api/practice/generate --method=POST --body-file=scripts/load-samples/practice-generate.sample.json
 ```
 
+## P0-B 公网开放防护检查
+
+- [ ] `supabase/sql/20260509_public_registration_p0b.sql` 已在目标环境执行。
+- [ ] `profiles.access_status` 默认 `active`，且可通过 SQL 设置为 `disabled`、`generation_limited`、`readonly`。
+- [ ] `DAILY_QUOTA_*` 环境变量已确认；未配置时接受服务端保守默认值。
+- [ ] 高成本接口超每日额度时返回 429，且不触发模型/TTS。
+- [ ] `/api/admin/status` 可看到 `todayHighCostUsage.items`。
+- [ ] `studySecondsDelta > 60` 不计入学习统计，并写入异常记录。
+- [ ] 同一 `user + scene` 10 秒内重复有效 delta 不计入学习统计，并写入异常记录。
+- [ ] `generation_limited` 用户不能调用 AI / TTS / generate。
+- [ ] `readonly` 用户不能写学习进度、保存表达或提交练习/复习写入。
+
 ## 当前已知风险
 
 - 本地环境的真实 HTTP baseline 依赖临时登录 cookie 与临时测试数据，不是正式生产容量结果

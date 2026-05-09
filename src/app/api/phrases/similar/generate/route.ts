@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
-import { requireVerifiedCurrentProfile } from "@/lib/server/auth";
+import { assertProfileCanGenerate, requireVerifiedCurrentProfile } from "@/lib/server/auth";
 import { toApiErrorResponse } from "@/lib/server/api-error";
 import { ValidationError } from "@/lib/server/errors";
 import { callGlmChatCompletion } from "@/lib/server/glm-client";
+import { markHighCostUsage, reserveHighCostUsage } from "@/lib/server/high-cost-usage";
 import { enforceHighCostRateLimit } from "@/lib/server/rate-limit";
 import { assertAllowedOrigin } from "@/lib/server/request-guard";
 import {
@@ -58,7 +59,8 @@ const sanitizeCandidate = (
 export async function POST(request: Request) {
   try {
     assertAllowedOrigin(request);
-    const { user } = await requireVerifiedCurrentProfile();
+    const { user, profile } = await requireVerifiedCurrentProfile();
+    assertProfileCanGenerate(profile);
     await enforceHighCostRateLimit({
       request,
       userId: user.id,
@@ -90,18 +92,35 @@ export async function POST(request: Request) {
       existingExpressions.map((item) => normalizePhraseText(item)).filter(Boolean),
     );
 
-    const rawText = await callGlmChatCompletion({
-      systemPrompt: SIMILAR_EXPRESSION_GENERATE_SYSTEM_PROMPT,
-      userPrompt: buildSimilarExpressionGenerateUserPrompt({
-        baseExpression,
-        existingExpressions,
-      }),
-      temperature: 0.2,
+    const reservation = await reserveHighCostUsage({
+      userId: user.id,
+      capability: "similar_generate",
     });
+    let rawText: string;
+    try {
+      rawText = await callGlmChatCompletion({
+        systemPrompt: SIMILAR_EXPRESSION_GENERATE_SYSTEM_PROMPT,
+        userPrompt: buildSimilarExpressionGenerateUserPrompt({
+          baseExpression,
+          existingExpressions,
+        }),
+        temperature: 0.2,
+      });
+    } catch (error) {
+      await markHighCostUsage(reservation, "failed");
+      throw error;
+    }
 
-    const parsed = parseWithDiagnostics(rawText);
-    if (!isObject(parsed) || parsed.version !== "v1" || !Array.isArray(parsed.candidates)) {
-      throw new Error("Invalid similar-expression response.");
+    let parsed: unknown;
+    try {
+      parsed = parseWithDiagnostics(rawText);
+      if (!isObject(parsed) || parsed.version !== "v1" || !Array.isArray(parsed.candidates)) {
+        throw new Error("Invalid similar-expression response.");
+      }
+      await markHighCostUsage(reservation, "success");
+    } catch (error) {
+      await markHighCostUsage(reservation, "failed");
+      throw error;
     }
 
     const dedupe = new Set<string>();

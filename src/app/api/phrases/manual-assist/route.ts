@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireCurrentProfile } from "@/lib/server/auth";
+import { assertProfileCanGenerate, requireCurrentProfile } from "@/lib/server/auth";
 import { toApiErrorResponse } from "@/lib/server/api-error";
 import { ValidationError } from "@/lib/server/errors";
 import { callGlmChatCompletion } from "@/lib/server/glm-client";
@@ -70,7 +70,8 @@ const sanitizeCandidate = (params: {
 
 export async function POST(request: Request) {
   try {
-    await requireCurrentProfile();
+    const { profile } = await requireCurrentProfile();
+    assertProfileCanGenerate(profile);
     const payload = await parseJsonBody<{
       mode?: unknown;
       text?: unknown;

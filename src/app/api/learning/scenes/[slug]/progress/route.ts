@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireCurrentProfile } from "@/lib/server/auth";
+import { assertProfileCanWrite, requireCurrentProfile } from "@/lib/server/auth";
 import { toApiErrorResponse } from "@/lib/server/api-error";
 import { assertAllowedOrigin } from "@/lib/server/request-guard";
 import { updateSceneProgress } from "@/lib/server/learning/service";
@@ -30,7 +30,8 @@ export async function handleLearningSceneProgressPost(
 ) {
   try {
     assertAllowedOrigin(request);
-    const { user } = await dependencies.requireCurrentProfile();
+    const { user, profile } = await dependencies.requireCurrentProfile();
+    assertProfileCanWrite(profile);
     const { slug } = await context.params;
     const payload = await parseLearningProgressRequest(request);
     const normalizedPayload = normalizeLearningProgressPayload(payload);

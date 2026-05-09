@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
+import { assertProfileCanWrite } from "@/lib/server/auth";
 import { toApiErrorResponse } from "@/lib/server/api-error";
 import { parseRequiredTrimmedString } from "@/lib/server/validation";
+import type { ProfileRow } from "@/lib/server/db/types";
 
-type RequireCurrentProfile = () => Promise<{ user: { id: string } }>;
+type RequireCurrentProfile = () => Promise<{ user: { id: string }; profile: ProfileRow }>;
 
 type DeleteUserPhraseForUser = (userId: string, userPhraseId: string) => Promise<unknown>;
 
@@ -15,7 +17,8 @@ export const handleDeleteUserPhrase = async (
   },
 ) => {
   try {
-    const { user } = await deps.requireCurrentProfile();
+    const { user, profile } = await deps.requireCurrentProfile();
+    assertProfileCanWrite(profile);
     const { userPhraseId } = await context.params;
     const normalizedUserPhraseId = parseRequiredTrimmedString(
       userPhraseId,

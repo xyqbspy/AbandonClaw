@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireCurrentProfile } from "@/lib/server/auth";
+import { assertProfileCanWrite, requireCurrentProfile } from "@/lib/server/auth";
 import { toApiErrorResponse } from "@/lib/server/api-error";
 import { savePhraseForUser } from "@/lib/server/phrases/service";
 import { trackChunksForUser } from "@/lib/server/chunks/service";
@@ -17,7 +17,8 @@ import {
 export async function POST(request: Request) {
   try {
     assertAllowedOrigin(request);
-    const { user } = await requireCurrentProfile();
+    const { user, profile } = await requireCurrentProfile();
+    assertProfileCanWrite(profile);
     const payload = await parseSavePhraseRequest(request);
     const normalizedPayload = normalizeSavePhrasePayload(payload);
     const idempotencyKey = getRequestIdempotencyKey(

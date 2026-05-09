@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireCurrentProfile } from "@/lib/server/auth";
+import { assertProfileCanWrite, requireCurrentProfile } from "@/lib/server/auth";
 import { toApiErrorResponse } from "@/lib/server/api-error";
 import { parseJsonBody, parseRequiredTrimmedString } from "@/lib/server/validation";
 import { completeSceneVariantRun } from "@/lib/server/learning/variant-service";
@@ -13,7 +13,8 @@ export async function POST(
   context: { params: Promise<{ slug: string }> },
 ) {
   try {
-    const { user } = await requireCurrentProfile();
+    const { user, profile } = await requireCurrentProfile();
+    assertProfileCanWrite(profile);
     const { slug } = await context.params;
     const payload = await parseJsonBody<CompleteSceneVariantRunPayload>(request);
     const result = await completeSceneVariantRun(user.id, slug, {

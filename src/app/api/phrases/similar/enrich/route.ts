@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
-import { requireCurrentProfile } from "@/lib/server/auth";
+import {
+  assertProfileCanGenerate,
+  assertProfileCanWrite,
+  requireCurrentProfile,
+} from "@/lib/server/auth";
 import { toApiErrorResponse } from "@/lib/server/api-error";
 import { ValidationError } from "@/lib/server/errors";
 import { enrichAiExpressionLearningInfo } from "@/lib/server/phrases/service";
@@ -13,7 +17,9 @@ interface EnrichPayload extends Record<string, unknown> {
 
 export async function POST(request: Request) {
   try {
-    const { user } = await requireCurrentProfile();
+    const { user, profile } = await requireCurrentProfile();
+    assertProfileCanGenerate(profile);
+    assertProfileCanWrite(profile);
     const payload = await parseJsonBody<EnrichPayload>(request);
 
     const userPhraseId = parseOptionalTrimmedString(payload.userPhraseId, "userPhraseId", 80);

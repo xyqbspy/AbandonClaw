@@ -920,3 +920,22 @@
 - `openspec/specs/auth-api-boundaries/spec.md`
 - `openspec/specs/api-operational-guardrails/spec.md`
 - `openspec/specs/learning-loop-overview/spec.md`
+
+## 12. P0-B 落地状态（2026-05-09）
+
+本轮已把 P0-B 的最小硬防护落到代码侧：
+
+- 高成本接口增加每日 quota 和调用前预占：`practice_generate`、`scene_generate`、`similar_generate`、`expression_map_generate`、`explain_selection`、`tts_generate`、`tts_regenerate`。
+- quota 默认值集中在 `src/lib/server/high-cost-usage.ts`，可通过 `DAILY_QUOTA_*` 环境变量覆盖；超额返回受控 429，且不会进入上游模型/TTS。
+- `profiles.access_status` 支持 `active`、`disabled`、`generation_limited`、`readonly`；当前先通过 SQL 或受控后台路径调整，完整封禁 UI 留到 P1。
+- `/api/admin/status` 增加 `todayHighCostUsage`，可查看今日各 capability 的 `reserved/success/failed/quota`。
+- `studySecondsDelta` 增加最小防污染：单次最大 60 秒，同一 `user + scene` 有效上报间隔最小 10 秒，异常写入 `learning_study_time_anomalies`。
+
+仍然不把当前学习时长视为计费、榜单、公开等级或奖励依据。它只适合个人 Progress 展示和轻量运营观察，完整服务端 heartbeat 仍保留在 P2。
+
+P1/P2 剩余风险：
+
+- 还没有完整运营后台、用户详情页、异常用户列表、封禁/解除封禁 UI。
+- 还没有注册 IP 频控、邮箱域名策略、设备指纹、WAF/DDoS。
+- 还没有长期成本趋势、成本金额估算、Top N 用户视图。
+- 还没有服务端学习 session heartbeat。

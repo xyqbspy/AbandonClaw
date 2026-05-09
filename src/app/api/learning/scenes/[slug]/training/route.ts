@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireCurrentProfile } from "@/lib/server/auth";
+import { assertProfileCanWrite, requireCurrentProfile } from "@/lib/server/auth";
 import { toApiErrorResponse } from "@/lib/server/api-error";
 import {
   recordSceneTrainingEvent,
@@ -36,7 +36,8 @@ export async function POST(
   context: { params: Promise<{ slug: string }> },
 ) {
   try {
-    const { user } = await requireCurrentProfile();
+    const { user, profile } = await requireCurrentProfile();
+    assertProfileCanWrite(profile);
     const { slug } = await context.params;
     const payload = await parseJsonBody<TrainingPayload>(request);
     const result = await recordSceneTrainingEvent(user.id, slug, {

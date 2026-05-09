@@ -123,3 +123,15 @@
 - 最近学习分钟数仍基于最近 7 天
 - 连续学习仍只按 `study_seconds > 0` 计算
 - 聚合失败时页面仍能稳定降级
+## 9. 学习时长可信边界
+
+当前 Progress 的学习分钟数仍来自前端上报的 `studySecondsDelta`，因此只适合作为个人学习概览展示，不适合作为计费、公开榜单、公开等级或奖励依据。
+
+服务端已经增加最小防污染规则：
+
+- 单次 `studySecondsDelta` 最大接受 60 秒。
+- 同一 `user + scene` 距离上次有效学习秒数写入不足 10 秒时，本次 delta 不计入统计。
+- 被拒绝的超大 delta 或过频 delta 会写入 `learning_study_time_anomalies`，用于后续排查。
+- 有效 delta 会更新 `user_scene_progress.last_study_seconds_at`，并继续累加到 `total_study_seconds`、`today_study_seconds` 和 `user_daily_learning_stats.study_seconds`。
+
+后续如果要把学习时长用于更高信任场景，应先实现服务端 session heartbeat，而不是继续提高前端 delta 的权重。

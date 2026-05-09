@@ -1,7 +1,7 @@
 import type { Session, User } from "@supabase/supabase-js";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { ProfileRow } from "@/lib/server/db/types";
+import { ProfileRow, UserAccessStatus } from "@/lib/server/db/types";
 import { AuthError, ForbiddenError } from "@/lib/server/errors";
 import { isAdminEmail } from "@/lib/shared/admin";
 
@@ -70,6 +70,35 @@ const defaultUsernameFromUser = (user: User) =>
   user.user_metadata?.username ||
   user.email?.split("@")[0] ||
   `user-${user.id.slice(0, 8)}`;
+
+const getAccessStatus = (profile: Pick<ProfileRow, "access_status">): UserAccessStatus =>
+  profile.access_status ?? "active";
+
+export function assertProfileCanEnterApp(profile: Pick<ProfileRow, "access_status">) {
+  if (getAccessStatus(profile) === "disabled") {
+    throw new ForbiddenError("Account disabled.");
+  }
+}
+
+export function assertProfileCanGenerate(profile: Pick<ProfileRow, "access_status">) {
+  const status = getAccessStatus(profile);
+  if (status === "disabled") {
+    throw new ForbiddenError("Account disabled.");
+  }
+  if (status === "generation_limited") {
+    throw new ForbiddenError("Generation is limited for this account.");
+  }
+}
+
+export function assertProfileCanWrite(profile: Pick<ProfileRow, "access_status">) {
+  const status = getAccessStatus(profile);
+  if (status === "disabled") {
+    throw new ForbiddenError("Account disabled.");
+  }
+  if (status === "readonly") {
+    throw new ForbiddenError("Account is readonly.");
+  }
+}
 
 export async function getCurrentSession(): Promise<Session | null> {
   const supabase = await createSupabaseServerClient();
@@ -165,6 +194,7 @@ export async function requireCurrentProfile(): Promise<{
 }> {
   const user = await requireCurrentUser();
   const profile = await ensureProfile(user);
+  assertProfileCanEnterApp(profile);
   return { user, profile };
 }
 
@@ -174,6 +204,7 @@ export async function requireVerifiedCurrentProfile(): Promise<{
 }> {
   const user = await requireVerifiedCurrentUser();
   const profile = await ensureProfile(user);
+  assertProfileCanEnterApp(profile);
   return { user, profile };
 }
 

@@ -1,5 +1,40 @@
 # Dev Log
 
+### [2026-05-09] 公网开放 P0-B 落地
+- 类型：Spec-Driven / 成本防护与账号降级
+- 状态：已完成并归档 `harden-public-registration-p0b`
+
+#### 背景
+P0-A 已经把注册模式、邀请码、邮箱验证和 user/IP 短窗口限流收住，但仍缺少“按天控成本”“快速降级异常账号”“防学习时长明显污染”这三块最小能力。本轮聚焦 P0-B，不扩展到完整运营后台或复杂风控。
+
+#### 本次改动
+- 新增 `supabase/sql/20260509_public_registration_p0b.sql`：
+  - `profiles.access_status`
+  - `user_daily_high_cost_usage`
+  - `learning_study_time_anomalies`
+  - `reserve_daily_high_cost_usage` / `mark_daily_high_cost_usage`
+  - `user_scene_progress.last_study_seconds_at`
+- 新增 `src/lib/server/high-cost-usage.ts`，集中定义 capability、默认 daily quota、预占、成功/失败标记和今日 usage 摘要。
+- `practice_generate`、`scene_generate`、`similar_generate`、`expression_map_generate`、`explain_selection`、`tts_generate`、`tts_regenerate` 已接入“参数校验后、上游调用前”的 daily quota 预占。
+- `assertProfileCanEnterApp`、`assertProfileCanGenerate`、`assertProfileCanWrite` 已接入主 profile helper、高成本入口和学习/表达写入口；`generation_limited` 也覆盖到 `manual-assist` 与表达 enrich 这类 AI 边路。
+- 学习时长写入增加最小防污染：单次最大 60 秒，同一 `user + scene` 最小 10 秒接受间隔，异常写入 `learning_study_time_anomalies`。
+- `/api/admin/status` 增加 `todayHighCostUsage` 摘要。
+- 同步公网开放计划、后端发布清单、auth 边界和 learning overview 文档。
+
+#### 验证
+- 已运行：
+  - `pnpm exec tsc --noEmit`
+  - `pnpm exec tsx --test src/app/api/practice/generate/route.test.ts src/app/api/explain-selection/route.test.ts src/app/api/tts/regenerate/route.test.ts src/app/api/phrases/handlers.test.ts src/lib/server/auth-access-status.test.ts src/lib/server/high-cost-usage.test.ts src/lib/server/learning/study-time-guard.test.ts`
+  - `pnpm exec openspec validate harden-public-registration-p0b --strict --no-interactive`
+  - `pnpm exec openspec validate api-operational-guardrails --strict --no-interactive`
+  - `pnpm run maintenance:check`
+  - `git diff --check`
+
+#### 剩余风险
+- `manual-assist`、表达 enrich 等 AI 边路已经接入 `generation_limited`，但本轮没有把它们纳入 daily quota capability 列表，后续可按真实成本再评估是否并入。
+- 仍未实现完整运营后台、封禁/解除封禁 UI、注册 IP 频控、长期成本趋势和 session heartbeat。
+- 当前轮未连接真实 Supabase/Upstash 生产环境执行完整 HTTP baseline；小范围开放前仍需按公网开放计划补跑并记录。
+
 ### [2026-05-08] 修复 Review 场景回补 practice set 锚点
 - 类型：Spec-Driven / Review 场景回补写回链路
 - 状态：已完成并归档 `fix-review-scene-practice-set-id`

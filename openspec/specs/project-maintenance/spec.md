@@ -2,6 +2,15 @@
 
 定义项目维护流程中的 OpenSpec、文档、收尾与验收同步要求，确保复杂链路改动在实现前后都有可审阅的边界、任务、验证记录和完成定义。
 ## Requirements
+
+### Requirement: 公网开放 P0-B 完成态必须记录防护与剩余风险
+当变更完成每日 quota、账号状态降级、学习时长 delta 防污染或 admin 今日用量摘要时，维护流程 MUST 同步记录验证结果、未覆盖边界和后续 P1/P2 风险。
+
+#### Scenario: 维护者完成公网开放 P0-B 变更
+- **WHEN** 维护者完成 daily quota、usage 预占、账号访问状态、学习时长 delta 防污染和 admin usage 摘要
+- **THEN** tasks、stable spec、开发文档和 dev-log MUST 记录已完成防护
+- **AND** MUST 明确完整运营后台、复杂风控、注册 IP 频控、长期成本趋势和 session heartbeat 仍不在本轮范围
+- **AND** 完成态收尾前 MUST 运行最小相关测试和 `maintenance:check`，或记录无法运行的原因
 ### Requirement: AI 协作输出必须默认使用中文
 系统 MUST 要求 AI 协作过程中的阶段性更新、问题分析、最终答复、OpenSpec proposal、design、tasks、spec delta 和普通维护文档默认使用中文。系统 MUST 禁止 AI 在未被用户明确要求时输出纯英文回答。
 

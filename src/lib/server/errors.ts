@@ -57,6 +57,18 @@ export class RateLimitError extends AppError {
   }
 }
 
+export class DailyQuotaExceededError extends AppError {
+  constructor(message = "Daily quota exceeded.", details?: Record<string, unknown>) {
+    super({
+      message,
+      status: 429,
+      code: "DAILY_QUOTA_EXCEEDED",
+      details,
+    });
+    this.name = "DailyQuotaExceededError";
+  }
+}
+
 export class SceneParseError extends AppError {
   constructor(message: string, details?: Record<string, unknown>) {
     super({ message, status: 422, code: "SCENE_PARSE_ERROR", details });

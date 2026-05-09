@@ -4,6 +4,25 @@
 
 这条学习闭环服务于产品北极星：让每一次场景学习，都沉淀为用户在未来真实场景中能回忆、能使用、能迁移的表达资产。`today -> scene -> chunks -> review` 是实现机制，不应替代这个用户结果导向。
 ## Requirements
+
+### Requirement: 学习时长 delta 必须做最小防污染
+系统 MUST 把前端上报的 `studySecondsDelta` 视为个人展示级信号，而不是强可信数据。服务端写入学习时长前 MUST 执行单次上限和最小上报间隔检查。
+
+#### Scenario: 正常学习时长上报
+- **WHEN** 用户在同一场景上报不超过 60 秒的学习时长
+- **AND** 距离该 `user + scene` 上次有效学习秒数写入不少于 10 秒
+- **THEN** 系统 MUST 计入场景进度和每日学习统计
+- **AND** 系统 MUST 更新该场景的上次有效学习秒数写入时间
+
+#### Scenario: 超大学习时长上报
+- **WHEN** 用户单次上报 `studySecondsDelta > 60`
+- **THEN** 系统 MUST 不把该 delta 计入学习统计
+- **AND** 系统 MUST 记录异常事件
+
+#### Scenario: 过频学习时长上报
+- **WHEN** 用户在同一 `user + scene` 距离上次有效写入不足 10 秒时再次上报学习时长
+- **THEN** 系统 MUST 不把该 delta 计入学习统计
+- **AND** 系统 MUST 记录异常事件
 ### Requirement: Today 必须作为每日学习入口
 系统 MUST 提供 `today` 入口，把继续学习、复习任务和学习概览聚合成当日可执行入口。涉及 continue 入口优先级、任务解释文案、聚合字段映射与 fallback 语义的专项规则，MUST 遵守 `today-learning-contract` capability，而不是在学习闭环总览中重复展开 today 聚合契约。
 
