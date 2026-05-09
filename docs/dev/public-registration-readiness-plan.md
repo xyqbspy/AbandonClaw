@@ -28,12 +28,14 @@
 - 邮箱未验证用户会被拦截到 `/verify-email`，受保护 API 返回 403，不进入学习主链路或高成本入口。
 - 高成本接口已接入 user + IP 双维度限流：practice generate、scene generate、similar generate、expression map generate、explain selection、TTS、TTS regenerate。
 - `/api/admin/status` 暴露 `rateLimitBackend.kind` 和 `upstashConfigured`，用于确认当前是 `upstash` 还是 `memory`。
+- 已新增 `pnpm run load:public-registration-baseline`，把注册模式、邮箱验证、Origin、user/IP 限流、daily quota、账号状态和 admin status 收口为统一的真实 HTTP baseline 入口。
 
-仍然不代表可以公开发到不可控渠道。P0-B 仍未完成：每日 quota、usage 预占、`generation_limited`、学习时长 delta 上限、今日用量统计和简单封禁能力。若入口要发到公开社群、社媒或任何不可控渠道，P0-B 必须提前补齐。
+仍然不代表可以公开发到不可控渠道。P0-B 的代码侧硬防护已经落地，但真实环境 baseline 证据还没有补齐；若入口要发到公开社群、社媒或任何不可控渠道，必须先补跑真实环境结果并记录。
 
 真实 HTTP baseline 状态：
 
 - 单元/类型验证已覆盖注册模式、邮箱未验证拦截、user/IP 限流、429 requestId 和限流后端状态。
+- 已新增统一 runner：`pnpm run load:public-registration-baseline --dry-run --config-file=scripts/load-samples/public-registration-http-baseline.sample.json`
 - 当前轮未连接真实 Supabase/Upstash 生产环境执行完整 HTTP baseline；小范围开放前必须按第 8 节清单补跑并记录结果。
 
 ## 2. 公开模式矩阵
@@ -846,6 +848,7 @@
 - [ ] 管理员能看到当前限流后端
 - [ ] 高成本接口已接入 user + IP 双维度限流
 - [ ] 真实 HTTP baseline 已记录
+- [ ] `pnpm run load:public-registration-baseline` 的结果已保存到结构化 JSON 或等价证据
 
 ### P0-B 检查
 

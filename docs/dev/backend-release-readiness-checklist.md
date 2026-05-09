@@ -41,13 +41,23 @@
 
 ## 真实 HTTP 验证
 
+执行前先看：
+
+- [public-registration-http-baseline-runbook.md](/d:/WorkCode/AbandonClaw/docs/dev/public-registration-http-baseline-runbook.md)
+
 - [ ] 本地开发服务或目标环境已启动
 - [ ] baseline 脚本使用的 `Origin` 与服务端允许域一致
 - [ ] 认证 cookie 已通过真实登录流程获取
-- [ ] `review submit` baseline 已执行
-- [ ] `learning progress` baseline 已执行
-- [ ] `practice generate` baseline 已执行
-- [ ] `tts` baseline 已执行
+- [ ] `registration-mode-visible` baseline 已执行，并确认返回的 `mode` 符合当前目标环境
+- [ ] `closed` 或 `invite_only` 对应注册场景已执行，并保留成功/失败结果
+- [ ] `unverified-app-redirects-to-verify-email` 与 `unverified-api-rejected` 至少执行一项
+- [ ] `origin-mismatch-rejected` baseline 已执行
+- [ ] `practice-generate-normal` baseline 已执行
+- [ ] `user-rate-limit-hits-429` baseline 已执行
+- [ ] `ip-rate-limit-hits-429` baseline 已执行，且使用至少 3 个不同账号 cookie
+- [ ] `daily-quota-exceeded-hits-429` baseline 已执行，或明确记录真实环境待补跑原因
+- [ ] `generation-limited-rejected` 与 `readonly-write-rejected` baseline 已执行，或明确记录待补跑原因
+- [ ] `admin-status-shows-backend-and-usage` baseline 已执行
 - [ ] 限流命中与异常结果已记录，不只保留终端输出
 - [ ] 至少验证过一组模型调用超时或上游异常时的受控失败表现
 - [ ] 已按 [real-learning-loop-acceptance-checklist.md](/d:/WorkCode/AbandonClaw/docs/dev/real-learning-loop-acceptance-checklist.md) 走完一轮真实学习闭环
@@ -68,9 +78,11 @@
 pnpm run validate:db-guardrails
 node --import tsx --test src/app/api/review/handlers.test.ts src/app/api/learning/handlers.test.ts src/app/api/practice/generate/route.test.ts src/lib/server/rate-limit.test.ts
 node --import tsx --test src/features/today/components/today-page-selectors.test.ts src/lib/utils/tts-api.test.ts src/lib/utils/tts-api.scene-loop.test.ts src/lib/server/tts/service.test.ts src/app/api/tts/regenerate/route.test.ts
+node --import tsx --test scripts/load-public-registration-http-baseline.test.ts
 node --import tsx -e "const mod = await import('./next.config.ts'); const config = mod.default?.default ?? mod.default; console.log(typeof config.headers)"
 pnpm run text:check-mojibake
 pnpm load:api-baseline --dry-run --path=/api/practice/generate --method=POST --body-file=scripts/load-samples/practice-generate.sample.json
+pnpm run load:public-registration-baseline --dry-run --config-file=scripts/load-samples/public-registration-http-baseline.sample.json
 ```
 
 ## P0-B 公网开放防护检查

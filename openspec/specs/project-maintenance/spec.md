@@ -11,6 +11,19 @@
 - **THEN** tasks、stable spec、开发文档和 dev-log MUST 记录已完成防护
 - **AND** MUST 明确完整运营后台、复杂风控、注册 IP 频控、长期成本趋势和 session heartbeat 仍不在本轮范围
 - **AND** 完成态收尾前 MUST 运行最小相关测试和 `maintenance:check`，或记录无法运行的原因
+
+### Requirement: 公网开放 baseline 完成态必须记录证据与阻塞项
+当维护者完成或准备完成公网开放相关变更时，维护流程 MUST 记录真实 HTTP baseline 的执行证据、未覆盖场景和环境阻塞，而不是只在终端临时查看结果。
+
+#### Scenario: 维护者完成公网开放相关收尾
+- **WHEN** 维护者完成注册模式、邀请码、邮箱验证、限流、daily quota、账号状态或相关后台状态改动
+- **THEN** `docs/dev/dev-log.md` 或等价完成态记录 MUST 说明 baseline 命令、环境前提、关键结果和未覆盖项
+- **AND** 若存在 blocked 或 skipped 场景，记录 MUST 明确说明原因和后续执行入口
+
+#### Scenario: 维护者只有本地或部分环境结果
+- **WHEN** 维护者只能在本地、临时环境或部分凭据条件下执行公网开放 baseline
+- **THEN** 维护流程 MUST 明确区分“已验证场景”和“待真实环境补跑场景”
+- **AND** 不得把部分 baseline 结果表述为完整公开前验证完成
 ### Requirement: AI 协作输出必须默认使用中文
 系统 MUST 要求 AI 协作过程中的阶段性更新、问题分析、最终答复、OpenSpec proposal、design、tasks、spec delta 和普通维护文档默认使用中文。系统 MUST 禁止 AI 在未被用户明确要求时输出纯英文回答。
 

@@ -1,5 +1,46 @@
 # Dev Log
 
+### [2026-05-09] 收口公网开放真实 HTTP baseline 入口
+- 类型：Spec-Driven / 发布前验证链路
+- 状态：已完成并归档 `record-public-registration-http-baseline`
+
+#### 背景
+P0-A / P0-B 的代码防护已经就位，但公开前“真实 HTTP baseline”仍停留在清单要求和零散单接口脚本层。继续这样会让开放前检查依赖人工临时拼命令，也会让脚本、清单和完成态记录继续漂移。
+
+#### 本次改动
+- 抽出 `scripts/load-api-baseline-lib.ts`，复用单接口 baseline 的环境加载、请求执行、统计和 JSON 输出能力。
+- 新增 `scripts/load-public-registration-http-baseline.ts` 与 `scripts/load-public-registration-http-baseline-lib.ts`，支持按场景执行：
+  - 注册模式可见性
+  - `closed` / `invite_only` 注册结果
+  - 未验证邮箱主应用重定向 / 高成本 API 拒绝
+  - Origin 拒绝
+  - 正常高成本调用
+  - user 限流 / IP 限流
+  - daily quota
+  - `generation_limited`
+  - `readonly`
+  - `/api/admin/status`
+- runner 支持 `--config-file`、`--output` 和 blocked/skipped 结果，不会在缺少 cookie、邀请码或其他前提时静默跳过场景。
+- 新增 sample：
+  - `scripts/load-samples/phrases-save.sample.json`
+  - `scripts/load-samples/public-registration-http-baseline.sample.json`
+- 新增脚本 `pnpm run load:public-registration-baseline`。
+- 新增操作手册 `docs/dev/public-registration-http-baseline-runbook.md`，统一说明 baseline 的前提准备、配置字段、执行顺序、blocked 判断和结果留证方式。
+- 同步后端发布清单、公网开放计划和 stable spec，统一 baseline 执行口径。
+
+#### 验证
+- 已运行：
+  - `node --import tsx --test scripts/load-public-registration-http-baseline.test.ts`
+  - `pnpm run load:public-registration-baseline --dry-run --config-file=scripts/load-samples/public-registration-http-baseline.sample.json`
+  - `pnpm run load:api-baseline --dry-run --path=/api/practice/generate --method=POST --body-file=scripts/load-samples/practice-generate.sample.json`
+  - `pnpm exec openspec validate record-public-registration-http-baseline --strict --no-interactive`
+  - `pnpm run maintenance:check`
+
+#### 剩余风险
+- 当前只完成了 runner、sample 和记录口径，没有替代真实 Supabase / Upstash / cookie / 邀请码 前提。
+- `daily-quota-exceeded`、`generation_limited`、`readonly`、`admin status` 等场景仍需要真实环境或专门测试账号补跑。
+- 本轮不做自动登录、自动造号、自动发邀请码或自动清理测试数据。
+
 ### [2026-05-09] 公网开放 P0-B 落地
 - 类型：Spec-Driven / 成本防护与账号降级
 - 状态：已完成并归档 `harden-public-registration-p0b`

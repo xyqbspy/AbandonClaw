@@ -1,0 +1,21 @@
+{
+  "baseUrl": "http://127.0.0.1:3000",
+  "origin": "http://127.0.0.1:3000",
+  "invalidOrigin": "https://invalid.example.com",
+  "expectedRegistrationMode": "invite_only",
+  "signupEmailPrefix": "baseline-signup",
+  "signupEmailDomain": "example.com",
+  "signupPassword": "ChangeMe123!",
+  "signupUsername": "baseline-user",
+  "inviteCode": "replace-with-real-invite-code",
+  "verifiedCookie": "replace-with-verified-session-cookie",
+  "unverifiedCookie": "replace-with-unverified-session-cookie",
+  "generationLimitedCookie": "replace-with-generation-limited-session-cookie",
+  "readonlyCookie": "replace-with-readonly-session-cookie",
+  "quotaExceededCookie": "replace-with-quota-exhausted-session-cookie",
+  "adminCookie": "replace-with-admin-session-cookie",
+  "ipLimitCookies": "cookie-a|||cookie-b|||cookie-c",
+  "practiceBodyFile": "scripts/load-samples/practice-generate.sample.json",
+  "phraseBodyFile": "scripts/load-samples/phrases-save.sample.json",
+  "outputPath": "tmp/public-registration-http-baseline.json"
+}

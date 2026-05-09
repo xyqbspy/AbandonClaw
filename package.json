@@ -21,6 +21,7 @@
     "phrases:backfill-relation-families": "npx tsx scripts/backfill-phrase-relation-families.ts",
     "phrases:enrich-missing": "npx tsx scripts/enrich-missing-phrases.ts",
     "load:api-baseline": "node --import tsx scripts/load-api-baseline.ts",
+    "load:public-registration-baseline": "node --import tsx scripts/load-public-registration-http-baseline.ts",
     "load:handler-baseline": "node --import tsx scripts/load-handler-baseline.ts",
     "validate:db-guardrails": "node --import tsx scripts/validate-db-guardrails.ts",
     "scenes:repair-duplicate-sentences": "npx tsx scripts/repair-generated-scene-duplicate-sentences.ts",
