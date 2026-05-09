@@ -3,7 +3,7 @@ import { requireAdmin } from "@/lib/server/auth";
 import { toApiErrorResponse } from "@/lib/server/api-error";
 import { ForbiddenError } from "@/lib/server/errors";
 import { logApiError } from "@/lib/server/logger";
-import { enforceRateLimit } from "@/lib/server/rate-limit";
+import { enforceHighCostRateLimit } from "@/lib/server/rate-limit";
 import { assertAllowedOrigin } from "@/lib/server/request-guard";
 import {
   parseJsonBody,
@@ -55,11 +55,13 @@ export async function handleTtsRegeneratePost(
   try {
     assertAllowedOrigin(request);
     const admin = await dependencies.requireAdmin();
-    await enforceRateLimit({
-      key: admin.id,
-      limit: REGENERATE_RATE_LIMIT,
-      windowMs: RATE_LIMIT_WINDOW_MS,
+    await enforceHighCostRateLimit({
+      request,
+      userId: admin.id,
       scope: "api-tts-regenerate",
+      userLimit: REGENERATE_RATE_LIMIT,
+      ipLimit: REGENERATE_RATE_LIMIT * 2,
+      windowMs: RATE_LIMIT_WINDOW_MS,
     });
     const payload = await parseJsonBody<RegenerateTtsPayload>(request);
     const result = await dependencies.regenerateChunkTtsAudioBatch(parseRegenerateItems(payload));

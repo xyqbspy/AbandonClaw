@@ -86,3 +86,23 @@
 - **WHEN** 维护者在真实 HTTP baseline 中传入的 `Origin` 与目标环境实际允许域不一致
 - **THEN** 受保护写接口 MUST 拒绝请求
 - **AND** 维护者 MUST 在记录中明确这是来源校验命中，而不是业务处理失败
+
+### Requirement: 高成本接口必须支持 user + IP 双维度限流
+公网小范围开放前，所有会触发模型、TTS、练习生成或重解析成本的接口 MUST 同时按用户和客户端 IP 执行限流。
+
+#### Scenario: 同一用户超过限流阈值
+- **WHEN** 同一登录用户在窗口期内超过高成本接口 user 阈值
+- **THEN** 系统 MUST 返回 429
+- **AND** 响应 MUST 带有 `requestId`
+- **AND** 系统 MUST 不再继续触发模型、TTS 或其他高成本处理
+
+#### Scenario: 同一 IP 多账号超过限流阈值
+- **WHEN** 同一客户端 IP 在窗口期内通过多个账号超过高成本接口 IP 阈值
+- **THEN** 系统 MUST 返回 429
+- **AND** 响应 MUST 带有 `requestId`
+- **AND** 系统 MUST 不再继续触发模型、TTS 或其他高成本处理
+
+#### Scenario: 管理员检查限流后端
+- **WHEN** 管理员访问运行状态入口
+- **THEN** 系统 MUST 暴露当前限流后端是 `upstash` 还是 `memory`
+- **AND** 公网开放 baseline MUST 记录当前后端状态

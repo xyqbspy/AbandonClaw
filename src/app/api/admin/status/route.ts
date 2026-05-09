@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/server/auth";
 import { toApiErrorResponse } from "@/lib/server/api-error";
 import { getAdminOverviewStats } from "@/lib/server/admin/service";
+import { getRateLimitBackendStatus } from "@/lib/server/rate-limit";
 
 export async function GET() {
   try {
@@ -10,6 +11,7 @@ export async function GET() {
     return NextResponse.json(
       {
         adminEmail: adminUser.email ?? null,
+        rateLimitBackend: getRateLimitBackendStatus(),
         ...stats,
       },
       { status: 200 },

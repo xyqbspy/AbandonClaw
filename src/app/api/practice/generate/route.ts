@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { toApiErrorResponse } from "@/lib/server/api-error";
-import { requireCurrentProfile } from "@/lib/server/auth";
+import { requireCurrentProfile, requireVerifiedCurrentProfile } from "@/lib/server/auth";
 import { AuthError, ForbiddenError, ValidationError } from "@/lib/server/errors";
 import { logApiError } from "@/lib/server/logger";
-import { enforceRateLimit } from "@/lib/server/rate-limit";
+import { enforceHighCostRateLimit } from "@/lib/server/rate-limit";
 import { assertAllowedOrigin } from "@/lib/server/request-guard";
 import { callGlmChatCompletion } from "@/lib/server/glm-client";
 import {
@@ -237,7 +237,7 @@ interface PracticeGenerateDependencies {
 }
 
 const defaultDependencies: PracticeGenerateDependencies = {
-  requireCurrentProfile,
+  requireCurrentProfile: requireVerifiedCurrentProfile,
   callGlmChatCompletion,
   buildExerciseSpecsFromScene,
 };
@@ -249,11 +249,13 @@ export async function handlePracticeGeneratePost(
   try {
     assertAllowedOrigin(request);
     const { user } = await dependencies.requireCurrentProfile();
-    await enforceRateLimit({
-      key: user.id,
-      limit: PRACTICE_GENERATE_RATE_LIMIT,
-      windowMs: RATE_LIMIT_WINDOW_MS,
+    await enforceHighCostRateLimit({
+      request,
+      userId: user.id,
       scope: "api-practice-generate",
+      userLimit: PRACTICE_GENERATE_RATE_LIMIT,
+      ipLimit: PRACTICE_GENERATE_RATE_LIMIT * 2,
+      windowMs: RATE_LIMIT_WINDOW_MS,
     });
     const payload = await parsePracticeGenerateRequest(request);
     const { scene, exerciseCount } = normalizePracticeGeneratePayload(payload);

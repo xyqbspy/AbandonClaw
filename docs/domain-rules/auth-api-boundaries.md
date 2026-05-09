@@ -50,6 +50,21 @@
 - 不得在同一请求里无必要地重复执行 session、user 或 profile 认证查询
 - 若热路径需要补充资料读取，应基于已有身份结果继续向下游查询，而不是重新回源到认证层
 
+### 3.6 公网注册必须走服务端受控入口
+
+- 注册页不得直接调用 Supabase Browser Client 创建账号；必须提交到服务端注册 API。
+- `REGISTRATION_MODE` 缺失或非法时保守视为 `closed`。
+- `invite_only` 模式必须校验数据库邀请码；邀请码只存 hash，不落库明文。
+- 邀请码必须具备 `max_uses`、`used_count`、可选 `expires_at` 和启停状态。
+- 注册尝试必须记录到 `registration_invite_attempts`，用于追踪成功、失败、拒绝和需要补偿的情况。
+
+### 3.7 邮箱验证是进入主应用的硬边界
+
+- Supabase 发验证邮件不等于主应用已完成边界收口。
+- 邮箱未验证用户只能停留在认证相关页面或 `/verify-email`。
+- 邮箱未验证用户不得进入 `/today`、`/scenes`、`/scene`、`/review`、`/chunks`、`/progress`、`/settings`、`/lesson` 或 `/admin`。
+- 邮箱未验证用户调用受保护 API 时应返回受控 403，不得触发模型、TTS 或学习数据写入。
+
 ## 4. 消费边界
 
 - `openspec/specs/auth-api-boundaries/spec.md`

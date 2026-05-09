@@ -1770,3 +1770,26 @@ Today / Review 已完成局部样式常量收口后，`scene` 页面族仍横跨
   - `pnpm run text:check-mojibake`
   - `git diff --check`
   - `pnpm run maintenance:check`
+### [2026-05-09] 公网注册 P0-A 硬门槛落地
+- 类型：Spec-Driven / 认证与高成本接口治理
+- 状态：实施完成，待真实生产环境 HTTP baseline 与 OpenSpec archive
+
+#### 背景
+公开注册前需要先完成最小硬门槛：注册模式、邀请码、邮箱验证拦截、Redis 状态可见，以及高成本接口 user + IP 双维度限流。本轮只收 P0-A，不扩展每日 quota、封禁后台或学习时长可信计时。
+
+#### 本次改动
+- 新增 `REGISTRATION_MODE=closed | invite_only | open`，非法或缺失值回退 `closed`。
+- 新增 `registration_invite_codes` 与 `registration_invite_attempts` SQL，邀请码只存 hash，并记录 attempt / compensation 状态。
+- 新增 `/api/auth/signup` 服务端注册入口，注册页改为调用该入口。
+- 新增 `/verify-email`，middleware 阻止邮箱未验证用户进入主应用或受保护 API。
+- 高成本接口接入 `enforceHighCostRateLimit`，覆盖 practice generate、scene generate、similar generate、expression map generate、explain selection、TTS、TTS regenerate。
+- `/api/admin/status` 增加 `rateLimitBackend`，用于确认 `upstash` / `memory`。
+
+#### 验证
+- `node --import tsx --test src/lib/server/rate-limit.test.ts src/lib/server/registration.test.ts src/app/api/practice/generate/route.test.ts middleware.test.ts`
+- `pnpm exec tsc --noEmit --pretty false`
+
+#### 剩余风险
+- 当前未连接真实 Supabase/Upstash 生产环境执行完整 HTTP baseline；小范围开放前必须补跑 closed、invite-only、邮箱验证、user/IP 限流、Origin 拒绝和 Redis 后端状态。
+- P0-B 未实现：每日 AI/TTS quota、usage 预占、`generation_limited`、学习时长 delta 上限、今日用量统计和简单封禁能力。
+- 当前限流仍保留 Upstash 失败时 fallback 到 memory 的可用性策略；公网开放前必须在 admin/status 与 baseline 中确认实际为 Upstash。

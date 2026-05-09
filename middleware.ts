@@ -10,6 +10,7 @@ import {
 } from "@/lib/server/request-context";
 
 const AUTH_PAGE_PATHS = new Set(["/login", "/signup"]);
+const VERIFY_EMAIL_PATH = "/verify-email";
 const PROTECTED_PAGE_PREFIXES = [
   "/today",
   "/scenes",
@@ -45,6 +46,10 @@ const isProtectedApiPath = (pathname: string) =>
   PROTECTED_API_PREFIXES.some(
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
   );
+
+const isEmailVerifiedUser = (
+  user: { email_confirmed_at?: string | null; confirmed_at?: string | null } | null,
+) => Boolean(user?.email_confirmed_at ?? user?.confirmed_at);
 
 interface MiddlewareDependencies {
   createServerClient: typeof createServerClient;
@@ -88,6 +93,7 @@ export async function handleMiddleware(
   if (
     !isProtectedPagePath(pathname) &&
     !AUTH_PAGE_PATHS.has(pathname) &&
+    pathname !== VERIFY_EMAIL_PATH &&
     !isProtectedApiPath(pathname)
   ) {
     return attachRequestIdToResponse(dependencies.next(request, requestId), requestId);
@@ -135,6 +141,21 @@ export async function handleMiddleware(
     );
   }
 
+  if (user && pathname === VERIFY_EMAIL_PATH && isEmailVerifiedUser(user)) {
+    const redirectTarget = request.nextUrl.searchParams.get("redirect");
+    const safeTarget = resolveSafeRedirectTarget(redirectTarget);
+    return attachRequestIdToResponse(
+      dependencies.redirect(new URL(safeTarget, request.url)),
+      requestId,
+    );
+  }
+
+  if (user && !isEmailVerifiedUser(user) && isProtectedPagePath(pathname)) {
+    const redirectUrl = new URL(VERIFY_EMAIL_PATH, request.url);
+    redirectUrl.searchParams.set("redirect", `${pathname}${search}`);
+    return attachRequestIdToResponse(dependencies.redirect(redirectUrl), requestId);
+  }
+
   if (
     user &&
     (pathname === "/admin" || pathname.startsWith("/admin/")) &&
@@ -149,6 +170,13 @@ export async function handleMiddleware(
   if (!user && isProtectedApiPath(pathname)) {
     return attachRequestIdToResponse(
       dependencies.json({ error: "Unauthorized", requestId }, { status: 401 }),
+      requestId,
+    );
+  }
+
+  if (user && !isEmailVerifiedUser(user) && isProtectedApiPath(pathname)) {
+    return attachRequestIdToResponse(
+      dependencies.json({ error: "Email verification required.", requestId }, { status: 403 }),
       requestId,
     );
   }

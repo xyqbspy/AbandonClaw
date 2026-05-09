@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
-import { requireCurrentProfile } from "@/lib/server/auth";
+import { requireVerifiedCurrentProfile } from "@/lib/server/auth";
 import { toApiErrorResponse } from "@/lib/server/api-error";
 import { ValidationError } from "@/lib/server/errors";
 import { callGlmChatCompletion } from "@/lib/server/glm-client";
+import { enforceHighCostRateLimit } from "@/lib/server/rate-limit";
+import { assertAllowedOrigin } from "@/lib/server/request-guard";
 import {
   SIMILAR_EXPRESSION_GENERATE_SYSTEM_PROMPT,
   buildSimilarExpressionGenerateUserPrompt,
@@ -19,6 +21,8 @@ const ALLOWED_LABELS = new Set([
   "更常用于疲惫状态",
   "相关说法",
 ]);
+const SIMILAR_GENERATE_RATE_LIMIT = 8;
+const RATE_LIMIT_WINDOW_MS = 60_000;
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
   Boolean(value) && typeof value === "object";
@@ -53,7 +57,16 @@ const sanitizeCandidate = (
 
 export async function POST(request: Request) {
   try {
-    await requireCurrentProfile();
+    assertAllowedOrigin(request);
+    const { user } = await requireVerifiedCurrentProfile();
+    await enforceHighCostRateLimit({
+      request,
+      userId: user.id,
+      scope: "api-similar-generate",
+      userLimit: SIMILAR_GENERATE_RATE_LIMIT,
+      ipLimit: SIMILAR_GENERATE_RATE_LIMIT * 2,
+      windowMs: RATE_LIMIT_WINDOW_MS,
+    });
     const payload = await parseJsonBody<{
       baseExpression?: unknown;
       existingExpressions?: unknown;

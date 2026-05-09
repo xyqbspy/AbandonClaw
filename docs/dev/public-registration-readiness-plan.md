@@ -18,6 +18,24 @@
 
 这套做完，可以小范围给 10-50 个真实用户试用。如果入口要发到小红书、推特、公开群或任何不可控渠道，则必须继续补 P0-B 里的每日额度、用量查看和封禁能力。
 
+## 1.1 当前实施状态（2026-05-09）
+
+已落地 P0-A 的代码侧硬门槛：
+
+- `REGISTRATION_MODE=closed | invite_only | open`，非法或缺失值保守回退为 `closed`。
+- 注册页改为调用服务端 `/api/auth/signup`，不再由浏览器直接绕过项目层创建账号。
+- `invite_only` 使用 `registration_invite_codes` 和 `registration_invite_attempts` 表，邀请码只存 hash，支持 `max_uses`、`used_count`、`expires_at`、启停状态和补偿状态。
+- 邮箱未验证用户会被拦截到 `/verify-email`，受保护 API 返回 403，不进入学习主链路或高成本入口。
+- 高成本接口已接入 user + IP 双维度限流：practice generate、scene generate、similar generate、expression map generate、explain selection、TTS、TTS regenerate。
+- `/api/admin/status` 暴露 `rateLimitBackend.kind` 和 `upstashConfigured`，用于确认当前是 `upstash` 还是 `memory`。
+
+仍然不代表可以公开发到不可控渠道。P0-B 仍未完成：每日 quota、usage 预占、`generation_limited`、学习时长 delta 上限、今日用量统计和简单封禁能力。若入口要发到公开社群、社媒或任何不可控渠道，P0-B 必须提前补齐。
+
+真实 HTTP baseline 状态：
+
+- 单元/类型验证已覆盖注册模式、邮箱未验证拦截、user/IP 限流、429 requestId 和限流后端状态。
+- 当前轮未连接真实 Supabase/Upstash 生产环境执行完整 HTTP baseline；小范围开放前必须按第 8 节清单补跑并记录结果。
+
 ## 2. 公开模式矩阵
 
 | 模式 | 适用阶段 | 注册方式 | 生成额度 | 管理要求 |

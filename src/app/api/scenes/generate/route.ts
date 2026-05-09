@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import { requireCurrentProfile } from "@/lib/server/auth";
+import { requireVerifiedCurrentProfile } from "@/lib/server/auth";
 import { toApiErrorResponse } from "@/lib/server/api-error";
 import { logApiError } from "@/lib/server/logger";
-import { enforceRateLimit } from "@/lib/server/rate-limit";
+import { enforceHighCostRateLimit } from "@/lib/server/rate-limit";
 import { assertAllowedOrigin } from "@/lib/server/request-guard";
 import {
   normalizeGenerateScenePayload,
@@ -16,12 +16,14 @@ const RATE_LIMIT_WINDOW_MS = 60_000;
 export async function POST(request: Request) {
   try {
     assertAllowedOrigin(request);
-    const { user } = await requireCurrentProfile();
-    await enforceRateLimit({
-      key: user.id,
-      limit: SCENE_GENERATE_RATE_LIMIT,
-      windowMs: RATE_LIMIT_WINDOW_MS,
+    const { user } = await requireVerifiedCurrentProfile();
+    await enforceHighCostRateLimit({
+      request,
+      userId: user.id,
       scope: "api-scenes-generate",
+      userLimit: SCENE_GENERATE_RATE_LIMIT,
+      ipLimit: SCENE_GENERATE_RATE_LIMIT * 2,
+      windowMs: RATE_LIMIT_WINDOW_MS,
     });
     const payload = await parseGenerateSceneRequest(request);
     const result = await generatePersonalizedSceneForUser(

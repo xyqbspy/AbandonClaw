@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
 import test, { afterEach } from "node:test";
 import { RateLimitError } from "@/lib/server/errors";
-import { clearRateLimitStore, enforceRateLimit } from "./rate-limit";
+import {
+  clearRateLimitStore,
+  enforceHighCostRateLimit,
+  enforceRateLimit,
+  getClientIp,
+  getRateLimitBackendStatus,
+} from "./rate-limit";
 
 const originalFetch = globalThis.fetch;
 const originalUrl = process.env.UPSTASH_REDIS_REST_URL;
@@ -20,6 +26,65 @@ afterEach(() => {
   } else {
     process.env.UPSTASH_REDIS_REST_TOKEN = originalToken;
   }
+});
+
+test("getClientIp 会按可信 header 顺序读取客户端 IP", () => {
+  const request = new Request("http://localhost/api/test", {
+    headers: {
+      "x-forwarded-for": "203.0.113.10, 10.0.0.1",
+      "x-real-ip": "203.0.113.11",
+      "cf-connecting-ip": "203.0.113.12",
+    },
+  });
+
+  assert.equal(getClientIp(request), "203.0.113.10");
+});
+
+test("enforceHighCostRateLimit 会同时按 user 和 IP 限流", async () => {
+  delete process.env.UPSTASH_REDIS_REST_URL;
+  delete process.env.UPSTASH_REDIS_REST_TOKEN;
+
+  const request = new Request("http://localhost/api/test", {
+    headers: {
+      "x-forwarded-for": "203.0.113.20",
+    },
+  });
+
+  await enforceHighCostRateLimit({
+    request,
+    userId: "user-1",
+    scope: "test-high-cost",
+    userLimit: 2,
+    ipLimit: 1,
+    windowMs: 60_000,
+  });
+
+  await assert.rejects(
+    () =>
+      enforceHighCostRateLimit({
+        request,
+        userId: "user-2",
+        scope: "test-high-cost",
+        userLimit: 2,
+        ipLimit: 1,
+        windowMs: 60_000,
+      }),
+    (error: unknown) => {
+      assert.ok(error instanceof RateLimitError);
+      return true;
+    },
+  );
+});
+
+test("getRateLimitBackendStatus 会暴露当前限流后端", () => {
+  delete process.env.UPSTASH_REDIS_REST_URL;
+  delete process.env.UPSTASH_REDIS_REST_TOKEN;
+  clearRateLimitStore();
+
+  assert.deepEqual(getRateLimitBackendStatus(), {
+    kind: "memory",
+    upstashConfigured: false,
+  });
 });
 
 test("enforceRateLimit 在内存模式下会在超限时抛出 RateLimitError", async () => {

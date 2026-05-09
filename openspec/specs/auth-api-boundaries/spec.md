@@ -72,3 +72,30 @@
 - **WHEN** 客户端在登录成功后请求当前用户资料接口
 - **THEN** 系统 MUST 复用同一请求内已经获取的用户身份结果
 - **AND** 不得在无必要时再次执行重复的认证查询
+
+### Requirement: 公网注册入口必须受注册模式控制
+系统 MUST 通过服务端注册入口统一执行注册模式判断。`REGISTRATION_MODE` MUST 支持 `closed`、`invite_only` 和 `open`；非法值或缺失值 MUST 保守回退为 `closed`。
+
+#### Scenario: 注册模式关闭
+- **WHEN** 用户提交注册请求且 `REGISTRATION_MODE=closed`
+- **THEN** 系统 MUST 在创建 Supabase Auth 用户前拒绝注册
+- **AND** 注册页 MUST 展示受控关闭文案
+
+#### Scenario: 邀请注册
+- **WHEN** 用户提交注册请求且 `REGISTRATION_MODE=invite_only`
+- **THEN** 系统 MUST 在服务端校验邀请码
+- **AND** 邀请码 MUST 使用 hash 匹配，不落库明文
+- **AND** 注册尝试 MUST 记录 email、状态、关联邀请码、auth user id 或失败原因
+
+### Requirement: 邮箱未验证用户不得进入主应用或高成本写入口
+系统 MUST 在主应用页面入口与高成本/关键写 API 入口检查 Supabase 邮箱验证状态。
+
+#### Scenario: 邮箱未验证用户访问主应用页面
+- **WHEN** 已登录但邮箱未验证的用户访问 `/today`、`/scenes`、`/scene`、`/review`、`/chunks`、`/progress`、`/settings`、`/lesson` 或 `/admin`
+- **THEN** 系统 MUST 重定向到受控邮箱验证提示页
+- **AND** 不得继续进入学习主链路页面
+
+#### Scenario: 邮箱未验证用户调用受保护 API
+- **WHEN** 已登录但邮箱未验证的用户调用受保护 API
+- **THEN** 系统 MUST 返回受控 403 响应
+- **AND** 不得触发模型、TTS 或学习数据写入

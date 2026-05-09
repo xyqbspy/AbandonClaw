@@ -60,6 +60,36 @@ test("practice generate handler 会拒绝未登录请求", async () => {
   assert.equal(typeof body.requestId, "string");
 });
 
+test("practice generate handler returns requestId when user rate limit is exceeded", async () => {
+  clearRateLimitStore();
+  const dependencies = {
+    requireCurrentProfile: async () => ({ user: { id: "rate-user-1" }, profile: {} } as never),
+    callGlmChatCompletion: async () => {
+      throw new Error("skip model");
+    },
+    buildExerciseSpecsFromScene: () =>
+      [{ id: "fallback-1", type: "typing", prompt: "p", answer: { text: "a" } }] as never,
+  };
+
+  for (let index = 0; index < 5; index += 1) {
+    const okResponse = await handlePracticeGeneratePost(
+      createJsonRequest({ scene: sampleScene }),
+      dependencies,
+    );
+    assert.equal(okResponse.status, 200);
+  }
+
+  const response = await handlePracticeGeneratePost(
+    createJsonRequest({ scene: sampleScene }),
+    dependencies,
+  );
+  const body = await response.json();
+
+  assert.equal(response.status, 429);
+  assert.equal(body.code, "RATE_LIMITED");
+  assert.equal(typeof body.requestId, "string");
+});
+
 test("practice generate handler 在模型结果不合法时会回退到本地 exercise 构建", async () => {
   clearRateLimitStore();
   let fallbackArgs: unknown[] = [];

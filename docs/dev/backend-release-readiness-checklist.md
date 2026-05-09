@@ -5,13 +5,25 @@
 - [ ] `NEXT_PUBLIC_SUPABASE_URL` 已配置且与目标项目一致
 - [ ] `NEXT_PUBLIC_SUPABASE_ANON_KEY` 已配置
 - [ ] `SUPABASE_SERVICE_ROLE_KEY` 仅服务端环境可用
+- [ ] `REGISTRATION_MODE` 已显式配置；公网小范围开放使用 `invite_only`
 - [ ] `UPSTASH_REDIS_REST_URL` 已配置
 - [ ] `UPSTASH_REDIS_REST_TOKEN` 已配置
 - [ ] `NEXT_PUBLIC_APP_URL` / `NEXT_PUBLIC_SITE_URL` / `APP_ORIGIN` 至少有一项与实际部署域名一致
 
+## 注册与邮箱验证
+
+- [ ] `closed` 模式下 `/api/auth/signup` 拒绝注册
+- [ ] `invite_only` 模式下无邀请码注册失败
+- [ ] 邀请码表包含 `max_uses`、`used_count`、`expires_at` 和 `is_active`
+- [ ] 注册成功或失败均有 `registration_invite_attempts` 记录
+- [ ] Supabase 项目已确认开启邮箱验证策略
+- [ ] 邮箱未验证用户访问主应用会进入 `/verify-email`
+- [ ] 邮箱未验证用户调用受保护 API 返回 403
+
 ## 接口治理
 
-- [ ] 高成本接口确认已接入统一限流
+- [ ] 高成本接口确认已接入 user + IP 双维度统一限流
+- [ ] `/api/admin/status` 可看到 `rateLimitBackend.kind`
 - [ ] 受保护写接口确认已接入 `Origin` 校验
 - [ ] 关键写接口确认已接入幂等保护
 - [ ] 未知异常确认会统一返回受控错误并带 `requestId`

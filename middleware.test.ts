@@ -2,7 +2,11 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { handleMiddleware } from "./middleware";
 
-type TestUser = { email: string | null } | null;
+type TestUser = {
+  email: string | null;
+  email_confirmed_at?: string | null;
+  confirmed_at?: string | null;
+} | null;
 
 const createRequest = (url: string) =>
   ({
@@ -30,18 +34,24 @@ const createResponse = (
   return response as never;
 };
 
-const createDependencies = (user: TestUser, isAdmin = false) => ({
+const createDependencies = (user: TestUser, isAdmin = false) => {
+  const normalizedUser =
+    user && user.email_confirmed_at === undefined && user.confirmed_at === undefined
+      ? { ...user, email_confirmed_at: "2026-05-09T00:00:00.000Z" }
+      : user;
+
+  return {
   createServerClient: (() =>
     ({
       auth: {
         getUser: async () => ({
-          data: { user },
+          data: { user: normalizedUser },
         }),
       },
     })) as never,
   getSupabaseUrl: (() => "https://example.supabase.co") as never,
   getSupabaseAnonKey: (() => "anon-key") as never,
-  isAdminEmail: ((email: string | null | undefined) => isAdmin && email === user?.email) as never,
+  isAdminEmail: ((email: string | null | undefined) => isAdmin && email === normalizedUser?.email) as never,
   next: (() => createResponse(null, { status: 200 })) as never,
   redirect: ((url: URL) =>
     createResponse(null, {
@@ -53,7 +63,8 @@ const createDependencies = (user: TestUser, isAdmin = false) => ({
       status: init.status,
       headers: { "content-type": "application/json" },
     })) as never,
-});
+  };
+};
 
 test("middleware 会将未登录用户重定向到登录页并保留原始路径", async () => {
   const response = await handleMiddleware(
@@ -66,6 +77,31 @@ test("middleware 会将未登录用户重定向到登录页并保留原始路径
     response.headers.get("location"),
     "http://localhost/login?redirect=%2Ftoday%3Ftab%3Dreview",
   );
+});
+
+test("middleware redirects unverified users to verify-email page", async () => {
+  const response = await handleMiddleware(
+    createRequest("http://localhost/scenes"),
+    createDependencies({ email: "user@example.com", email_confirmed_at: null }),
+  );
+
+  assert.equal(response.status, 307);
+  assert.equal(
+    response.headers.get("location"),
+    "http://localhost/verify-email?redirect=%2Fscenes",
+  );
+});
+
+test("middleware rejects protected API calls from unverified users", async () => {
+  const response = await handleMiddleware(
+    createRequest("http://localhost/api/practice/generate"),
+    createDependencies({ email: "user@example.com", email_confirmed_at: null }),
+  );
+
+  assert.equal(response.status, 403);
+  const body = await response.json();
+  assert.equal(body.error, "Email verification required.");
+  assert.equal(typeof body.requestId, "string");
 });
 
 test("middleware 会将已登录用户从登录页安全重定向回站内路径", async () => {

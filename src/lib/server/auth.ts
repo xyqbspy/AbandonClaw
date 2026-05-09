@@ -122,6 +122,20 @@ export async function requireCurrentUser(): Promise<User> {
   return user;
 }
 
+export function isEmailVerifiedUser(
+  user: Pick<User, "email_confirmed_at"> & { confirmed_at?: string | null },
+): boolean {
+  return Boolean(user.email_confirmed_at ?? user.confirmed_at);
+}
+
+export async function requireVerifiedCurrentUser(): Promise<User> {
+  const user = await requireCurrentUser();
+  if (!isEmailVerifiedUser(user)) {
+    throw new ForbiddenError("Email verification required.");
+  }
+  return user;
+}
+
 export function isAdminUser(user: Pick<User, "email">): boolean {
   return isAdminEmail(user.email);
 }
@@ -150,6 +164,15 @@ export async function requireCurrentProfile(): Promise<{
   profile: ProfileRow;
 }> {
   const user = await requireCurrentUser();
+  const profile = await ensureProfile(user);
+  return { user, profile };
+}
+
+export async function requireVerifiedCurrentProfile(): Promise<{
+  user: User;
+  profile: ProfileRow;
+}> {
+  const user = await requireVerifiedCurrentUser();
   const profile = await ensureProfile(user);
   return { user, profile };
 }

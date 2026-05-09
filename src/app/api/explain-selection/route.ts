@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { explainSelection } from "@/lib/explain/provider";
 import { toApiErrorResponse } from "@/lib/server/api-error";
-import { requireCurrentProfile } from "@/lib/server/auth";
+import { requireCurrentProfile, requireVerifiedCurrentProfile } from "@/lib/server/auth";
 import { logApiError } from "@/lib/server/logger";
-import { enforceRateLimit } from "@/lib/server/rate-limit";
+import { enforceHighCostRateLimit } from "@/lib/server/rate-limit";
 import { assertAllowedOrigin } from "@/lib/server/request-guard";
 import {
   normalizeExplainSelectionPayload,
@@ -19,7 +19,7 @@ interface ExplainSelectionDependencies {
 }
 
 const defaultDependencies: ExplainSelectionDependencies = {
-  requireCurrentProfile,
+  requireCurrentProfile: requireVerifiedCurrentProfile,
   explainSelection,
 };
 
@@ -30,11 +30,13 @@ export async function handleExplainSelectionPost(
   try {
     assertAllowedOrigin(request);
     const { user } = await dependencies.requireCurrentProfile();
-    await enforceRateLimit({
-      key: user.id,
-      limit: EXPLAIN_SELECTION_RATE_LIMIT,
-      windowMs: RATE_LIMIT_WINDOW_MS,
+    await enforceHighCostRateLimit({
+      request,
+      userId: user.id,
       scope: "api-explain-selection",
+      userLimit: EXPLAIN_SELECTION_RATE_LIMIT,
+      ipLimit: EXPLAIN_SELECTION_RATE_LIMIT * 2,
+      windowMs: RATE_LIMIT_WINDOW_MS,
     });
     const payload = await parseExplainSelectionRequest(request);
     const result = await dependencies.explainSelection(normalizeExplainSelectionPayload(payload));

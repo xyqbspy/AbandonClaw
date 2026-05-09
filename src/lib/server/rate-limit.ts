@@ -18,6 +18,15 @@ type RateLimitBackend = {
   enforce: (params: EnforceRateLimitParams) => Promise<void>;
 };
 
+type HighCostRateLimitParams = {
+  request: Request;
+  userId: string;
+  scope: string;
+  userLimit: number;
+  ipLimit: number;
+  windowMs: number;
+};
+
 const rateLimitStore = new Map<string, RateLimitEntry>();
 
 let backendCache: RateLimitBackend | null = null;
@@ -56,6 +65,20 @@ const getUpstashConfig = () => {
 
   if (!url || !token) return null;
   return { url, token };
+};
+
+export const getClientIp = (request: Request) => {
+  const forwardedFor = request.headers.get("x-forwarded-for");
+  if (forwardedFor) {
+    const first = forwardedFor.split(",")[0]?.trim();
+    if (first) return first;
+  }
+
+  return (
+    request.headers.get("x-real-ip")?.trim() ||
+    request.headers.get("cf-connecting-ip")?.trim() ||
+    "unknown"
+  );
 };
 
 const callUpstashPipeline = async (
@@ -141,6 +164,38 @@ export const enforceRateLimit = async (params: EnforceRateLimitParams) => {
     }
     await enforceMemoryRateLimit(params);
   }
+};
+
+export const enforceHighCostRateLimit = async ({
+  request,
+  userId,
+  scope,
+  userLimit,
+  ipLimit,
+  windowMs,
+}: HighCostRateLimitParams) => {
+  const clientIp = getClientIp(request);
+
+  await enforceRateLimit({
+    key: `user:${userId}`,
+    limit: userLimit,
+    windowMs,
+    scope,
+  });
+  await enforceRateLimit({
+    key: `ip:${clientIp}`,
+    limit: ipLimit,
+    windowMs,
+    scope,
+  });
+};
+
+export const getRateLimitBackendStatus = () => {
+  const backend = getRateLimitBackend();
+  return {
+    kind: backend.kind,
+    upstashConfigured: Boolean(getUpstashConfig()),
+  };
 };
 
 export const clearRateLimitStore = () => {
