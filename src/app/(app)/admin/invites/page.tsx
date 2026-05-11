@@ -1,5 +1,8 @@
 import { Ticket, TicketCheck, TicketX } from "lucide-react";
-import { updateAdminInviteCodeAction } from "@/app/(app)/admin/actions";
+import {
+  updateAdminInviteCodeAction,
+  updateAdminRegistrationModeAction,
+} from "@/app/(app)/admin/actions";
 import {
   buildAdminHref,
   readAdminNotice,
@@ -23,7 +26,8 @@ import {
 import { PageHeader } from "@/components/shared/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { listAdminInviteCodes } from "@/lib/server/admin/service";
+import { Label } from "@/components/ui/label";
+import { getAdminRegistrationModeState, listAdminInviteCodes } from "@/lib/server/admin/service";
 import { APPLE_ADMIN_CONTROL, APPLE_META_TEXT } from "@/lib/ui/apple-style";
 
 const LABELS = {
@@ -33,6 +37,8 @@ const LABELS = {
   empty: "还没有邀请码。",
   update: "更新",
   deactivate: "停用",
+  registrationMode: "注册模式",
+  registrationModeDescription: "控制 /signup 是否关闭、邀请注册或公开注册。后台配置会优先生效。",
   summaryPrefix: "显示",
   summaryMiddle: "/ 共",
 } as const;
@@ -45,6 +51,18 @@ const ATTEMPT_LABELS: Record<string, string> = {
   needs_repair: "需修复",
 };
 
+const REGISTRATION_MODE_LABELS = {
+  closed: "关闭注册",
+  invite_only: "邀请注册",
+  open: "公开注册",
+} as const;
+
+const REGISTRATION_MODE_SOURCE_LABELS = {
+  runtime: "后台配置",
+  environment: "环境变量",
+  default: "默认兜底",
+} as const;
+
 export default async function AdminInvitesPage({
   searchParams,
 }: {
@@ -54,7 +72,10 @@ export default async function AdminInvitesPage({
   const page = readAdminPositivePage(params);
   const notice = readAdminNotice(params);
   const pageSize = 20;
-  const result = await listAdminInviteCodes({ page, pageSize });
+  const [registrationMode, result] = await Promise.all([
+    getAdminRegistrationModeState(),
+    listAdminInviteCodes({ page, pageSize }),
+  ]);
   const currentHref = buildAdminHref("/admin/invites", { page });
   const hasPrev = result.page > 1;
   const hasNext = result.page * result.pageSize < result.total;
@@ -65,6 +86,48 @@ export default async function AdminInvitesPage({
       <PageHeader eyebrow={LABELS.eyebrow} title={LABELS.title} description={LABELS.description} />
 
       {notice ? <AdminNoticeCard tone={notice.tone}>{notice.notice}</AdminNoticeCard> : null}
+
+      <section className="space-y-4 rounded-[var(--app-radius-panel)] border border-[var(--app-border-soft)] bg-[var(--app-surface)] p-4 shadow-[var(--app-shadow-soft)]">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-base font-semibold text-foreground">{LABELS.registrationMode}</h2>
+            <p className={`mt-1 text-sm ${APPLE_META_TEXT}`}>
+              {LABELS.registrationModeDescription}
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant={registrationMode.mode === "open" ? "destructive" : "secondary"}>
+              {REGISTRATION_MODE_LABELS[registrationMode.mode]}
+            </Badge>
+            <Badge variant="outline">
+              来源：{REGISTRATION_MODE_SOURCE_LABELS[registrationMode.source]}
+            </Badge>
+          </div>
+        </div>
+        <AdminListMeta>
+          <span>最近修改人：{registrationMode.updatedBy ?? "-"}</span>
+          <span>最近修改时间：{registrationMode.updatedAt ?? "-"}</span>
+        </AdminListMeta>
+        <form action={updateAdminRegistrationModeAction} className="flex flex-wrap items-end gap-3">
+          <input type="hidden" name="returnTo" value={currentHref} />
+          <div className="min-w-[220px] space-y-1.5">
+            <Label htmlFor="registrationMode">切换注册模式</Label>
+            <select
+              id="registrationMode"
+              name="registrationMode"
+              defaultValue={registrationMode.mode}
+              className={`${APPLE_ADMIN_CONTROL} h-9`}
+            >
+              <option value="closed">关闭注册</option>
+              <option value="invite_only">邀请注册</option>
+              <option value="open">公开注册</option>
+            </select>
+          </div>
+          <AdminActionButton type="submit" tone="primary">
+            更新注册模式
+          </AdminActionButton>
+        </form>
+      </section>
 
       <InviteCodeCreatePanel />
 
@@ -144,24 +207,30 @@ export default async function AdminInvitesPage({
                   <input type="hidden" name="inviteCodeId" value={row.id} />
                   <input type="hidden" name="returnTo" value={currentHref} />
                   <input type="hidden" name="inviteAction" value="update" />
-                  <Input
-                    name="maxUses"
-                    type="number"
-                    min={Math.max(row.usedCount, 1)}
-                    max={100}
-                    defaultValue={row.maxUses}
-                    className={APPLE_ADMIN_CONTROL}
-                    aria-label="最大使用次数"
-                  />
-                  <Input
-                    name="expiresInDays"
-                    type="number"
-                    min={0}
-                    max={90}
-                    placeholder="从现在起多少天后过期"
-                    className={APPLE_ADMIN_CONTROL}
-                    aria-label="过期天数"
-                  />
+                  <div className="space-y-1.5">
+                    <Label htmlFor={`invite-${row.id}-max-uses`}>每码可用次数</Label>
+                    <Input
+                      id={`invite-${row.id}-max-uses`}
+                      name="maxUses"
+                      type="number"
+                      min={Math.max(row.usedCount, 1)}
+                      max={100}
+                      defaultValue={row.maxUses}
+                      className={APPLE_ADMIN_CONTROL}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor={`invite-${row.id}-expires-days`}>新的有效天数</Label>
+                    <Input
+                      id={`invite-${row.id}-expires-days`}
+                      name="expiresInDays"
+                      type="number"
+                      min={0}
+                      max={90}
+                      placeholder="0 为永不过期"
+                      className={APPLE_ADMIN_CONTROL}
+                    />
+                  </div>
                   <AdminActionButton type="submit" tone="primary">
                     {LABELS.update}
                   </AdminActionButton>

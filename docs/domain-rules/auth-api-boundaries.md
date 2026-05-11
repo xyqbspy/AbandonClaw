@@ -53,7 +53,8 @@
 ### 3.6 公网注册必须走服务端受控入口
 
 - 注册页不得直接调用 Supabase Browser Client 创建账号；必须提交到服务端注册 API。
-- `REGISTRATION_MODE` 缺失或非法时保守视为 `closed`。
+- 注册模式优先读取 admin 后台运行时配置；后台配置缺失、非法或读取失败时回退 `REGISTRATION_MODE`，最终保守视为 `closed`。
+- 管理员可在 `/admin/invites` 查看并切换 `closed`、`invite_only`、`open`；该入口只承担最小注册准入开关，不是完整配置中心。
 - `invite_only` 与 `open` 模式下，注册入口必须在邀请码校验和 Auth 注册前执行同一 IP 频控。
 - `invite_only` 模式必须校验数据库邀请码；邀请码只存 hash，不落库明文。
 - 邀请码必须具备 `max_uses`、`used_count`、可选 `expires_at` 和启停状态。

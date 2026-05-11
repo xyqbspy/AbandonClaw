@@ -11,6 +11,7 @@ import {
   createAdminInviteCodes,
   deleteSceneById,
   regenerateSceneVariants,
+  updateAdminRegistrationMode,
   updateAdminInviteCode,
   updateAdminUserAccessStatus,
   updateSceneSentencesById,
@@ -39,6 +40,8 @@ const ADMIN_NOTICE = {
   batchSelectFirst: "请先选择需要补全的项。",
   batchEnrichFailed: "批量补全失败，请稍后重试。",
   invitesUpdated: "邀请码已更新。",
+  registrationModeUpdated: "注册模式已更新。",
+  registrationModeInvalid: "注册模式无效，请重试。",
   inviteNotFound: "未找到邀请码。",
   inviteInvalid: "邀请码参数无效，请重试。",
 } as const;
@@ -83,6 +86,13 @@ interface UpdateAdminInviteCodeActionDependencies {
   revalidatePath: typeof revalidatePath;
 }
 
+interface UpdateAdminRegistrationModeActionDependencies {
+  requireAdmin: typeof requireAdmin;
+  updateAdminRegistrationMode: typeof updateAdminRegistrationMode;
+  redirect: typeof redirect;
+  revalidatePath: typeof revalidatePath;
+}
+
 const updateAdminUserAccessStatusActionDependencies: UpdateAdminUserAccessStatusActionDependencies = {
   requireAdmin,
   updateAdminUserAccessStatus,
@@ -99,6 +109,13 @@ const createAdminInviteCodesActionDependencies: CreateAdminInviteCodesActionDepe
 const updateAdminInviteCodeActionDependencies: UpdateAdminInviteCodeActionDependencies = {
   requireAdmin,
   updateAdminInviteCode,
+  redirect,
+  revalidatePath,
+};
+
+const updateAdminRegistrationModeActionDependencies: UpdateAdminRegistrationModeActionDependencies = {
+  requireAdmin,
+  updateAdminRegistrationMode,
   redirect,
   revalidatePath,
 };
@@ -344,6 +361,40 @@ export async function handleUpdateAdminInviteCodeAction(
 
 export async function updateAdminInviteCodeAction(formData: FormData) {
   return handleUpdateAdminInviteCodeAction(formData);
+}
+
+export async function handleUpdateAdminRegistrationModeAction(
+  formData: FormData,
+  dependencies: UpdateAdminRegistrationModeActionDependencies = updateAdminRegistrationModeActionDependencies,
+) {
+  const adminUser = await dependencies.requireAdmin();
+  const returnTo = normalizeAdminReturnTo(formData.get("returnTo"), "/admin/invites");
+  const mode = String(formData.get("registrationMode") ?? "");
+
+  try {
+    await dependencies.updateAdminRegistrationMode({
+      mode: mode as never,
+      updatedBy: adminUser.id,
+    });
+  } catch (error) {
+    if (error instanceof ValidationError) {
+      return dependencies.redirect(
+        appendAdminNotice(returnTo, ADMIN_NOTICE.registrationModeInvalid, "danger"),
+      );
+    }
+    throw error;
+  }
+
+  dependencies.revalidatePath("/admin");
+  dependencies.revalidatePath("/admin/invites");
+  dependencies.revalidatePath("/signup");
+  return dependencies.redirect(
+    appendAdminNotice(returnTo, ADMIN_NOTICE.registrationModeUpdated, "success"),
+  );
+}
+
+export async function updateAdminRegistrationModeAction(formData: FormData) {
+  return handleUpdateAdminRegistrationModeAction(formData);
 }
 
 export async function deleteAdminPhraseAction(formData: FormData) {

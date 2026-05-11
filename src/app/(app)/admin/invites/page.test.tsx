@@ -8,6 +8,7 @@ const localRequire = createRequire(import.meta.url);
 const nodeModule = localRequire("node:module") as typeof import("node:module");
 
 const listAdminInviteCodesCalls: Array<Record<string, unknown>> = [];
+const getAdminRegistrationModeStateCalls: Array<true> = [];
 let listAdminInviteCodesResult = {
   rows: [
     {
@@ -49,6 +50,15 @@ let listAdminInviteCodesResult = {
 
 const mockedModules = {
   "@/lib/server/admin/service": {
+    getAdminRegistrationModeState: async () => {
+      getAdminRegistrationModeStateCalls.push(true);
+      return {
+        mode: "invite_only",
+        source: "runtime",
+        updatedBy: "admin-1",
+        updatedAt: "2026-05-11T00:00:00.000Z",
+      };
+    },
     listAdminInviteCodes: async (filters: Record<string, unknown>) => {
       listAdminInviteCodesCalls.push(filters);
       return listAdminInviteCodesResult;
@@ -56,6 +66,7 @@ const mockedModules = {
   },
   "@/app/(app)/admin/actions": {
     updateAdminInviteCodeAction: async () => {},
+    updateAdminRegistrationModeAction: async () => {},
   },
   "@/app/(app)/admin/invites/invite-code-create-panel": {
     InviteCodeCreatePanel: () => React.createElement("section", null, "生成邀请码"),
@@ -95,6 +106,7 @@ const getPageModule = () => {
 
 afterEach(() => {
   listAdminInviteCodesCalls.length = 0;
+  getAdminRegistrationModeStateCalls.length = 0;
   listAdminInviteCodesResult = {
     rows: [
       {
@@ -144,7 +156,11 @@ test("/admin/invites 页面会渲染邀请码使用账号与活动摘要", async
   const html = renderToStaticMarkup(element);
 
   assert.deepEqual(listAdminInviteCodesCalls, [{ page: 1, pageSize: 20 }]);
+  assert.equal(getAdminRegistrationModeStateCalls.length, 1);
   assert.match(html, /邀请码管理/);
+  assert.match(html, /注册模式/);
+  assert.match(html, /邀请注册/);
+  assert.match(html, /来源：后台配置/);
   assert.match(html, /生成邀请码/);
   assert.match(html, /rose@example.com/);
   assert.match(html, /user-1/);

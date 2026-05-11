@@ -62,6 +62,7 @@
 - 与服务端允许域一致的 `Origin`
 - 若要执行登录态场景，需要真实登录后拿到 cookie
 - 若要执行 `invite_only` 成功场景，需要有效邀请码；推荐从 `/admin/invites` 生成
+- 若要切换目标环境注册模式，推荐从 `/admin/invites` 的“注册模式”面板操作；后台配置不可用时再使用 `REGISTRATION_MODE` 环境变量兜底
 - 若要执行 `signup-ip-rate-limit-hits-429`，当前推荐在 `invite_only` 模式下执行，避免 `open` 模式真实造号
 - 若要执行 `generation_limited` / `readonly` / `daily quota` 场景，需要专门准备对应测试账号
 - 若要执行 `admin-status-shows-backend-and-usage`，需要管理员 cookie
@@ -184,7 +185,7 @@ blocked 之后必须在 `docs/dev/dev-log.md` 记录：
 
 failed 之后先查：
 
-- 环境变量是否正确
+- `/admin/invites` 显示的注册模式是否符合预期；若依赖环境变量兜底，再检查环境变量是否正确
 - 目标账号状态是否真的已设置
 - 目标环境是否真的应用了最新 SQL / 最新代码
 - `requestId` 与相关服务端日志

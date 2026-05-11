@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test, { afterEach } from "node:test";
 import { AuthError, ValidationError } from "@/lib/server/errors";
 import {
+  getEffectiveRegistrationMode,
   getRegistrationMode,
   hashInviteCode,
   normalizeInviteCode,
@@ -32,6 +33,70 @@ test("getRegistrationMode accepts supported public registration modes", () => {
 
   process.env.REGISTRATION_MODE = "open";
   assert.equal(getRegistrationMode(), "open");
+});
+
+test("getEffectiveRegistrationMode prefers runtime setting", async () => {
+  process.env.REGISTRATION_MODE = "closed";
+
+  const result = await getEffectiveRegistrationMode({
+    createSupabaseAdminClient: () =>
+      ({
+        from: (table: string) => {
+          assert.equal(table, "app_runtime_settings");
+          return {
+            select: () => ({
+              eq: (_column: string, key: string) => {
+                assert.equal(key, "registration_mode");
+                return {
+                  maybeSingle: async () => ({
+                    data: {
+                      value: "invite_only",
+                      updated_by: "admin-1",
+                      updated_at: "2026-05-11T00:00:00.000Z",
+                    },
+                    error: null,
+                  }),
+                };
+              },
+            }),
+          };
+        },
+      }) as never,
+  });
+
+  assert.deepEqual(result, {
+    mode: "invite_only",
+    source: "runtime",
+    updatedBy: "admin-1",
+    updatedAt: "2026-05-11T00:00:00.000Z",
+  });
+});
+
+test("getEffectiveRegistrationMode falls back to env and default closed", async () => {
+  process.env.REGISTRATION_MODE = "open";
+
+  const envResult = await getEffectiveRegistrationMode({
+    createSupabaseAdminClient: () =>
+      ({
+        from: () => {
+          throw new Error("missing table");
+        },
+      }) as never,
+  });
+  assert.equal(envResult.mode, "open");
+  assert.equal(envResult.source, "environment");
+
+  process.env.REGISTRATION_MODE = "bad";
+  const defaultResult = await getEffectiveRegistrationMode({
+    createSupabaseAdminClient: () =>
+      ({
+        from: () => {
+          throw new Error("missing table");
+        },
+      }) as never,
+  });
+  assert.equal(defaultResult.mode, "closed");
+  assert.equal(defaultResult.source, "default");
 });
 
 test("invite code hash is stable and never stores trimmed plaintext", () => {

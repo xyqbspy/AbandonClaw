@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { ForbiddenError } from "@/lib/server/errors";
+import { ForbiddenError, ValidationError } from "@/lib/server/errors";
 import {
   handleCreateAdminInviteCodesAction,
+  handleUpdateAdminRegistrationModeAction,
   handleUpdateAdminInviteCodeAction,
   handleUpdateAdminUserAccessStatusAction,
 } from "./actions";
@@ -172,4 +173,75 @@ test("admin 邀请码更新 action 会停用邀请码并返回提示", async () 
   assert.equal(url.pathname, "/admin/invites");
   assert.equal(url.searchParams.get("page"), "2");
   assert.equal(url.searchParams.get("noticeTone"), "success");
+});
+
+test("admin 注册模式 action 会拒绝非管理员调用", async () => {
+  await assert.rejects(
+    () =>
+      handleUpdateAdminRegistrationModeAction(new FormData(), {
+        requireAdmin: async () => {
+          throw new ForbiddenError();
+        },
+        updateAdminRegistrationMode: async () => {
+          throw new Error("should not update registration mode");
+        },
+        redirect: ((href: string) => href) as never,
+        revalidatePath: (() => {}) as never,
+      }),
+    ForbiddenError,
+  );
+});
+
+test("admin 注册模式 action 成功后刷新注册相关页面", async () => {
+  const formData = new FormData();
+  formData.set("registrationMode", "invite_only");
+  formData.set("returnTo", "/admin/invites");
+  const revalidatedPaths: string[] = [];
+  let updatedParams:
+    | {
+        mode: string;
+        updatedBy: string;
+      }
+    | undefined;
+
+  const href = await handleUpdateAdminRegistrationModeAction(formData, {
+    requireAdmin: async () => ({ id: "admin-1" } as never),
+    updateAdminRegistrationMode: async (params) => {
+      updatedParams = params;
+      return { mode: params.mode };
+    },
+    redirect: ((nextHref: string) => nextHref) as never,
+    revalidatePath: ((path: string) => {
+      revalidatedPaths.push(path);
+    }) as never,
+  });
+
+  const url = new URL(href, "http://localhost");
+  assert.deepEqual(updatedParams, {
+    mode: "invite_only",
+    updatedBy: "admin-1",
+  });
+  assert.deepEqual(revalidatedPaths, ["/admin", "/admin/invites", "/signup"]);
+  assert.equal(url.pathname, "/admin/invites");
+  assert.equal(url.searchParams.get("noticeTone"), "success");
+});
+
+test("admin 注册模式 action 会把非法模式收口为 danger notice", async () => {
+  const formData = new FormData();
+  formData.set("registrationMode", "bad");
+  let updateCalled = false;
+
+  const href = await handleUpdateAdminRegistrationModeAction(formData, {
+    requireAdmin: async () => ({ id: "admin-1" } as never),
+    updateAdminRegistrationMode: async () => {
+      updateCalled = true;
+      throw new ValidationError("bad");
+    },
+    redirect: ((nextHref: string) => nextHref) as never,
+    revalidatePath: (() => {}) as never,
+  });
+
+  const url = new URL(href, "http://localhost");
+  assert.equal(updateCalled, true);
+  assert.equal(url.searchParams.get("noticeTone"), "danger");
 });

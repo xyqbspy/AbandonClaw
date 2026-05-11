@@ -18,7 +18,7 @@
 执行真实环境验证前，先确认：
 
 - 目标环境代码和 SQL 都已部署到位。
-- `REGISTRATION_MODE` 已显式配置；小范围公网开放使用 `invite_only`。
+- 注册模式已显式确认；推荐在 `/admin/invites` 切换到 `invite_only`，后台配置缺失时再使用 `REGISTRATION_MODE` 兜底。
 - `UPSTASH_REDIS_REST_URL` 和 `UPSTASH_REDIS_REST_TOKEN` 已配置。
 - `APP_ORIGIN` / `NEXT_PUBLIC_APP_URL` / `NEXT_PUBLIC_SITE_URL` 与目标域名一致。
 - 已准备管理员账号、普通已验证账号、未验证邮箱账号、`generation_limited` 测试账号、`readonly` 测试账号。
@@ -63,13 +63,15 @@ pnpm run load:public-registration-baseline --config-file=tmp/public-registration
 
 ### 3.1 打开测试注册
 
-当前 `REGISTRATION_MODE=closed` 时，无论有没有邀请码都会拒绝注册。测试注册前，先把目标环境切到：
+当前有效注册模式为 `closed` 时，无论有没有邀请码都会拒绝注册。测试注册前，推荐管理员进入 `/admin/invites`，在“注册模式”面板切到 `invite_only`；页面会显示当前模式来自“后台配置 / 环境变量 / 默认兜底”。
+
+若后台配置表尚未部署或后台不可用，再使用环境变量兜底：
 
 ```env
 REGISTRATION_MODE=invite_only
 ```
 
-本地开发环境改完环境变量后需要重启 dev server；线上环境改完后需要重新部署或重启对应服务。测试完成后，如果不继续开放，应切回：
+本地开发环境改完环境变量后需要重启 dev server；线上环境改完后需要重新部署或重启对应服务。测试完成后，如果不继续开放，应在 `/admin/invites` 切回 `closed`，或使用环境变量兜底切回：
 
 ```env
 REGISTRATION_MODE=closed
@@ -240,8 +242,8 @@ where code_hash = '<邀请码 hash>';
 
 如果你现在测试没办法注册，按这个顺序查：
 
-1. `REGISTRATION_MODE` 是否仍是 `closed`；如果是，先切到 `invite_only`。
-2. 目标服务是否已经重启或重新部署，确保新环境变量生效。
+1. `/admin/invites` 显示的有效注册模式是否仍是 `closed`；如果是，先切到 `invite_only`。
+2. 如果依赖环境变量兜底，目标服务是否已经重启或重新部署，确保新环境变量生效。
 3. 注册页是否出现“邀请码”输入框；没有出现通常说明前端看到的模式不是 `invite_only`。
 4. `/admin/invites` 是否能看到对应邀请码处于启用状态。
 5. `expires_at` 是否为空或晚于当前时间。
@@ -251,13 +253,12 @@ where code_hash = '<邀请码 hash>';
 
 最小可行测试路径：
 
-1. 设置 `REGISTRATION_MODE=invite_only`。
-2. 重启服务。
-3. 在 `/admin/invites` 生成一个 `max_uses=1` 的测试邀请码。
-4. 打开注册页，输入邮箱、密码、用户名和明文邀请码。
-5. 注册成功后检查邮箱验证提示。
-6. 在 `/admin/invites` 确认使用记录为 `used`，并能看到注册 email / auth user id / 最小活动摘要。
-7. 测试结束后切回 `REGISTRATION_MODE=closed`，或在 `/admin/invites` 停用该测试邀请码。
+1. 在 `/admin/invites` 把注册模式切到 `invite_only`。
+2. 在 `/admin/invites` 生成一个 `max_uses=1` 的测试邀请码。
+3. 打开注册页，输入邮箱、密码、用户名和明文邀请码。
+4. 注册成功后检查邮箱验证提示。
+5. 在 `/admin/invites` 确认使用记录为 `used`，并能看到注册 email / auth user id / 最小活动摘要。
+6. 测试结束后在 `/admin/invites` 切回 `closed`，并停用该测试邀请码。
 
 ## 4. 注册 IP 频控
 
@@ -485,7 +486,7 @@ pnpm run load:public-registration-baseline --config-file=tmp/public-registration
 - 注册模式、注册 IP 频控、邮箱验证、Origin、user/IP 限流和 admin status baseline 均通过。
 - `rateLimitBackend.kind=upstash`。
 - `/admin/users` 处置演练完成。
-- `REGISTRATION_MODE=closed` 紧急切换已确认。
+- `/admin/invites` 切回 `closed` 的紧急切换已确认；后台不可用时 `REGISTRATION_MODE=closed` 兜底也已确认。
 - 真实 baseline JSON 已留证。
 
 不建议进入不可控公开渠道的情况：

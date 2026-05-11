@@ -13,7 +13,14 @@ import { mapLessonToParsedScene, mapParsedSceneToLesson } from "@/lib/adapters/s
 import { normalizeParsedSceneDialogue } from "@/lib/shared/scene-dialogue";
 import { ParsedScene } from "@/lib/types/scene-parser";
 import { parseUserAccessStatus } from "@/lib/server/validation";
-import { hashInviteCode, normalizeInviteCode } from "@/lib/server/registration";
+import {
+  EffectiveRegistrationMode,
+  hashInviteCode,
+  normalizeInviteCode,
+  parseRegistrationMode,
+  RegistrationMode,
+  getEffectiveRegistrationMode,
+} from "@/lib/server/registration";
 
 export interface AdminSceneListFilters {
   page?: number;
@@ -124,6 +131,8 @@ export interface AdminCreateInviteCodesResultItem {
   maxUses: number;
   expiresAt: string | null;
 }
+
+export type AdminRegistrationModeState = EffectiveRegistrationMode;
 
 interface AdminUserServiceDependencies {
   createSupabaseAdminClient: typeof createSupabaseAdminClient;
@@ -1412,6 +1421,48 @@ export async function updateAdminInviteCode(
   }
 
   return { inviteCodeId: data.id };
+}
+
+export async function getAdminRegistrationModeState() {
+  return getEffectiveRegistrationMode();
+}
+
+export async function updateAdminRegistrationMode(params: {
+  mode: RegistrationMode;
+  updatedBy: string;
+}, dependencies: AdminUserServiceDependencies = adminUserServiceDependencies) {
+  const mode = parseRegistrationMode(params.mode);
+  if (!mode) {
+    throw new ValidationError("registration mode is invalid.");
+  }
+  const updatedBy = params.updatedBy.trim();
+  if (!updatedBy) {
+    throw new ValidationError("updatedBy is required.");
+  }
+
+  const admin = dependencies.createSupabaseAdminClient();
+  const { data, error } = await admin
+    .from("app_runtime_settings")
+    .upsert(
+      {
+        key: "registration_mode",
+        value: mode,
+        updated_by: updatedBy,
+        updated_at: new Date().toISOString(),
+      } as never,
+      { onConflict: "key" },
+    )
+    .select("key")
+    .maybeSingle<{ key: string }>();
+
+  if (error) {
+    throw new Error(`Failed to update registration mode: ${error.message}`);
+  }
+  if (!data) {
+    throw new Error("Failed to update registration mode.");
+  }
+
+  return { mode };
 }
 
 export async function listAdminUsers(

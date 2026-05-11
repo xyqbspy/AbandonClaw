@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { toApiErrorResponse } from "@/lib/server/api-error";
 import { logApiError } from "@/lib/server/logger";
-import { getRegistrationMode, registerWithEmailPassword } from "@/lib/server/registration";
+import { getEffectiveRegistrationMode, registerWithEmailPassword } from "@/lib/server/registration";
 import { enforceRegistrationIpRateLimit } from "@/lib/server/rate-limit";
 import { assertAllowedOrigin } from "@/lib/server/request-guard";
 import { parseJsonBody } from "@/lib/server/validation";
@@ -16,7 +16,7 @@ type SignupRequestBody = {
 interface SignupRouteDependencies {
   assertAllowedOrigin: typeof assertAllowedOrigin;
   parseJsonBody: typeof parseJsonBody<SignupRequestBody>;
-  getRegistrationMode: typeof getRegistrationMode;
+  getEffectiveRegistrationMode: typeof getEffectiveRegistrationMode;
   enforceRegistrationIpRateLimit: typeof enforceRegistrationIpRateLimit;
   registerWithEmailPassword: typeof registerWithEmailPassword;
 }
@@ -24,15 +24,17 @@ interface SignupRouteDependencies {
 const signupRouteDependencies: SignupRouteDependencies = {
   assertAllowedOrigin,
   parseJsonBody,
-  getRegistrationMode,
+  getEffectiveRegistrationMode,
   enforceRegistrationIpRateLimit,
   registerWithEmailPassword,
 };
 
 export async function GET() {
+  const registrationMode = await getEffectiveRegistrationMode();
   return NextResponse.json(
     {
-      mode: getRegistrationMode(),
+      mode: registrationMode.mode,
+      source: registrationMode.source,
     },
     {
       status: 200,
@@ -50,7 +52,8 @@ export async function handleSignupPost(
   try {
     dependencies.assertAllowedOrigin(request);
     const payload = await dependencies.parseJsonBody(request);
-    const mode = dependencies.getRegistrationMode();
+    const registrationMode = await dependencies.getEffectiveRegistrationMode();
+    const mode = registrationMode.mode;
 
     if (mode !== "closed") {
       await dependencies.enforceRegistrationIpRateLimit(request);
@@ -61,6 +64,7 @@ export async function handleSignupPost(
       password: payload.password ?? "",
       username: payload.username,
       inviteCode: payload.inviteCode,
+      registrationMode: mode,
     });
 
     return NextResponse.json(result, {

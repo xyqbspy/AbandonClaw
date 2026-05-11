@@ -5,6 +5,7 @@ import { getSupabaseAnonKey, getSupabaseUrl } from "@/lib/supabase/env";
 import { AuthError, ValidationError } from "@/lib/server/errors";
 
 export type RegistrationMode = "closed" | "invite_only" | "open";
+export type RegistrationModeSource = "runtime" | "environment" | "default";
 
 type InviteCodeRow = {
   id: string;
@@ -22,6 +23,7 @@ export type SignupPayload = {
   password: string;
   username?: string;
   inviteCode?: string;
+  registrationMode?: RegistrationMode;
 };
 
 export type SignupResult = {
@@ -31,13 +33,81 @@ export type SignupResult = {
   emailVerificationRequired: boolean;
 };
 
-export const getRegistrationMode = (): RegistrationMode => {
-  const raw = process.env.REGISTRATION_MODE?.trim();
-  if (raw === "closed" || raw === "invite_only" || raw === "open") {
-    return raw;
-  }
-  return "closed";
+export type EffectiveRegistrationMode = {
+  mode: RegistrationMode;
+  source: RegistrationModeSource;
+  updatedBy: string | null;
+  updatedAt: string | null;
 };
+
+type RuntimeRegistrationModeRow = {
+  value: string;
+  updated_by: string | null;
+  updated_at: string | null;
+};
+
+interface RegistrationModeDependencies {
+  createSupabaseAdminClient: typeof createSupabaseAdminClient;
+}
+
+const registrationModeDependencies: RegistrationModeDependencies = {
+  createSupabaseAdminClient,
+};
+
+export const parseRegistrationMode = (value: unknown): RegistrationMode | null => {
+  if (value === "closed" || value === "invite_only" || value === "open") {
+    return value;
+  }
+  return null;
+};
+
+export const getRegistrationMode = (): RegistrationMode => {
+  return parseRegistrationMode(process.env.REGISTRATION_MODE?.trim()) ?? "closed";
+};
+
+export async function getEffectiveRegistrationMode(
+  dependencies: RegistrationModeDependencies = registrationModeDependencies,
+): Promise<EffectiveRegistrationMode> {
+  try {
+    const admin = dependencies.createSupabaseAdminClient();
+    const { data, error } = await admin
+      .from("app_runtime_settings")
+      .select("value,updated_by,updated_at")
+      .eq("key", "registration_mode")
+      .maybeSingle<RuntimeRegistrationModeRow>();
+
+    if (!error && data) {
+      const runtimeMode = parseRegistrationMode(data.value);
+      if (runtimeMode) {
+        return {
+          mode: runtimeMode,
+          source: "runtime",
+          updatedBy: data.updated_by ?? null,
+          updatedAt: data.updated_at ?? null,
+        };
+      }
+    }
+  } catch {
+    // 保守兜底到环境变量和 closed，避免配置读取异常误开放注册。
+  }
+
+  const environmentMode = parseRegistrationMode(process.env.REGISTRATION_MODE?.trim());
+  if (environmentMode) {
+    return {
+      mode: environmentMode,
+      source: "environment",
+      updatedBy: null,
+      updatedAt: null,
+    };
+  }
+
+  return {
+    mode: "closed",
+    source: "default",
+    updatedBy: null,
+    updatedAt: null,
+  };
+}
 
 export const normalizeInviteCode = (code: string) => code.trim();
 
@@ -139,7 +209,7 @@ const consumeInviteCode = async (inviteCode: InviteCodeRow) => {
 };
 
 export async function registerWithEmailPassword(payload: SignupPayload): Promise<SignupResult> {
-  const mode = getRegistrationMode();
+  const mode = payload.registrationMode ?? getRegistrationMode();
   const email = normalizeEmail(payload.email);
   const password = normalizePassword(payload.password);
   const username = normalizeUsername(payload.username);

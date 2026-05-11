@@ -4,6 +4,7 @@ import {
   createAdminInviteCodes,
   listAdminInviteCodes,
   listAdminUsers,
+  updateAdminRegistrationMode,
   updateAdminInviteCode,
   updateAdminUserAccessStatus,
 } from "./service";
@@ -317,6 +318,65 @@ test("updateAdminInviteCode 会更新元数据或停用邀请码", async () => {
     expires_at: null,
     is_active: false,
   });
+});
+
+test("updateAdminRegistrationMode 会写入运行时注册模式", async () => {
+  let upsertPayload: Record<string, unknown> | null = null;
+
+  const result = await updateAdminRegistrationMode(
+    {
+      mode: "invite_only",
+      updatedBy: "admin-1",
+    },
+    {
+      createSupabaseAdminClient: () =>
+        ({
+          from: (table: string) => {
+            assert.equal(table, "app_runtime_settings");
+            return {
+              upsert: (payload: Record<string, unknown>, options: Record<string, unknown>) => {
+                upsertPayload = payload;
+                assert.deepEqual(options, { onConflict: "key" });
+                return {
+                  select: () => ({
+                    maybeSingle: async () => ({
+                      data: { key: "registration_mode" },
+                      error: null,
+                    }),
+                  }),
+                };
+              },
+            };
+          },
+        }) as never,
+    },
+  );
+
+  assert.equal(result.mode, "invite_only");
+  assert.ok(upsertPayload);
+  const payload = upsertPayload as Record<string, unknown>;
+  assert.equal(payload.key, "registration_mode");
+  assert.equal(payload.value, "invite_only");
+  assert.equal(payload.updated_by, "admin-1");
+  assert.equal(typeof payload.updated_at, "string");
+});
+
+test("updateAdminRegistrationMode 会拒绝非法模式", async () => {
+  await assert.rejects(
+    () =>
+      updateAdminRegistrationMode(
+        {
+          mode: "bad" as never,
+          updatedBy: "admin-1",
+        },
+        {
+          createSupabaseAdminClient: () => {
+            throw new Error("should not write");
+          },
+        },
+      ),
+    /registration mode is invalid/,
+  );
 });
 
 test("listAdminInviteCodes 会返回使用明细与账号活动摘要", async () => {

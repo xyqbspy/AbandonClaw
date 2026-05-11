@@ -8,6 +8,7 @@ import {
 import { AdminActionButton } from "@/components/admin/admin-action-button";
 import { AdminNoticeCard } from "@/components/shared/admin-info-card";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { APPLE_ADMIN_CONTROL, APPLE_ADMIN_SELECT, APPLE_META_TEXT } from "@/lib/ui/apple-style";
 
 const INITIAL_STATE: CreateAdminInviteCodesActionState = {
@@ -30,47 +31,70 @@ export function InviteCodeCreatePanel() {
 
       {state.notice ? <AdminNoticeCard tone={state.tone}>{state.notice}</AdminNoticeCard> : null}
 
-      <form action={formAction} className="grid gap-3 sm:grid-cols-[1fr_1fr_1fr_auto]">
-        <select name="mode" defaultValue="auto" className={APPLE_ADMIN_SELECT} aria-label="生成模式">
-          <option value="auto">自动批量</option>
-          <option value="manual">手动输入</option>
-        </select>
-        <Input
-          name="code"
-          placeholder="手动邀请码（可空）"
-          className={APPLE_ADMIN_CONTROL}
-          aria-label="手动邀请码"
-        />
-        <Input
-          name="count"
-          type="number"
-          min={1}
-          max={50}
-          defaultValue={5}
-          className={APPLE_ADMIN_CONTROL}
-          aria-label="生成数量"
-        />
-        <Input
-          name="maxUses"
-          type="number"
-          min={1}
-          max={100}
-          defaultValue={1}
-          className={APPLE_ADMIN_CONTROL}
-          aria-label="最大使用次数"
-        />
-        <Input
-          name="expiresInDays"
-          type="number"
-          min={0}
-          max={90}
-          defaultValue={7}
-          className={APPLE_ADMIN_CONTROL}
-          aria-label="过期天数"
-        />
-        <AdminActionButton type="submit" tone="primary" disabled={pending}>
-          {pending ? "生成中" : "生成"}
-        </AdminActionButton>
+      <form action={formAction} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_1fr_auto]">
+        <div className="space-y-1.5">
+          <Label htmlFor="invite-create-mode">生成方式</Label>
+          <select
+            id="invite-create-mode"
+            name="mode"
+            defaultValue="auto"
+            className={APPLE_ADMIN_SELECT}
+          >
+            <option value="auto">自动批量</option>
+            <option value="manual">手动输入</option>
+          </select>
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="invite-create-code">手动邀请码</Label>
+          <Input
+            id="invite-create-code"
+            name="code"
+            placeholder="仅手动输入时填写"
+            className={APPLE_ADMIN_CONTROL}
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="invite-create-count">生成数量</Label>
+          <Input
+            id="invite-create-count"
+            name="count"
+            type="number"
+            min={1}
+            max={50}
+            defaultValue={5}
+            className={APPLE_ADMIN_CONTROL}
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="invite-create-max-uses">每码可用次数</Label>
+          <Input
+            id="invite-create-max-uses"
+            name="maxUses"
+            type="number"
+            min={1}
+            max={100}
+            defaultValue={1}
+            className={APPLE_ADMIN_CONTROL}
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="invite-create-expires-days">有效天数</Label>
+          <Input
+            id="invite-create-expires-days"
+            name="expiresInDays"
+            type="number"
+            min={0}
+            max={90}
+            defaultValue={7}
+            placeholder="0 为永不过期"
+            className={APPLE_ADMIN_CONTROL}
+          />
+        </div>
+        <div className="flex items-end">
+          <AdminActionButton type="submit" tone="primary" disabled={pending}>
+            {pending ? "生成中" : "生成"}
+          </AdminActionButton>
+        </div>
       </form>
 
       {state.codes.length > 0 ? (

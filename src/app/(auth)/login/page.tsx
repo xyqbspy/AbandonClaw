@@ -3,10 +3,9 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
+import { Mail, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
+import { AuthCard, AuthField } from "@/app/(auth)/auth-card";
 import {
   buildAuthRedirectHref,
   resolveSafeRedirectTarget,
@@ -52,35 +51,62 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-semibold">登录</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          登录后继续你的学习流程。
-        </p>
-      </div>
-      <form className="space-y-4" onSubmit={onSubmit}>
-        <div className="space-y-2">
-          <Label htmlFor="email">邮箱</Label>
-          <Input id="email" name="email" type="email" placeholder="name@example.com" required />
+    <AuthCard
+      title="欢迎回来"
+      description="请登录您的账号以继续"
+      footer={
+        <>
+          还没有账号？{" "}
+          <Link
+            href={buildAuthRedirectHref("/signup", redirectTo)}
+            className="font-semibold text-[#007AFF] no-underline"
+          >
+            立即注册
+          </Link>
+        </>
+      }
+    >
+      <form onSubmit={onSubmit}>
+        <AuthField
+          id="email"
+          name="email"
+          type="email"
+          label="邮箱地址"
+          placeholder="name@example.com"
+          required
+          icon={<Mail className="size-4" />}
+        />
+        <div className="mb-6">
+          <div className="mb-2 flex items-center justify-between">
+            <label htmlFor="password" className="block text-[13px] font-semibold text-[#1d1d1f]">
+              密码
+            </label>
+            <a href="#" className="text-xs text-[#007AFF] no-underline">
+              忘记密码？
+            </a>
+          </div>
+          <div className="relative flex items-center">
+            <span className="absolute left-4 text-[#86868b]">
+              <ShieldCheck className="size-4" />
+            </span>
+            <input
+              id="password"
+              name="password"
+              type="password"
+              placeholder="输入您的密码"
+              required
+              className="w-full rounded-xl border-[1.5px] border-[#e5e5e7] bg-white px-4 py-3.5 pl-12 text-[15px] text-[#1d1d1f] transition duration-200 placeholder:text-[#86868b] focus:border-[#007AFF] focus:outline-none focus:ring-4 focus:ring-[#007AFF]/10"
+            />
+          </div>
         </div>
-        <div className="space-y-2">
-          <Label htmlFor="password">密码</Label>
-          <Input id="password" name="password" type="password" placeholder="********" required />
-        </div>
-        <Button className="w-full" type="submit" disabled={submitting}>
-          {submitting ? "登录中..." : "登录"}
-        </Button>
-      </form>
-      <p className="text-sm text-muted-foreground">
-        还没有账号？{" "}
-        <Link
-          href={buildAuthRedirectHref("/signup", redirectTo)}
-          className="text-foreground underline underline-offset-4"
+        <button
+          className="mt-2.5 w-full cursor-pointer rounded-xl border-0 bg-[#007AFF] p-4 text-base font-semibold text-white transition duration-300 hover:bg-[#0056b3] disabled:cursor-not-allowed disabled:opacity-60"
+          type="submit"
+          disabled={submitting}
         >
-          去注册
-        </Link>
-      </p>
-    </div>
+          {submitting ? "登录中..." : "登 录"}
+        </button>
+      </form>
+    </AuthCard>
   );
 }

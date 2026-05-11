@@ -1,5 +1,32 @@
 # Dev Log
 
+### [2026-05-11] 推进 admin 注册模式控制入口
+- 类型：Spec-Driven / 注册准入开关后台化
+- 状态：已完成并归档 `add-admin-registration-mode-control`
+
+#### 背景
+管理员已经可以在 `/admin/invites` 生成邀请码，但注册模式仍只能通过 `REGISTRATION_MODE` 环境变量切换，导致“发码”和“打开邀请注册”不在同一个后台闭环里。
+
+#### 本次改动
+- 新增 `app_runtime_settings` 运行时配置表，用于保存 `registration_mode`。
+- 注册入口读取模式时优先使用后台运行时配置，缺失或异常时回退 `REGISTRATION_MODE`，最终兜底 `closed`。
+- `/admin/invites` 增加注册模式面板，可查看当前模式、来源、最近修改人和时间，并切换 `closed`、`invite_only`、`open`。
+- admin action 写入口继续复用 `requireAdmin()`，非法模式返回受控失败。
+
+#### 已运行验证
+- `pnpm exec tsc --noEmit`
+- `node --import tsx --test src/lib/server/registration.test.ts src/app/api/auth/signup/route.test.ts src/lib/server/admin/service.test.ts 'src/app/(app)/admin/actions.test.ts'`
+- `node --import tsx --import ./src/test/setup-dom.ts --test 'src/app/(app)/admin/invites/page.test.tsx'`
+- `pnpm exec openspec validate add-admin-registration-mode-control --strict --no-interactive`
+- `pnpm exec openspec validate --all --strict --no-interactive`
+- `pnpm run maintenance:check`
+- `git diff --check`
+
+#### 明确不收项
+- 不做完整配置中心、审批流、定时切换或历史回滚列表。
+- 不做自动发码、邮件/短信发送或邀请批次联动。
+- 不改变 `closed` 的保守默认语义。
+
 ### [2026-05-11] 推进 admin 邀请码管理入口
 - 类型：Spec-Driven / 公网注册准入运营工具
 - 状态：已完成并归档 `add-admin-invite-code-management`

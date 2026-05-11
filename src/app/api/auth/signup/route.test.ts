@@ -53,9 +53,9 @@ test("signup handler 会在 invite 校验和注册前执行 IP 频控", async ()
           inviteCode: "invite-code",
         };
       },
-      getRegistrationMode: () => {
+      getEffectiveRegistrationMode: async () => {
         order.push("mode");
-        return "invite_only";
+        return { mode: "invite_only", source: "runtime", updatedBy: null, updatedAt: null };
       },
       enforceRegistrationIpRateLimit: async () => {
         order.push("rate-limit");
@@ -90,7 +90,12 @@ test("signup handler 命中 IP 频控时返回受控 429 且不会继续注册",
         email: "user@example.com",
         password: "password123",
       }),
-      getRegistrationMode: () => "open",
+      getEffectiveRegistrationMode: async () => ({
+        mode: "open",
+        source: "runtime",
+        updatedBy: null,
+        updatedAt: null,
+      }),
       enforceRegistrationIpRateLimit: async () => {
         throw new RateLimitError(60);
       },
@@ -123,7 +128,12 @@ test("signup handler 在实际限流配置下会对同一 IP 返回 429", async 
       email: "user@example.com",
       password: "password123",
     })) as never,
-    getRegistrationMode: (() => "open") as never,
+    getEffectiveRegistrationMode: (async () => ({
+      mode: "open",
+      source: "runtime",
+      updatedBy: null,
+      updatedAt: null,
+    })) as never,
     enforceRegistrationIpRateLimit,
     registerWithEmailPassword: (async () => ({
       userId: "user-1",
