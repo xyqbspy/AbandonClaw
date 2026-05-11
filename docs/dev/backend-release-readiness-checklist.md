@@ -48,6 +48,14 @@
 
 - [public-registration-http-baseline-runbook.md](/d:/WorkCode/AbandonClaw/docs/dev/public-registration-http-baseline-runbook.md)
 
+以下项目未完成前，不应把注册入口发给真实公网用户：
+
+- [ ] 目标环境 `/api/admin/status` 已确认 `rateLimitBackend.kind=upstash`
+- [ ] 真实 HTTP baseline 已输出结构化 JSON，并在 `docs/dev/dev-log.md` 记录摘要
+- [ ] `signup-ip-rate-limit-hits-429`、`user-rate-limit-hits-429`、`ip-rate-limit-hits-429` 已在目标环境或等价环境跑通
+- [ ] `/admin/users` 已完成一次真实演练：把测试账号切到受限状态并恢复
+- [ ] 已确认可紧急切回 `REGISTRATION_MODE=closed`
+
 - [ ] 本地开发服务或目标环境已启动
 - [ ] baseline 脚本使用的 `Origin` 与服务端允许域一致
 - [ ] 认证 cookie 已通过真实登录流程获取
@@ -94,6 +102,8 @@ pnpm run load:public-registration-baseline --dry-run --config-file=scripts/load-
 - [ ] `supabase/sql/20260509_public_registration_p0b.sql` 已在目标环境执行。
 - [ ] `profiles.access_status` 默认 `active`，且可通过 `/admin/users` 或 SQL 设置为 `disabled`、`generation_limited`、`readonly`。
 - [ ] `/admin/users` 可按邮箱、用户 ID、用户名或状态查找目标用户，并成功切换 `access_status`。
+- [ ] `/admin/users` 非 admin 手输路由会被拦截，`/api/admin/status` 非 admin 请求会被拒绝。
+- [ ] 已用测试账号实际演练 `generation_limited` 与 `readonly` 的设置和恢复，而不只是停留在单测通过。
 - [ ] `DAILY_QUOTA_*` 环境变量已确认；未配置时接受服务端保守默认值。
 - [ ] 高成本接口超每日额度时返回 429，且不触发模型/TTS。
 - [ ] `/api/admin/status` 可看到 `todayHighCostUsage.items`。

@@ -39,6 +39,28 @@
 - 已新增统一 runner：`pnpm run load:public-registration-baseline --dry-run --config-file=scripts/load-samples/public-registration-http-baseline.sample.json`
 - 当前轮未连接真实 Supabase/Upstash 生产环境执行完整 HTTP baseline；小范围开放前必须按第 8 节清单补跑并记录结果。
 
+## 1.2 当前判断（2026-05-11）
+
+结合最近几轮落地结果，当前代码侧已经具备 `invite_only_strict` 小范围开放前需要的最小硬防护：
+
+- 注册入口已收口到服务端，并在账号创建前执行同一 IP 注册频控。
+- 高成本接口已有 user + IP 双维度限流、daily quota 和受控 429。
+- 账号已支持 `disabled`、`generation_limited`、`readonly` 三种最小处置状态。
+- 管理员已有最小 `/admin/users` 入口，可搜索用户并切换 `access_status`。
+- 非管理员手输 `/admin` 或直打 `/api/admin/*` 已有实现防护和回归测试。
+
+但这还不等于“已经可以直接放开到不可控渠道”。当前仍有 3 个放行前硬门槛不能跳过：
+
+1. 必须在目标环境补跑真实 HTTP baseline，并保留 JSON 证据与 `dev-log` 摘要。
+2. 必须确认目标环境限流后端实际为 `upstash`，不能以 `memory` 作为公网开放基线。
+3. 必须演练最小运营处置：能通过 `/admin/users` 把测试账号切到受限状态并恢复，且能紧急切回 `REGISTRATION_MODE=closed`。
+
+因此当前结论应统一为：
+
+- 可以准备 `invite_only` 的小范围真实用户开放，但前提是先补齐真实环境 baseline 与放行清单。
+- 还不适合把入口直接发到公开社群、社媒或任何不可控扩散渠道。
+- 如果目标从 `invite_only` 升到 `open_guarded` 或 `open`，仍需继续补更重的注册风控与运营视图。
+
 ## 2. 公开模式矩阵
 
 | 模式 | 适用阶段 | 注册方式 | 生成额度 | 管理要求 |
@@ -944,3 +966,10 @@ P1/P2 剩余风险：
 - 还没有邮箱域名策略、设备指纹、WAF/DDoS。
 - 还没有长期成本趋势、成本金额估算、Top N 用户视图。
 - 还没有服务端学习 session heartbeat。
+
+建议继续按这个优先级推进：
+
+1. 先补跑真实环境 baseline，并把结果留证到 `docs/dev/dev-log.md`。
+2. 再做目标环境的放行演练：确认 `upstash`、演练 `/admin/users` 处置和 `REGISTRATION_MODE=closed` 紧急切换。
+3. 如果准备发到不可控渠道，再补验证码、邮箱域名策略、设备/来源风控或 WAF 能力。
+4. 长期再做用户详情、成本趋势和服务端 heartbeat，这些不应阻塞当前受控开放。

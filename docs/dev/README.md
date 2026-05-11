@@ -36,6 +36,8 @@
   - 服务端上线前检查、运行护栏和真实 HTTP baseline。
 - [public-registration-http-baseline-runbook.md](/d:/WorkCode/AbandonClaw/docs/dev/public-registration-http-baseline-runbook.md)
   - 公网开放注册相关 baseline 的准备、执行、blocked 判断和结果留证手册。
+- [public-registration-feature-verification-guide.md](/d:/WorkCode/AbandonClaw/docs/dev/public-registration-feature-verification-guide.md)
+  - 公网开放注册前各项防护能力的验证方法、通过标准和失败排查入口。
 - [public-registration-readiness-plan.md](/d:/WorkCode/AbandonClaw/docs/dev/public-registration-readiness-plan.md)
   - 公网开放注册、滥用防护、学习数据可信化和运营处置的优先级执行计划。
 - [server-data-boundary-audit.md](/d:/WorkCode/AbandonClaw/docs/dev/server-data-boundary-audit.md)
