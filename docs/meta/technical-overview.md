@@ -58,6 +58,8 @@
 项目的数据能力主要依赖 Supabase，既承担用户认证，也承担数据库与对象存储。  
 当前已经不是“只靠前端本地状态”的模式，而是服务端维护学习、复习、短语资产和音频资源的完整闭环。
 
+认证和公开注册也已经收口到服务端：注册页调用 `/api/auth/signup`，服务端统一处理注册模式、邀请码、注册 IP 频控和 Supabase Auth 创建账号；邮箱验证使用项目内 `/auth/callback` 处理 Supabase code，`/verify-email` 提供重发验证邮件入口。
+
 ### 3.4 AI 与音频能力
 
 - `msedge-tts`
@@ -241,11 +243,14 @@
 
 ## 6.6 限流与高成本接口保护
 
-高成本接口已经接入统一限流：
+高成本接口已经接入统一限流与成本止损：
 
 - 进程内限流
 - `Upstash Redis` 可用时走共享限流
 - 共享后端失败时自动 fallback 到本地内存限流
+- 用户 + IP 双维度限流
+- daily quota 和调用前预占
+- 管理员可在后台临时关闭单个 high-cost capability
 
 这块主要保护：
 
@@ -255,7 +260,23 @@
 - tts
 - scenes import
 
-## 6.7 统一错误追踪
+如果某个能力异常放大成本，系统会在 quota 预占或上游调用前拒绝请求，而不是等模型或 TTS 已经触发后再失败。
+
+## 6.7 注册准入与邮箱验证闭环
+
+公网注册相关能力已经形成服务端闭环：
+
+- `closed / invite_only / open` 注册模式优先读取后台运行时配置，环境变量作为兜底。
+- `invite_only` 通过 `registration_invite_codes` 的 hash 校验邀请码，明文不落库。
+- 注册入口在邀请码校验和 Auth 注册前执行同一 IP 频控。
+- Supabase Auth 注册时显式传入 `/auth/callback` 邮箱验证回跳地址。
+- `/auth/callback` 使用 Supabase server client 交换 code 并写入 session cookie。
+- `/verify-email` 支持重发 signup 验证邮件。
+- middleware 基于 `email_confirmed_at / confirmed_at` 阻止未验证用户进入主应用或受保护 API。
+
+这套方案没有自建验证码系统，核心取舍是复用 Supabase Auth，把项目内需要控制的回跳、重发、拦截和文档验证补齐。
+
+## 6.8 统一错误追踪
 
 接口层已经补了：
 
@@ -273,8 +294,11 @@
 - 服务端统一 requestId
 - 统一错误响应
 - 高成本接口限流
+- 高成本 daily quota、预占和紧急开关
+- 服务端受控注册、邀请码准入、邮箱验证闭环和注册 IP 频控
 - 关键写接口幂等
 - 受保护写接口 Origin 校验
+- 账号状态降级：`disabled`、`generation_limited`、`readonly`
 - 用户态表逐步切换到 `createSupabaseServerClient`
 - 数据库侧已有主要用户态表的 RLS / policy 配套
 
@@ -335,6 +359,8 @@
 - `音频预热`：scene、today、chunks 多入口触发
 - `review pack 循环播放`：scenes 列表提前准备同日稳定场景音频包，减少后台播放对 JS 切歌的依赖
 - `接口限流`：高成本接口防刷
+- `注册准入`：服务端注册模式、邀请码、邮箱验证和 IP 频控
+- `成本止损`：daily quota、调用前预占和 admin 高成本紧急开关
 - `幂等去重`：重复写请求更稳
 - `统一错误追踪`：requestId + logger + 统一错误结构
 - `Origin 防护`：受保护写接口最小攻击防护
@@ -350,6 +376,7 @@
 - 未看到 PWA / Service Worker 级离线架构
 - 未看到全面的字段级加解密
 - 已补齐最小安全头基线，但 CSP、报告机制、跨源隔离与环境化安全策略仍未平台化
+- 公开注册已具备小范围试放的准入和处置基线，但完整 WAF、设备指纹、邮件投递监控、增长分析和运营审计后台仍未平台化
 
 也就是说，这个项目的技术路线更偏“实用型全栈产品工程”，而不是“大而全的平台工程模板”。
 
