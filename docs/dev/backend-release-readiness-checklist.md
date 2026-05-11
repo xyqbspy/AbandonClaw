@@ -18,6 +18,8 @@
 - [ ] `invite_only` 模式下无邀请码注册失败
 - [ ] 同一 IP 连续注册会在 `/api/auth/signup` 命中受控 429
 - [ ] 邀请码表包含 `max_uses`、`used_count`、`expires_at` 和 `is_active`
+- [ ] 管理员可通过 `/admin/invites` 生成、停用和调整邀请码
+- [ ] `/admin/invites` 可查看邀请码使用 email、auth user id、attempt 状态和最小活动摘要
 - [ ] 注册成功或失败均有 `registration_invite_attempts` 记录
 - [ ] Supabase 项目已确认开启邮箱验证策略
 - [ ] 邮箱未验证用户访问主应用会进入 `/verify-email`

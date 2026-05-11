@@ -7,6 +7,7 @@
 ### 注册入口与后台处置继续收口
 - `/api/auth/signup` 现在会在邀请码校验和账号创建前按同一 IP 频控；命中后直接返回受控 429，并带 `requestId`。
 - 管理后台新增 `/admin/users`，管理员可以按邮箱、用户 ID、用户名和账号状态查找用户，并直接切换 `active`、`disabled`、`generation_limited`、`readonly`。
+- 管理后台新增 `/admin/invites`，管理员可以生成、停用和调整邀请码，并查看邀请码被哪个邮箱/账号使用及最小活动摘要。
 
 ## 2026-05-09
 

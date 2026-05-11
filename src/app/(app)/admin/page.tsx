@@ -40,6 +40,12 @@ const entries = [
     href: "/admin/users",
   },
   {
+    title: "邀请码",
+    description:
+      "生成、停用和查看注册邀请码，追踪使用账号与最小活动情况。",
+    href: "/admin/invites",
+  },
+  {
     title: "\u573a\u666f",
     description:
       "\u67e5\u770b\u5168\u90e8 seed/imported \u573a\u666f\uff0c\u652f\u6301\u641c\u7d22\u548c\u7b5b\u9009\u3002",

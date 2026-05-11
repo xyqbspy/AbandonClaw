@@ -8,8 +8,10 @@ import {
   deleteAdminUserPhraseById,
   enrichAdminUserPhraseById,
   enrichAdminUserPhrasesByIds,
+  createAdminInviteCodes,
   deleteSceneById,
   regenerateSceneVariants,
+  updateAdminInviteCode,
   updateAdminUserAccessStatus,
   updateSceneSentencesById,
   updateSceneVisibility,
@@ -36,6 +38,9 @@ const ADMIN_NOTICE = {
   phraseEnrichFailed: "表达补全失败，请稍后重试。",
   batchSelectFirst: "请先选择需要补全的项。",
   batchEnrichFailed: "批量补全失败，请稍后重试。",
+  invitesUpdated: "邀请码已更新。",
+  inviteNotFound: "未找到邀请码。",
+  inviteInvalid: "邀请码参数无效，请重试。",
 } as const;
 
 const USER_ACCESS_STATUS_NOTICE = {
@@ -46,6 +51,7 @@ const USER_ACCESS_STATUS_NOTICE = {
 
 const refreshAdminPages = (sceneId?: string) => {
   revalidatePath("/admin");
+  revalidatePath("/admin/invites");
   revalidatePath("/admin/users");
   revalidatePath("/admin/scenes");
   revalidatePath("/admin/phrases");
@@ -64,9 +70,35 @@ interface UpdateAdminUserAccessStatusActionDependencies {
   revalidatePath: typeof revalidatePath;
 }
 
+interface CreateAdminInviteCodesActionDependencies {
+  requireAdmin: typeof requireAdmin;
+  createAdminInviteCodes: typeof createAdminInviteCodes;
+  revalidatePath: typeof revalidatePath;
+}
+
+interface UpdateAdminInviteCodeActionDependencies {
+  requireAdmin: typeof requireAdmin;
+  updateAdminInviteCode: typeof updateAdminInviteCode;
+  redirect: typeof redirect;
+  revalidatePath: typeof revalidatePath;
+}
+
 const updateAdminUserAccessStatusActionDependencies: UpdateAdminUserAccessStatusActionDependencies = {
   requireAdmin,
   updateAdminUserAccessStatus,
+  redirect,
+  revalidatePath,
+};
+
+const createAdminInviteCodesActionDependencies: CreateAdminInviteCodesActionDependencies = {
+  requireAdmin,
+  createAdminInviteCodes,
+  revalidatePath,
+};
+
+const updateAdminInviteCodeActionDependencies: UpdateAdminInviteCodeActionDependencies = {
+  requireAdmin,
+  updateAdminInviteCode,
   redirect,
   revalidatePath,
 };
@@ -204,6 +236,114 @@ export async function handleUpdateAdminUserAccessStatusAction(
 
 export async function updateAdminUserAccessStatusAction(formData: FormData) {
   return handleUpdateAdminUserAccessStatusAction(formData);
+}
+
+export type CreateAdminInviteCodesActionState = {
+  notice: string | null;
+  tone: "success" | "danger";
+  codes: Array<{
+    id: string;
+    code: string;
+    maxUses: number;
+    expiresAt: string | null;
+  }>;
+};
+
+const parseOptionalNumberFromForm = (value: FormDataEntryValue | null) => {
+  if (typeof value !== "string" || !value.trim()) return undefined;
+  const parsed = Number(value);
+  if (Number.isNaN(parsed)) {
+    throw new ValidationError("number value is invalid.");
+  }
+  return parsed;
+};
+
+export async function handleCreateAdminInviteCodesAction(
+  _previousState: CreateAdminInviteCodesActionState,
+  formData: FormData,
+  dependencies: CreateAdminInviteCodesActionDependencies = createAdminInviteCodesActionDependencies,
+): Promise<CreateAdminInviteCodesActionState> {
+  await dependencies.requireAdmin();
+
+  try {
+    const modeValue = String(formData.get("mode") ?? "auto");
+    const mode = modeValue === "manual" ? "manual" : "auto";
+    const codes = await dependencies.createAdminInviteCodes({
+      mode,
+      code: String(formData.get("code") ?? ""),
+      count: parseOptionalNumberFromForm(formData.get("count")),
+      maxUses: parseOptionalNumberFromForm(formData.get("maxUses")),
+      expiresInDays: parseOptionalNumberFromForm(formData.get("expiresInDays")),
+    });
+
+    dependencies.revalidatePath("/admin");
+    dependencies.revalidatePath("/admin/invites");
+
+    return {
+      notice: `已生成 ${codes.length} 个邀请码。请现在复制，刷新后不会再显示明文。`,
+      tone: "success",
+      codes,
+    };
+  } catch (error) {
+    if (error instanceof ValidationError) {
+      return {
+        notice: ADMIN_NOTICE.inviteInvalid,
+        tone: "danger",
+        codes: [],
+      };
+    }
+    throw error;
+  }
+}
+
+export async function createAdminInviteCodesAction(
+  previousState: CreateAdminInviteCodesActionState,
+  formData: FormData,
+) {
+  return handleCreateAdminInviteCodesAction(previousState, formData);
+}
+
+export async function handleUpdateAdminInviteCodeAction(
+  formData: FormData,
+  dependencies: UpdateAdminInviteCodeActionDependencies = updateAdminInviteCodeActionDependencies,
+) {
+  await dependencies.requireAdmin();
+
+  const inviteCodeId = parseRequiredIdFromForm(formData.get("inviteCodeId"), "inviteCodeId");
+  const returnTo = normalizeAdminReturnTo(formData.get("returnTo"), "/admin/invites");
+  const action = String(formData.get("inviteAction") ?? "update");
+
+  try {
+    await dependencies.updateAdminInviteCode({
+      inviteCodeId,
+      isActive: action === "deactivate" ? false : undefined,
+      maxUses: action === "update" ? parseOptionalNumberFromForm(formData.get("maxUses")) : undefined,
+      expiresInDays:
+        action === "update" ? parseOptionalNumberFromForm(formData.get("expiresInDays")) : undefined,
+    });
+  } catch (error) {
+    if (error instanceof ValidationError) {
+      return dependencies.redirect(
+        appendAdminNotice(returnTo, ADMIN_NOTICE.inviteInvalid, "danger"),
+      );
+    }
+    if (error instanceof NotFoundError) {
+      return dependencies.redirect(
+        appendAdminNotice(returnTo, ADMIN_NOTICE.inviteNotFound, "danger"),
+      );
+    }
+    throw error;
+  }
+
+  dependencies.revalidatePath("/admin");
+  dependencies.revalidatePath("/admin/invites");
+  return dependencies.redirect(
+    appendAdminNotice(returnTo, ADMIN_NOTICE.invitesUpdated, "success"),
+  );
+}
+
+export async function updateAdminInviteCodeAction(formData: FormData) {
+  return handleUpdateAdminInviteCodeAction(formData);
 }
 
 export async function deleteAdminPhraseAction(formData: FormData) {

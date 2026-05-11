@@ -1,6 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { listAdminUsers, updateAdminUserAccessStatus } from "./service";
+import {
+  createAdminInviteCodes,
+  listAdminInviteCodes,
+  listAdminUsers,
+  updateAdminInviteCode,
+  updateAdminUserAccessStatus,
+} from "./service";
+import { hashInviteCode } from "@/lib/server/registration";
 
 type AuthUserRow = {
   id: string;
@@ -201,4 +208,241 @@ test("updateAdminUserAccessStatus 遇到缺失资料会返回受控失败", asyn
       ),
     /User profile not found/,
   );
+});
+
+const createInviteCreateDependencies = (params: {
+  onInsert?: (rows: Array<Record<string, unknown>>) => void;
+  data?: Array<{ id: string; max_uses: number; expires_at: string | null }>;
+  error?: { message: string } | null;
+}) =>
+  ({
+    createSupabaseAdminClient: () =>
+      ({
+        from: (table: string) => {
+          assert.equal(table, "registration_invite_codes");
+          return {
+            insert: (rows: Array<Record<string, unknown>>) => {
+              params.onInsert?.(rows);
+              return {
+                select: async () => ({
+                  data: params.data ?? rows.map((_, index) => ({
+                    id: `invite-${index + 1}`,
+                    max_uses: Number(rows[index]?.max_uses ?? 1),
+                    expires_at: String(rows[index]?.expires_at ?? ""),
+                  })),
+                  error: params.error ?? null,
+                }),
+              };
+            },
+          };
+        },
+      }) as never,
+  }) as const;
+
+test("createAdminInviteCodes 只写入 hash 并返回本次明文", async () => {
+  let insertedRows: Array<Record<string, unknown>> = [];
+  const result = await createAdminInviteCodes(
+    {
+      mode: "manual",
+      code: "  AC-TEST-001  ",
+      maxUses: 2,
+      expiresInDays: 7,
+    },
+    createInviteCreateDependencies({
+      onInsert: (rows) => {
+        insertedRows = rows;
+      },
+      data: [{ id: "invite-1", max_uses: 2, expires_at: "2026-05-18T00:00:00.000Z" }],
+    }),
+  );
+
+  assert.equal(result[0]?.code, "AC-TEST-001");
+  assert.equal(insertedRows[0]?.code_hash, hashInviteCode("AC-TEST-001"));
+  assert.equal("code" in insertedRows[0]!, false);
+  assert.equal(insertedRows[0]?.max_uses, 2);
+});
+
+test("createAdminInviteCodes 会限制批量生成数量", async () => {
+  await assert.rejects(
+    () =>
+      createAdminInviteCodes(
+        {
+          mode: "auto",
+          count: 51,
+        },
+        createInviteCreateDependencies({}),
+      ),
+    /count must be between 1 and 50/,
+  );
+});
+
+test("updateAdminInviteCode 会更新元数据或停用邀请码", async () => {
+  let updatePayload: Record<string, unknown> | null = null;
+
+  const result = await updateAdminInviteCode(
+    {
+      inviteCodeId: "invite-1",
+      maxUses: 3,
+      expiresInDays: 0,
+      isActive: false,
+    },
+    {
+      createSupabaseAdminClient: () =>
+        ({
+          from: (table: string) => {
+            assert.equal(table, "registration_invite_codes");
+            return {
+              update: (payload: Record<string, unknown>) => {
+                updatePayload = payload;
+                return {
+                  eq: (_column: string, inviteCodeId: string) => ({
+                    select: () => ({
+                      maybeSingle: async () => ({
+                        data: { id: inviteCodeId },
+                        error: null,
+                      }),
+                    }),
+                  }),
+                };
+              },
+            };
+          },
+        }) as never,
+    },
+  );
+
+  assert.equal(result.inviteCodeId, "invite-1");
+  assert.deepEqual(updatePayload, {
+    max_uses: 3,
+    expires_at: null,
+    is_active: false,
+  });
+});
+
+test("listAdminInviteCodes 会返回使用明细与账号活动摘要", async () => {
+  const result = await listAdminInviteCodes(
+    { page: 1, pageSize: 10 },
+    {
+      createSupabaseAdminClient: () =>
+        ({
+          auth: {
+            admin: {
+              listUsers: async () => ({
+                data: {
+                  users: [
+                    {
+                      id: "user-1",
+                      email: "rose@example.com",
+                      created_at: "2026-05-09T00:00:00.000Z",
+                      email_confirmed_at: "2026-05-09T01:00:00.000Z",
+                    },
+                  ],
+                },
+                error: null,
+              }),
+            },
+          },
+          from: (table: string) => {
+            if (table === "registration_invite_codes") {
+              return {
+                select: () => ({
+                  order: () => ({
+                    range: async () => ({
+                      data: [
+                        {
+                          id: "invite-1",
+                          max_uses: 2,
+                          used_count: 1,
+                          expires_at: null,
+                          is_active: true,
+                          created_at: "2026-05-09T00:00:00.000Z",
+                          updated_at: "2026-05-09T00:00:00.000Z",
+                        },
+                      ],
+                      error: null,
+                      count: 1,
+                    }),
+                  }),
+                }),
+              };
+            }
+            if (table === "registration_invite_attempts") {
+              return {
+                select: () => ({
+                  in: () => ({
+                    order: async () => ({
+                      data: [
+                        {
+                          id: "attempt-1",
+                          invite_code_id: "invite-1",
+                          email: "rose@example.com",
+                          status: "used",
+                          auth_user_id: "user-1",
+                          failure_reason: null,
+                          created_at: "2026-05-09T01:00:00.000Z",
+                        },
+                      ],
+                      error: null,
+                    }),
+                  }),
+                }),
+              };
+            }
+            if (table === "profiles") {
+              return {
+                select: () => ({
+                  in: async () => ({
+                    data: [{ id: "user-1", username: "rose", access_status: "active" }],
+                    error: null,
+                  }),
+                }),
+              };
+            }
+            if (table === "user_daily_learning_stats") {
+              return {
+                select: () => ({
+                  in: async () => ({
+                    data: [
+                      {
+                        user_id: "user-1",
+                        study_seconds: 120,
+                        scenes_completed: 1,
+                        review_items_completed: 2,
+                        phrases_saved: 3,
+                      },
+                    ],
+                    error: null,
+                  }),
+                }),
+              };
+            }
+            assert.equal(table, "user_daily_high_cost_usage");
+            return {
+              select: () => ({
+                eq: () => ({
+                  in: async () => ({
+                    data: [
+                      {
+                        user_id: "user-1",
+                        reserved_count: 4,
+                        success_count: 3,
+                        failed_count: 1,
+                      },
+                    ],
+                    error: null,
+                  }),
+                }),
+              }),
+            };
+          },
+        }) as never,
+    },
+  );
+
+  assert.equal(result.total, 1);
+  assert.equal(result.rows[0]?.attempts[0]?.email, "rose@example.com");
+  assert.equal(result.rows[0]?.attempts[0]?.account?.username, "rose");
+  assert.equal(result.rows[0]?.attempts[0]?.account?.emailVerified, true);
+  assert.equal(result.rows[0]?.attempts[0]?.account?.studySeconds, 120);
+  assert.equal(result.rows[0]?.attempts[0]?.account?.highCostSuccess, 3);
 });

@@ -1,4 +1,5 @@
 import type { User } from "@supabase/supabase-js";
+import { randomBytes } from "node:crypto";
 import { isValidParsedScene } from "@/lib/server/scene-json";
 import { generateSceneVariants, getSceneVariantsBySceneId } from "@/lib/server/scene/variants";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -12,6 +13,7 @@ import { mapLessonToParsedScene, mapParsedSceneToLesson } from "@/lib/adapters/s
 import { normalizeParsedSceneDialogue } from "@/lib/shared/scene-dialogue";
 import { ParsedScene } from "@/lib/types/scene-parser";
 import { parseUserAccessStatus } from "@/lib/server/validation";
+import { hashInviteCode, normalizeInviteCode } from "@/lib/server/registration";
 
 export interface AdminSceneListFilters {
   page?: number;
@@ -69,6 +71,60 @@ export interface AdminUserListItem {
   createdAt: string;
 }
 
+export interface AdminInviteCodeListFilters {
+  page?: number;
+  pageSize?: number;
+}
+
+export interface AdminInviteAttemptItem {
+  id: string;
+  email: string;
+  status: "pending" | "used" | "rejected" | "failed" | "needs_repair";
+  failureReason: string | null;
+  authUserId: string | null;
+  createdAt: string;
+  account:
+    | {
+        username: string | null;
+        accessStatus: UserAccessStatus;
+        emailVerified: boolean | null;
+        studySeconds: number;
+        scenesCompleted: number;
+        reviewItemsCompleted: number;
+        phrasesSaved: number;
+        highCostReserved: number;
+        highCostSuccess: number;
+        highCostFailed: number;
+      }
+    | null;
+}
+
+export interface AdminInviteCodeListItem {
+  id: string;
+  maxUses: number;
+  usedCount: number;
+  expiresAt: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  attempts: AdminInviteAttemptItem[];
+}
+
+export interface AdminCreateInviteCodesInput {
+  mode: "manual" | "auto";
+  code?: string;
+  count?: number;
+  maxUses?: number;
+  expiresInDays?: number;
+}
+
+export interface AdminCreateInviteCodesResultItem {
+  id: string;
+  code: string;
+  maxUses: number;
+  expiresAt: string | null;
+}
+
 interface AdminUserServiceDependencies {
   createSupabaseAdminClient: typeof createSupabaseAdminClient;
 }
@@ -80,6 +136,13 @@ const adminUserServiceDependencies: AdminUserServiceDependencies = {
 const DEFAULT_ADMIN_ACCESS_STATUS: UserAccessStatus = "active";
 const AUTH_LIST_USERS_PAGE_SIZE = 100;
 const AUTH_LIST_USERS_MAX_PAGES = 20;
+const ADMIN_INVITE_DEFAULT_COUNT = 5;
+const ADMIN_INVITE_MAX_COUNT = 50;
+const ADMIN_INVITE_DEFAULT_MAX_USES = 1;
+const ADMIN_INVITE_MAX_USES = 100;
+const ADMIN_INVITE_DEFAULT_EXPIRES_IN_DAYS = 7;
+const ADMIN_INVITE_MAX_EXPIRES_IN_DAYS = 90;
+const ADMIN_INVITE_CODE_MAX_LENGTH = 128;
 
 export interface AdminSceneSentenceUpdate {
   sentenceId: string;
@@ -103,6 +166,41 @@ const normalizeSearch = (value: string | undefined) => {
   const text = value?.trim();
   return text ? text : undefined;
 };
+
+const todayDate = (now = new Date()) => now.toISOString().slice(0, 10);
+
+const parsePositiveIntInRange = (
+  value: number | undefined,
+  fallback: number,
+  max: number,
+  fieldName: string,
+) => {
+  if (value == null || Number.isNaN(value)) return fallback;
+  const rounded = Math.floor(value);
+  if (rounded < 1 || rounded > max) {
+    throw new ValidationError(`${fieldName} must be between 1 and ${max}.`);
+  }
+  return rounded;
+};
+
+const parseOptionalExpiresInDays = (value: number | undefined) => {
+  if (value == null || Number.isNaN(value)) return ADMIN_INVITE_DEFAULT_EXPIRES_IN_DAYS;
+  const rounded = Math.floor(value);
+  if (rounded < 0 || rounded > ADMIN_INVITE_MAX_EXPIRES_IN_DAYS) {
+    throw new ValidationError(`expiresInDays must be between 0 and ${ADMIN_INVITE_MAX_EXPIRES_IN_DAYS}.`);
+  }
+  return rounded;
+};
+
+const buildInviteExpiresAt = (expiresInDays: number) => {
+  if (expiresInDays === 0) return null;
+  const date = new Date();
+  date.setUTCDate(date.getUTCDate() + expiresInDays);
+  return date.toISOString();
+};
+
+export const generateAdminInvitePlainCode = () =>
+  `AC-${randomBytes(3).toString("hex").toUpperCase()}-${randomBytes(3).toString("hex").toUpperCase()}`;
 
 const hasEnoughExampleSentences = (value: unknown) => Array.isArray(value) && value.length >= 2;
 
@@ -967,6 +1065,353 @@ async function listAllAuthUsers(
   }
 
   return users;
+}
+
+type InviteCodeRow = {
+  id: string;
+  max_uses: number;
+  used_count: number;
+  expires_at: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+type InviteAttemptRow = {
+  id: string;
+  invite_code_id: string | null;
+  email: string;
+  status: "pending" | "used" | "rejected" | "failed" | "needs_repair";
+  auth_user_id: string | null;
+  failure_reason: string | null;
+  created_at: string;
+};
+
+const mapAuthEmailVerified = (user: User | undefined) => {
+  if (!user) return null;
+  return Boolean(user.email_confirmed_at || user.confirmed_at);
+};
+
+export async function listAdminInviteCodes(
+  filters: AdminInviteCodeListFilters,
+  dependencies: AdminUserServiceDependencies = adminUserServiceDependencies,
+) {
+  const admin = dependencies.createSupabaseAdminClient();
+  const page = clampPage(filters.page);
+  const pageSize = clampPageSize(filters.pageSize);
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+
+  const { data, error, count } = await admin
+    .from("registration_invite_codes")
+    .select("id,max_uses,used_count,expires_at,is_active,created_at,updated_at", { count: "exact" })
+    .order("created_at", { ascending: false })
+    .range(from, to);
+
+  if (error) {
+    throw new Error(`Failed to list invite codes: ${error.message}`);
+  }
+
+  const inviteRows = (data ?? []) as InviteCodeRow[];
+  const inviteIds = inviteRows.map((row) => row.id);
+  const attemptsByInviteId = new Map<string, InviteAttemptRow[]>();
+
+  if (inviteIds.length > 0) {
+    const { data: attemptsData, error: attemptsError } = await admin
+      .from("registration_invite_attempts")
+      .select("id,invite_code_id,email,status,auth_user_id,failure_reason,created_at")
+      .in("invite_code_id", inviteIds)
+      .order("created_at", { ascending: false });
+
+    if (attemptsError) {
+      throw new Error(`Failed to list invite attempts: ${attemptsError.message}`);
+    }
+
+    for (const attempt of (attemptsData ?? []) as InviteAttemptRow[]) {
+      if (!attempt.invite_code_id) continue;
+      const rows = attemptsByInviteId.get(attempt.invite_code_id) ?? [];
+      rows.push(attempt);
+      attemptsByInviteId.set(attempt.invite_code_id, rows);
+    }
+  }
+
+  const authUserIds = Array.from(
+    new Set(
+      Array.from(attemptsByInviteId.values())
+        .flat()
+        .map((attempt) => attempt.auth_user_id)
+        .filter((value): value is string => Boolean(value)),
+    ),
+  );
+
+  const profilesById = new Map<
+    string,
+    { id: string; username: string | null; access_status?: UserAccessStatus }
+  >();
+  const learningByUserId = new Map<
+    string,
+    {
+      studySeconds: number;
+      scenesCompleted: number;
+      reviewItemsCompleted: number;
+      phrasesSaved: number;
+    }
+  >();
+  const highCostByUserId = new Map<
+    string,
+    { reserved: number; success: number; failed: number }
+  >();
+  const authUsersById = new Map<string, User>();
+
+  if (authUserIds.length > 0) {
+    const [profileResult, learningResult, highCostResult, authUsers] = await Promise.all([
+      admin.from("profiles").select("id,username,access_status").in("id", authUserIds),
+      admin
+        .from("user_daily_learning_stats")
+        .select("user_id,study_seconds,scenes_completed,review_items_completed,phrases_saved")
+        .in("user_id", authUserIds),
+      admin
+        .from("user_daily_high_cost_usage")
+        .select("user_id,reserved_count,success_count,failed_count")
+        .eq("usage_date", todayDate())
+        .in("user_id", authUserIds),
+      listAllAuthUsers(dependencies),
+    ]);
+
+    if (profileResult.error) {
+      throw new Error(`Failed to list invite user profiles: ${profileResult.error.message}`);
+    }
+    if (learningResult.error) {
+      throw new Error(`Failed to list invite learning summary: ${learningResult.error.message}`);
+    }
+    if (highCostResult.error) {
+      throw new Error(`Failed to list invite high cost summary: ${highCostResult.error.message}`);
+    }
+
+    for (const profile of (profileResult.data ?? []) as Array<{
+      id: string;
+      username: string | null;
+      access_status?: UserAccessStatus;
+    }>) {
+      profilesById.set(profile.id, profile);
+    }
+
+    for (const row of (learningResult.data ?? []) as Array<{
+      user_id: string;
+      study_seconds: number;
+      scenes_completed: number;
+      review_items_completed: number;
+      phrases_saved: number;
+    }>) {
+      const current = learningByUserId.get(row.user_id) ?? {
+        studySeconds: 0,
+        scenesCompleted: 0,
+        reviewItemsCompleted: 0,
+        phrasesSaved: 0,
+      };
+      current.studySeconds += Number(row.study_seconds ?? 0);
+      current.scenesCompleted += Number(row.scenes_completed ?? 0);
+      current.reviewItemsCompleted += Number(row.review_items_completed ?? 0);
+      current.phrasesSaved += Number(row.phrases_saved ?? 0);
+      learningByUserId.set(row.user_id, current);
+    }
+
+    for (const row of (highCostResult.data ?? []) as Array<{
+      user_id: string;
+      reserved_count: number;
+      success_count: number;
+      failed_count: number;
+    }>) {
+      const current = highCostByUserId.get(row.user_id) ?? {
+        reserved: 0,
+        success: 0,
+        failed: 0,
+      };
+      current.reserved += Number(row.reserved_count ?? 0);
+      current.success += Number(row.success_count ?? 0);
+      current.failed += Number(row.failed_count ?? 0);
+      highCostByUserId.set(row.user_id, current);
+    }
+
+    for (const user of authUsers) {
+      if (authUserIds.includes(user.id)) {
+        authUsersById.set(user.id, user);
+      }
+    }
+  }
+
+  return {
+    rows: inviteRows.map<AdminInviteCodeListItem>((invite) => ({
+      id: invite.id,
+      maxUses: invite.max_uses,
+      usedCount: invite.used_count,
+      expiresAt: invite.expires_at,
+      isActive: invite.is_active,
+      createdAt: invite.created_at,
+      updatedAt: invite.updated_at,
+      attempts: (attemptsByInviteId.get(invite.id) ?? []).map<AdminInviteAttemptItem>((attempt) => {
+        const userId = attempt.auth_user_id;
+        const profile = userId ? profilesById.get(userId) : undefined;
+        const learning = userId ? learningByUserId.get(userId) : undefined;
+        const highCost = userId ? highCostByUserId.get(userId) : undefined;
+        return {
+          id: attempt.id,
+          email: attempt.email,
+          status: attempt.status,
+          failureReason: attempt.failure_reason,
+          authUserId: userId,
+          createdAt: attempt.created_at,
+          account: userId
+            ? {
+                username: profile?.username ?? null,
+                accessStatus: profile?.access_status ?? DEFAULT_ADMIN_ACCESS_STATUS,
+                emailVerified: mapAuthEmailVerified(authUsersById.get(userId)),
+                studySeconds: learning?.studySeconds ?? 0,
+                scenesCompleted: learning?.scenesCompleted ?? 0,
+                reviewItemsCompleted: learning?.reviewItemsCompleted ?? 0,
+                phrasesSaved: learning?.phrasesSaved ?? 0,
+                highCostReserved: highCost?.reserved ?? 0,
+                highCostSuccess: highCost?.success ?? 0,
+                highCostFailed: highCost?.failed ?? 0,
+              }
+            : null,
+        };
+      }),
+    })),
+    total: count ?? 0,
+    page,
+    pageSize,
+  };
+}
+
+export async function createAdminInviteCodes(
+  input: AdminCreateInviteCodesInput,
+  dependencies: AdminUserServiceDependencies = adminUserServiceDependencies,
+) {
+  const mode = input.mode;
+  if (mode !== "manual" && mode !== "auto") {
+    throw new ValidationError("mode must be manual or auto.");
+  }
+
+  const count =
+    mode === "manual"
+      ? 1
+      : parsePositiveIntInRange(
+          input.count,
+          ADMIN_INVITE_DEFAULT_COUNT,
+          ADMIN_INVITE_MAX_COUNT,
+          "count",
+        );
+  const maxUses = parsePositiveIntInRange(
+    input.maxUses,
+    ADMIN_INVITE_DEFAULT_MAX_USES,
+    ADMIN_INVITE_MAX_USES,
+    "maxUses",
+  );
+  const expiresAt = buildInviteExpiresAt(parseOptionalExpiresInDays(input.expiresInDays));
+  const codes =
+    mode === "manual"
+      ? [normalizeInviteCode(input.code ?? "")]
+      : Array.from({ length: count }, () => generateAdminInvitePlainCode());
+
+  if (codes.some((code) => !code)) {
+    throw new ValidationError("invite code is required.");
+  }
+  if (codes.some((code) => code.length > ADMIN_INVITE_CODE_MAX_LENGTH)) {
+    throw new ValidationError(`invite code must be <= ${ADMIN_INVITE_CODE_MAX_LENGTH} characters.`);
+  }
+
+  const uniqueCodes = Array.from(new Set(codes));
+  if (uniqueCodes.length !== codes.length) {
+    throw new ValidationError("invite codes must be unique.");
+  }
+
+  const rows = uniqueCodes.map((code) => ({
+    code_hash: hashInviteCode(code),
+    max_uses: maxUses,
+    expires_at: expiresAt,
+    is_active: true,
+  }));
+
+  const admin = dependencies.createSupabaseAdminClient();
+  const { data, error } = await admin
+    .from("registration_invite_codes")
+    .insert(rows as never)
+    .select("id,max_uses,expires_at");
+
+  if (error) {
+    throw new Error(`Failed to create invite codes: ${error.message}`);
+  }
+
+  const createdRows = (data ?? []) as Array<{
+    id: string;
+    max_uses: number;
+    expires_at: string | null;
+  }>;
+
+  return createdRows.map<AdminCreateInviteCodesResultItem>((row, index) => ({
+    id: row.id,
+    code: uniqueCodes[index] ?? "",
+    maxUses: row.max_uses,
+    expiresAt: row.expires_at,
+  }));
+}
+
+export async function updateAdminInviteCode(
+  params: {
+    inviteCodeId: string;
+    maxUses?: number;
+    expiresInDays?: number;
+    isActive?: boolean;
+  },
+  dependencies: AdminUserServiceDependencies = adminUserServiceDependencies,
+) {
+  const inviteCodeId = params.inviteCodeId.trim();
+  if (!inviteCodeId) {
+    throw new ValidationError("inviteCodeId is required.");
+  }
+
+  const updatePayload: {
+    max_uses?: number;
+    expires_at?: string | null;
+    is_active?: boolean;
+  } = {};
+
+  if (typeof params.isActive === "boolean") {
+    updatePayload.is_active = params.isActive;
+  }
+  if (params.maxUses != null) {
+    updatePayload.max_uses = parsePositiveIntInRange(
+      params.maxUses,
+      ADMIN_INVITE_DEFAULT_MAX_USES,
+      ADMIN_INVITE_MAX_USES,
+      "maxUses",
+    );
+  }
+  if (params.expiresInDays != null) {
+    updatePayload.expires_at = buildInviteExpiresAt(parseOptionalExpiresInDays(params.expiresInDays));
+  }
+
+  if (Object.keys(updatePayload).length === 0) {
+    throw new ValidationError("No invite code updates provided.");
+  }
+
+  const admin = dependencies.createSupabaseAdminClient();
+  const { data, error } = await admin
+    .from("registration_invite_codes")
+    .update(updatePayload as never)
+    .eq("id", inviteCodeId)
+    .select("id")
+    .maybeSingle<{ id: string }>();
+
+  if (error) {
+    throw new Error(`Failed to update invite code: ${error.message}`);
+  }
+  if (!data) {
+    throw new NotFoundError("Invite code not found.");
+  }
+
+  return { inviteCodeId: data.id };
 }
 
 export async function listAdminUsers(

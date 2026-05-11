@@ -1,5 +1,33 @@
 # Dev Log
 
+### [2026-05-11] 推进 admin 邀请码管理入口
+- 类型：Spec-Driven / 公网注册准入运营工具
+- 状态：已完成并归档 `add-admin-invite-code-management`
+
+#### 背景
+公网注册当前支持 `invite_only`，但邀请码发放仍依赖手工 SQL：维护者需要自己生成 hash、写入 `registration_invite_codes`，再用 SQL 查询使用记录。这个流程安全但不适合日常测试和小范围发放。
+
+#### 本次改动
+- 新增 `/admin/invites` 最小邀请码管理页。
+- 管理员可自动批量生成或手动创建邀请码；明文只在生成成功后展示一次，数据库仍只保存 hash。
+- 管理员可查看邀请码状态、使用次数、过期时间和使用记录。
+- 使用记录展示注册 email、attempt 状态、失败原因、auth user id 和时间。
+- 对已注册账号展示最小活动摘要：username、`access_status`、邮箱验证状态、学习统计和今日高成本用量摘要。
+- 管理员可停用邀请码，并调整 `max_uses` 或过期时间。
+
+#### 已运行验证
+- `pnpm exec tsc --noEmit --pretty false`
+- `node --import tsx --test src/lib/server/admin/service.test.ts 'src/app/(app)/admin/actions.test.ts' 'src/app/(app)/admin/invites/page.test.tsx' src/lib/server/registration.test.ts 'src/app/api/auth/signup/route.test.ts'`
+- `pnpm exec openspec validate --all --strict --no-interactive`
+- `pnpm run maintenance:check`
+- `git diff --check`
+
+#### 明确不收项
+- 不做公开申请邀请码。
+- 不做邮件、短信或站内信自动发送。
+- 不做 recipient、渠道、批次、活动归因。
+- 不做完整邀请码审计后台、异常排行或用户画像。
+
 ### [2026-05-11] 收口注册入口同 IP 频控
 - 类型：Spec-Driven / 公网注册滥用前置防护
 - 状态：已完成并归档 `add-registration-ip-rate-limit`

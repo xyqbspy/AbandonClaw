@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { ForbiddenError } from "@/lib/server/errors";
-import { handleUpdateAdminUserAccessStatusAction } from "./actions";
+import {
+  handleCreateAdminInviteCodesAction,
+  handleUpdateAdminInviteCodeAction,
+  handleUpdateAdminUserAccessStatusAction,
+} from "./actions";
 
 const createFormData = (accessStatus: string) => {
   const formData = new FormData();
@@ -84,4 +88,88 @@ test("admin 用户状态 action 成功后会刷新后台页面并返回成功提
   assert.equal(url.searchParams.get("page"), "2");
   assert.equal(url.searchParams.get("noticeTone"), "success");
   assert.equal(url.searchParams.get("notice"), "账号状态已更新。");
+});
+
+test("admin 邀请码创建 action 会拒绝非管理员调用", async () => {
+  await assert.rejects(
+    () =>
+      handleCreateAdminInviteCodesAction(
+        { notice: null, tone: "success", codes: [] },
+        new FormData(),
+        {
+          requireAdmin: async () => {
+            throw new ForbiddenError();
+          },
+          createAdminInviteCodes: async () => {
+            throw new Error("should not create invite codes");
+          },
+          revalidatePath: (() => {}) as never,
+        },
+      ),
+    ForbiddenError,
+  );
+});
+
+test("admin 邀请码创建 action 成功后返回本次明文", async () => {
+  const formData = new FormData();
+  formData.set("mode", "auto");
+  formData.set("count", "2");
+  const revalidatedPaths: string[] = [];
+
+  const state = await handleCreateAdminInviteCodesAction(
+    { notice: null, tone: "success", codes: [] },
+    formData,
+    {
+      requireAdmin: async () => ({ id: "admin-1" } as never),
+      createAdminInviteCodes: async (input) => [
+        {
+          id: "invite-1",
+          code: `code-${input.count}`,
+          maxUses: 1,
+          expiresAt: null,
+        },
+      ],
+      revalidatePath: ((path: string) => {
+        revalidatedPaths.push(path);
+      }) as never,
+    },
+  );
+
+  assert.equal(state.tone, "success");
+  assert.equal(state.codes[0]?.code, "code-2");
+  assert.deepEqual(revalidatedPaths, ["/admin", "/admin/invites"]);
+});
+
+test("admin 邀请码更新 action 会停用邀请码并返回提示", async () => {
+  const formData = new FormData();
+  formData.set("inviteCodeId", "invite-1");
+  formData.set("inviteAction", "deactivate");
+  formData.set("returnTo", "/admin/invites?page=2");
+  const revalidatedPaths: string[] = [];
+  let updatedParams:
+    | {
+        inviteCodeId: string;
+        isActive?: boolean;
+      }
+    | undefined;
+
+  const href = await handleUpdateAdminInviteCodeAction(formData, {
+    requireAdmin: async () => ({ id: "admin-1" } as never),
+    updateAdminInviteCode: async (params) => {
+      updatedParams = params;
+      return { inviteCodeId: params.inviteCodeId };
+    },
+    redirect: ((nextHref: string) => nextHref) as never,
+    revalidatePath: ((path: string) => {
+      revalidatedPaths.push(path);
+    }) as never,
+  });
+
+  const url = new URL(href, "http://localhost");
+  assert.equal(updatedParams?.inviteCodeId, "invite-1");
+  assert.equal(updatedParams?.isActive, false);
+  assert.deepEqual(revalidatedPaths, ["/admin", "/admin/invites"]);
+  assert.equal(url.pathname, "/admin/invites");
+  assert.equal(url.searchParams.get("page"), "2");
+  assert.equal(url.searchParams.get("noticeTone"), "success");
 });

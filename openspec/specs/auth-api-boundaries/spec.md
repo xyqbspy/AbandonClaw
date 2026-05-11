@@ -1,9 +1,7 @@
 ## Purpose
 
 定义认证入口、高成本接口、用户态数据访问与后台高权限入口的稳定边界，确保接口治理、安全约束与数据库最小权限规则保持一致。
-
 ## Requirements
-
 ### Requirement: 账号访问状态必须约束主应用、生成与写入
 系统 MUST 使用 profile 级访问状态提供最小封禁和降级能力，避免异常账号只能通过关闭全站入口处理。
 
@@ -149,3 +147,16 @@
 - **WHEN** 已登录但邮箱未验证的用户调用受保护 API
 - **THEN** 系统 MUST 返回受控 403 响应
 - **AND** 不得触发模型、TTS 或学习数据写入
+
+### Requirement: Admin 生成的邀请码必须沿用注册入口 hash 校验
+系统 MUST 让 admin-only 后台生成的邀请码与现有 `invite_only` 注册入口使用同一套 normalize 与 hash 匹配规则。
+
+#### Scenario: 用户使用管理员生成的邀请码注册
+- **WHEN** 用户在 `invite_only` 模式下提交管理员生成的明文邀请码
+- **THEN** 注册入口 MUST 按现有 hash 规则匹配 `registration_invite_codes.code_hash`
+- **AND** 注册成功后 MUST 继续记录 `registration_invite_attempts` 并扣减 `used_count`
+
+#### Scenario: 数据库保存管理员生成的邀请码
+- **WHEN** 管理员生成邀请码
+- **THEN** 数据库 MUST 只保存邀请码 hash
+- **AND** 不得持久化明文邀请码

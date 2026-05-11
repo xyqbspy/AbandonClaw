@@ -23,7 +23,7 @@
 - `APP_ORIGIN` / `NEXT_PUBLIC_APP_URL` / `NEXT_PUBLIC_SITE_URL` 与目标域名一致。
 - 已准备管理员账号、普通已验证账号、未验证邮箱账号、`generation_limited` 测试账号、`readonly` 测试账号。
 - 已准备至少 3 个不同普通账号 cookie，用于验证同一 IP 多账号限流。
-- 已准备可消耗或可清理的邀请码。
+- 已通过 `/admin/invites` 准备可消耗或可清理的邀请码；若后台不可用，再使用备用 SQL 流程。
 
 验证结果必须记录到 `docs/dev/dev-log.md`，并保留 baseline JSON 路径或摘要。
 
@@ -57,7 +57,209 @@ pnpm run load:public-registration-baseline --config-file=tmp/public-registration
 - 目标环境是否应用了 invite code SQL。
 - 邀请码是否过期、停用或超过 `max_uses`。
 
-## 3. 注册 IP 频控
+## 3. 邀请码设置、发放与处理
+
+推荐使用 `/admin/invites` 生成和管理邀请码。系统只保存邀请码的 SHA-256 hash，不保存明文；明文只会在管理员生成成功后展示一次，真正发给用户的是这一次展示出来的明文邀请码。
+
+### 3.1 打开测试注册
+
+当前 `REGISTRATION_MODE=closed` 时，无论有没有邀请码都会拒绝注册。测试注册前，先把目标环境切到：
+
+```env
+REGISTRATION_MODE=invite_only
+```
+
+本地开发环境改完环境变量后需要重启 dev server；线上环境改完后需要重新部署或重启对应服务。测试完成后，如果不继续开放，应切回：
+
+```env
+REGISTRATION_MODE=closed
+```
+
+### 3.2 推荐路径：后台生成邀请码
+
+管理员进入：
+
+```text
+/admin/invites
+```
+
+可以执行：
+
+- 自动生成一批随机邀请码。
+- 手动输入一个指定邀请码。
+- 设置 `max_uses` 和过期天数。
+- 查看邀请码启停状态、最大使用次数、已用次数和使用记录。
+- 查看邀请码被哪个邮箱 / auth user id 使用，以及该账号的最小活动摘要。
+- 停用邀请码，或调整 `max_uses` 和过期时间。
+
+生成成功后，页面会展示本次明文邀请码列表。刷新后不会再显示明文；如果丢失，只能重新生成新码，并停用旧码。
+
+### 3.3 备用路径：手工生成邀请码 hash
+
+先选一个明文邀请码，例如：
+
+```text
+AC-TEST-20260511-01
+```
+
+用 Node 计算 hash：
+
+```bash
+node -e "const crypto=require('crypto'); const code=process.argv[1].trim(); console.log(crypto.createHash('sha256').update(code,'utf8').digest('hex'))" "AC-TEST-20260511-01"
+```
+
+注意：
+
+- 明文邀请码不要提交到仓库。
+- 只把 hash 写入数据库。
+- 发放给测试用户时，发的是明文邀请码。
+
+### 3.4 备用路径：写入邀请码
+
+在 Supabase SQL Editor 或目标数据库执行：
+
+```sql
+insert into public.registration_invite_codes (
+  code_hash,
+  max_uses,
+  expires_at,
+  is_active
+) values (
+  '<上一步生成的 sha256 hash>',
+  5,
+  now() + interval '7 days',
+  true
+);
+```
+
+字段含义：
+
+- `code_hash`：邀请码明文 trim 后的 SHA-256。
+- `max_uses`：最多可注册次数。
+- `used_count`：系统注册成功后自动增加。
+- `expires_at`：过期时间；可以设为 `null`，但测试码建议设置过期时间。
+- `is_active`：是否启用。
+
+### 3.5 发放方式
+
+小范围测试建议这样发：
+
+- 一人一码，或一小组一个低 `max_uses` 的码。
+- 明文邀请码只通过私聊、邮件或可信渠道发送。
+- 不把邀请码写进 Git、公开文档、issue、群公告或截图。
+- 发放时同时告知：注册后需要完成邮箱验证，未验证账号不能进入主应用。
+
+当前数据库没有 recipient 字段；如果要追踪“发给了谁”，先用外部表格或发放记录保存，不要把明文邀请码写回仓库。实际使用者可以在 `/admin/invites` 的使用记录里通过注册 email 和 auth user id 追踪。
+
+### 3.6 查看使用情况
+
+推荐先在 `/admin/invites` 查看。页面会展示：
+
+- 邀请码是否启用。
+- `used_count / max_uses`。
+- 过期时间。
+- 注册尝试 email、状态、失败原因、auth user id 和时间。
+- 已注册账号的 username、`access_status`、邮箱验证状态、学习秒数、完成场景、复习数和今日高成本用量摘要。
+
+如果需要数据库级排查，可执行以下 SQL。
+
+查看邀请码是否可用：
+
+```sql
+select
+  id,
+  max_uses,
+  used_count,
+  expires_at,
+  is_active,
+  created_at,
+  updated_at
+from public.registration_invite_codes
+order by created_at desc;
+```
+
+查看注册尝试：
+
+```sql
+select
+  a.email,
+  a.status,
+  a.failure_reason,
+  a.auth_user_id,
+  a.created_at,
+  c.max_uses,
+  c.used_count,
+  c.expires_at,
+  c.is_active
+from public.registration_invite_attempts a
+left join public.registration_invite_codes c
+  on c.id = a.invite_code_id
+order by a.created_at desc
+limit 50;
+```
+
+常见 `status`：
+
+- `pending`：邀请码校验通过，正在注册流程中。
+- `used`：注册成功，邀请码已扣次数。
+- `rejected`：缺少邀请码、邀请码无效或过期。
+- `failed`：邀请码通过，但 Supabase Auth 注册失败。
+- `needs_repair`：Auth 用户创建成功，但邀请码扣次数发生并发冲突，需要人工核对。
+
+### 3.7 停用、延期和增加次数
+
+推荐在 `/admin/invites` 里操作。SQL 仅作为后台不可用时的备用方案。
+
+停用某个邀请码：
+
+```sql
+update public.registration_invite_codes
+set is_active = false
+where code_hash = '<邀请码 hash>';
+```
+
+延期：
+
+```sql
+update public.registration_invite_codes
+set expires_at = now() + interval '7 days'
+where code_hash = '<邀请码 hash>';
+```
+
+增加可用次数：
+
+```sql
+update public.registration_invite_codes
+set max_uses = max_uses + 5
+where code_hash = '<邀请码 hash>';
+```
+
+不建议手动降低 `used_count`，除非已经确认对应 Auth 用户和 attempt 记录都需要回滚。
+
+### 3.8 测试注册失败时先查
+
+如果你现在测试没办法注册，按这个顺序查：
+
+1. `REGISTRATION_MODE` 是否仍是 `closed`；如果是，先切到 `invite_only`。
+2. 目标服务是否已经重启或重新部署，确保新环境变量生效。
+3. 注册页是否出现“邀请码”输入框；没有出现通常说明前端看到的模式不是 `invite_only`。
+4. `/admin/invites` 是否能看到对应邀请码处于启用状态。
+5. `expires_at` 是否为空或晚于当前时间。
+6. `used_count < max_uses` 是否成立。
+7. `/admin/invites` 使用记录里是否出现 `rejected`、`failed` 或 `needs_repair`。
+8. 邮箱是否已经注册过，或密码是否小于 8 位。
+
+最小可行测试路径：
+
+1. 设置 `REGISTRATION_MODE=invite_only`。
+2. 重启服务。
+3. 在 `/admin/invites` 生成一个 `max_uses=1` 的测试邀请码。
+4. 打开注册页，输入邮箱、密码、用户名和明文邀请码。
+5. 注册成功后检查邮箱验证提示。
+6. 在 `/admin/invites` 确认使用记录为 `used`，并能看到注册 email / auth user id / 最小活动摘要。
+7. 测试结束后切回 `REGISTRATION_MODE=closed`，或在 `/admin/invites` 停用该测试邀请码。
+
+## 4. 注册 IP 频控
 
 验证目标：
 
@@ -82,7 +284,7 @@ pnpm run load:public-registration-baseline --config-file=tmp/public-registration
 - 推荐在 `invite_only` 环境验证，避免 `open` 模式为了测频控真实造号。
 - 如果该场景在 `open` 模式被标记为 `blocked`，必须安排在 `invite_only` 或可清理账号的等价环境补跑。
 
-## 4. 邮箱验证拦截
+## 5. 邮箱验证拦截
 
 验证目标：
 
@@ -108,7 +310,7 @@ pnpm run load:public-registration-baseline --config-file=tmp/public-registration
 - 测试 cookie 是否确实属于未验证邮箱账号。
 - middleware 和受保护 API 是否部署为最新版本。
 
-## 5. Origin 与受保护写接口
+## 6. Origin 与受保护写接口
 
 验证目标：
 
@@ -132,7 +334,7 @@ pnpm run load:public-registration-baseline --config-file=tmp/public-registration
 - `APP_ORIGIN` / `NEXT_PUBLIC_APP_URL` / `NEXT_PUBLIC_SITE_URL` 是否与目标域名一致。
 - baseline 配置里的 `origin` 是否故意设置为不匹配值。
 
-## 6. 高成本接口限流
+## 7. 高成本接口限流
 
 验证目标：
 
@@ -162,7 +364,7 @@ pnpm run load:public-registration-baseline --config-file=tmp/public-registration
 - `ipLimitCookies` 是否真的来自不同账号。
 - 目标环境是否有代理导致 client IP 识别不符合预期。
 
-## 7. 每日额度
+## 8. 每日额度
 
 验证目标：
 
@@ -189,7 +391,7 @@ pnpm run load:public-registration-baseline --config-file=tmp/public-registration
 - 测试账号是否真的处于额度已耗尽状态。
 - 目标环境是否已执行 P0-B SQL。
 
-## 8. 账号状态处置
+## 9. 账号状态处置
 
 验证目标：
 
@@ -228,7 +430,7 @@ pnpm run load:public-registration-baseline --config-file=tmp/public-registration
 - 测试账号的 `profiles.access_status` 是否真实更新。
 - 是否使用了旧 cookie 或错误账号。
 
-## 9. 学习时长防污染
+## 10. 学习时长防污染
 
 验证目标：
 
@@ -254,7 +456,7 @@ pnpm run load:public-registration-baseline --config-file=tmp/public-registration
 - 当前学习时长仍不能作为计费、排行、公开等级或奖励依据。
 - 完整服务端 heartbeat 仍属于后续 P2 能力。
 
-## 10. 运行状态与留证
+## 11. 运行状态与留证
 
 验证目标：
 
@@ -276,7 +478,7 @@ pnpm run load:public-registration-baseline --config-file=tmp/public-registration
 - baseline JSON 已保留。
 - `docs/dev/dev-log.md` 已记录目标环境、命令、通过项、blocked/failed 项和后续补跑项。
 
-## 11. 放行判断
+## 12. 放行判断
 
 可进入 `invite_only` 小范围真实用户试放的最低条件：
 
