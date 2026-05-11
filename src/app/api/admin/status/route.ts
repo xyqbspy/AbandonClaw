@@ -5,17 +5,33 @@ import { getAdminOverviewStats } from "@/lib/server/admin/service";
 import { getTodayHighCostUsageSummary } from "@/lib/server/high-cost-usage";
 import { getRateLimitBackendStatus } from "@/lib/server/rate-limit";
 
-export async function GET() {
+interface AdminStatusDependencies {
+  requireAdmin: typeof requireAdmin;
+  getAdminOverviewStats: typeof getAdminOverviewStats;
+  getTodayHighCostUsageSummary: typeof getTodayHighCostUsageSummary;
+  getRateLimitBackendStatus: typeof getRateLimitBackendStatus;
+}
+
+const defaultDependencies: AdminStatusDependencies = {
+  requireAdmin,
+  getAdminOverviewStats,
+  getTodayHighCostUsageSummary,
+  getRateLimitBackendStatus,
+};
+
+export async function handleAdminStatusGet(
+  dependencies: AdminStatusDependencies = defaultDependencies,
+) {
   try {
-    const adminUser = await requireAdmin();
+    const adminUser = await dependencies.requireAdmin();
     const [stats, todayHighCostUsage] = await Promise.all([
-      getAdminOverviewStats(),
-      getTodayHighCostUsageSummary(),
+      dependencies.getAdminOverviewStats(),
+      dependencies.getTodayHighCostUsageSummary(),
     ]);
     return NextResponse.json(
       {
         adminEmail: adminUser.email ?? null,
-        rateLimitBackend: getRateLimitBackendStatus(),
+        rateLimitBackend: dependencies.getRateLimitBackendStatus(),
         todayHighCostUsage,
         ...stats,
       },
@@ -24,5 +40,9 @@ export async function GET() {
   } catch (error) {
     return toApiErrorResponse(error, "Failed to load admin status.");
   }
+}
+
+export async function GET() {
+  return handleAdminStatusGet();
 }
 

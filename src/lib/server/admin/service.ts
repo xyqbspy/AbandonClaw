@@ -1,15 +1,17 @@
+import type { User } from "@supabase/supabase-js";
 import { isValidParsedScene } from "@/lib/server/scene-json";
 import { generateSceneVariants, getSceneVariantsBySceneId } from "@/lib/server/scene/variants";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { AiCacheRow, SceneRow, SceneVariantRow } from "@/lib/server/db/types";
+import { AiCacheRow, SceneRow, SceneVariantRow, UserAccessStatus } from "@/lib/server/db/types";
 import { runSeedScenesSync } from "@/lib/server/scene/service";
 import { listRecentAiCacheStats } from "@/lib/server/ai-cache/service";
-import { NotFoundError } from "@/lib/server/errors";
+import { NotFoundError, ValidationError } from "@/lib/server/errors";
 import { enrichAiExpressionLearningInfo } from "@/lib/server/phrases/service";
 import { deleteSceneTtsAudioBySlug } from "@/lib/server/tts/storage";
 import { mapLessonToParsedScene, mapParsedSceneToLesson } from "@/lib/adapters/scene-parser-adapter";
 import { normalizeParsedSceneDialogue } from "@/lib/shared/scene-dialogue";
 import { ParsedScene } from "@/lib/types/scene-parser";
+import { parseUserAccessStatus } from "@/lib/server/validation";
 
 export interface AdminSceneListFilters {
   page?: number;
@@ -51,6 +53,33 @@ export interface AdminPhraseListItem {
   createdAt: string;
   savedAt: string;
 }
+
+export interface AdminUserListFilters {
+  page?: number;
+  pageSize?: number;
+  q?: string;
+  accessStatus?: UserAccessStatus;
+}
+
+export interface AdminUserListItem {
+  userId: string;
+  email: string | null;
+  username: string | null;
+  accessStatus: UserAccessStatus;
+  createdAt: string;
+}
+
+interface AdminUserServiceDependencies {
+  createSupabaseAdminClient: typeof createSupabaseAdminClient;
+}
+
+const adminUserServiceDependencies: AdminUserServiceDependencies = {
+  createSupabaseAdminClient,
+};
+
+const DEFAULT_ADMIN_ACCESS_STATUS: UserAccessStatus = "active";
+const AUTH_LIST_USERS_PAGE_SIZE = 100;
+const AUTH_LIST_USERS_MAX_PAGES = 20;
 
 export interface AdminSceneSentenceUpdate {
   sentenceId: string;
@@ -904,5 +933,156 @@ export async function getAdminOverviewStats() {
     scenesInProgressCount,
     scenesCompletedCount,
     latestLearningActivityAt: latestLearningRes.data?.last_viewed_at ?? null,
+  };
+}
+
+const getAdminUserSearchTerms = (user: {
+  id: string;
+  email: string | null;
+  username: string | null;
+}) => [user.id, user.email ?? "", user.username ?? ""].map((value) => value.toLowerCase());
+
+async function listAllAuthUsers(
+  dependencies: AdminUserServiceDependencies,
+) {
+  const admin = dependencies.createSupabaseAdminClient();
+  const users: User[] = [];
+
+  for (let page = 1; page <= AUTH_LIST_USERS_MAX_PAGES; page += 1) {
+    const { data, error } = await admin.auth.admin.listUsers({
+      page,
+      perPage: AUTH_LIST_USERS_PAGE_SIZE,
+    });
+
+    if (error) {
+      throw new Error(`Failed to list auth users: ${error.message}`);
+    }
+
+    const pageUsers = data.users ?? [];
+    users.push(...pageUsers);
+
+    if (pageUsers.length < AUTH_LIST_USERS_PAGE_SIZE) {
+      break;
+    }
+  }
+
+  return users;
+}
+
+export async function listAdminUsers(
+  filters: AdminUserListFilters,
+  dependencies: AdminUserServiceDependencies = adminUserServiceDependencies,
+) {
+  const page = clampPage(filters.page);
+  const pageSize = clampPageSize(filters.pageSize);
+  const search = normalizeSearch(filters.q)?.toLowerCase();
+  const accessStatusFilter = filters.accessStatus
+    ? parseUserAccessStatus(filters.accessStatus, "accessStatus")
+    : undefined;
+  const authUsers = await listAllAuthUsers(dependencies);
+  const userIds = authUsers.map((user) => user.id);
+  const admin = dependencies.createSupabaseAdminClient();
+
+  const profilesById = new Map<
+    string,
+    {
+      id: string;
+      username: string | null;
+      access_status?: UserAccessStatus;
+    }
+  >();
+
+  if (userIds.length > 0) {
+    const { data, error } = await admin
+      .from("profiles")
+      .select("id,username,access_status")
+      .in("id", userIds);
+
+    if (error) {
+      throw new Error(`Failed to list user profiles: ${error.message}`);
+    }
+
+    for (const row of (data ?? []) as Array<{
+      id: string;
+      username: string | null;
+      access_status?: UserAccessStatus;
+    }>) {
+      profilesById.set(row.id, row);
+    }
+  }
+
+  const rows = authUsers
+    .map<AdminUserListItem>((user) => {
+      const profile = profilesById.get(user.id);
+      return {
+        userId: user.id,
+        email: user.email ?? null,
+        username: profile?.username ?? null,
+        accessStatus: profile?.access_status ?? DEFAULT_ADMIN_ACCESS_STATUS,
+        createdAt: user.created_at,
+      };
+    })
+    .filter((row) => {
+      if (accessStatusFilter && row.accessStatus !== accessStatusFilter) {
+        return false;
+      }
+      if (!search) return true;
+      return getAdminUserSearchTerms({
+        id: row.userId,
+        email: row.email,
+        username: row.username,
+      }).some((value) => value.includes(search));
+    })
+    .sort((lhs, rhs) => new Date(rhs.createdAt).getTime() - new Date(lhs.createdAt).getTime());
+
+  const total = rows.length;
+  const from = (page - 1) * pageSize;
+
+  return {
+    rows: rows.slice(from, from + pageSize),
+    total,
+    page,
+    pageSize,
+  };
+}
+
+export async function updateAdminUserAccessStatus(
+  params: {
+    userId: string;
+    accessStatus: UserAccessStatus;
+  },
+  dependencies: AdminUserServiceDependencies = adminUserServiceDependencies,
+) {
+  const userId = params.userId.trim();
+  if (!userId) {
+    throw new ValidationError("userId is required.");
+  }
+
+  const accessStatus = parseUserAccessStatus(params.accessStatus);
+  const admin = dependencies.createSupabaseAdminClient();
+
+  const { data, error } = await admin
+    .from("profiles")
+    .update({ access_status: accessStatus } as never)
+    .eq("id", userId)
+    .select("id,username,access_status")
+    .maybeSingle<{
+      id: string;
+      username: string | null;
+      access_status?: UserAccessStatus;
+    }>();
+
+  if (error) {
+    throw new Error(`Failed to update access status: ${error.message}`);
+  }
+
+  if (!data) {
+    throw new NotFoundError("User profile not found.");
+  }
+
+  return {
+    userId: data.id,
+    username: data.username,
+    accessStatus: data.access_status ?? DEFAULT_ADMIN_ACCESS_STATUS,
   };
 }

@@ -34,6 +34,12 @@ const LABELS = {
 
 const entries = [
   {
+    title: "用户",
+    description:
+      "按邮箱、用户 ID、用户名和账号状态快速查找用户，并执行最小账号处置。",
+    href: "/admin/users",
+  },
+  {
     title: "\u573a\u666f",
     description:
       "\u67e5\u770b\u5168\u90e8 seed/imported \u573a\u666f\uff0c\u652f\u6301\u641c\u7d22\u548c\u7b5b\u9009\u3002",

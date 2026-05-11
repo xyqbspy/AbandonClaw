@@ -41,28 +41,28 @@ const createDependencies = (user: TestUser, isAdmin = false) => {
       : user;
 
   return {
-  createServerClient: (() =>
-    ({
-      auth: {
-        getUser: async () => ({
-          data: { user: normalizedUser },
-        }),
-      },
-    })) as never,
-  getSupabaseUrl: (() => "https://example.supabase.co") as never,
-  getSupabaseAnonKey: (() => "anon-key") as never,
-  isAdminEmail: ((email: string | null | undefined) => isAdmin && email === normalizedUser?.email) as never,
-  next: (() => createResponse(null, { status: 200 })) as never,
-  redirect: ((url: URL) =>
-    createResponse(null, {
-      status: 307,
-      headers: { location: url.toString() },
-    })) as never,
-  json: ((body: unknown, init: { status: number }) =>
-    createResponse(JSON.stringify(body), {
-      status: init.status,
-      headers: { "content-type": "application/json" },
-    })) as never,
+    createServerClient: (() =>
+      ({
+        auth: {
+          getUser: async () => ({
+            data: { user: normalizedUser },
+          }),
+        },
+      })) as never,
+    getSupabaseUrl: (() => "https://example.supabase.co") as never,
+    getSupabaseAnonKey: (() => "anon-key") as never,
+    isAdminEmail: ((email: string | null | undefined) => isAdmin && email === normalizedUser?.email) as never,
+    next: (() => createResponse(null, { status: 200 })) as never,
+    redirect: ((url: URL) =>
+      createResponse(null, {
+        status: 307,
+        headers: { location: url.toString() },
+      })) as never,
+    json: ((body: unknown, init: { status: number }) =>
+      createResponse(JSON.stringify(body), {
+        status: init.status,
+        headers: { "content-type": "application/json" },
+      })) as never,
   };
 };
 
@@ -79,7 +79,7 @@ test("middleware 会将未登录用户重定向到登录页并保留原始路径
   );
 });
 
-test("middleware redirects unverified users to verify-email page", async () => {
+test("middleware 会将未验证邮箱用户重定向到 verify-email 页面", async () => {
   const response = await handleMiddleware(
     createRequest("http://localhost/scenes"),
     createDependencies({ email: "user@example.com", email_confirmed_at: null }),
@@ -92,7 +92,7 @@ test("middleware redirects unverified users to verify-email page", async () => {
   );
 });
 
-test("middleware rejects protected API calls from unverified users", async () => {
+test("middleware 会拒绝未验证邮箱用户调用受保护 API", async () => {
   const response = await handleMiddleware(
     createRequest("http://localhost/api/practice/generate"),
     createDependencies({ email: "user@example.com", email_confirmed_at: null }),
@@ -128,6 +128,16 @@ test("middleware 会拦截危险的协议相对 redirect 参数", async () => {
 test("middleware 会阻止非管理员访问 /admin", async () => {
   const response = await handleMiddleware(
     createRequest("http://localhost/admin"),
+    createDependencies({ email: "user@example.com" }),
+  );
+
+  assert.equal(response.status, 307);
+  assert.equal(response.headers.get("location"), "http://localhost/");
+});
+
+test("middleware 会阻止非管理员手动进入 admin 子路由", async () => {
+  const response = await handleMiddleware(
+    createRequest("http://localhost/admin/observability"),
     createDependencies({ email: "user@example.com" }),
   );
 

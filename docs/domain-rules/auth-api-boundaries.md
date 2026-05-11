@@ -54,6 +54,7 @@
 
 - 注册页不得直接调用 Supabase Browser Client 创建账号；必须提交到服务端注册 API。
 - `REGISTRATION_MODE` 缺失或非法时保守视为 `closed`。
+- `invite_only` 与 `open` 模式下，注册入口必须在邀请码校验和 Auth 注册前执行同一 IP 频控。
 - `invite_only` 模式必须校验数据库邀请码；邀请码只存 hash，不落库明文。
 - 邀请码必须具备 `max_uses`、`used_count`、可选 `expires_at` 和启停状态。
 - 注册尝试必须记录到 `registration_invite_attempts`，用于追踪成功、失败、拒绝和需要补偿的情况。
@@ -106,3 +107,4 @@
 - 高成本入口必须在 quota 预占前调用 `assertProfileCanGenerate(profile)`。
 - 学习写入、表达保存/删除、表达 enrich 写入和练习写入必须调用 `assertProfileCanWrite(profile)`。
 - middleware 当前不直接读取 profile；因此 `disabled` 的兜底边界在服务端 profile helper 和主应用服务端入口。
+- 管理员当前可通过 `/admin/users` 查询并调整 `access_status`；该入口以 server action 为受控写入边界，完整用户详情、批量处置和审计日志仍留在 P1。

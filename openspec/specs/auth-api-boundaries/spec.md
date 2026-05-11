@@ -23,6 +23,24 @@
 - **THEN** 系统 MUST 拒绝请求
 - **AND** 不得执行后续写入
 
+### Requirement: 账号状态修改入口必须限制为 admin-only
+系统 MUST 通过明确的管理员入口修改 `profiles.access_status`，不得把普通用户入口、公共 API 或手工 SQL 视为默认唯一运维路径。
+
+#### Scenario: 管理员修改账号状态
+- **WHEN** 管理员通过后台页面、server action 或受控 admin route 提交新的 `access_status`
+- **THEN** 系统 MUST 先校验调用者为管理员
+- **AND** 只允许写入 `active`、`disabled`、`generation_limited` 或 `readonly`
+
+#### Scenario: 非管理员尝试修改账号状态
+- **WHEN** 非管理员用户调用账号状态修改入口
+- **THEN** 系统 MUST 拒绝请求
+- **AND** 不得执行 `profiles.access_status` 更新
+
+#### Scenario: 非法状态值写入
+- **WHEN** 调用方提交不在允许集合内的状态值
+- **THEN** 系统 MUST 返回受控失败
+- **AND** 不得写入数据库
+
 ### Requirement: 登录跳转只允许安全站内目标
 系统 MUST 仅接受站内安全路径作为登录页、注册页与认证中间件的跳转目标。任何缺失、非法、跨站或协议相对的 `redirect` 值都 MUST 回退到默认站内落点，而不能进入前端或服务端跳转链路。
 
@@ -105,6 +123,19 @@
 - **THEN** 系统 MUST 在服务端校验邀请码
 - **AND** 邀请码 MUST 使用 hash 匹配，不落库明文
 - **AND** 注册尝试 MUST 记录 email、状态、关联邀请码、auth user id 或失败原因
+
+### Requirement: 注册入口必须在创建账号前限制同一 IP 频率
+系统 MUST 在服务端 `/api/auth/signup` 入口对同一客户端 IP 执行注册频控，并在 `invite_only` 或 `open` 模式下于邀请码校验和 Auth 注册前完成拦截。
+
+#### Scenario: 同一 IP 在阈值内注册
+- **WHEN** 同一客户端 IP 在注册频控窗口内提交注册请求且未超过阈值
+- **THEN** 系统 MUST 允许请求继续进入后续注册流程
+- **AND** 不得改变原有注册模式、邀请码或邮箱验证语义
+
+#### Scenario: 同一 IP 超过注册阈值
+- **WHEN** 同一客户端 IP 在窗口期内超过注册入口阈值
+- **THEN** 系统 MUST 在邀请码校验和 Auth 注册前直接拒绝请求
+- **AND** 不得继续执行邀请码扣减、attempt 写入或 Auth 注册
 
 ### Requirement: 邮箱未验证用户不得进入主应用或高成本写入口
 系统 MUST 在主应用页面入口与高成本/关键写 API 入口检查 Supabase 邮箱验证状态。

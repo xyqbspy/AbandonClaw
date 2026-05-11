@@ -36,6 +36,7 @@
   - 查看 `/api/auth/signup` 返回的当前 `mode`
 - `closed-signup-rejected`
 - `invite-only-signup-without-invite-rejected`
+- `signup-ip-rate-limit-hits-429`
 - `invite-only-signup-with-invite-succeeds`
 - `unverified-app-redirects-to-verify-email`
 - `unverified-api-rejected`
@@ -59,6 +60,7 @@
 - 与服务端允许域一致的 `Origin`
 - 若要执行登录态场景，需要真实登录后拿到 cookie
 - 若要执行 `invite_only` 成功场景，需要有效邀请码
+- 若要执行 `signup-ip-rate-limit-hits-429`，当前推荐在 `invite_only` 模式下执行，避免 `open` 模式真实造号
 - 若要执行 `generation_limited` / `readonly` / `daily quota` 场景，需要专门准备对应测试账号
 - 若要执行 `admin-status-shows-backend-and-usage`，需要管理员 cookie
 
@@ -129,6 +131,7 @@ pnpm run load:public-registration-baseline --config-file=tmp/public-registration
 表示该场景按当前预期完成，例如：
 
 - `closed` 注册返回 401
+- `signup-ip-rate-limit-hits-429` 在短窗口内出现 429
 - 未验证邮箱访问主应用被重定向到 `/verify-email`
 - `daily quota` 返回 429 且 `code=DAILY_QUOTA_EXCEEDED`
 - `/api/admin/status` 返回 `rateLimitBackend.kind` 和 `todayHighCostUsage.items`
@@ -143,6 +146,7 @@ pnpm run load:public-registration-baseline --config-file=tmp/public-registration
 - 缺少邀请码
 - `expectedRegistrationMode` 与当前目标环境不匹配
 - 没有准备 3 个不同账号 cookie 去验证 IP 限流
+- 当前目标环境不是 `invite_only`，但又想安全验证注册 IP 频控
 
 blocked 之后必须在 `docs/dev/dev-log.md` 记录：
 
@@ -155,6 +159,7 @@ blocked 之后必须在 `docs/dev/dev-log.md` 记录：
 表示场景真正没有达到预期，例如：
 
 - `Origin` 不匹配却没有返回 403
+- 同一 IP 连续注册没有命中 429
 - 同一用户短窗口没有命中 429
 - `readonly` 用户仍可写入
 - admin status 缺少 `todayHighCostUsage.items`
@@ -209,4 +214,5 @@ node --import tsx --test scripts/load-public-registration-http-baseline.test.ts
 pnpm run load:public-registration-baseline --dry-run --config-file=scripts/load-samples/public-registration-http-baseline.sample.json
 pnpm run load:public-registration-baseline --config-file=tmp/public-registration-http-baseline.local.json
 pnpm run load:public-registration-baseline --config-file=tmp/public-registration-http-baseline.local.json --scenario=registration-mode-visible
+pnpm run load:public-registration-baseline --config-file=tmp/public-registration-http-baseline.local.json --scenario=signup-ip-rate-limit-hits-429
 ```

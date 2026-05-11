@@ -10,14 +10,17 @@ import {
   enrichAdminUserPhrasesByIds,
   deleteSceneById,
   regenerateSceneVariants,
+  updateAdminUserAccessStatus,
   updateSceneSentencesById,
   updateSceneVisibility,
 } from "@/lib/server/admin/service";
+import { NotFoundError, ValidationError } from "@/lib/server/errors";
 import { runSeedScenesSync } from "@/lib/server/scene/service";
 import {
   parseBooleanFromForm,
   parseRequiredIdFromForm,
   parseRetainChunkRatio,
+  parseUserAccessStatus,
   parseVariantCount,
 } from "@/lib/server/validation";
 
@@ -35,8 +38,15 @@ const ADMIN_NOTICE = {
   batchEnrichFailed: "批量补全失败，请稍后重试。",
 } as const;
 
+const USER_ACCESS_STATUS_NOTICE = {
+  updated: "账号状态已更新。",
+  invalid: "账号状态无效，请重试。",
+  notFound: "未找到该用户资料。",
+} as const;
+
 const refreshAdminPages = (sceneId?: string) => {
   revalidatePath("/admin");
+  revalidatePath("/admin/users");
   revalidatePath("/admin/scenes");
   revalidatePath("/admin/phrases");
   revalidatePath("/admin/imported");
@@ -45,6 +55,20 @@ const refreshAdminPages = (sceneId?: string) => {
   if (sceneId) {
     revalidatePath(`/admin/scenes/${sceneId}`);
   }
+};
+
+interface UpdateAdminUserAccessStatusActionDependencies {
+  requireAdmin: typeof requireAdmin;
+  updateAdminUserAccessStatus: typeof updateAdminUserAccessStatus;
+  redirect: typeof redirect;
+  revalidatePath: typeof revalidatePath;
+}
+
+const updateAdminUserAccessStatusActionDependencies: UpdateAdminUserAccessStatusActionDependencies = {
+  requireAdmin,
+  updateAdminUserAccessStatus,
+  redirect,
+  revalidatePath,
 };
 
 export async function deleteSceneAction(formData: FormData) {
@@ -140,6 +164,46 @@ export async function syncSeedScenesAction() {
   await runSeedScenesSync();
   refreshAdminPages();
   redirect(appendAdminNotice("/admin", ADMIN_NOTICE.seedSynced));
+}
+
+export async function handleUpdateAdminUserAccessStatusAction(
+  formData: FormData,
+  dependencies: UpdateAdminUserAccessStatusActionDependencies = updateAdminUserAccessStatusActionDependencies,
+) {
+  await dependencies.requireAdmin();
+
+  const userId = parseRequiredIdFromForm(formData.get("userId"), "userId");
+  const returnTo = normalizeAdminReturnTo(formData.get("returnTo"), "/admin/users");
+
+  try {
+    const accessStatus = parseUserAccessStatus(formData.get("accessStatus"));
+    await dependencies.updateAdminUserAccessStatus({
+      userId,
+      accessStatus,
+    });
+  } catch (error) {
+    if (error instanceof ValidationError) {
+      return dependencies.redirect(
+        appendAdminNotice(returnTo, USER_ACCESS_STATUS_NOTICE.invalid, "danger"),
+      );
+    }
+    if (error instanceof NotFoundError) {
+      return dependencies.redirect(
+        appendAdminNotice(returnTo, USER_ACCESS_STATUS_NOTICE.notFound, "danger"),
+      );
+    }
+    throw error;
+  }
+
+  dependencies.revalidatePath("/admin");
+  dependencies.revalidatePath("/admin/users");
+  return dependencies.redirect(
+    appendAdminNotice(returnTo, USER_ACCESS_STATUS_NOTICE.updated, "success"),
+  );
+}
+
+export async function updateAdminUserAccessStatusAction(formData: FormData) {
+  return handleUpdateAdminUserAccessStatusAction(formData);
 }
 
 export async function deleteAdminPhraseAction(formData: FormData) {

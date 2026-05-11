@@ -1,4 +1,5 @@
 import { ValidationError } from "@/lib/server/errors";
+import { UserAccessStatus } from "@/lib/server/db/types";
 
 const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value));
@@ -153,6 +154,33 @@ export const parseRequiredIdFromForm = (
     throw new ValidationError(`${fieldName} is required.`);
   }
   return value.trim();
+};
+
+export const parseUserAccessStatus = (
+  value: unknown,
+  fieldName = "accessStatus",
+): UserAccessStatus => {
+  if (
+    value === "active" ||
+    value === "disabled" ||
+    value === "generation_limited" ||
+    value === "readonly"
+  ) {
+    return value;
+  }
+
+  throw new ValidationError(
+    `${fieldName} must be one of active/disabled/generation_limited/readonly.`,
+  );
+};
+
+export const parseOptionalUserAccessStatusFilter = (
+  value: unknown,
+): UserAccessStatus | undefined => {
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim();
+  if (!normalized) return undefined;
+  return parseUserAccessStatus(normalized, "accessStatus");
 };
 
 export const parseProgressPercent = (value: unknown) => {

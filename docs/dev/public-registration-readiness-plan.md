@@ -24,6 +24,7 @@
 
 - `REGISTRATION_MODE=closed | invite_only | open`，非法或缺失值保守回退为 `closed`。
 - 注册页改为调用服务端 `/api/auth/signup`，不再由浏览器直接绕过项目层创建账号。
+- `invite_only` / `open` 模式下，注册入口会在邀请码校验和 Auth 注册前执行同一 IP 频控；阈值可由 `REGISTRATION_IP_LIMIT_MAX_ATTEMPTS` 与 `REGISTRATION_IP_LIMIT_WINDOW_SECONDS` 覆盖。
 - `invite_only` 使用 `registration_invite_codes` 和 `registration_invite_attempts` 表，邀请码只存 hash，支持 `max_uses`、`used_count`、`expires_at`、启停状态和补偿状态。
 - 邮箱未验证用户会被拦截到 `/verify-email`，受保护 API 返回 403，不进入学习主链路或高成本入口。
 - 高成本接口已接入 user + IP 双维度限流：practice generate、scene generate、similar generate、expression map generate、explain selection、TTS、TTS regenerate。
@@ -155,8 +156,9 @@
 
 当前状态：
 
-- 注册由 Supabase Auth 处理。
-- 项目层没有邀请码、验证码、注册 IP 限流或邮箱域名策略。
+- 注册已经统一走服务端 `/api/auth/signup`。
+- 项目层已补最小同一 IP 注册频控。
+- 仍没有验证码、邮箱域名策略或更复杂注册风控。
 
 影响：
 
@@ -477,7 +479,7 @@
   - `disabled`：不能进入主应用。
   - `generation_limited`：不能调用 AI / TTS / generate。
   - `readonly`：不能写学习、保存表达、提交 review。
-- 第一阶段可以先不做后台页面，但必须能通过 SQL 或 admin-only route 修改状态。
+- 当前已经有最小 `/admin/users` 后台页面和受控 server action，可在页面内修改状态；完整用户详情、批量处置和审计日志继续留到 P1。
 
 验收：
 
@@ -859,8 +861,8 @@
 - [ ] 超每日额度不会调用上游模型/TTS
 - [ ] 管理员能查看今日用量
 - [ ] 支持 `generation_limited`
-- [ ] 支持通过数据或 admin-only route 设置 `disabled`
-- [ ] 支持通过数据或 admin-only route 设置 `readonly`
+- [ ] 支持通过 `/admin/users` 或 SQL 设置 `disabled`
+- [ ] 支持通过 `/admin/users` 或 SQL 设置 `readonly`
 - [ ] `studySecondsDelta` 有单次上限
 - [ ] 同一 `user + scene` 有最小上报间隔
 - [ ] 异常 delta 不写入学习统计
@@ -895,7 +897,7 @@
 
 1. 看 `/admin/observability` 或日志，确认异常接口、请求量、requestId 和时间窗口。
 2. 判断是单账号、同 IP 多账号还是全站流量。
-3. 如果是单账号，先设置 `generation_limited`。
+3. 如果是单账号，先在 `/admin/users` 设置 `generation_limited`。
 4. 如果是同 IP 多账号，收紧 IP 限流阈值。
 5. 如果是全站流量，临时关闭注册或切到 `invite_only`。
 6. 如果外部成本快速上升，临时降低每日额度或关闭对应生成入口。
@@ -930,7 +932,7 @@
 
 - 高成本接口增加每日 quota 和调用前预占：`practice_generate`、`scene_generate`、`similar_generate`、`expression_map_generate`、`explain_selection`、`tts_generate`、`tts_regenerate`。
 - quota 默认值集中在 `src/lib/server/high-cost-usage.ts`，可通过 `DAILY_QUOTA_*` 环境变量覆盖；超额返回受控 429，且不会进入上游模型/TTS。
-- `profiles.access_status` 支持 `active`、`disabled`、`generation_limited`、`readonly`；当前先通过 SQL 或受控后台路径调整，完整封禁 UI 留到 P1。
+- `profiles.access_status` 支持 `active`、`disabled`、`generation_limited`、`readonly`；当前可通过 `/admin/users` 或 SQL 调整，完整封禁/解除封禁 UI 留到 P1。
 - `/api/admin/status` 增加 `todayHighCostUsage`，可查看今日各 capability 的 `reserved/success/failed/quota`。
 - `studySecondsDelta` 增加最小防污染：单次最大 60 秒，同一 `user + scene` 有效上报间隔最小 10 秒，异常写入 `learning_study_time_anomalies`。
 
@@ -939,6 +941,6 @@
 P1/P2 剩余风险：
 
 - 还没有完整运营后台、用户详情页、异常用户列表、封禁/解除封禁 UI。
-- 还没有注册 IP 频控、邮箱域名策略、设备指纹、WAF/DDoS。
+- 还没有邮箱域名策略、设备指纹、WAF/DDoS。
 - 还没有长期成本趋势、成本金额估算、Top N 用户视图。
 - 还没有服务端学习 session heartbeat。

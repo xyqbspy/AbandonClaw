@@ -1,5 +1,77 @@
 # Dev Log
 
+### [2026-05-11] 收口注册入口同 IP 频控
+- 类型：Spec-Driven / 公网注册滥用前置防护
+- 状态：已完成并归档 `add-registration-ip-rate-limit`
+
+#### 背景
+公开注册入口已经服务端化，也已经有邀请码、邮箱验证和高成本接口 user/IP 限流，但批量注册仍可以在“账号创建前”消耗邀请码查询、Auth 注册和 profile 资源。本轮补的是最前面的注册 IP 频控，而不是继续扩后台。
+
+#### 本次改动
+- 在 `src/lib/server/rate-limit.ts` 增加注册专用频控配置与 helper：
+  - `getRegistrationIpRateLimitConfig()`
+  - `enforceRegistrationIpRateLimit()`
+- 新增 `REGISTRATION_IP_LIMIT_MAX_ATTEMPTS` 与 `REGISTRATION_IP_LIMIT_WINDOW_SECONDS` 两个专用环境变量；未配置时使用保守默认值 `3 次 / 10 分钟`。
+- `/api/auth/signup` 抽出 `handleSignupPost()`，并在 `invite_only` / `open` 模式下于邀请码校验和 Auth 注册前执行同一 IP 频控。
+- 命中频控时返回受控 429 与 `requestId`，且不会继续进入 `registerWithEmailPassword()`，因此不会写 invite attempt、消耗邀请码或触发 Auth 注册。
+- 公网 baseline 新增 `signup-ip-rate-limit-hits-429` 场景，当前安全口径限定在 `invite_only` 环境执行，避免在 `open` 模式真实造号。
+- 同步公网开放计划、baseline runbook、后端发布清单、账号边界规则和稳定规范。
+
+#### 验证
+- 已运行：
+  - `pnpm exec tsc --noEmit --pretty false`
+  - `node --import tsx --test src/lib/server/rate-limit.test.ts src/lib/server/registration.test.ts 'src/app/api/auth/signup/route.test.ts'`
+  - `node --import tsx --test scripts/load-public-registration-http-baseline.test.ts`
+
+#### 明确不收项
+- 不做验证码、邮箱域名策略、设备指纹、IP 信誉库或全局风控评分。
+- 不做注册来源分析后台、异常 IP 看板或长期趋势报表。
+- 不扩展到更复杂的按邮箱/设备/指纹组合注册风控。
+
+#### 剩余风险
+- 共享出口网络下的多用户可能更早命中同一 IP 阈值；当前只提供保守默认值与环境变量调节，不做白名单或信誉策略。
+- baseline 中的注册 IP 频控场景当前只安全支持 `invite_only` 环境；`open` 模式若要验证，需要额外设计无副作用测试数据策略。
+- 真实公网环境仍需按 runbook 补跑并留存结构化结果，确认当前限流后端实际为 Upstash。
+
+### [2026-05-11] 收口最小 admin 用户状态处置入口
+- 类型：Spec-Driven / 管理员账号处置入口
+- 状态：已完成并归档 `add-admin-access-status-controls`
+
+#### 背景
+P0-B 已经把 `profiles.access_status`、daily quota 和高成本入口边界落进代码，但异常账号处置仍主要依赖 SQL。对于小范围公网开放，这会让“发现异常账号”到“真正止血”之间继续依赖人工查库和手工更新，和 readiness checklist 的执行口径也不一致。
+
+#### 本次改动
+- 新增 `/admin/users` 最小用户管理页，支持按 `email / userId / username / access_status` 筛选用户。
+- 新增 admin service 用户列表与 `profiles.access_status` 更新能力，列表返回 `userId`、`email`、`username`、`accessStatus`、`createdAt` 最小字段。
+- 新增 admin-only server action，用于切换 `active`、`disabled`、`generation_limited`、`readonly`，并返回受控 success / danger notice。
+- 后台首页与导航补上“用户”入口，避免仍需手输路径进入。
+- 补齐回归测试：
+  - admin service 用户查询与状态更新
+  - admin action 的非管理员拒绝、非法状态拒绝、成功更新
+  - `/admin/users` 页面最小渲染与筛选参数透传
+  - 继续保留 `/admin` 与 `/api/admin/status` 的非管理员防护测试
+- 同步 `auth-api-boundaries` stable spec，新增 `admin-user-access-controls` stable spec，并把 `/admin/users` 写入公网开放计划、发布检查清单和账号边界规则文档。
+
+#### 关键决策
+- 本轮不额外补 admin HTTP route，继续以 `/admin/users` + server action 作为受控修改入口。
+- 原因是现有后台操作已经统一走 server action / notice / revalidate 模式，先补 route 只会扩大表面积，不增加当前最小处置闭环价值。
+
+#### 验证
+- 已运行：
+  - `pnpm exec tsc --noEmit --pretty false`
+  - `node --import tsx --test middleware.test.ts src/app/api/admin/status/route.test.ts src/lib/server/admin/service.test.ts 'src/app/(app)/admin/actions.test.ts' 'src/app/(app)/admin/admin-page-state.test.ts'`
+  - `node --import tsx --test 'src/app/(app)/admin/users/page.test.tsx'`
+
+#### 明确不收项
+- 不做完整运营后台、用户详情页、批量状态切换、审计日志或自动风控规则。
+- 不做注册 IP 频控、邮箱域名策略、设备指纹或长期成本趋势。
+- 不把 `/admin/users` 扩成完整 CRM 或异常排行榜。
+
+#### 剩余风险
+- 当前用户查询基于 `auth.admin.listUsers()` + `profiles` 组合，适合小规模处置，不适合作为大规模运营后台的最终方案。
+- `/admin/users` 只覆盖最小处置闭环，没有用户详情、最近活跃、今日用量明细或 requestId 历史。
+- 真实公网环境仍需要按 baseline runbook 补跑实际 cookie / invite code / 限流证据；本轮不替代真实环境留证。
+
 ### [2026-05-09] 收口公网开放真实 HTTP baseline 入口
 - 类型：Spec-Driven / 发布前验证链路
 - 状态：已完成并归档 `record-public-registration-http-baseline`

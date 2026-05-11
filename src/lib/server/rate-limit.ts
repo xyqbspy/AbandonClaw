@@ -27,6 +27,11 @@ type HighCostRateLimitParams = {
   windowMs: number;
 };
 
+export type RegistrationIpRateLimitConfig = {
+  maxAttempts: number;
+  windowMs: number;
+};
+
 const rateLimitStore = new Map<string, RateLimitEntry>();
 
 let backendCache: RateLimitBackend | null = null;
@@ -66,6 +71,20 @@ const getUpstashConfig = () => {
   if (!url || !token) return null;
   return { url, token };
 };
+
+const parsePositiveIntEnv = (value: string | undefined, fallback: number) => {
+  const parsed = Number(value?.trim());
+  if (Number.isFinite(parsed) && parsed > 0) {
+    return Math.floor(parsed);
+  }
+  return fallback;
+};
+
+export const getRegistrationIpRateLimitConfig = (): RegistrationIpRateLimitConfig => ({
+  maxAttempts: parsePositiveIntEnv(process.env.REGISTRATION_IP_LIMIT_MAX_ATTEMPTS, 3),
+  windowMs:
+    parsePositiveIntEnv(process.env.REGISTRATION_IP_LIMIT_WINDOW_SECONDS, 10 * 60) * 1000,
+});
 
 export const getClientIp = (request: Request) => {
   const forwardedFor = request.headers.get("x-forwarded-for");
@@ -187,6 +206,18 @@ export const enforceHighCostRateLimit = async ({
     limit: ipLimit,
     windowMs,
     scope,
+  });
+};
+
+export const enforceRegistrationIpRateLimit = async (
+  request: Request,
+  config = getRegistrationIpRateLimitConfig(),
+) => {
+  await enforceRateLimit({
+    key: `ip:${getClientIp(request)}`,
+    limit: config.maxAttempts,
+    windowMs: config.windowMs,
+    scope: "signup:ip",
   });
 };
 

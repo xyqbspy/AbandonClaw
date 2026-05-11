@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   buildDryRunPreview,
   buildPublicRegistrationBaselineConfig,
+  getScenarioDefinitions,
   summarizeBaselineResults,
 } from "./load-public-registration-http-baseline-lib";
 
@@ -59,4 +60,9 @@ test("summary 会正确统计 passed failed blocked", () => {
     failed: 1,
     blocked: 1,
   });
+});
+
+test("baseline 场景列表包含注册 IP 频控验证", () => {
+  const names = getScenarioDefinitions().map((item) => item.name);
+  assert.ok(names.includes("signup-ip-rate-limit-hits-429"));
 });

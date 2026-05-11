@@ -6,6 +6,8 @@
 - [ ] `NEXT_PUBLIC_SUPABASE_ANON_KEY` 已配置
 - [ ] `SUPABASE_SERVICE_ROLE_KEY` 仅服务端环境可用
 - [ ] `REGISTRATION_MODE` 已显式配置；公网小范围开放使用 `invite_only`
+- [ ] `REGISTRATION_IP_LIMIT_MAX_ATTEMPTS` 已配置或确认接受保守默认值
+- [ ] `REGISTRATION_IP_LIMIT_WINDOW_SECONDS` 已配置或确认接受保守默认值
 - [ ] `UPSTASH_REDIS_REST_URL` 已配置
 - [ ] `UPSTASH_REDIS_REST_TOKEN` 已配置
 - [ ] `NEXT_PUBLIC_APP_URL` / `NEXT_PUBLIC_SITE_URL` / `APP_ORIGIN` 至少有一项与实际部署域名一致
@@ -14,6 +16,7 @@
 
 - [ ] `closed` 模式下 `/api/auth/signup` 拒绝注册
 - [ ] `invite_only` 模式下无邀请码注册失败
+- [ ] 同一 IP 连续注册会在 `/api/auth/signup` 命中受控 429
 - [ ] 邀请码表包含 `max_uses`、`used_count`、`expires_at` 和 `is_active`
 - [ ] 注册成功或失败均有 `registration_invite_attempts` 记录
 - [ ] Supabase 项目已确认开启邮箱验证策略
@@ -50,6 +53,7 @@
 - [ ] 认证 cookie 已通过真实登录流程获取
 - [ ] `registration-mode-visible` baseline 已执行，并确认返回的 `mode` 符合当前目标环境
 - [ ] `closed` 或 `invite_only` 对应注册场景已执行，并保留成功/失败结果
+- [ ] `signup-ip-rate-limit-hits-429` baseline 已执行，或明确记录为何仍待在 `invite_only` 环境补跑
 - [ ] `unverified-app-redirects-to-verify-email` 与 `unverified-api-rejected` 至少执行一项
 - [ ] `origin-mismatch-rejected` baseline 已执行
 - [ ] `practice-generate-normal` baseline 已执行
@@ -88,7 +92,8 @@ pnpm run load:public-registration-baseline --dry-run --config-file=scripts/load-
 ## P0-B 公网开放防护检查
 
 - [ ] `supabase/sql/20260509_public_registration_p0b.sql` 已在目标环境执行。
-- [ ] `profiles.access_status` 默认 `active`，且可通过 SQL 设置为 `disabled`、`generation_limited`、`readonly`。
+- [ ] `profiles.access_status` 默认 `active`，且可通过 `/admin/users` 或 SQL 设置为 `disabled`、`generation_limited`、`readonly`。
+- [ ] `/admin/users` 可按邮箱、用户 ID、用户名或状态查找目标用户，并成功切换 `access_status`。
 - [ ] `DAILY_QUOTA_*` 环境变量已确认；未配置时接受服务端保守默认值。
 - [ ] 高成本接口超每日额度时返回 429，且不触发模型/TTS。
 - [ ] `/api/admin/status` 可看到 `todayHighCostUsage.items`。

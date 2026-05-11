@@ -299,6 +299,54 @@ const buildScenarioDefinitions = (): ScenarioDefinition[] => [
     },
   },
   {
+    name: "signup-ip-rate-limit-hits-429",
+    group: "registration",
+    description: "同一 IP 连续注册会在注册入口命中 429。",
+    run: async (config) => {
+      if (config.expectedRegistrationMode !== "invite_only") {
+        return blocked(
+          "registration",
+          "signup-ip-rate-limit-hits-429",
+          "同一 IP 连续注册会在注册入口命中 429。",
+          "当前仅在 `invite_only` 模式下提供安全 baseline；`open` 模式需避免真实造号后再单独执行。",
+        );
+      }
+      const email = buildSignupEmail(config, "signup-ip-limit");
+      if (!email || !config.signupPassword) {
+        return blocked(
+          "registration",
+          "signup-ip-rate-limit-hits-429",
+          "同一 IP 连续注册会在注册入口命中 429。",
+          "缺少 signupEmailPrefix、signupEmailDomain 或 signupPassword。",
+        );
+      }
+      const summary = await runLoad({
+        baseUrl: config.baseUrl,
+        path: "/api/auth/signup",
+        method: "POST",
+        origin: config.origin,
+        cookie: null,
+        body: JSON.stringify({
+          email,
+          password: config.signupPassword,
+          username: config.signupUsername ?? "baseline-user",
+        }),
+        requests: 6,
+        concurrency: 1,
+      });
+      const hit429 = Number(summary.statusCounts["429"] ?? 0) > 0;
+      return {
+        group: "registration",
+        name: "signup-ip-rate-limit-hits-429",
+        description: "同一 IP 连续注册会在注册入口命中 429。",
+        status: hit429 ? "passed" : "failed",
+        reason: hit429 ? undefined : "注册入口 IP 频控未命中 429。",
+        expected: { statusCountsIncludes: 429, requests: 6, mode: "invite_only" },
+        actual: summary,
+      };
+    },
+  },
+  {
     name: "invite-only-signup-with-invite-succeeds",
     group: "registration",
     description: "`invite_only` 模式下有效邀请码注册成功。",
