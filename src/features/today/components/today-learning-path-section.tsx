@@ -1,23 +1,9 @@
-import {
-  TODAY_SECTION_CLASSNAME,
-  TODAY_SECTION_EMOJI_CLASSNAME,
-  TODAY_LEARNING_PATH_HEADING_CLASSNAME,
-  TODAY_LEARNING_PRIMARY_CARD_CLASSNAME,
-  TODAY_LEARNING_PRIMARY_REASON_CLASSNAME,
-  TODAY_LEARNING_PRIMARY_TITLE_CLASSNAME,
-  TODAY_TASK_STEP_ACTIVE_CLASSNAME,
-  TODAY_TASK_STEP_BASE_CLASSNAME,
-  TODAY_TASK_STEP_COMPLETED_CLASSNAME,
-  TODAY_TASK_STEP_DESC_CLASSNAME,
-  TODAY_TASK_STEP_ICON_CLASSNAME,
-  TODAY_TASK_STEP_INACTIVE_CLASSNAME,
-  TODAY_TASK_STEP_TITLE_CLASSNAME,
-  TODAY_TASK_ICON_GLYPH_CLASSNAME,
-} from "@/features/today/components/today-page-styles";
+import { Headphones, RotateCw, Sparkles } from "lucide-react";
 import { DailyTask } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
-const STEP_ICONS = ["🎧", "✨", "🧠"] as const;
-const STEP_FALLBACK_DESCS = ["开始练习", "带走表达", "主动提取"] as const;
+const STEP_ICONS = [Headphones, Sparkles, RotateCw] as const;
+const STEP_TITLES = ["场景输入", "表达沉淀", "回忆复习"] as const;
 
 const getTaskStepVariant = (task: DailyTask) => {
   if (task.done) return "completed";
@@ -25,17 +11,8 @@ const getTaskStepVariant = (task: DailyTask) => {
   return "inactive";
 };
 
-const getTaskStepDescription = (task: DailyTask, index: number) => {
-  if (task.shortReason) return task.shortReason;
-  if (task.done) return "已完成";
-  if (task.status === "locked") return index === 0 ? STEP_FALLBACK_DESCS[index] : "等待解锁";
-  return task.actionLabel?.replace(/^继续：/, "") ?? STEP_FALLBACK_DESCS[index];
-};
-
 export function TodayLearningPathSection({
   tasks,
-  primaryTaskTitle,
-  primaryTaskReason,
   onOpenTask,
 }: {
   tasks: DailyTask[];
@@ -44,53 +21,35 @@ export function TodayLearningPathSection({
   onOpenTask: (task: DailyTask) => void;
 }) {
   return (
-    <section className={TODAY_SECTION_CLASSNAME}>
-      <div className={TODAY_LEARNING_PATH_HEADING_CLASSNAME}>
-        <span className={TODAY_SECTION_EMOJI_CLASSNAME}>🪄</span>
-        <span>今日学习路径</span>
-      </div>
-      <div className={TODAY_LEARNING_PRIMARY_CARD_CLASSNAME}>
-        <div className={TODAY_LEARNING_PRIMARY_TITLE_CLASSNAME}>
-          {primaryTaskTitle}
-        </div>
-        <div className={TODAY_LEARNING_PRIMARY_REASON_CLASSNAME}>
-          {primaryTaskReason}
-        </div>
-      </div>
-      <div className="flex gap-[var(--mobile-space-sm)]">
-        {tasks.map((task, index) => {
-          const variant = getTaskStepVariant(task);
-          const isLocked = task.status === "locked";
-          return (
-            <button
-              key={task.id}
-              type="button"
-              disabled={isLocked}
-              className={`${TODAY_TASK_STEP_BASE_CLASSNAME} ${
-                variant === "completed"
-                  ? TODAY_TASK_STEP_COMPLETED_CLASSNAME
-                  : variant === "active"
-                    ? TODAY_TASK_STEP_ACTIVE_CLASSNAME
-                    : TODAY_TASK_STEP_INACTIVE_CLASSNAME
-              } ${isLocked ? "cursor-not-allowed opacity-80" : "active:scale-[0.98]"}`}
-              onClick={() => {
-                if (isLocked) return;
-                onOpenTask(task);
-              }}
-            >
-              <div className={TODAY_TASK_STEP_ICON_CLASSNAME}>
-                <span className={TODAY_TASK_ICON_GLYPH_CLASSNAME}>
-                  {variant === "completed" ? "✓" : STEP_ICONS[index] ?? "•"}
-                </span>
-              </div>
-              <div className={TODAY_TASK_STEP_TITLE_CLASSNAME}>{task.title}</div>
-              <div className={TODAY_TASK_STEP_DESC_CLASSNAME}>
-                {getTaskStepDescription(task, index)}
-              </div>
-            </button>
-          );
-        })}
-      </div>
+    <section className="grid grid-cols-3 gap-3">
+      {tasks.slice(0, 3).map((task, index) => {
+        const Icon = STEP_ICONS[index] ?? Sparkles;
+        const variant = getTaskStepVariant(task);
+        const isLocked = task.status === "locked";
+        return (
+          <button
+            key={task.id}
+            type="button"
+            disabled={isLocked}
+            className={cn(
+              "rounded-[16px] border bg-white px-3 py-4 text-center transition active:scale-[0.98]",
+              variant === "active" && "border-[#007AFF] bg-[#f0f7ff]",
+              variant === "completed" && "border-[#bdecc9] bg-[#f0fff4]",
+              variant === "inactive" && "border-transparent",
+              isLocked && "cursor-not-allowed opacity-70",
+            )}
+            onClick={() => {
+              if (isLocked) return;
+              onOpenTask(task);
+            }}
+          >
+            <Icon className="mx-auto mb-2 size-5 text-[#007AFF]" aria-hidden="true" />
+            <span className="block text-[12px] font-semibold text-[#1d1d1f]">
+              {STEP_TITLES[index] ?? task.title}
+            </span>
+          </button>
+        );
+      })}
     </section>
   );
 }

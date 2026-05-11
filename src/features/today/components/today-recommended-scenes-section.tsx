@@ -1,19 +1,5 @@
+import { ChevronRight } from "lucide-react";
 import { LoadingState } from "@/components/shared/action-loading";
-import {
-  TODAY_BADGE_EMOJI_CLASSNAME,
-  TODAY_RECOMMEND_BADGE_CLASSNAME,
-  TODAY_RECOMMEND_CARD_CLASSNAME,
-  TODAY_RECOMMEND_EMPTY_CLASSNAME,
-  TODAY_RECOMMEND_HEADER_CLASSNAME,
-  TODAY_RECOMMEND_HEADING_CLASSNAME,
-  TODAY_RECOMMEND_LIST_CLASSNAME,
-  TODAY_RECOMMEND_LOADING_CLASSNAME,
-  TODAY_RECOMMEND_META_CLASSNAME,
-  TODAY_RECOMMEND_REASON_PILL_CLASSNAME,
-  TODAY_RECOMMEND_TITLE_CLASSNAME,
-  TODAY_SECTION_EMOJI_CLASSNAME,
-} from "@/features/today/components/today-page-styles";
-import { APPLE_META_TEXT } from "@/lib/ui/apple-style";
 import { SceneListItemResponse } from "@/lib/utils/scenes-api";
 
 export function TodayRecommendedScenesSection({
@@ -21,8 +7,6 @@ export function TodayRecommendedScenesSection({
   recommendedScenes,
   emptyText,
   loadingText,
-  getRecommendationReason,
-  getRecommendationBadge,
   onOpenScene,
 }: {
   loading: boolean;
@@ -33,42 +17,49 @@ export function TodayRecommendedScenesSection({
   getRecommendationBadge: (scene: SceneListItemResponse) => string;
   onOpenScene: (slug: string) => void;
 }) {
+  const nextScene = recommendedScenes[0];
+
   return (
-    <section className="space-y-[var(--mobile-space-md)]">
-      <div className={TODAY_RECOMMEND_HEADER_CLASSNAME}>
-        <div className={TODAY_RECOMMEND_HEADING_CLASSNAME}>
-          <span className={TODAY_SECTION_EMOJI_CLASSNAME}>✨</span>
-          <span>推荐下一组场景</span>
-        </div>
-        <span className={APPLE_META_TEXT}>轻触卡片切换</span>
+    <section className="space-y-3 pt-2">
+      <div className="flex items-center justify-between">
+        <h3 className="text-[16px] font-semibold tracking-normal text-[#86868b]">
+          推荐下一组
+        </h3>
+        <button
+          type="button"
+          className="text-[13px] font-medium text-[#007AFF]"
+          onClick={() => {
+            if (nextScene) onOpenScene(nextScene.slug);
+          }}
+        >
+          查看更多
+        </button>
       </div>
 
-      {loading && recommendedScenes.length === 0 ? (
-        <div className={TODAY_RECOMMEND_LOADING_CLASSNAME}>
+      {loading && !nextScene ? (
+        <div className="rounded-[18px] bg-white p-5">
           <LoadingState text={loadingText} className="py-0" />
         </div>
-      ) : recommendedScenes.length === 0 ? (
-        <div className={TODAY_RECOMMEND_EMPTY_CLASSNAME}>{emptyText}</div>
-      ) : (
-        <div className={TODAY_RECOMMEND_LIST_CLASSNAME}>
-          {recommendedScenes.map((scene) => (
-            <button
-              key={scene.id}
-              type="button"
-              className={TODAY_RECOMMEND_CARD_CLASSNAME}
-              onClick={() => onOpenScene(scene.slug)}
-            >
-              <div className={TODAY_RECOMMEND_TITLE_CLASSNAME}>{scene.title}</div>
-              <div className={TODAY_RECOMMEND_META_CLASSNAME}>
-                <span className={TODAY_BADGE_EMOJI_CLASSNAME}>⏰</span> {scene.estimatedMinutes} 分钟
-              </div>
-              <div className={TODAY_RECOMMEND_REASON_PILL_CLASSNAME}>
-                {getRecommendationReason(scene)}
-              </div>
-              <div className={TODAY_RECOMMEND_BADGE_CLASSNAME}>{getRecommendationBadge(scene)}</div>
-            </button>
-          ))}
+      ) : !nextScene ? (
+        <div className="rounded-[18px] bg-white p-5 text-[14px] text-[#86868b]">
+          {emptyText}
         </div>
+      ) : (
+        <button
+          type="button"
+          className="flex w-full items-center justify-between rounded-[18px] bg-white p-5 text-left shadow-[0_4px_14px_rgba(0,0,0,0.03)] transition active:scale-[0.99]"
+          onClick={() => onOpenScene(nextScene.slug)}
+        >
+          <div className="min-w-0">
+            <span className="block truncate text-[15px] font-semibold text-[#1d1d1f]">
+              {nextScene.title}
+            </span>
+            <span className="mt-1 block text-[12px] text-[#86868b]">
+              {nextScene.estimatedMinutes} 分钟
+            </span>
+          </div>
+          <ChevronRight className="size-5 shrink-0 text-[#d1d1d6]" aria-hidden="true" />
+        </button>
       )}
     </section>
   );

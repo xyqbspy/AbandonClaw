@@ -41,9 +41,9 @@ test("TodayContinueCard 在 pending 时展示骨架并禁用按钮", async () =>
   render(
     <TodayContinueCard
       title="正在恢复今天的学习进度"
-      subtitle="稍等一下，正在同步你上次学到的场景和步骤。"
+      subtitle="稍等一下"
       stepLabel="正在加载"
-      stepIcon="🎧"
+      stepIcon=""
       helperText="正在恢复继续学习入口"
       resultSummary="pending"
       progressPercent={0}
@@ -56,20 +56,18 @@ test("TodayContinueCard 在 pending 时展示骨架并禁用按钮", async () =>
   );
 
   assert.ok(screen.getByRole("button", { name: "正在恢复进度..." }).hasAttribute("disabled"));
-  screen.getByLabelText("继续学习进度加载中");
   screen.getByLabelText("继续学习说明加载中");
   fireEvent.click(screen.getByRole("button", { name: "正在恢复进度..." }));
   assert.equal(clicked, false);
 });
 
-test("TodayWelcomeCard 会渲染欢迎语和连续学习天数", async () => {
+test("TodayWelcomeCard 会渲染简短欢迎和连续学习天数", async () => {
   const { TodayWelcomeCard } = localRequire("./today-welcome-card") as typeof import("./today-welcome-card");
 
   render(<TodayWelcomeCard displayName="xyqbspy" streakDays={7} />);
 
   screen.getByText("欢迎回来，xyqbspy");
-  screen.getByText("7");
-  screen.getByText("连续学习");
+  screen.getByText("7 天连续学习");
 });
 
 test("TodayLearningPathSection 会处理点击和 locked 状态", async () => {
@@ -81,7 +79,7 @@ test("TodayLearningPathSection 会处理点击和 locked 状态", async () => {
   render(
     <TodayLearningPathSection
       primaryTaskTitle="先推进当前场景输入"
-      primaryTaskReason="当前有进行中的场景学习，优先延续上下文。"
+      primaryTaskReason="当前有进行中的场景学习"
       tasks={[
         {
           id: "task-scene",
@@ -91,7 +89,7 @@ test("TodayLearningPathSection 会处理点击和 locked 状态", async () => {
           done: false,
           actionHref: "/scene/demo",
           status: "available",
-          actionLabel: "继续，听熟这段",
+          actionLabel: "继续",
         },
         {
           id: "task-review",
@@ -109,18 +107,16 @@ test("TodayLearningPathSection 会处理点击和 locked 状态", async () => {
     />,
   );
 
-  screen.getByText("先推进当前场景输入");
-  screen.getByText("当前有进行中的场景学习，优先延续上下文。");
   fireEvent.click(screen.getByRole("button", { name: /场景输入/ }));
   assert.deepEqual(clickedIds, ["task-scene"]);
 
-  const lockedButton = screen.getByRole("button", { name: /回忆复习/ });
+  const lockedButton = screen.getByRole("button", { name: /表达沉淀/ });
   assert.ok(lockedButton.hasAttribute("disabled"));
   fireEvent.click(lockedButton);
   assert.deepEqual(clickedIds, ["task-scene"]);
 });
 
-test("TodaySavedExpressionsSection 会渲染表达列表和跳转入口", async () => {
+test("TodaySavedExpressionsSection 会渲染压缩入口和跳转", async () => {
   const { TodaySavedExpressionsSection } = localRequire(
     "./today-saved-expressions-section",
   ) as typeof import("./today-saved-expressions-section");
@@ -135,8 +131,8 @@ test("TodaySavedExpressionsSection 会渲染表达列表和跳转入口", async 
     />,
   );
 
-  screen.getByText("burn yourself out", { exact: false });
-  screen.getByText("把自己熬垮");
+  screen.getByText("表达库");
+  screen.getByText("2 条已保存");
   const link = screen.getByRole("link");
   assert.equal(link.getAttribute("href"), "/chunks");
 });
@@ -156,7 +152,7 @@ test("TodayReviewSummaryCard 会根据待复习数量切换状态文案", async 
   );
 
   screen.getByText("92%");
-  screen.getByText(/3 条表达待复习/);
+  screen.getByText("3 条待复习");
   fireEvent.click(screen.getByRole("button"));
   assert.equal(clicked, 1);
 
@@ -171,7 +167,7 @@ test("TodayReviewSummaryCard 会根据待复习数量切换状态文案", async 
   );
 
   screen.getByText("--");
-  screen.getByText(/当前没有待复习内容/);
+  screen.getByText("暂无待复习");
 });
 
 test("TodayRecommendedScenesSection 会处理 loading 和列表点击", async () => {
@@ -220,7 +216,7 @@ test("TodayRecommendedScenesSection 会处理 loading 和列表点击", async ()
       emptyText="暂无推荐"
       loadingText="加载场景中..."
       getRecommendationReason={() => "可以顺手接着练"}
-      getRecommendationBadge={() => "⭐ 继续"}
+      getRecommendationBadge={() => "继续"}
       onOpenScene={(slug) => {
         openCalls.push(slug);
       }}
@@ -231,7 +227,7 @@ test("TodayRecommendedScenesSection 会处理 loading 和列表点击", async ()
   assert.deepEqual(openCalls, ["coffee-chat"]);
 });
 
-test("TodayContinueCard 会展示结果摘要", async () => {
+test("TodayContinueCard 只展示一个短提示而不是结果长说明", async () => {
   const { TodayContinueCard } = localRequire("./today-continue-card") as typeof import("./today-continue-card");
 
   render(
@@ -239,7 +235,7 @@ test("TodayContinueCard 会展示结果摘要", async () => {
       title="继续这一轮"
       subtitle="把今天这轮输入接着推完"
       stepLabel="句子练习"
-      stepIcon="📝"
+      stepIcon=""
       helperText="当前先把这一句推进到完整复现。"
       resultSummary="今天已带走 2 条表达，完成当前推进后还有 3 条待回忆。"
       progressPercent={48}
@@ -249,5 +245,6 @@ test("TodayContinueCard 会展示结果摘要", async () => {
     />,
   );
 
-  screen.getByText("今天已带走 2 条表达，完成当前推进后还有 3 条待回忆。");
+  screen.getByText("当前先把这一句推进到完整复现。");
+  assert.equal(screen.queryByText("今天已带走 2 条表达，完成当前推进后还有 3 条待回忆。"), null);
 });

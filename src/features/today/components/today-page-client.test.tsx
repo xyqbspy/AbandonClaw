@@ -202,14 +202,14 @@ afterEach(() => {
   mockGetScenesFromApi = async () => [];
 });
 
-test("TodayPageClient 会优先展示最近表达预览", async () => {
+test("TodayPageClient 会把表达入口压缩成数量摘要", async () => {
   const TodayPageClient = getTodayPageClient();
 
   render(<TodayPageClient displayName="xyqbspy" />);
 
   await waitFor(() => {
-    screen.getByText("burn yourself out", { exact: false });
-    screen.getByText("把自己熬垮");
+    screen.getByText("表达库");
+    screen.getByText("12 条已保存");
   });
 
   assert.equal(routerPushCalls.length, 0);

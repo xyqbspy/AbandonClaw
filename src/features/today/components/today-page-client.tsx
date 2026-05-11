@@ -381,21 +381,8 @@ export function TodayPageClient({ displayName }: { displayName: string }) {
   }, [continueLearning, todayLearningSnapshot.effectiveCurrentStep]);
 
   return (
-    <div className="mx-auto max-w-[500px] space-y-[var(--mobile-space-lg)] text-foreground">
+    <div className="mx-auto max-w-[800px] space-y-6 text-foreground">
       <TodayWelcomeCard displayName={finalDisplayName} streakDays={dashboard.overview.streakDays} />
-
-      <TodayLearningPathSection
-        tasks={dailyTasks}
-        primaryTaskTitle={primaryTaskExplanation.title}
-        primaryTaskReason={primaryTaskExplanation.reason}
-        onOpenTask={(task) => {
-          if (task.id === "task-review") {
-            startReviewSession({ router, source: "today-task" });
-            return;
-          }
-          router.push(task.actionHref);
-        }}
-      />
 
       <TodayContinueCard
         title={continueCardState.title}
@@ -418,22 +405,37 @@ export function TodayPageClient({ displayName }: { displayName: string }) {
         }}
       />
 
-      <TodaySavedExpressionsSection
-        savedPhraseCount={dashboard.overview.savedPhraseCount}
-        items={expressionPreviewItems}
-      />
-
-      <TodayReviewSummaryCard
-        reviewAccuracy={dashboard.overview.reviewAccuracy}
-        dueReviewCount={dashboard.todayTasks.reviewTask.dueReviewCount}
-        onClick={() => {
-          recordClientEvent("today_review_opened", {
-            dueReviewCount: dashboard.todayTasks.reviewTask.dueReviewCount,
-            reviewedTodayCount: dashboard.todayTasks.reviewTask.reviewItemsCompleted,
-          });
-          startReviewSession({ router, source: "today-task" });
+      <TodayLearningPathSection
+        tasks={dailyTasks}
+        primaryTaskTitle={primaryTaskExplanation.title}
+        primaryTaskReason={primaryTaskExplanation.reason}
+        onOpenTask={(task) => {
+          if (task.id === "task-review") {
+            startReviewSession({ router, source: "today-task" });
+            return;
+          }
+          router.push(task.actionHref);
         }}
       />
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <TodaySavedExpressionsSection
+          savedPhraseCount={dashboard.overview.savedPhraseCount}
+          items={expressionPreviewItems}
+        />
+
+        <TodayReviewSummaryCard
+          reviewAccuracy={dashboard.overview.reviewAccuracy}
+          dueReviewCount={dashboard.todayTasks.reviewTask.dueReviewCount}
+          onClick={() => {
+            recordClientEvent("today_review_opened", {
+              dueReviewCount: dashboard.todayTasks.reviewTask.dueReviewCount,
+              reviewedTodayCount: dashboard.todayTasks.reviewTask.reviewItemsCompleted,
+            });
+            startReviewSession({ router, source: "today-task" });
+          }}
+        />
+      </div>
 
       <TodayRecommendedScenesSection
         loading={loading}
