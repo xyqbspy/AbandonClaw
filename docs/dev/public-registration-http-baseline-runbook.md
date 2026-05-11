@@ -51,7 +51,7 @@
 - `readonly-write-rejected`
 - `admin-status-shows-backend-and-usage`
 
-这些场景对应当前公开前最关键的验证矩阵：注册模式、邮箱验证、Origin、防刷限流、daily quota、账号状态和运行状态可见性。
+这些场景对应当前公开前最关键的验证矩阵：注册模式、邮箱验证回跳与重发、Origin、防刷限流、daily quota、账号状态和运行状态可见性。
 
 ## 3. 执行前准备
 
@@ -147,7 +147,7 @@ pnpm run load:public-registration-baseline --config-file=tmp/public-registration
 
 - `closed` 注册返回 401
 - `signup-ip-rate-limit-hits-429` 在短窗口内出现 429
-- 未验证邮箱访问主应用被重定向到 `/verify-email`
+- 注册验证邮件能回到 `/auth/callback`，未验证邮箱访问主应用被重定向到 `/verify-email`，且 `/verify-email` 可重发验证邮件
 - `daily quota` 返回 429 且 `code=DAILY_QUOTA_EXCEEDED`
 - `/api/admin/status` 返回 `rateLimitBackend.kind` 和 `todayHighCostUsage.items`
 

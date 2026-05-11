@@ -5,6 +5,7 @@ import { getEffectiveRegistrationMode, registerWithEmailPassword } from "@/lib/s
 import { enforceRegistrationIpRateLimit } from "@/lib/server/rate-limit";
 import { assertAllowedOrigin } from "@/lib/server/request-guard";
 import { parseJsonBody } from "@/lib/server/validation";
+import { buildEmailVerificationRedirectTo } from "@/lib/server/email-verification-url";
 
 type SignupRequestBody = {
   email?: string;
@@ -65,6 +66,7 @@ export async function handleSignupPost(
       username: payload.username,
       inviteCode: payload.inviteCode,
       registrationMode: mode,
+      emailRedirectTo: buildEmailVerificationRedirectTo(request),
     });
 
     return NextResponse.json(result, {

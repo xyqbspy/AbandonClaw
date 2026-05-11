@@ -21,6 +21,7 @@
 - 注册模式已显式确认；推荐在 `/admin/invites` 切换到 `invite_only`，后台配置缺失时再使用 `REGISTRATION_MODE` 兜底。
 - `UPSTASH_REDIS_REST_URL` 和 `UPSTASH_REDIS_REST_TOKEN` 已配置。
 - `APP_ORIGIN` / `NEXT_PUBLIC_APP_URL` / `NEXT_PUBLIC_SITE_URL` 与目标域名一致。
+- Supabase Auth 已开启邮箱确认，并把 `https://<目标域名>/auth/callback` 加入允许的 Redirect URLs。
 - 已准备管理员账号、普通已验证账号、未验证邮箱账号、`generation_limited` 测试账号、`readonly` 测试账号。
 - 已准备至少 3 个不同普通账号 cookie，用于验证同一 IP 多账号限流。
 - 已通过 `/admin/invites` 准备可消耗或可清理的邀请码；若后台不可用，再使用备用 SQL 流程。
@@ -289,6 +290,8 @@ pnpm run load:public-registration-baseline --config-file=tmp/public-registration
 
 验证目标：
 
+- 注册邮件使用项目内 `/auth/callback` 回跳。
+- `/verify-email` 可以重发验证邮件。
 - 邮箱未验证用户不能进入主应用。
 - 邮箱未验证用户不能调用受保护 API 或高成本入口。
 
@@ -301,6 +304,8 @@ pnpm run load:public-registration-baseline --config-file=tmp/public-registration
 
 通过标准：
 
+- 注册后收到的验证邮件点击后回到 `/auth/callback`，并最终进入站内安全目标。
+- `/verify-email` 重发验证邮件返回成功，邮箱能收到新验证邮件。
 - 页面访问被重定向到 `/verify-email`。
 - API 返回受控 403。
 - 不触发学习写入、模型调用或 TTS 调用。
@@ -308,6 +313,8 @@ pnpm run load:public-registration-baseline --config-file=tmp/public-registration
 失败先查：
 
 - Supabase 项目是否启用邮箱验证。
+- Supabase Redirect URLs 是否包含当前域名的 `/auth/callback`。
+- `APP_ORIGIN` / `NEXT_PUBLIC_APP_URL` / `NEXT_PUBLIC_SITE_URL` 是否与目标域名一致。
 - 测试 cookie 是否确实属于未验证邮箱账号。
 - middleware 和受保护 API 是否部署为最新版本。
 

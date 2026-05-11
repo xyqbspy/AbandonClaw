@@ -24,6 +24,7 @@ export type SignupPayload = {
   username?: string;
   inviteCode?: string;
   registrationMode?: RegistrationMode;
+  emailRedirectTo?: string;
 };
 
 export type SignupResult = {
@@ -52,6 +53,21 @@ interface RegistrationModeDependencies {
 
 const registrationModeDependencies: RegistrationModeDependencies = {
   createSupabaseAdminClient,
+};
+
+interface RegisterDependencies {
+  createSupabaseAuthClient: () => ReturnType<typeof createClient>;
+}
+
+const registerDependencies: RegisterDependencies = {
+  createSupabaseAuthClient: () =>
+    createClient(getSupabaseUrl(), getSupabaseAnonKey(), {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false,
+      },
+    }),
 };
 
 export const parseRegistrationMode = (value: unknown): RegistrationMode | null => {
@@ -208,7 +224,10 @@ const consumeInviteCode = async (inviteCode: InviteCodeRow) => {
   return Boolean(data);
 };
 
-export async function registerWithEmailPassword(payload: SignupPayload): Promise<SignupResult> {
+export async function registerWithEmailPassword(
+  payload: SignupPayload,
+  dependencies: RegisterDependencies = registerDependencies,
+): Promise<SignupResult> {
   const mode = payload.registrationMode ?? getRegistrationMode();
   const email = normalizeEmail(payload.email);
   const password = normalizePassword(payload.password);
@@ -243,18 +262,16 @@ export async function registerWithEmailPassword(payload: SignupPayload): Promise
     attemptId = await createAttempt(email, "pending", invite.id);
   }
 
-  const supabase = createClient(getSupabaseUrl(), getSupabaseAnonKey(), {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-      detectSessionInUrl: false,
-    },
-  });
+  const supabase = dependencies.createSupabaseAuthClient();
+  const signUpOptions = {
+    ...(username ? { data: { username } } : {}),
+    ...(payload.emailRedirectTo ? { emailRedirectTo: payload.emailRedirectTo } : {}),
+  };
 
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
-    options: username ? { data: { username } } : undefined,
+    options: Object.keys(signUpOptions).length > 0 ? signUpOptions : undefined,
   });
 
   if (error) {

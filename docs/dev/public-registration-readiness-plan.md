@@ -26,7 +26,7 @@
 - 注册页改为调用服务端 `/api/auth/signup`，不再由浏览器直接绕过项目层创建账号。
 - `invite_only` / `open` 模式下，注册入口会在邀请码校验和 Auth 注册前执行同一 IP 频控；阈值可由 `REGISTRATION_IP_LIMIT_MAX_ATTEMPTS` 与 `REGISTRATION_IP_LIMIT_WINDOW_SECONDS` 覆盖。
 - `invite_only` 使用 `registration_invite_codes` 和 `registration_invite_attempts` 表，邀请码只存 hash，支持 `max_uses`、`used_count`、`expires_at`、启停状态和补偿状态。
-- 邮箱未验证用户会被拦截到 `/verify-email`，受保护 API 返回 403，不进入学习主链路或高成本入口。
+- 邮箱注册会使用项目内 `/auth/callback` 处理 Supabase 验证回跳；邮箱未验证用户会被拦截到 `/verify-email`，可重发验证邮件，受保护 API 返回 403，不进入学习主链路或高成本入口。
 - 高成本接口已接入 user + IP 双维度限流：practice generate、scene generate、similar generate、expression map generate、explain selection、TTS、TTS regenerate。
 - `/api/admin/status` 暴露 `rateLimitBackend.kind` 和 `upstashConfigured`，用于确认当前是 `upstash` 还是 `memory`。
 - 已新增 `pnpm run load:public-registration-baseline`，把注册模式、邮箱验证、Origin、user/IP 限流、daily quota、账号状态和 admin status 收口为统一的真实 HTTP baseline 入口。
@@ -323,13 +323,14 @@
 要求：
 
 - Supabase 项目确认开启邮箱验证策略。
+- Supabase Auth 允许当前目标域名的 `/auth/callback` 作为 Redirect URL。
 - 注册成功但邮箱未验证时，不允许进入主应用。
 - 不只是“Supabase 发验证邮件”，主应用入口也要判断用户是否完成邮箱验证。
 
 建议检查点：
 
 - middleware 或 profile 初始化前检查邮箱验证状态。
-- 未验证用户只能进入登录、验证提示或重发邮件页面。
+- 未验证用户只能进入登录、验证提示或重发邮件页面；重发邮件仍走 Supabase Auth，不自建验证码。
 - 已验证用户才能进入 `/today`、`/scenes`、`/review` 等主链路。
 
 验收：

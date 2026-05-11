@@ -22,6 +22,8 @@
 - [ ] `/admin/invites` 可查看邀请码使用 email、auth user id、attempt 状态和最小活动摘要
 - [ ] 注册成功或失败均有 `registration_invite_attempts` 记录
 - [ ] Supabase 项目已确认开启邮箱验证策略
+- [ ] Supabase Auth Redirect URLs 已包含目标域名的 `/auth/callback`
+- [ ] `/verify-email` 重发验证邮件可用
 - [ ] 邮箱未验证用户访问主应用会进入 `/verify-email`
 - [ ] 邮箱未验证用户调用受保护 API 返回 403
 

@@ -1,5 +1,34 @@
 # Dev Log
 
+### [2026-05-11] 接入邮箱验证闭环
+- 类型：Spec-Driven / 公网注册邮箱验证闭环
+- 状态：已完成并归档 `complete-email-verification-flow`
+
+#### 背景
+注册入口已经调用 Supabase Auth 创建邮箱账号，也通过 middleware 阻止邮箱未验证用户进入主应用和受保护 API，但缺少显式 `/auth/callback` 回跳和 `/verify-email` 重发验证邮件入口。这样会让“邮箱验证是否真的接入”过度依赖外部默认配置，用户注册后也缺少自助补发路径。
+
+#### 本次改动
+- 注册时向 Supabase `signUp` 显式传入项目内 `/auth/callback` 验证回跳地址。
+- 新增 `/auth/callback`，使用 Supabase server client 交换邮件链接中的 code，并只跳转到安全站内目标。
+- 新增 `/api/auth/resend-verification`，用于在 `/verify-email` 重发 signup 验证邮件。
+- `/verify-email` 增加注册邮箱输入和重发验证邮件按钮。
+- 同步 `email-verification-flow` stable spec、`auth-api-boundaries`、公开注册验证指南、runbook 和上线检查清单。
+
+#### 已运行验证
+- `pnpm exec tsc --noEmit`
+- `node --import tsx --test src/lib/server/registration.test.ts src/lib/server/email-verification.test.ts src/app/api/auth/signup/route.test.ts src/app/api/auth/resend-verification/route.test.ts src/app/auth/callback/route.test.ts`
+- `node --import tsx --import ./src/test/setup-dom.ts --test 'src/app/(auth)/verify-email/page.test.tsx'`
+- `pnpm exec openspec validate complete-email-verification-flow --strict --no-interactive`
+- `pnpm exec openspec validate --all --strict --no-interactive`
+- `pnpm run maintenance:check`
+- `git diff --check`
+
+#### 明确不收项
+- 不自建验证码、邮箱 token 表或邮件投递系统。
+- 不做邮件模板、域名信誉、退信监控或到达率统计。
+- 不做管理员手动标记邮箱已验证。
+- 真实环境仍必须确认 Supabase Auth 已开启邮箱确认，并把目标域名 `/auth/callback` 加入 Redirect URLs。
+
 ### [2026-05-11] 推进 admin 高成本紧急开关
 - 类型：Spec-Driven / 公网开放应急控制
 - 状态：已完成并归档 `add-admin-high-cost-emergency-controls`

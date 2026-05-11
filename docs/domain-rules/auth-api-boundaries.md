@@ -63,7 +63,10 @@
 ### 3.7 邮箱验证是进入主应用的硬边界
 
 - Supabase 发验证邮件不等于主应用已完成边界收口。
+- 注册创建 Supabase Auth 用户时必须显式传入项目内 `/auth/callback` 验证回跳地址。
+- `/auth/callback` 只处理 Supabase 邮件链接中的 code，并且成功或失败后都只能跳转到安全站内目标。
 - 邮箱未验证用户只能停留在认证相关页面或 `/verify-email`。
+- `/verify-email` 必须提供最小重发验证邮件入口；重发仍使用 Supabase Auth，不自建验证码。
 - 邮箱未验证用户不得进入 `/today`、`/scenes`、`/scene`、`/review`、`/chunks`、`/progress`、`/settings`、`/lesson` 或 `/admin`。
 - 邮箱未验证用户调用受保护 API 时应返回受控 403，不得触发模型、TTS 或学习数据写入。
 

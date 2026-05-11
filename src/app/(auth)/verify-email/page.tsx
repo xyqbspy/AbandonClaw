@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { VerifyEmailForm } from "@/app/(auth)/verify-email/verify-email-form";
 
 export default function VerifyEmailPage() {
   return (
@@ -10,7 +11,10 @@ export default function VerifyEmailPage() {
         </p>
       </div>
       <div className="rounded-lg border bg-card p-4 text-sm text-muted-foreground">
-        如果已经完成验证，请重新登录。没有收到邮件时，可以先检查垃圾邮件或稍后重试。
+        如果已经完成验证，请重新登录。没有收到邮件时，可以先检查垃圾邮件，或在这里重新发送验证邮件。
+      </div>
+      <div className="rounded-lg border bg-card p-4">
+        <VerifyEmailForm />
       </div>
       <Link className="text-sm text-foreground underline underline-offset-4" href="/login">
         去登录

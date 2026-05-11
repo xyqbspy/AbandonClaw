@@ -34,6 +34,7 @@ afterEach(() => {
 
 test("signup handler 会在 invite 校验和注册前执行 IP 频控", async () => {
   const order: string[] = [];
+  let emailRedirectTo: string | undefined;
 
   const response = await handleSignupPost(
     createSignupRequest({
@@ -60,8 +61,9 @@ test("signup handler 会在 invite 校验和注册前执行 IP 频控", async ()
       enforceRegistrationIpRateLimit: async () => {
         order.push("rate-limit");
       },
-      registerWithEmailPassword: async () => {
+      registerWithEmailPassword: async (payload) => {
         order.push("register");
+        emailRedirectTo = payload.emailRedirectTo;
         return {
           userId: "user-1",
           email: "user@example.com",
@@ -74,6 +76,7 @@ test("signup handler 会在 invite 校验和注册前执行 IP 频控", async ()
 
   assert.equal(response.status, 201);
   assert.deepEqual(order, ["origin", "parse", "mode", "rate-limit", "register"]);
+  assert.equal(emailRedirectTo, "http://localhost/auth/callback?next=%2Fscenes");
 });
 
 test("signup handler 命中 IP 频控时返回受控 429 且不会继续注册", async () => {

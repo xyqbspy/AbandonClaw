@@ -134,3 +134,41 @@ test("registerWithEmailPassword validates basic signup input", async () => {
     (error: unknown) => error instanceof ValidationError,
   );
 });
+
+test("registerWithEmailPassword passes email redirect to Supabase signup", async () => {
+  process.env.REGISTRATION_MODE = "open";
+  let signupPayload: unknown = null;
+
+  const result = await registerWithEmailPassword(
+    {
+      email: "USER@example.com",
+      password: "password123",
+      username: "Demo",
+      emailRedirectTo: "https://app.example.com/auth/callback?next=%2Fscenes",
+    },
+    {
+      createSupabaseAuthClient: () =>
+        ({
+          auth: {
+            signUp: async (payload: unknown) => {
+              signupPayload = payload;
+              return {
+                data: { user: { id: "user-1" } },
+                error: null,
+              };
+            },
+          },
+        }) as never,
+    },
+  );
+
+  assert.equal(result.userId, "user-1");
+  assert.deepEqual(signupPayload, {
+    email: "user@example.com",
+    password: "password123",
+    options: {
+      data: { username: "Demo" },
+      emailRedirectTo: "https://app.example.com/auth/callback?next=%2Fscenes",
+    },
+  });
+});
