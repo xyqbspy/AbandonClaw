@@ -6,12 +6,17 @@ import { enforceRegistrationIpRateLimit } from "@/lib/server/rate-limit";
 import { assertAllowedOrigin } from "@/lib/server/request-guard";
 import { parseJsonBody } from "@/lib/server/validation";
 import { buildEmailVerificationRedirectTo } from "@/lib/server/email-verification-url";
+import {
+  consumeSignupEmailCode,
+  verifySignupEmailCode,
+} from "@/lib/server/signup-email-code";
 
 type SignupRequestBody = {
   email?: string;
   password?: string;
   username?: string;
   inviteCode?: string;
+  emailCode?: string;
 };
 
 interface SignupRouteDependencies {
@@ -19,6 +24,8 @@ interface SignupRouteDependencies {
   parseJsonBody: typeof parseJsonBody<SignupRequestBody>;
   getEffectiveRegistrationMode: typeof getEffectiveRegistrationMode;
   enforceRegistrationIpRateLimit: typeof enforceRegistrationIpRateLimit;
+  verifySignupEmailCode: typeof verifySignupEmailCode;
+  consumeSignupEmailCode: typeof consumeSignupEmailCode;
   registerWithEmailPassword: typeof registerWithEmailPassword;
 }
 
@@ -27,6 +34,8 @@ const signupRouteDependencies: SignupRouteDependencies = {
   parseJsonBody,
   getEffectiveRegistrationMode,
   enforceRegistrationIpRateLimit,
+  verifySignupEmailCode,
+  consumeSignupEmailCode,
   registerWithEmailPassword,
 };
 
@@ -60,6 +69,14 @@ export async function handleSignupPost(
       await dependencies.enforceRegistrationIpRateLimit(request);
     }
 
+    const emailCode =
+      mode === "closed"
+        ? null
+        : await dependencies.verifySignupEmailCode({
+            email: payload.email ?? "",
+            code: payload.emailCode ?? "",
+          });
+
     const result = await dependencies.registerWithEmailPassword({
       email: payload.email ?? "",
       password: payload.password ?? "",
@@ -68,6 +85,10 @@ export async function handleSignupPost(
       registrationMode: mode,
       emailRedirectTo: buildEmailVerificationRedirectTo(request),
     });
+
+    if (emailCode) {
+      await dependencies.consumeSignupEmailCode(emailCode.id);
+    }
 
     return NextResponse.json(result, {
       status: 201,

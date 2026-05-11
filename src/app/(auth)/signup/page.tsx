@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Mail, ShieldCheck, Ticket, User } from "lucide-react";
+import { KeyRound, Mail, ShieldCheck, Ticket, User } from "lucide-react";
 import { toast } from "sonner";
 import { AuthCard, AuthField } from "@/app/(auth)/auth-card";
 import {
@@ -13,10 +13,14 @@ import {
 
 type RegistrationMode = "closed" | "invite_only" | "open";
 
+const CODE_COOLDOWN_SECONDS = 60;
+
 export default function SignupPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [submitting, setSubmitting] = useState(false);
+  const [sendingCode, setSendingCode] = useState(false);
+  const [cooldown, setCooldown] = useState(0);
   const [registrationMode, setRegistrationMode] = useState<RegistrationMode>("closed");
   const redirectTo = searchParams.get("redirect");
 
@@ -41,6 +45,49 @@ export default function SignupPage() {
     };
   }, []);
 
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const timer = window.setTimeout(() => {
+      setCooldown((current) => Math.max(0, current - 1));
+    }, 1000);
+    return () => window.clearTimeout(timer);
+  }, [cooldown]);
+
+  const sendEmailCode = async () => {
+    if (sendingCode || cooldown > 0) return;
+
+    const emailInput = document.getElementById("email") as HTMLInputElement | null;
+    const email = emailInput?.value.trim() ?? "";
+    if (!email) {
+      toast.error("请先填写邮箱地址。");
+      emailInput?.focus();
+      return;
+    }
+
+    setSendingCode(true);
+    try {
+      const response = await fetch("/api/auth/signup/email-code", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email }),
+      });
+
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(body?.error ?? "验证码发送失败。");
+      }
+
+      setCooldown(CODE_COOLDOWN_SECONDS);
+      toast.success("验证码已发送，请查看邮箱。");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "验证码发送失败。");
+    } finally {
+      setSendingCode(false);
+    }
+  };
+
   const onSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (submitting) return;
@@ -49,10 +96,15 @@ export default function SignupPage() {
     const username = String(formData.get("username") ?? "").trim();
     const email = String(formData.get("email") ?? "").trim();
     const password = String(formData.get("password") ?? "");
+    const emailCode = String(formData.get("emailCode") ?? "").trim();
     const inviteCode = String(formData.get("inviteCode") ?? "").trim();
 
     if (!email || !password) {
       toast.error("邮箱和密码不能为空。");
+      return;
+    }
+    if (!emailCode) {
+      toast.error("请填写邮箱验证码。");
       return;
     }
     if (registrationMode === "invite_only" && !inviteCode) {
@@ -71,6 +123,7 @@ export default function SignupPage() {
           username,
           email,
           password,
+          emailCode,
           inviteCode,
         }),
       });
@@ -80,7 +133,7 @@ export default function SignupPage() {
         throw new Error(body?.error ?? "注册失败。");
       }
 
-      toast.success("账号已创建，请先完成邮箱验证。");
+      toast.success("账号已创建，请登录继续。");
       router.push(
         isSafeRedirectTarget(redirectTo)
           ? `/login?redirect=${encodeURIComponent(redirectTo)}`
@@ -100,8 +153,8 @@ export default function SignupPage() {
         registrationMode === "closed"
           ? "当前暂未开放注册。"
           : registrationMode === "invite_only"
-            ? "当前为邀请注册，请使用有效邀请码创建账号。"
-            : "创建账号并开始场景化学习。"
+            ? "当前为邀请注册，请使用邮箱验证码和有效邀请码创建账号。"
+            : "使用邮箱验证码创建账号并开始场景化学习。"
       }
       footer={
         <>
@@ -132,6 +185,36 @@ export default function SignupPage() {
           required
           icon={<Mail className="size-4" />}
         />
+        <div className="mb-6">
+          <label htmlFor="emailCode" className="mb-2 block text-[13px] font-semibold text-[#1d1d1f]">
+            邮箱验证码
+          </label>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <div className="relative flex min-w-0 flex-1 items-center">
+              <span className="absolute left-4 text-[#86868b]">
+                <KeyRound className="size-4" />
+              </span>
+              <input
+                id="emailCode"
+                name="emailCode"
+                inputMode="numeric"
+                pattern="[0-9]{6}"
+                maxLength={6}
+                placeholder="6 位验证码"
+                required
+                className="w-full rounded-xl border-[1.5px] border-[#e5e5e7] bg-white px-4 py-3.5 pl-12 text-[15px] text-[#1d1d1f] transition duration-200 placeholder:text-[#86868b] focus:border-[#007AFF] focus:outline-none focus:ring-4 focus:ring-[#007AFF]/10"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={sendEmailCode}
+              disabled={sendingCode || cooldown > 0 || registrationMode === "closed"}
+              className="min-h-12 shrink-0 rounded-xl border border-[#007AFF] px-4 text-sm font-semibold text-[#007AFF] transition hover:bg-[#e5f1ff] disabled:cursor-not-allowed disabled:border-[#d2d2d7] disabled:text-[#86868b]"
+            >
+              {sendingCode ? "发送中..." : cooldown > 0 ? `${cooldown}s 后重发` : "发送验证码"}
+            </button>
+          </div>
+        </div>
         <AuthField
           id="password"
           name="password"

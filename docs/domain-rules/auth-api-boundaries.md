@@ -59,10 +59,13 @@
 - `invite_only` 模式必须校验数据库邀请码；邀请码只存 hash，不落库明文。
 - 邀请码必须具备 `max_uses`、`used_count`、可选 `expires_at` 和启停状态。
 - 注册尝试必须记录到 `registration_invite_attempts`，用于追踪成功、失败、拒绝和需要补偿的情况。
+- 注册页必须提供邮箱验证码输入体验；验证码由服务端生成，只保存 hash、过期时间、错误次数和消费状态。
+- `invite_only` 与 `open` 模式下，`/api/auth/signup` 必须在创建 Supabase Auth 用户前校验邮箱验证码。
+- 错误、过期、已消费或超出错误次数上限的验证码不得创建账号，也不得扣减邀请码使用次数。
 
 ### 3.7 邮箱验证是进入主应用的硬边界
 
-- Supabase 发验证邮件不等于主应用已完成边界收口。
+- 注册页邮箱验证主体验是“发送验证码 -> 输入验证码 -> 提交注册”；Supabase 发验证邮件不等于主应用已完成边界收口。
 - 注册创建 Supabase Auth 用户时必须显式传入项目内 `/auth/callback` 验证回跳地址。
 - `/auth/callback` 只处理 Supabase 邮件链接中的 code，并且成功或失败后都只能跳转到安全站内目标。
 - 邮箱未验证用户只能停留在认证相关页面或 `/verify-email`。

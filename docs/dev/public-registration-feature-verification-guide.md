@@ -21,6 +21,7 @@
 - 注册模式已显式确认；推荐在 `/admin/invites` 切换到 `invite_only`，后台配置缺失时再使用 `REGISTRATION_MODE` 兜底。
 - `UPSTASH_REDIS_REST_URL` 和 `UPSTASH_REDIS_REST_TOKEN` 已配置。
 - `APP_ORIGIN` / `NEXT_PUBLIC_APP_URL` / `NEXT_PUBLIC_SITE_URL` 与目标域名一致。
+- 注册邮箱验证码邮件发送配置已确认；本地开发可通过受控日志查看验证码，生产环境必须配置真实邮件 provider。
 - Supabase Auth 已开启邮箱确认，并把 `https://<目标域名>/auth/callback` 加入允许的 Redirect URLs。
 - 已准备管理员账号、普通已验证账号、未验证邮箱账号、`generation_limited` 测试账号、`readonly` 测试账号。
 - 已准备至少 3 个不同普通账号 cookie，用于验证同一 IP 多账号限流。
@@ -150,7 +151,7 @@ insert into public.registration_invite_codes (
 - 一人一码，或一小组一个低 `max_uses` 的码。
 - 明文邀请码只通过私聊、邮件或可信渠道发送。
 - 不把邀请码写进 Git、公开文档、issue、群公告或截图。
-- 发放时同时告知：注册后需要完成邮箱验证，未验证账号不能进入主应用。
+- 发放时同时告知：注册需要邮箱验证码；若 Supabase 邮箱确认开启，注册后仍需完成邮件链接确认才能进入主应用。
 
 当前数据库没有 recipient 字段；如果要追踪“发给了谁”，先用外部表格或发放记录保存，不要把明文邀请码写回仓库。实际使用者可以在 `/admin/invites` 的使用记录里通过注册 email 和 auth user id 追踪。
 
@@ -256,10 +257,11 @@ where code_hash = '<邀请码 hash>';
 
 1. 在 `/admin/invites` 把注册模式切到 `invite_only`。
 2. 在 `/admin/invites` 生成一个 `max_uses=1` 的测试邀请码。
-3. 打开注册页，输入邮箱、密码、用户名和明文邀请码。
-4. 注册成功后检查邮箱验证提示。
-5. 在 `/admin/invites` 确认使用记录为 `used`，并能看到注册 email / auth user id / 最小活动摘要。
-6. 测试结束后在 `/admin/invites` 切回 `closed`，并停用该测试邀请码。
+3. 打开注册页，输入邮箱并发送邮箱验证码。
+4. 填写验证码、密码、用户名和明文邀请码后注册。
+5. 注册成功后检查登录与邮箱验证提示。
+6. 在 `/admin/invites` 确认使用记录为 `used`，并能看到注册 email / auth user id / 最小活动摘要。
+7. 测试结束后在 `/admin/invites` 切回 `closed`，并停用该测试邀请码。
 
 ## 4. 注册 IP 频控
 
@@ -287,6 +289,12 @@ pnpm run load:public-registration-baseline --config-file=tmp/public-registration
 - 如果该场景在 `open` 模式被标记为 `blocked`，必须安排在 `invite_only` 或可清理账号的等价环境补跑。
 
 ## 5. 邮箱验证拦截
+
+注册页主体验为邮箱验证码：
+
+- `/signup` 输入邮箱后可以发送 6 位验证码。
+- `/api/auth/signup` 必须携带验证码；错误、过期或已消费验证码不能创建账号。
+- `invite_only` 模式下必须同时填写邀请码和邮箱验证码。
 
 验证目标：
 

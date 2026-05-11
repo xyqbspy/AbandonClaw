@@ -1,5 +1,23 @@
 # Dev Log
 
+### [2026-05-11] 接入注册邮箱验证码
+- 类型：Spec-Driven / 注册邮箱验证码前置校验
+- 状态：实施完成，待 archive `add-email-code-signup-verification`
+
+#### 背景
+上一轮邮箱验证复用 Supabase 邮件链接确认，能处理 `/auth/callback`、未验证拦截和重发验证邮件，但注册页没有“发送验证码、输入验证码”的体验。本轮将注册主流程改为邮箱验证码前置校验，避免“邮箱验证”语义在产品体验和代码实现之间继续漂移。
+
+#### 本次改动
+- 新增 `registration_email_verification_codes`，验证码只存 hash、过期时间、错误次数和消费状态。
+- 新增 `/api/auth/signup/email-code`，在注册未关闭时发送 6 位邮箱验证码，并复用注册 IP 频控。
+- `/api/auth/signup` 新增 `emailCode`，在创建 Supabase Auth 用户前校验验证码，账号创建成功后消费验证码。
+- `/signup` 增加发送验证码按钮、验证码输入和移动端可用布局；`invite_only` 下同时要求邀请码和验证码。
+- 同步 `auth-api-boundaries`、`email-verification-flow` stable spec 和公开注册验证文档。
+
+#### 明确不收
+- 不做邮件投递监控、退信处理、模板系统、短信验证码、设备指纹、WAF 或复杂风控评分。
+- 不删除 `/auth/callback` 和 `/verify-email`，它们继续作为 Supabase 链接确认与未验证拦截兼容入口。
+
 ### [2026-05-11] 接入邮箱验证闭环
 - 类型：Spec-Driven / 公网注册邮箱验证闭环
 - 状态：已完成并归档 `complete-email-verification-flow`

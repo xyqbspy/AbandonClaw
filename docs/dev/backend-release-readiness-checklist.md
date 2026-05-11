@@ -16,6 +16,7 @@
 
 - [ ] `closed` 模式下 `/api/auth/signup` 拒绝注册
 - [ ] `invite_only` 模式下无邀请码注册失败
+- [ ] `/signup` 邮箱验证码发送、错误验证码拒绝、正确验证码注册成功
 - [ ] 同一 IP 连续注册会在 `/api/auth/signup` 命中受控 429
 - [ ] 邀请码表包含 `max_uses`、`used_count`、`expires_at` 和 `is_active`
 - [ ] 管理员可通过 `/admin/invites` 生成、停用和调整邀请码
