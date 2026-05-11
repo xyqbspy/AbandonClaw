@@ -53,7 +53,7 @@
 
 1. 必须在目标环境补跑真实 HTTP baseline，并保留 JSON 证据与 `dev-log` 摘要。
 2. 必须确认目标环境限流后端实际为 `upstash`，不能以 `memory` 作为公网开放基线。
-3. 必须演练最小运营处置：能通过 `/admin/users` 把测试账号切到受限状态并恢复，且能紧急切回 `REGISTRATION_MODE=closed`。
+3. 必须演练最小运营处置：能通过 `/admin/users` 把测试账号切到受限状态并恢复，能紧急切回 `closed`，并能临时关闭高成本 capability。
 
 因此当前结论应统一为：
 
@@ -668,6 +668,7 @@
 5. 高成本接口 user + IP 双维度限流。
 6. 真实 HTTP baseline。
 7. 紧急关闭注册开关。
+8. 高成本 capability 紧急关闭开关。
 
 完成标准：
 
@@ -675,7 +676,7 @@
 - 未验证邮箱不能进入主应用。
 - 高成本接口不能被单账号或同 IP 快速刷爆。
 - 管理员知道当前限流后端是否为 Upstash。
-- 出事时能立即切到 `REGISTRATION_MODE=closed`。
+- 出事时能立即切到 `closed`，并能临时关闭异常高成本 capability。
 
 ### 第二批：公开后立刻补
 
@@ -891,10 +892,8 @@
 
 ### 紧急开关检查
 
-- [ ] 可以一键切到 `REGISTRATION_MODE=closed`
-- [ ] 可以一键关闭 `/api/practice/generate`
-- [ ] 可以一键关闭 `/api/scenes/generate`
-- [ ] 可以一键关闭 `/api/tts/regenerate`
+- [x] 可以在 `/admin/invites` 一键切到 `closed`
+- [x] 可以在 `/admin` 临时关闭 practice / scene / TTS 等高成本 capability
 - [ ] 可以临时把每日额度调低
 - [ ] 可以临时把 IP 限流调严
 - [ ] 可以把所有新用户设为 `generation_limited`
@@ -922,7 +921,7 @@
 3. 如果是单账号，先在 `/admin/users` 设置 `generation_limited`。
 4. 如果是同 IP 多账号，收紧 IP 限流阈值。
 5. 如果是全站流量，临时关闭注册或切到 `invite_only`。
-6. 如果外部成本快速上升，临时降低每日额度或关闭对应生成入口。
+6. 如果外部成本快速上升，在 `/admin` 临时关闭对应高成本 capability，必要时再降低每日额度。
 7. 记录事件到 `docs/dev/dev-log.md`，包括时间、影响、处置和后续补救。
 
 ## 10. 当前明确不解决的事情
@@ -966,10 +965,11 @@ P1/P2 剩余风险：
 - 还没有邮箱域名策略、设备指纹、WAF/DDoS。
 - 还没有长期成本趋势、成本金额估算、Top N 用户视图。
 - 还没有服务端学习 session heartbeat。
+- 高成本 capability 已有最小紧急关闭入口，但还没有审批流、定时开关、历史回滚列表或自动风控。
 
 建议继续按这个优先级推进：
 
 1. 先补跑真实环境 baseline，并把结果留证到 `docs/dev/dev-log.md`。
-2. 再做目标环境的放行演练：确认 `upstash`、演练 `/admin/users` 处置和 `REGISTRATION_MODE=closed` 紧急切换。
+2. 再做目标环境的放行演练：确认 `upstash`、演练 `/admin/users` 处置、`/admin` 高成本紧急关闭和 `closed` 紧急切换。
 3. 如果准备发到不可控渠道，再补验证码、邮箱域名策略、设备/来源风控或 WAF 能力。
 4. 长期再做用户详情、成本趋势和服务端 heartbeat，这些不应阻塞当前受控开放。

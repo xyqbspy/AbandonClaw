@@ -21,6 +21,12 @@ import {
   RegistrationMode,
   getEffectiveRegistrationMode,
 } from "@/lib/server/registration";
+import {
+  getHighCostCapabilityControls,
+  parseHighCostCapability,
+  updateHighCostCapabilityDisabled,
+  HighCostCapability,
+} from "@/lib/server/high-cost-usage";
 
 export interface AdminSceneListFilters {
   page?: number;
@@ -133,6 +139,9 @@ export interface AdminCreateInviteCodesResultItem {
 }
 
 export type AdminRegistrationModeState = EffectiveRegistrationMode;
+export type AdminHighCostCapabilityControlItem = Awaited<
+  ReturnType<typeof getHighCostCapabilityControls>
+>[number];
 
 interface AdminUserServiceDependencies {
   createSupabaseAdminClient: typeof createSupabaseAdminClient;
@@ -1463,6 +1472,31 @@ export async function updateAdminRegistrationMode(params: {
   }
 
   return { mode };
+}
+
+export async function getAdminHighCostCapabilityControls() {
+  return getHighCostCapabilityControls();
+}
+
+export async function updateAdminHighCostCapabilityDisabled(params: {
+  capability: HighCostCapability;
+  disabled: boolean;
+  updatedBy: string;
+}) {
+  const capability = parseHighCostCapability(params.capability);
+  if (!capability) {
+    throw new ValidationError("high cost capability is invalid.");
+  }
+  const updatedBy = params.updatedBy.trim();
+  if (!updatedBy) {
+    throw new ValidationError("updatedBy is required.");
+  }
+
+  return updateHighCostCapabilityDisabled({
+    capability,
+    disabled: params.disabled,
+    updatedBy,
+  });
 }
 
 export async function listAdminUsers(

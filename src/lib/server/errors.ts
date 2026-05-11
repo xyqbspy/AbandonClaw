@@ -69,6 +69,18 @@ export class DailyQuotaExceededError extends AppError {
   }
 }
 
+export class HighCostCapabilityDisabledError extends AppError {
+  constructor(message = "This capability is temporarily disabled.", details?: Record<string, unknown>) {
+    super({
+      message,
+      status: 503,
+      code: "HIGH_COST_CAPABILITY_DISABLED",
+      details,
+    });
+    this.name = "HighCostCapabilityDisabledError";
+  }
+}
+
 export class SceneParseError extends AppError {
   constructor(message: string, details?: Record<string, unknown>) {
     super({ message, status: 422, code: "SCENE_PARSE_ERROR", details });

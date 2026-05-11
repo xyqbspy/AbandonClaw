@@ -1,5 +1,5 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { DailyQuotaExceededError } from "@/lib/server/errors";
+import { DailyQuotaExceededError, HighCostCapabilityDisabledError } from "@/lib/server/errors";
 
 export const HIGH_COST_CAPABILITIES = [
   "practice_generate",
@@ -29,6 +29,25 @@ export type HighCostUsageSummaryItem = {
   limitCount: number;
 };
 
+export type HighCostCapabilityControlItem = {
+  capability: HighCostCapability;
+  disabled: boolean;
+};
+
+type RuntimeSettingRow = {
+  value: string | null;
+};
+
+interface HighCostUsageDependencies {
+  createSupabaseAdminClient: typeof createSupabaseAdminClient;
+}
+
+const highCostUsageDependencies: HighCostUsageDependencies = {
+  createSupabaseAdminClient,
+};
+
+export const HIGH_COST_DISABLED_CAPABILITIES_SETTING_KEY = "high_cost_disabled_capabilities";
+
 const DEFAULT_DAILY_QUOTAS: Record<HighCostCapability, number> = {
   practice_generate: 20,
   scene_generate: 8,
@@ -51,6 +70,29 @@ const ENV_KEYS: Record<HighCostCapability, string> = {
 
 const todayDate = (now = new Date()) => now.toISOString().slice(0, 10);
 
+export const parseHighCostCapability = (value: unknown): HighCostCapability | null =>
+  typeof value === "string" && (HIGH_COST_CAPABILITIES as readonly string[]).includes(value)
+    ? (value as HighCostCapability)
+    : null;
+
+export const parseDisabledHighCostCapabilities = (value: unknown): HighCostCapability[] => {
+  if (typeof value !== "string" || !value.trim()) return [];
+
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return Array.from(
+      new Set(
+        parsed
+          .map(parseHighCostCapability)
+          .filter((item): item is HighCostCapability => item !== null),
+      ),
+    );
+  } catch {
+    return [];
+  }
+};
+
 export const getDailyQuotaLimit = (capability: HighCostCapability) => {
   const raw = process.env[ENV_KEYS[capability]]?.trim();
   const parsed = raw ? Number(raw) : NaN;
@@ -64,10 +106,19 @@ export async function reserveHighCostUsage(params: {
   userId: string;
   capability: HighCostCapability;
   now?: Date;
+  dependencies?: HighCostUsageDependencies;
 }): Promise<HighCostUsageReservation> {
+  const dependencies = params.dependencies ?? highCostUsageDependencies;
+  const disabledCapabilities = await listDisabledHighCostCapabilities(dependencies);
+  if (disabledCapabilities.includes(params.capability)) {
+    throw new HighCostCapabilityDisabledError("This capability is temporarily disabled.", {
+      capability: params.capability,
+    });
+  }
+
   const usageDate = todayDate(params.now);
   const limitCount = getDailyQuotaLimit(params.capability);
-  const admin = createSupabaseAdminClient();
+  const admin = dependencies.createSupabaseAdminClient();
 
   const { data, error } = await admin.rpc("reserve_daily_high_cost_usage", {
     p_user_id: params.userId,
@@ -153,4 +204,63 @@ export async function getTodayHighCostUsageSummary(now = new Date()) {
       };
     }),
   };
+}
+
+export async function listDisabledHighCostCapabilities(
+  dependencies: HighCostUsageDependencies = highCostUsageDependencies,
+) {
+  const admin = dependencies.createSupabaseAdminClient();
+  const { data, error } = await admin
+    .from("app_runtime_settings")
+    .select("value")
+    .eq("key", HIGH_COST_DISABLED_CAPABILITIES_SETTING_KEY)
+    .maybeSingle<RuntimeSettingRow>();
+
+  if (error || !data) return [];
+  return parseDisabledHighCostCapabilities(data.value);
+}
+
+export async function getHighCostCapabilityControls(
+  dependencies: HighCostUsageDependencies = highCostUsageDependencies,
+): Promise<HighCostCapabilityControlItem[]> {
+  const disabled = await listDisabledHighCostCapabilities(dependencies);
+  return HIGH_COST_CAPABILITIES.map((capability) => ({
+    capability,
+    disabled: disabled.includes(capability),
+  }));
+}
+
+export async function updateHighCostCapabilityDisabled(params: {
+  capability: HighCostCapability;
+  disabled: boolean;
+  updatedBy: string;
+}, dependencies: HighCostUsageDependencies = highCostUsageDependencies) {
+  const capability = parseHighCostCapability(params.capability);
+  if (!capability) {
+    throw new Error("Invalid high cost capability.");
+  }
+
+  const current = await listDisabledHighCostCapabilities(dependencies);
+  const next = params.disabled
+    ? Array.from(new Set([...current, capability]))
+    : current.filter((item) => item !== capability);
+
+  const admin = dependencies.createSupabaseAdminClient();
+  const { error } = await admin
+    .from("app_runtime_settings")
+    .upsert(
+      {
+        key: HIGH_COST_DISABLED_CAPABILITIES_SETTING_KEY,
+        value: JSON.stringify(next),
+        updated_by: params.updatedBy,
+        updated_at: new Date().toISOString(),
+      } as never,
+      { onConflict: "key" },
+    );
+
+  if (error) {
+    throw new Error(`Failed to update high cost emergency controls: ${error.message}`);
+  }
+
+  return getHighCostCapabilityControls(dependencies);
 }

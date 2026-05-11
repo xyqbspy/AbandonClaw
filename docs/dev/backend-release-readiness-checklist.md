@@ -28,6 +28,7 @@
 ## 接口治理
 
 - [ ] 高成本接口确认已接入 user + IP 双维度统一限流
+- [ ] `/admin` 可临时关闭和恢复高成本 capability，关闭后请求在 quota 预占和上游调用前被拒绝
 - [ ] `/api/admin/status` 可看到 `rateLimitBackend.kind`
 - [ ] 受保护写接口确认已接入 `Origin` 校验
 - [ ] 关键写接口确认已接入幂等保护
@@ -56,7 +57,8 @@
 - [ ] 真实 HTTP baseline 已输出结构化 JSON，并在 `docs/dev/dev-log.md` 记录摘要
 - [ ] `signup-ip-rate-limit-hits-429`、`user-rate-limit-hits-429`、`ip-rate-limit-hits-429` 已在目标环境或等价环境跑通
 - [ ] `/admin/users` 已完成一次真实演练：把测试账号切到受限状态并恢复
-- [ ] 已确认可紧急切回 `REGISTRATION_MODE=closed`
+- [ ] 已确认可在 `/admin/invites` 紧急切回 `closed`
+- [ ] 已确认可在 `/admin` 紧急关闭并恢复至少一个高成本 capability
 
 - [ ] 本地开发服务或目标环境已启动
 - [ ] baseline 脚本使用的 `Origin` 与服务端允许域一致
@@ -108,6 +110,7 @@ pnpm run load:public-registration-baseline --dry-run --config-file=scripts/load-
 - [ ] 已用测试账号实际演练 `generation_limited` 与 `readonly` 的设置和恢复，而不只是停留在单测通过。
 - [ ] `DAILY_QUOTA_*` 环境变量已确认；未配置时接受服务端保守默认值。
 - [ ] 高成本接口超每日额度时返回 429，且不触发模型/TTS。
+- [ ] 高成本 capability 被 `/admin` 关闭后返回受控错误，且不触发 quota 预占或模型/TTS。
 - [ ] `/api/admin/status` 可看到 `todayHighCostUsage.items`。
 - [ ] `studySecondsDelta > 60` 不计入学习统计，并写入异常记录。
 - [ ] 同一 `user + scene` 10 秒内重复有效 delta 不计入学习统计，并写入异常记录。

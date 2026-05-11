@@ -66,6 +66,7 @@
 - 若要执行 `signup-ip-rate-limit-hits-429`，当前推荐在 `invite_only` 模式下执行，避免 `open` 模式真实造号
 - 若要执行 `generation_limited` / `readonly` / `daily quota` 场景，需要专门准备对应测试账号
 - 若要执行 `admin-status-shows-backend-and-usage`，需要管理员 cookie
+- 若要演练高成本紧急关闭，需要管理员先在 `/admin` 关闭对应 capability，验证完成后立即恢复
 
 注意：
 
@@ -136,7 +137,7 @@ pnpm run load:public-registration-baseline --config-file=tmp/public-registration
 - 第一层是“可给小范围真实用户开放”：
   `registration-mode-visible`、注册模式对应场景、`signup-ip-rate-limit-hits-429`、`unverified-app-redirects-to-verify-email` 或 `unverified-api-rejected`、`origin-mismatch-rejected`、`practice-generate-normal`、`user-rate-limit-hits-429`、`ip-rate-limit-hits-429`、`admin-status-shows-backend-and-usage` 不应是 `blocked` 或 `failed`。
 - 第二层是“可继续发到不可控渠道”：
-  除了第一层，还应补齐 `daily-quota-exceeded-hits-429`、`generation-limited-rejected`、`readonly-write-rejected`，并确认 `/admin/users` 处置演练已完成。
+  除了第一层，还应补齐 `daily-quota-exceeded-hits-429`、`generation-limited-rejected`、`readonly-write-rejected`，并确认 `/admin/users` 处置演练和 `/admin` 高成本紧急关闭演练已完成。
 
 如果第一层里还有 `blocked`，不要把它理解成“只是缺少测试数据”。这通常意味着目标环境还不具备可放行证据。
 

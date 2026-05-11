@@ -1,14 +1,18 @@
 import Link from "next/link";
-import { RefreshCw } from "lucide-react";
-import { syncSeedScenesAction } from "@/app/(app)/admin/actions";
+import { RefreshCw, ShieldAlert } from "lucide-react";
+import {
+  syncSeedScenesAction,
+  updateAdminHighCostControlAction,
+} from "@/app/(app)/admin/actions";
 import { readAdminNotice } from "@/app/(app)/admin/admin-page-state";
 import { AdminActionButton } from "@/components/admin/admin-action-button";
 import { AdminInfoCard, AdminInfoList, AdminNoticeCard } from "@/components/shared/admin-info-card";
 import { PageHeader } from "@/components/shared/page-header";
 import { StatCard } from "@/components/shared/stat-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { requireAdmin } from "@/lib/server/auth";
-import { getAdminOverviewStats } from "@/lib/server/admin/service";
+import { getAdminHighCostCapabilityControls, getAdminOverviewStats } from "@/lib/server/admin/service";
 import {
   APPLE_CARD_INTERACTIVE,
   APPLE_META_TEXT,
@@ -30,7 +34,19 @@ const LABELS = {
   activityDone: "\u5df2\u5b8c\u6210\uff1a",
   activityRecent: "\u6700\u8fd1\u6d3b\u8dc3\uff1a",
   adminTitle: "\u5f53\u524d\u7ba1\u7406\u5458",
+  highCostTitle: "高成本紧急开关",
+  highCostDescription: "临时关闭某个生成或 TTS 能力；关闭后会在 quota 预占和上游调用前拒绝。",
 } as const;
+
+const HIGH_COST_LABELS: Record<string, string> = {
+  practice_generate: "练习生成",
+  scene_generate: "场景生成",
+  similar_generate: "相似表达生成",
+  expression_map_generate: "表达地图生成",
+  explain_selection: "划词解释",
+  tts_generate: "TTS 生成",
+  tts_regenerate: "TTS 重生成",
+};
 
 const entries = [
   {
@@ -90,7 +106,11 @@ export default async function AdminHomePage({
 }) {
   const params = await searchParams;
   const notice = readAdminNotice(params);
-  const [adminUser, stats] = await Promise.all([requireAdmin(), getAdminOverviewStats()]);
+  const [adminUser, stats, highCostControls] = await Promise.all([
+    requireAdmin(),
+    getAdminOverviewStats(),
+    getAdminHighCostCapabilityControls(),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -137,6 +157,44 @@ export default async function AdminHomePage({
       <AdminInfoCard title={LABELS.adminTitle} contentClassName="text-muted-foreground">
         {adminUser.email ?? adminUser.id}
       </AdminInfoCard>
+
+      <section className="space-y-3 rounded-[var(--app-radius-panel)] border border-[var(--app-border-soft)] bg-[var(--app-surface)] p-4 shadow-[var(--app-shadow-soft)]">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="flex items-center gap-2 text-base font-semibold text-foreground">
+              <ShieldAlert className="size-4" />
+              {LABELS.highCostTitle}
+            </h2>
+            <p className={`mt-1 text-sm ${APPLE_META_TEXT}`}>{LABELS.highCostDescription}</p>
+          </div>
+          <Badge variant={highCostControls.some((item) => item.disabled) ? "destructive" : "secondary"}>
+            {highCostControls.filter((item) => item.disabled).length} 个已关闭
+          </Badge>
+        </div>
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {highCostControls.map((item) => (
+            <div
+              key={item.capability}
+              className="flex items-center justify-between gap-3 rounded-md border border-[var(--app-border-soft)] bg-muted/30 p-3"
+            >
+              <div>
+                <p className="text-sm font-medium text-foreground">
+                  {HIGH_COST_LABELS[item.capability] ?? item.capability}
+                </p>
+                <p className={`text-xs ${APPLE_META_TEXT}`}>{item.capability}</p>
+              </div>
+              <form action={updateAdminHighCostControlAction}>
+                <input type="hidden" name="returnTo" value="/admin" />
+                <input type="hidden" name="capability" value={item.capability} />
+                <input type="hidden" name="disabled" value={item.disabled ? "false" : "true"} />
+                <AdminActionButton type="submit" tone={item.disabled ? "primary" : "danger"}>
+                  {item.disabled ? "恢复" : "关闭"}
+                </AdminActionButton>
+              </form>
+            </div>
+          ))}
+        </div>
+      </section>
 
       <div className="grid gap-3 sm:grid-cols-2">
         {entries.map((entry) => (

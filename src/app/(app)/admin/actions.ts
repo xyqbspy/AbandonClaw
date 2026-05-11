@@ -11,6 +11,7 @@ import {
   createAdminInviteCodes,
   deleteSceneById,
   regenerateSceneVariants,
+  updateAdminHighCostCapabilityDisabled,
   updateAdminRegistrationMode,
   updateAdminInviteCode,
   updateAdminUserAccessStatus,
@@ -42,6 +43,8 @@ const ADMIN_NOTICE = {
   invitesUpdated: "邀请码已更新。",
   registrationModeUpdated: "注册模式已更新。",
   registrationModeInvalid: "注册模式无效，请重试。",
+  highCostControlUpdated: "高成本紧急开关已更新。",
+  highCostControlInvalid: "高成本能力无效，请重试。",
   inviteNotFound: "未找到邀请码。",
   inviteInvalid: "邀请码参数无效，请重试。",
 } as const;
@@ -93,6 +96,13 @@ interface UpdateAdminRegistrationModeActionDependencies {
   revalidatePath: typeof revalidatePath;
 }
 
+interface UpdateAdminHighCostControlActionDependencies {
+  requireAdmin: typeof requireAdmin;
+  updateAdminHighCostCapabilityDisabled: typeof updateAdminHighCostCapabilityDisabled;
+  redirect: typeof redirect;
+  revalidatePath: typeof revalidatePath;
+}
+
 const updateAdminUserAccessStatusActionDependencies: UpdateAdminUserAccessStatusActionDependencies = {
   requireAdmin,
   updateAdminUserAccessStatus,
@@ -116,6 +126,13 @@ const updateAdminInviteCodeActionDependencies: UpdateAdminInviteCodeActionDepend
 const updateAdminRegistrationModeActionDependencies: UpdateAdminRegistrationModeActionDependencies = {
   requireAdmin,
   updateAdminRegistrationMode,
+  redirect,
+  revalidatePath,
+};
+
+const updateAdminHighCostControlActionDependencies: UpdateAdminHighCostControlActionDependencies = {
+  requireAdmin,
+  updateAdminHighCostCapabilityDisabled,
   redirect,
   revalidatePath,
 };
@@ -395,6 +412,40 @@ export async function handleUpdateAdminRegistrationModeAction(
 
 export async function updateAdminRegistrationModeAction(formData: FormData) {
   return handleUpdateAdminRegistrationModeAction(formData);
+}
+
+export async function handleUpdateAdminHighCostControlAction(
+  formData: FormData,
+  dependencies: UpdateAdminHighCostControlActionDependencies = updateAdminHighCostControlActionDependencies,
+) {
+  const adminUser = await dependencies.requireAdmin();
+  const returnTo = normalizeAdminReturnTo(formData.get("returnTo"), "/admin");
+  const capability = String(formData.get("capability") ?? "");
+  const disabled = parseBooleanFromForm(formData.get("disabled"), false);
+
+  try {
+    await dependencies.updateAdminHighCostCapabilityDisabled({
+      capability: capability as never,
+      disabled,
+      updatedBy: adminUser.id,
+    });
+  } catch (error) {
+    if (error instanceof ValidationError) {
+      return dependencies.redirect(
+        appendAdminNotice(returnTo, ADMIN_NOTICE.highCostControlInvalid, "danger"),
+      );
+    }
+    throw error;
+  }
+
+  dependencies.revalidatePath("/admin");
+  return dependencies.redirect(
+    appendAdminNotice(returnTo, ADMIN_NOTICE.highCostControlUpdated, "success"),
+  );
+}
+
+export async function updateAdminHighCostControlAction(formData: FormData) {
+  return handleUpdateAdminHighCostControlAction(formData);
 }
 
 export async function deleteAdminPhraseAction(formData: FormData) {

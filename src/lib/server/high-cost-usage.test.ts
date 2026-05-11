@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { getDailyQuotaLimit } from "./high-cost-usage";
+import {
+  getDailyQuotaLimit,
+  parseDisabledHighCostCapabilities,
+  reserveHighCostUsage,
+} from "./high-cost-usage";
+import { HighCostCapabilityDisabledError } from "@/lib/server/errors";
 
 test("getDailyQuotaLimit 使用保守默认值", () => {
   const original = process.env.DAILY_QUOTA_PRACTICE_GENERATE;
@@ -42,4 +47,51 @@ test("getDailyQuotaLimit 会忽略非法覆盖值", () => {
       process.env.DAILY_QUOTA_SCENE_GENERATE = original;
     }
   }
+});
+
+test("parseDisabledHighCostCapabilities 只保留合法 capability", () => {
+  assert.deepEqual(
+    parseDisabledHighCostCapabilities('["practice_generate","bad","tts_regenerate","practice_generate"]'),
+    ["practice_generate", "tts_regenerate"],
+  );
+  assert.deepEqual(parseDisabledHighCostCapabilities("bad-json"), []);
+});
+
+test("reserveHighCostUsage 在 capability 被关闭时不会预占 quota", async () => {
+  let rpcCalled = false;
+
+  await assert.rejects(
+    () =>
+      reserveHighCostUsage({
+        userId: "user-1",
+        capability: "practice_generate",
+        dependencies: {
+          createSupabaseAdminClient: () =>
+            ({
+              from: (table: string) => {
+                assert.equal(table, "app_runtime_settings");
+                return {
+                  select: () => ({
+                    eq: () => ({
+                      maybeSingle: async () => ({
+                        data: { value: '["practice_generate"]' },
+                        error: null,
+                      }),
+                    }),
+                  }),
+                };
+              },
+              rpc: async () => {
+                rpcCalled = true;
+                return { data: null, error: null };
+              },
+            }) as never,
+        },
+      }),
+    (error: unknown) => {
+      assert.ok(error instanceof HighCostCapabilityDisabledError);
+      assert.equal(rpcCalled, false);
+      return true;
+    },
+  );
 });

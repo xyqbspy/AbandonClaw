@@ -3,6 +3,7 @@ import test from "node:test";
 import { ForbiddenError, ValidationError } from "@/lib/server/errors";
 import {
   handleCreateAdminInviteCodesAction,
+  handleUpdateAdminHighCostControlAction,
   handleUpdateAdminRegistrationModeAction,
   handleUpdateAdminInviteCodeAction,
   handleUpdateAdminUserAccessStatusAction,
@@ -234,6 +235,80 @@ test("admin 注册模式 action 会把非法模式收口为 danger notice", asyn
   const href = await handleUpdateAdminRegistrationModeAction(formData, {
     requireAdmin: async () => ({ id: "admin-1" } as never),
     updateAdminRegistrationMode: async () => {
+      updateCalled = true;
+      throw new ValidationError("bad");
+    },
+    redirect: ((nextHref: string) => nextHref) as never,
+    revalidatePath: (() => {}) as never,
+  });
+
+  const url = new URL(href, "http://localhost");
+  assert.equal(updateCalled, true);
+  assert.equal(url.searchParams.get("noticeTone"), "danger");
+});
+
+test("admin 高成本紧急开关 action 会拒绝非管理员调用", async () => {
+  await assert.rejects(
+    () =>
+      handleUpdateAdminHighCostControlAction(new FormData(), {
+        requireAdmin: async () => {
+          throw new ForbiddenError();
+        },
+        updateAdminHighCostCapabilityDisabled: async () => {
+          throw new Error("should not update high cost control");
+        },
+        redirect: ((href: string) => href) as never,
+        revalidatePath: (() => {}) as never,
+      }),
+    ForbiddenError,
+  );
+});
+
+test("admin 高成本紧急开关 action 成功后刷新 admin", async () => {
+  const formData = new FormData();
+  formData.set("capability", "practice_generate");
+  formData.set("disabled", "true");
+  formData.set("returnTo", "/admin");
+  const revalidatedPaths: string[] = [];
+  let updatedParams:
+    | {
+        capability: string;
+        disabled: boolean;
+        updatedBy: string;
+      }
+    | undefined;
+
+  const href = await handleUpdateAdminHighCostControlAction(formData, {
+    requireAdmin: async () => ({ id: "admin-1" } as never),
+    updateAdminHighCostCapabilityDisabled: async (params) => {
+      updatedParams = params;
+      return [];
+    },
+    redirect: ((nextHref: string) => nextHref) as never,
+    revalidatePath: ((path: string) => {
+      revalidatedPaths.push(path);
+    }) as never,
+  });
+
+  const url = new URL(href, "http://localhost");
+  assert.deepEqual(updatedParams, {
+    capability: "practice_generate",
+    disabled: true,
+    updatedBy: "admin-1",
+  });
+  assert.deepEqual(revalidatedPaths, ["/admin"]);
+  assert.equal(url.pathname, "/admin");
+  assert.equal(url.searchParams.get("noticeTone"), "success");
+});
+
+test("admin 高成本紧急开关 action 会把非法 capability 收口为 danger notice", async () => {
+  const formData = new FormData();
+  formData.set("capability", "bad");
+  let updateCalled = false;
+
+  const href = await handleUpdateAdminHighCostControlAction(formData, {
+    requireAdmin: async () => ({ id: "admin-1" } as never),
+    updateAdminHighCostCapabilityDisabled: async () => {
       updateCalled = true;
       throw new ValidationError("bad");
     },

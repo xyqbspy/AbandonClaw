@@ -1,5 +1,33 @@
 # Dev Log
 
+### [2026-05-11] 推进 admin 高成本紧急开关
+- 类型：Spec-Driven / 公网开放应急控制
+- 状态：已完成并归档 `add-admin-high-cost-emergency-controls`
+
+#### 背景
+公网小范围开放已经有 user/IP 限流、daily quota 和账号降级，但 readiness plan 中“一键关闭高成本入口”仍缺少后台实现。若某个生成或 TTS capability 异常消耗成本，管理员需要能在后台临时关闭。
+
+#### 本次改动
+- 复用 `app_runtime_settings` 保存被关闭的 high-cost capability 列表。
+- `reserveHighCostUsage()` 在 quota 预占前检查 capability 是否被关闭；关闭时返回受控 `HIGH_COST_CAPABILITY_DISABLED`，不触发 quota 预占或上游调用。
+- `/admin` 增加高成本紧急开关面板，可关闭和恢复 practice / scene / TTS 等 capability。
+- admin action 继续复用 `requireAdmin()`，非法 capability 返回受控失败。
+
+#### 已运行验证
+- `pnpm exec tsc --noEmit`
+- `node --import tsx --test src/lib/server/high-cost-usage.test.ts 'src/app/(app)/admin/actions.test.ts'`
+- `node --import tsx --test src/app/api/practice/generate/route.test.ts src/app/api/explain-selection/route.test.ts src/app/api/tts/regenerate/route.test.ts`
+- `node --import tsx --import ./src/test/setup-dom.ts --test 'src/app/(app)/admin/page.test.tsx'`
+- `pnpm exec openspec validate add-admin-high-cost-emergency-controls --strict --no-interactive`
+- `pnpm exec openspec validate --all --strict --no-interactive`
+- `pnpm run maintenance:check`
+- `git diff --check`
+
+#### 明确不收项
+- 不做完整配置中心、审批流、定时开关或历史回滚列表。
+- 不做自动异常检测或自动关闭。
+- 不做按用户/IP/设备/来源维度的动态规则。
+
 ### [2026-05-11] 推进 admin 注册模式控制入口
 - 类型：Spec-Driven / 注册准入开关后台化
 - 状态：已完成并归档 `add-admin-registration-mode-control`
