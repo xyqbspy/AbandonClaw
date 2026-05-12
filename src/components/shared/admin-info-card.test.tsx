@@ -24,5 +24,5 @@ test("AdminInfoCard 和 AdminInfoList 会渲染标题与信息项", () => {
 test("AdminNoticeCard 会渲染危险提示内容", () => {
   const html = renderToStaticMarkup(<AdminNoticeCard>删除后无法恢复</AdminNoticeCard>);
   assert.match(html, /删除后无法恢复/);
-  assert.match(html, /text-destructive/);
+  assert.match(html, /text-red-700/);
 });

@@ -350,7 +350,7 @@ export async function handleUpdateAdminInviteCodeAction(
   try {
     await dependencies.updateAdminInviteCode({
       inviteCodeId,
-      isActive: action === "deactivate" ? false : undefined,
+      isActive: action === "deactivate" ? false : action === "activate" ? true : undefined,
       maxUses: action === "update" ? parseOptionalNumberFromForm(formData.get("maxUses")) : undefined,
       expiresInDays:
         action === "update" ? parseOptionalNumberFromForm(formData.get("expiresInDays")) : undefined,

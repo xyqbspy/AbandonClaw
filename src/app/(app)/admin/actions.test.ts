@@ -176,6 +176,32 @@ test("admin 邀请码更新 action 会停用邀请码并返回提示", async () 
   assert.equal(url.searchParams.get("noticeTone"), "success");
 });
 
+test("admin 邀请码更新 action 会重新启用邀请码", async () => {
+  const formData = new FormData();
+  formData.set("inviteCodeId", "invite-1");
+  formData.set("inviteAction", "activate");
+  formData.set("returnTo", "/admin/invites?page=2");
+  let updatedParams:
+    | {
+        inviteCodeId: string;
+        isActive?: boolean;
+      }
+    | undefined;
+
+  await handleUpdateAdminInviteCodeAction(formData, {
+    requireAdmin: async () => ({ id: "admin-1" } as never),
+    updateAdminInviteCode: async (params) => {
+      updatedParams = params;
+      return { inviteCodeId: params.inviteCodeId };
+    },
+    redirect: ((nextHref: string) => nextHref) as never,
+    revalidatePath: (() => {}) as never,
+  });
+
+  assert.equal(updatedParams?.inviteCodeId, "invite-1");
+  assert.equal(updatedParams?.isActive, true);
+});
+
 test("admin 注册模式 action 会拒绝非管理员调用", async () => {
   await assert.rejects(
     () =>

@@ -115,6 +115,7 @@ export default async function AdminHomePage({
   return (
     <div className="space-y-6">
       <PageHeader
+        variant="admin"
         eyebrow={LABELS.eyebrow}
         title={LABELS.title}
         description={LABELS.description}
@@ -154,11 +155,11 @@ export default async function AdminHomePage({
         </AdminInfoCard>
       </div>
 
-      <AdminInfoCard title={LABELS.adminTitle} contentClassName="text-muted-foreground">
+      <AdminInfoCard title={LABELS.adminTitle} contentClassName="text-slate-500">
         {adminUser.email ?? adminUser.id}
       </AdminInfoCard>
 
-      <section className="space-y-3 rounded-[var(--app-radius-panel)] border border-[var(--app-border-soft)] bg-[var(--app-surface)] p-4 shadow-[var(--app-shadow-soft)]">
+      <section className="space-y-3 rounded-xl bg-white p-5 shadow-sm sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="flex items-center gap-2 text-base font-semibold text-foreground">
@@ -175,7 +176,7 @@ export default async function AdminHomePage({
           {highCostControls.map((item) => (
             <div
               key={item.capability}
-              className="flex items-center justify-between gap-3 rounded-md border border-[var(--app-border-soft)] bg-muted/30 p-3"
+              className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 p-3"
             >
               <div>
                 <p className="text-sm font-medium text-foreground">
@@ -199,7 +200,7 @@ export default async function AdminHomePage({
       <div className="grid gap-3 sm:grid-cols-2">
         {entries.map((entry) => (
           <Link key={entry.href} href={entry.href} className="block cursor-pointer">
-            <Card className={APPLE_CARD_INTERACTIVE}>
+            <Card className={`${APPLE_CARD_INTERACTIVE} rounded-xl bg-white shadow-sm ring-0`}>
               <CardHeader>
                 <CardTitle className={APPLE_TITLE_MD}>{entry.title}</CardTitle>
               </CardHeader>

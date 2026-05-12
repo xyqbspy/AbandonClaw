@@ -20,7 +20,6 @@ import {
   APPLE_INPUT_BASE,
   APPLE_META_TEXT,
   APPLE_PANEL,
-  APPLE_SURFACE,
   APPLE_TITLE_SM,
 } from "@/lib/ui/apple-style";
 
@@ -152,7 +151,7 @@ export function SceneSentenceEditorSheet({
 
           <div className="space-y-5 px-4 py-4">
             {draftSections.map((section, sectionIndex) => (
-              <section key={section.sectionId} className={`space-y-3 p-4 ${APPLE_SURFACE}`}>
+              <section key={section.sectionId} className="space-y-3 rounded-xl bg-white p-4 shadow-sm">
                 <div className="space-y-1">
                   <p className={APPLE_TITLE_SM}>
                     第 {sectionIndex + 1} 个段落
@@ -172,7 +171,7 @@ export function SceneSentenceEditorSheet({
                     {block.sentences.map((sentence, sentenceIndex) => (
                       <div
                         key={sentence.sentenceId}
-                        className="space-y-2 rounded-xl border border-border/60 bg-background p-3"
+                        className="space-y-2 rounded-xl bg-slate-50 p-3"
                       >
                         <div className={APPLE_META_TEXT}>
                           第 {sentenceIndex + 1} 句 · ID: {sentence.sentenceId} · 说话人：{" "}

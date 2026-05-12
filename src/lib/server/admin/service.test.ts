@@ -506,3 +506,120 @@ test("listAdminInviteCodes 会返回使用明细与账号活动摘要", async ()
   assert.equal(result.rows[0]?.attempts[0]?.account?.studySeconds, 120);
   assert.equal(result.rows[0]?.attempts[0]?.account?.highCostSuccess, 3);
 });
+
+test("listAdminInviteCodes 遇到学习摘要失败时仍返回邀请码列表", async () => {
+  const originalWarn = console.warn;
+  console.warn = () => {};
+  try {
+    const result = await listAdminInviteCodes(
+      { page: 1, pageSize: 10 },
+      {
+        createSupabaseAdminClient: () =>
+          ({
+            auth: {
+              admin: {
+                listUsers: async () => ({
+                  data: {
+                    users: [
+                      {
+                        id: "user-1",
+                        email: "rose@example.com",
+                        created_at: "2026-05-09T00:00:00.000Z",
+                        email_confirmed_at: "2026-05-09T01:00:00.000Z",
+                      },
+                    ],
+                  },
+                  error: null,
+                }),
+              },
+            },
+            from: (table: string) => {
+              if (table === "registration_invite_codes") {
+                return {
+                  select: () => ({
+                    order: () => ({
+                      range: async () => ({
+                        data: [
+                          {
+                            id: "invite-1",
+                            max_uses: 2,
+                            used_count: 1,
+                            expires_at: null,
+                            is_active: true,
+                            created_at: "2026-05-09T00:00:00.000Z",
+                            updated_at: "2026-05-09T00:00:00.000Z",
+                          },
+                        ],
+                        error: null,
+                        count: 1,
+                      }),
+                    }),
+                  }),
+                };
+              }
+              if (table === "registration_invite_attempts") {
+                return {
+                  select: () => ({
+                    in: () => ({
+                      order: async () => ({
+                        data: [
+                          {
+                            id: "attempt-1",
+                            invite_code_id: "invite-1",
+                            email: "rose@example.com",
+                            status: "used",
+                            auth_user_id: "user-1",
+                            failure_reason: null,
+                            created_at: "2026-05-09T01:00:00.000Z",
+                          },
+                        ],
+                        error: null,
+                      }),
+                    }),
+                  }),
+                };
+              }
+              if (table === "profiles") {
+                return {
+                  select: () => ({
+                    in: async () => ({
+                      data: [{ id: "user-1", username: "rose", access_status: "active" }],
+                      error: null,
+                    }),
+                  }),
+                };
+              }
+              if (table === "user_daily_learning_stats") {
+                return {
+                  select: () => ({
+                    in: async () => ({
+                      data: null,
+                      error: { message: "missing column" },
+                    }),
+                  }),
+                };
+              }
+              assert.equal(table, "user_daily_high_cost_usage");
+              return {
+                select: () => ({
+                  eq: () => ({
+                    in: async () => ({
+                      data: null,
+                      error: { message: "missing table" },
+                    }),
+                  }),
+                }),
+              };
+            },
+          }) as never,
+      },
+    );
+
+    assert.equal(result.total, 1);
+    assert.equal(result.rows[0]?.attempts[0]?.account?.username, "rose");
+    assert.equal(result.rows[0]?.attempts[0]?.account?.studySeconds, 0);
+    assert.equal(result.rows[0]?.attempts[0]?.account?.highCostSuccess, 0);
+  } finally {
+    console.warn = originalWarn;
+  }
+});

@@ -1200,10 +1200,14 @@ export async function listAdminInviteCodes(
       throw new Error(`Failed to list invite user profiles: ${profileResult.error.message}`);
     }
     if (learningResult.error) {
-      throw new Error(`Failed to list invite learning summary: ${learningResult.error.message}`);
+      console.warn(
+        `Failed to list invite learning summary: ${learningResult.error.message}. Falling back to empty invite learning summary.`,
+      );
     }
     if (highCostResult.error) {
-      throw new Error(`Failed to list invite high cost summary: ${highCostResult.error.message}`);
+      console.warn(
+        `Failed to list invite high cost summary: ${highCostResult.error.message}. Falling back to empty invite high cost summary.`,
+      );
     }
 
     for (const profile of (profileResult.data ?? []) as Array<{

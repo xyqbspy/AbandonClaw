@@ -54,6 +54,7 @@ export default async function AdminVariantsPage({
   return (
     <div className="space-y-4">
       <PageHeader
+        variant="admin"
         eyebrow={LABELS.eyebrow}
         title={LABELS.title}
         description={LABELS.description}
@@ -69,7 +70,7 @@ export default async function AdminVariantsPage({
             <option value="desc">{LABELS.sortDesc}</option>
             <option value="asc">{LABELS.sortAsc}</option>
           </select>
-          <Button type="submit" variant="default" size="lg" className="gap-2">
+          <Button type="submit" variant="default" size="lg" className="h-[46px] gap-2 rounded-[12px] px-6 text-sm font-bold">
             <Filter className="size-4" />
             {LABELS.submit}
           </Button>
@@ -94,10 +95,10 @@ export default async function AdminVariantsPage({
                   </Link>
                   </AdminListTitle>
                   <AdminListBadges>
-                    <span className="rounded-md bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground">
+                    <span className="rounded-xl bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">
                       第 {row.variant_index} 个变体
                     </span>
-                    <span className="rounded-md bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground">
+                    <span className="rounded-xl bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">
                       模型：{row.model ?? "-"}
                     </span>
                   </AdminListBadges>

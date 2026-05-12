@@ -11,7 +11,7 @@ export function FilterBar({
   return (
     <div
       className={cn(
-        "rounded-[var(--app-radius-panel)] border border-[var(--app-border-soft)] bg-[var(--app-surface)] p-4 shadow-[var(--app-shadow-soft)]",
+        "rounded-xl bg-white p-5 shadow-sm sm:p-6",
         className,
       )}
     >
@@ -27,7 +27,7 @@ export function FilterBarForm({
   children: ReactNode;
   className?: string;
 }) {
-  return <form className={cn("grid gap-2", className)}>{children}</form>;
+  return <form className={cn("grid gap-4", className)}>{children}</form>;
 }
 
 export function FilterBarMeta({
@@ -38,7 +38,7 @@ export function FilterBarMeta({
   className?: string;
 }) {
   return (
-    <div className={cn("flex flex-wrap gap-2 text-xs text-muted-foreground", className)}>
+    <div className={cn("flex flex-wrap gap-2 text-xs text-slate-500", className)}>
       {children}
     </div>
   );

@@ -100,7 +100,7 @@ export default async function AdminUsersPage({
 
   return (
     <div className="space-y-4">
-      <PageHeader eyebrow={LABELS.eyebrow} title={LABELS.title} description={LABELS.description} />
+      <PageHeader variant="admin" eyebrow={LABELS.eyebrow} title={LABELS.title} description={LABELS.description} />
 
       {notice ? <AdminNoticeCard tone={notice.tone}>{notice.notice}</AdminNoticeCard> : null}
 
@@ -126,7 +126,7 @@ export default async function AdminUsersPage({
               </option>
             ))}
           </select>
-          <Button type="submit" variant="default" size="lg">
+          <Button type="submit" variant="default" size="lg" className="h-[46px] rounded-[12px] px-6 text-sm font-bold">
             {LABELS.submit}
           </Button>
         </FilterBarForm>

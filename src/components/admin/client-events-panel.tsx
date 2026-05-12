@@ -32,7 +32,6 @@ import {
   APPLE_ADMIN_CONTROL,
   APPLE_ADMIN_SELECT,
   APPLE_META_TEXT,
-  APPLE_PANEL_RAISED,
 } from "@/lib/ui/apple-style";
 import { formatAdminDateTime } from "@/lib/ui/admin-format";
 
@@ -86,7 +85,7 @@ export function ClientEventsPanel() {
 
   return (
     <div className="space-y-4">
-      <Card className={APPLE_PANEL_RAISED}>
+      <Card className="rounded-xl bg-white py-5 shadow-sm ring-0">
         <CardHeader className="pb-3">
           <CardTitle className="text-sm">业务事件回看</CardTitle>
         </CardHeader>
@@ -149,7 +148,7 @@ export function ClientEventsPanel() {
               </select>
             </div>
 
-            <AdminActionBar className="rounded-[var(--app-radius-panel)] border border-[var(--app-border-soft)]">
+            <AdminActionBar>
               <AdminActionBarHint>
                 当前展示 {filteredRecords.length} 条最近记录，刷新页面后仍可回看，直到本地记录被清空。
               </AdminActionBarHint>
@@ -177,7 +176,7 @@ export function ClientEventsPanel() {
             </AdminActionBar>
           </div>
 
-          <div className="rounded-[var(--app-radius-panel)] border border-[var(--app-border-soft)] bg-background p-3">
+          <div className="rounded-xl bg-slate-50 p-3">
             {filteredRecords.length === 0 ? (
               <AdminEmptyState>当前没有可回看的业务记录。</AdminEmptyState>
             ) : (
@@ -191,7 +190,7 @@ export function ClientEventsPanel() {
                       <div className="flex flex-wrap items-center gap-2">
                         <AdminListTitle className="text-base">{record.name}</AdminListTitle>
                         <AdminListBadges>
-                          <span className="rounded-md bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground">
+                          <span className="rounded-xl bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">
                             {formatKind(record.kind)}
                           </span>
                         </AdminListBadges>

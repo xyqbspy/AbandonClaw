@@ -323,7 +323,17 @@ export default async function AdminInvitesPage({
                               </button>
                             </form>
                           ) : (
-                            <span aria-hidden="true" />
+                            <form action={updateAdminInviteCodeAction}>
+                              <input type="hidden" name="inviteCodeId" value={row.id} />
+                              <input type="hidden" name="returnTo" value={currentHref} />
+                              <input type="hidden" name="inviteAction" value="activate" />
+                              <button
+                                type="submit"
+                                className="min-h-[38px] w-full cursor-pointer rounded-[12px] border border-blue-100 bg-white px-3 py-2.5 text-xs font-bold text-blue-600 transition-all hover:bg-blue-50 active:scale-95"
+                              >
+                                启用
+                              </button>
+                            </form>
                           )}
                           <button
                             type="submit"

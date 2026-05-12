@@ -35,7 +35,6 @@ import {
   APPLE_ADMIN_CONTROL,
   APPLE_ADMIN_SELECT,
   APPLE_META_TEXT,
-  APPLE_PANEL_RAISED,
 } from "@/lib/ui/apple-style";
 
 const formatBytes = (bytes: number) => {
@@ -199,7 +198,7 @@ export function TtsBrowserCachePanel() {
 
   return (
     <div className="space-y-4">
-      <Card className={APPLE_PANEL_RAISED}>
+      <Card className="rounded-xl bg-white py-5 shadow-sm ring-0">
         <CardHeader className="pb-3">
           <CardTitle className="text-sm">浏览器本地 TTS 缓存</CardTitle>
         </CardHeader>
@@ -210,7 +209,7 @@ export function TtsBrowserCachePanel() {
           </p>
 
           {!supported ? (
-            <div className={`rounded-[var(--app-radius-panel)] border border-dashed border-[var(--app-border-soft)] px-3 py-4 ${APPLE_META_TEXT}`}>
+            <div className={`rounded-[12px] border border-dashed border-slate-200 px-3 py-4 ${APPLE_META_TEXT}`}>
               当前环境不支持浏览器 Cache Storage，无法查看本地 TTS 缓存。
             </div>
           ) : (
@@ -260,7 +259,7 @@ export function TtsBrowserCachePanel() {
                   </select>
                 </div>
 
-                <AdminActionBar className="rounded-[var(--app-radius-panel)] border border-[var(--app-border-soft)]">
+                <AdminActionBar>
                   <AdminActionBarHint>已选 {selectedEntryCount} 条，可按类型筛选后定向清理。</AdminActionBarHint>
                   <AdminActionBarActions>
                     <AdminActionButton
@@ -293,8 +292,8 @@ export function TtsBrowserCachePanel() {
                 </AdminActionBar>
               </div>
 
-              <div className="rounded-[var(--app-radius-panel)] border border-[var(--app-border-soft)] bg-background">
-                <div className={`flex items-center justify-between border-b border-[var(--app-border-soft)] px-3 py-2 text-xs ${APPLE_META_TEXT}`}>
+              <div className="rounded-xl bg-slate-50">
+                <div className={`flex items-center justify-between px-3 py-2 text-xs ${APPLE_META_TEXT}`}>
                   <label className="inline-flex items-center gap-2">
                     <input
                       type="checkbox"
@@ -333,7 +332,7 @@ export function TtsBrowserCachePanel() {
                               />
                               <AdminListTitle className="font-mono text-sm">{entry.cacheKey}</AdminListTitle>
                               <AdminListBadges>
-                                <span className="rounded-md bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground">
+                                <span className="rounded-xl bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">
                                   {TTS_KIND_LABELS[entry.kind]}
                                 </span>
                               </AdminListBadges>

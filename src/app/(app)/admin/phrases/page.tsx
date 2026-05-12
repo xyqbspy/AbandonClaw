@@ -97,7 +97,7 @@ export default async function AdminPhrasesPage({
 
   return (
     <div className="space-y-4">
-      <PageHeader eyebrow={LABELS.eyebrow} title={LABELS.title} description={LABELS.description} />
+      <PageHeader variant="admin" eyebrow={LABELS.eyebrow} title={LABELS.title} description={LABELS.description} />
 
       {notice ? <AdminNoticeCard tone={notice.tone}>{notice.notice}</AdminNoticeCard> : null}
 
@@ -116,7 +116,7 @@ export default async function AdminPhrasesPage({
             <option value="chunk">{LABELS.chunk}</option>
             <option value="sentence">{LABELS.sentence}</option>
           </select>
-          <Button type="submit" variant="default" size="lg" className="gap-2">
+          <Button type="submit" variant="default" size="lg" className="h-[46px] gap-2 rounded-[12px] px-6 text-sm font-bold">
             <Filter className="size-4" />
             {LABELS.submit}
           </Button>
@@ -127,7 +127,7 @@ export default async function AdminPhrasesPage({
         <input type="hidden" name="returnTo" value={currentHref} />
       </form>
 
-      <div className="rounded-[var(--app-radius-panel)] border border-[var(--app-border-soft)] bg-[var(--app-surface)] shadow-[var(--app-shadow-soft)]">
+      <div className="rounded-xl bg-white shadow-sm">
         <AdminActionBar>
           <AdminActionBarHint>{LABELS.batchHint}</AdminActionBarHint>
           <AdminActionBarActions>

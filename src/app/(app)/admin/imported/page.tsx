@@ -59,6 +59,7 @@ export default async function AdminImportedScenesPage({
   return (
     <div className="space-y-4">
       <PageHeader
+        variant="admin"
         eyebrow={LABELS.eyebrow}
         title={LABELS.title}
         description={LABELS.description}
@@ -70,7 +71,7 @@ export default async function AdminImportedScenesPage({
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input name="q" defaultValue={q} placeholder={LABELS.search} className={`${APPLE_ADMIN_CONTROL} pl-9`} />
           </div>
-          <Button type="submit" variant="default" size="lg" className="gap-2">
+          <Button type="submit" variant="default" size="lg" className="h-[46px] gap-2 rounded-[12px] px-6 text-sm font-bold">
             <Search className="size-4" />
             {LABELS.submit}
           </Button>

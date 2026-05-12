@@ -65,11 +65,12 @@ export default async function AdminSceneDetailPage({
   const latestVariants = latestCacheKey
     ? variants.filter((row) => row.cache_key === latestCacheKey)
     : variants;
-  const adminLinkButtonClassName = adminActionButtonClassName("secondary", "px-2 py-1 text-xs text-muted-foreground");
+  const adminLinkButtonClassName = adminActionButtonClassName("secondary", "px-2 py-1 text-xs text-slate-500");
 
   return (
     <div className="space-y-4">
       <PageHeader
+        variant="admin"
         eyebrow={LABELS.eyebrow}
         title={scene.title}
         description={`ID: ${scene.id}`}
@@ -135,7 +136,7 @@ export default async function AdminSceneDetailPage({
 
       <AdminDetailSection title={LABELS.variants} contentClassName="space-y-2">
         {latestVariants.length === 0 ? (
-          <p className="text-sm text-muted-foreground">{LABELS.noVariants}</p>
+          <p className="text-sm text-slate-500">{LABELS.noVariants}</p>
         ) : (
           <AdminList>
             {latestVariants.map((variant) => (

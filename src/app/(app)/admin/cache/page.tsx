@@ -86,6 +86,7 @@ export default async function AdminCachePage({
   return (
     <div className="space-y-4">
       <PageHeader
+        variant="admin"
         eyebrow={LABELS.eyebrow}
         title={LABELS.title}
         description={LABELS.description}
@@ -115,7 +116,7 @@ export default async function AdminCachePage({
             <option value="success">{LABELS.success}</option>
             <option value="error">{LABELS.error}</option>
           </select>
-          <Button type="submit" variant="default" size="lg" className="gap-2">
+          <Button type="submit" variant="default" size="lg" className="h-[46px] gap-2 rounded-[12px] px-6 text-sm font-bold">
             <Filter className="size-4" />
             {LABELS.filter}
           </Button>
@@ -146,10 +147,10 @@ export default async function AdminCachePage({
                     </Link>
                   </AdminListTitle>
                   <AdminListBadges>
-                    <span className="rounded-md bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground">
+                    <span className="rounded-xl bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">
                       {formatCacheType(row.cache_type)}
                     </span>
-                    <span className="rounded-md bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground">
+                    <span className="rounded-xl bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">
                       {formatCacheStatus(row.status)}
                     </span>
                   </AdminListBadges>

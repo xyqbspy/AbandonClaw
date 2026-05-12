@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { APPLE_META_TEXT, APPLE_SURFACE, APPLE_TITLE_SM } from "@/lib/ui/apple-style";
+import { APPLE_META_TEXT } from "@/lib/ui/apple-style";
 import { cn } from "@/lib/utils";
 
 export function AdminInfoCard({
@@ -15,9 +15,9 @@ export function AdminInfoCard({
   contentClassName?: string;
 }) {
   return (
-    <Card className={cn(APPLE_SURFACE, className)}>
+    <Card className={cn("rounded-xl bg-white py-5 shadow-sm ring-0", className)}>
       <CardHeader>
-        <CardTitle className={APPLE_TITLE_SM}>{title}</CardTitle>
+        <CardTitle className="text-sm font-bold text-slate-800">{title}</CardTitle>
       </CardHeader>
       <CardContent className={cn("text-sm", contentClassName)}>{children}</CardContent>
     </Card>
@@ -38,7 +38,7 @@ export function AdminInfoList({
   return (
     <div className={cn("space-y-1.5", className)}>
       {items.map((item, index) => (
-        <p key={index} className={item.muted ? APPLE_META_TEXT : undefined}>
+        <p key={index} className={item.muted ? APPLE_META_TEXT : "text-slate-700"}>
           {item.label}
           {item.value}
         </p>
@@ -58,14 +58,14 @@ export function AdminNoticeCard({
 }) {
   const toneClassName =
     tone === "success"
-      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+      ? "border border-green-100 bg-green-50 text-green-700"
       : tone === "info"
-        ? "border-sky-200 bg-sky-50 text-sky-700"
-        : "border-destructive/30 bg-destructive/5 text-destructive";
+        ? "border border-blue-100 bg-blue-50 text-blue-700"
+        : "border border-red-100 bg-red-50 text-red-700";
 
   return (
-    <Card className={cn(toneClassName, className)}>
-      <CardContent className="pt-4 text-sm">{children}</CardContent>
+    <Card className={cn("rounded-xl py-0 shadow-none ring-0", toneClassName, className)}>
+      <CardContent className="px-4 py-3 text-sm font-medium">{children}</CardContent>
     </Card>
   );
 }

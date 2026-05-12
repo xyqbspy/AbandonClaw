@@ -157,7 +157,7 @@ export default async function AdminScenesPage({
 
   return (
     <div className="space-y-4">
-      <PageHeader eyebrow={LABELS.eyebrow} title={LABELS.title} description={LABELS.description} />
+      <PageHeader variant="admin" eyebrow={LABELS.eyebrow} title={LABELS.title} description={LABELS.description} />
 
       {notice ? <AdminNoticeCard tone={notice.tone}>{notice.notice}</AdminNoticeCard> : null}
 
@@ -177,20 +177,20 @@ export default async function AdminScenesPage({
             <option value="true">{LABELS.public}</option>
             <option value="false">{LABELS.private}</option>
           </select>
-          <Button type="submit" variant="default" size="lg" className="gap-2">
+          <Button type="submit" variant="default" size="lg" className="h-[46px] gap-2 rounded-[12px] px-6 text-sm font-bold">
             <Filter className="size-4" />
             {LABELS.submit}
           </Button>
         </FilterBarForm>
 
         <FilterBarMeta>
-          <span className="rounded-full bg-muted px-2 py-1">
+          <span className="rounded-full bg-slate-100 px-2 py-1">
             {LABELS.total} {result.total}
           </span>
-          <span className="rounded-full bg-muted px-2 py-1">
+          <span className="rounded-full bg-slate-100 px-2 py-1">
             {LABELS.currentPage} {result.rows.length} 条
           </span>
-          <span className="rounded-full bg-muted px-2 py-1">{LABELS.guidance}</span>
+          <span className="rounded-full bg-slate-100 px-2 py-1">{LABELS.guidance}</span>
         </FilterBarMeta>
       </FilterBar>
 
@@ -246,7 +246,7 @@ export default async function AdminScenesPage({
                     sections={editorSections}
                   />
                 ) : (
-                  <span className="text-xs text-muted-foreground">{LABELS.notEditable}</span>
+                  <span className="text-xs text-slate-400">{LABELS.notEditable}</span>
                 )}
                 <form action={deleteSceneAction}>
                   <input type="hidden" name="sceneId" value={row.id} />

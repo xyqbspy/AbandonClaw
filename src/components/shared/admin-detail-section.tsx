@@ -1,6 +1,5 @@
 import { ReactNode } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { APPLE_SURFACE } from "@/lib/ui/apple-style";
 import { cn } from "@/lib/utils";
 
 export function AdminDetailSection({
@@ -17,10 +16,10 @@ export function AdminDetailSection({
   contentClassName?: string;
 }) {
   return (
-    <Card className={cn(APPLE_SURFACE, className)}>
+    <Card className={cn("rounded-xl bg-white py-5 shadow-sm ring-0", className)}>
       <CardHeader>
-        <CardTitle>{title}</CardTitle>
-        {description ? <p className="text-sm text-muted-foreground">{description}</p> : null}
+        <CardTitle className="text-sm font-bold text-slate-800">{title}</CardTitle>
+        {description ? <p className="text-sm text-slate-500">{description}</p> : null}
       </CardHeader>
       <CardContent className={contentClassName}>{children}</CardContent>
     </Card>
@@ -34,7 +33,7 @@ export function AdminDetailGrid({
   children: ReactNode;
   className?: string;
 }) {
-  return <div className={cn("grid gap-2 text-sm sm:grid-cols-2", className)}>{children}</div>;
+  return <div className={cn("grid gap-2 text-sm text-slate-700 sm:grid-cols-2", className)}>{children}</div>;
 }
 
 export function AdminDetailItem({
@@ -48,7 +47,7 @@ export function AdminDetailItem({
 }) {
   return (
     <p className={className}>
-      <span className="text-muted-foreground">{label}</span> {value}
+      <span className="text-slate-400">{label}</span> {value}
     </p>
   );
 }
@@ -63,7 +62,7 @@ export function AdminCodeBlock({
   return (
     <pre
       className={cn(
-        "max-h-64 overflow-auto whitespace-pre-wrap rounded bg-[rgb(240,240,240)] p-3 text-xs",
+        "max-h-64 overflow-auto whitespace-pre-wrap rounded-[12px] bg-slate-50 p-3 text-xs text-slate-700",
         className,
       )}
     >
