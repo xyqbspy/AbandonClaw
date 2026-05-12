@@ -68,6 +68,7 @@ export function ExpressionSummaryGroup({
   children,
   footer,
   collapsed = false,
+  muted = false,
 }: {
   label: ReactNode;
   actionLabel?: string;
@@ -75,16 +76,32 @@ export function ExpressionSummaryGroup({
   children?: ReactNode;
   footer?: ReactNode;
   collapsed?: boolean;
+  muted?: boolean;
 }) {
   return (
-    <div className={cn(GROUP_CLASS, collapsed ? GROUP_COLLAPSED_CLASS : "")}>
+    <div
+      className={cn(
+        GROUP_CLASS,
+        muted ? "bg-slate-50 hover:bg-slate-50" : "",
+        collapsed ? GROUP_COLLAPSED_CLASS : "",
+      )}
+    >
       <div className={cn(GROUP_HEADER_CLASS, collapsed ? GROUP_HEADER_COLLAPSED_CLASS : "")}>
-        <span className={GROUP_LABEL_CLASS}>{label}</span>
+        <span className={cn(GROUP_LABEL_CLASS, muted ? "text-slate-400" : "")}>{label}</span>
         {actionLabel && onAction ? (
-          <button type="button" className={GROUP_LINK_CLASS} onClick={onAction}>
+          <button
+            type="button"
+            className={cn(GROUP_LINK_CLASS, muted ? "text-slate-400" : "")}
+            onClick={onAction}
+          >
             {actionLabel}
             <ArrowRight className="size-3" aria-hidden="true" />
           </button>
+        ) : actionLabel ? (
+          <span className={cn(GROUP_LINK_CLASS, "text-slate-400")}>
+            {actionLabel}
+            <ArrowRight className="size-3" aria-hidden="true" />
+          </span>
         ) : null}
       </div>
       {children}
@@ -96,15 +113,17 @@ export function ExpressionSummaryGroup({
 export function SimilarExpressionGroupLabel({
   label,
   count,
+  muted = false,
 }: {
   label: string;
   count?: number;
+  muted?: boolean;
 }) {
   return (
     <span className="inline-flex min-w-0 items-center gap-1.5">
       <span className="flex shrink-0 -space-x-1.5" aria-hidden="true">
-        <span className="size-3 rounded-full border-2 border-white bg-blue-200" />
-        <span className="size-3 rounded-full border-2 border-white bg-blue-300" />
+        <span className={cn("size-3 rounded-full border-2 border-white", muted ? "bg-slate-200" : "bg-blue-200")} />
+        <span className={cn("size-3 rounded-full border-2 border-white", muted ? "bg-slate-300" : "bg-blue-300")} />
       </span>
       <span className="truncate">
         {label}

@@ -132,11 +132,13 @@ export function ClusterFocusList({
                 <SimilarExpressionGroupLabel
                   label={labels.similarTab}
                   count={previewSimilarItems.length > 0 ? previewSimilarItems.length : undefined}
+                  muted={previewSimilarItems.length === 0}
                 />
               }
               actionLabel={labels.openCurrentDetail}
-              onAction={() => onOpenMainSimilarTab(row)}
+              onAction={previewSimilarItems.length > 0 ? () => onOpenMainSimilarTab(row) : undefined}
               collapsed={!isExpanded}
+              muted={previewSimilarItems.length === 0}
             >
               <div
                 className={`overflow-hidden transition-all duration-200 ${
@@ -156,8 +158,6 @@ export function ClusterFocusList({
                       />
                     ))}
                   </div>
-                ) : isExpanded ? (
-                  <p className="px-1 py-[var(--mobile-space-sm)] text-[length:var(--mobile-font-body-sm)] text-[var(--app-chunks-sheet-muted)]">{labels.noTranslation}</p>
                 ) : null}
               </div>
             </ExpressionSummaryGroup>

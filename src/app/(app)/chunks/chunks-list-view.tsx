@@ -509,28 +509,34 @@ export function ChunksListView({
                   <SimilarExpressionGroupLabel
                     label={labels.similarExpressions}
                     count={hasSimilarPreview ? similarPreview.length : undefined}
+                    muted={!hasSimilarPreview}
                   />
                 }
                 actionLabel={labels.viewAllSimilar}
-                onAction={() =>
-                  item.expressionClusterId
-                    ? applyClusterFilter(item.expressionClusterId, item.text)
-                    : void openGenerateSimilarSheet(item)
+                onAction={
+                  hasSimilarPreview
+                    ? () =>
+                        item.expressionClusterId
+                          ? applyClusterFilter(item.expressionClusterId, item.text)
+                          : void openGenerateSimilarSheet(item)
+                    : undefined
                 }
+                muted={!hasSimilarPreview}
                 footer={
-                  <button
-                    type="button"
-                    className={EXPAND_BUTTON_CLASS}
-                    onClick={() => toggleSimilarExpanded(item.userPhraseId)}
-                    aria-expanded={isSimilarExpanded}
-                    aria-label={`${labels.similarExpressions} ${isSimilarExpanded ? labels.hideSimilar : labels.showSimilar}`}
-                  >
-                    {isSimilarExpanded ? "📘 收起同类表达" : "📖 展开同类表达"}
-                  </button>
+                  hasSimilarPreview ? (
+                    <button
+                      type="button"
+                      className={EXPAND_BUTTON_CLASS}
+                      onClick={() => toggleSimilarExpanded(item.userPhraseId)}
+                      aria-expanded={isSimilarExpanded}
+                      aria-label={`${labels.similarExpressions} ${isSimilarExpanded ? labels.hideSimilar : labels.showSimilar}`}
+                    >
+                      {isSimilarExpanded ? "📘 收起同类表达" : "📖 展开同类表达"}
+                    </button>
+                  ) : null
                 }
               >
-                {isSimilarExpanded ? (
-                  hasSimilarPreview ? (
+                {isSimilarExpanded && hasSimilarPreview ? (
                     <div className="space-y-0">
                       {similarPreview.map((similarItem) => (
                         <ExpressionSummaryRelatedItem
@@ -540,9 +546,6 @@ export function ChunksListView({
                         />
                       ))}
                     </div>
-                  ) : (
-                    <p className={APPLE_META_TEXT}>{labels.similarEmpty}</p>
-                  )
                 ) : null}
               </ExpressionSummaryGroup>
 

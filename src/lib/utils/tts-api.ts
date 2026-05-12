@@ -17,6 +17,10 @@ import {
   __resetTtsWarmupRegistryForTests,
   getWarmupInfo,
 } from "@/lib/utils/tts-warmup-registry";
+import {
+  getUserVoiceSpeedRate,
+  readUserVoiceSpeedPreference,
+} from "@/lib/utils/user-settings";
 
 type SentenceTtsPayload = {
   kind: "sentence";
@@ -698,6 +702,14 @@ const ensurePlaybackAudio = () => {
   return playbackAudio;
 };
 
+const getPreferredAudioPlaybackRate = () =>
+  getUserVoiceSpeedRate(readUserVoiceSpeedPreference());
+
+const getPreferredSpeechRate = (mode: "normal" | "slow" = "normal") => {
+  const preferredRate = getPreferredAudioPlaybackRate();
+  return mode === "slow" ? 0.8 * preferredRate : preferredRate;
+};
+
 const requestTtsUrl = async (
   cacheKey: string,
   payload: TtsRequestPayload,
@@ -771,7 +783,7 @@ const speakByBrowser = async (text: string, mode: "normal" | "slow" = "normal") 
   await new Promise<void>((resolve, reject) => {
     const utter = new SpeechSynthesisUtterance(text);
     utter.lang = "en-US";
-    utter.rate = mode === "slow" ? 0.8 : 1;
+    utter.rate = getPreferredSpeechRate(mode);
     utter.onend = () => resolve();
     utter.onerror = () => reject(new Error("speechSynthesis playback failed"));
     window.speechSynthesis.cancel();
@@ -827,6 +839,7 @@ const playAudioUrl = async (url: string) => {
   }
   const audio = ensurePlaybackAudio();
   audio.loop = false;
+  audio.playbackRate = getPreferredAudioPlaybackRate();
   if (audio.src !== url) {
     audio.src = url;
   }
@@ -1244,6 +1257,7 @@ export async function playSceneLoopAudio(params: {
     audio.currentTime = 0;
     audio.load();
     audio.loop = true;
+    audio.playbackRate = getPreferredAudioPlaybackRate();
     currentAudio = audio;
     audio.onerror = () => {
       if (currentAudio === audio) {

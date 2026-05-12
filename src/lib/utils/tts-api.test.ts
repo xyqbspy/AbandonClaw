@@ -22,6 +22,7 @@ import {
   stopTtsPlayback,
 } from "./tts-api";
 import { markAudioWarmed } from "./tts-warmup-registry";
+import { USER_SETTINGS_STORAGE_KEY } from "./user-settings";
 
 const originalFetch = globalThis.fetch;
 const originalAudio = globalThis.Audio;
@@ -735,4 +736,51 @@ test("playSentenceAudio 会把 warmup registry 信息写入播放事件", async 
   assert.equal(record?.payload.audioUnit, "block");
   assert.equal(record?.payload.wasWarmed, true);
   assert.equal(record?.payload.warmupSource, "playback");
+});
+
+test("playChunkAudio applies the stored user voice speed", async () => {
+  const storage = createLocalStorageMock();
+  storage.setItem(USER_SETTINGS_STORAGE_KEY, JSON.stringify({ voiceSpeed: "1.2x" }));
+  globalThis.window = {
+    localStorage: storage,
+    dispatchEvent: () => true,
+  } as unknown as Window & typeof globalThis;
+
+  const playbackRates: number[] = [];
+
+  class FakeAudio {
+    preload = "auto";
+    src = "";
+    currentTime = 0;
+    loop = false;
+    playbackRate = 1;
+    onended: null | (() => void) = null;
+    onerror: null | (() => void) = null;
+
+    load() {}
+
+    play() {
+      playbackRates.push(this.playbackRate);
+      queueMicrotask(() => {
+        this.onended?.();
+      });
+      return Promise.resolve();
+    }
+
+    pause() {}
+  }
+
+  globalThis.Audio = FakeAudio as unknown as typeof Audio;
+  globalThis.fetch = (async () =>
+    new Response(JSON.stringify({ url: "https://cdn.test/chunk-speed.mp3" }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    })) as typeof fetch;
+
+  await playChunkAudio({
+    chunkText: "speed test",
+    chunkKey: "speed-test",
+  });
+
+  assert.deepEqual(playbackRates, [1.2]);
 });
