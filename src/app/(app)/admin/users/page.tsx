@@ -6,7 +6,7 @@ import {
   readAdminPositivePage,
   readAdminStringParam,
 } from "@/app/(app)/admin/admin-page-state";
-import { AdminActionButton } from "@/components/admin/admin-action-button";
+import { AdminSubmitButton } from "@/components/admin/admin-action-button";
 import { AdminNoticeCard } from "@/components/shared/admin-info-card";
 import {
   AdminEmptyState,
@@ -181,9 +181,9 @@ export default async function AdminUsersPage({
                         </option>
                       ))}
                     </select>
-                    <AdminActionButton type="submit" tone="primary">
+                    <AdminSubmitButton tone="primary" pendingText="处理中...">
                       {LABELS.updateStatus}
-                    </AdminActionButton>
+                    </AdminSubmitButton>
                   </form>
                 </AdminListActions>
               </AdminListItem>

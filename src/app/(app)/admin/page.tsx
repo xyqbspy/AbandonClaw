@@ -16,7 +16,7 @@ import {
   updateAdminHighCostControlAction,
 } from "@/app/(app)/admin/actions";
 import { readAdminNotice } from "@/app/(app)/admin/admin-page-state";
-import { AdminActionButton } from "@/components/admin/admin-action-button";
+import { AdminSubmitButton } from "@/components/admin/admin-action-button";
 import { AdminNoticeCard } from "@/components/shared/admin-info-card";
 import { requireAdmin } from "@/lib/server/auth";
 import { getAdminHighCostCapabilityControls, getAdminOverviewStats } from "@/lib/server/admin/service";
@@ -129,13 +129,13 @@ export default async function AdminHomePage({
     <div className="space-y-8">
       <div className="flex justify-end">
         <form action={syncSeedScenesAction}>
-          <button
-            type="submit"
+          <AdminSubmitButton
+            pendingText="同步中..."
             className="flex min-h-10 cursor-pointer items-center gap-2 rounded-xl px-3 text-xs font-bold text-slate-500 transition-all hover:text-blue-600"
           >
             <RefreshCw className="size-3.5" aria-hidden="true" />
             {LABELS.syncSeed}
-          </button>
+          </AdminSubmitButton>
         </form>
       </div>
 
@@ -212,9 +212,9 @@ export default async function AdminHomePage({
                 <input type="hidden" name="returnTo" value="/admin" />
                 <input type="hidden" name="capability" value={item.capability} />
                 <input type="hidden" name="disabled" value={item.disabled ? "false" : "true"} />
-                <AdminActionButton
-                  type="submit"
+                <AdminSubmitButton
                   tone={item.disabled ? "primary" : "secondary"}
+                  pendingText="处理中..."
                   className={cn(
                     "min-h-0 rounded-full px-0 py-0 text-[0px]",
                     item.disabled ? "border-orange-200 bg-orange-50 hover:bg-orange-100" : "border-transparent bg-transparent hover:bg-transparent",
@@ -235,7 +235,7 @@ export default async function AdminHomePage({
                       )}
                     />
                   </span>
-                </AdminActionButton>
+                </AdminSubmitButton>
               </form>
             </div>
           ))}

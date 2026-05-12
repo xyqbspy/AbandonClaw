@@ -10,6 +10,7 @@ import {
   readAdminPositivePage,
 } from "@/app/(app)/admin/admin-page-state";
 import { InviteCodeCreatePanel } from "@/app/(app)/admin/invites/invite-code-create-panel";
+import { AdminSubmitButton } from "@/components/admin/admin-action-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { getAdminRegistrationModeState, listAdminInviteCodes } from "@/lib/server/admin/service";
@@ -129,12 +130,13 @@ export default async function AdminInvitesPage({
                   <option value="open">全开放注册</option>
                   <option value="closed">维护中 - 禁止注册</option>
                 </select>
-                <button
-                  type="submit"
+                <AdminSubmitButton
+                  tone="primary"
+                  pendingText="更新中..."
                   className="min-h-[46px] cursor-pointer rounded-[12px] bg-blue-600 px-6 py-3 text-sm font-bold text-white transition-all hover:bg-blue-700 active:scale-95"
                 >
                   立即更新
-                </button>
+                </AdminSubmitButton>
               </form>
               <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-400">
                 <span>状态：{REGISTRATION_MODE_LABELS[registrationMode.mode]}</span>
@@ -263,10 +265,7 @@ export default async function AdminInvitesPage({
                           isUsedUp ? "bg-blue-50/30" : "bg-slate-50"
                         } space-y-3`}
                       >
-                        <form action={updateAdminInviteCodeAction} id={`invite-update-${row.id}`} className="grid gap-3">
-                          <input type="hidden" name="inviteCodeId" value={row.id} />
-                          <input type="hidden" name="returnTo" value={currentHref} />
-                          <input type="hidden" name="inviteAction" value="update" />
+                        <div className="grid gap-3">
                           <div className="grid gap-3">
                             <div>
                               <div className="grid grid-cols-2 gap-3">
@@ -280,6 +279,7 @@ export default async function AdminInvitesPage({
                                   <Input
                                     id={`invite-${row.id}-max-uses`}
                                     name="maxUses"
+                                    form={`invite-update-${row.id}`}
                                     type="number"
                                     min={Math.max(row.usedCount, 1)}
                                     max={100}
@@ -297,6 +297,7 @@ export default async function AdminInvitesPage({
                                   <Input
                                     id={`invite-${row.id}-expires-days`}
                                     name="expiresInDays"
+                                    form={`invite-update-${row.id}`}
                                     type="number"
                                     min={0}
                                     max={90}
@@ -307,7 +308,7 @@ export default async function AdminInvitesPage({
                               </div>
                             </div>
                           </div>
-                        </form>
+                        </div>
 
                         <div className="grid grid-cols-2 gap-2">
                           {row.isActive ? (
@@ -315,29 +316,34 @@ export default async function AdminInvitesPage({
                               <input type="hidden" name="inviteCodeId" value={row.id} />
                               <input type="hidden" name="returnTo" value={currentHref} />
                               <input type="hidden" name="inviteAction" value="deactivate" />
-                              <button
-                                type="submit"
+                              <AdminSubmitButton
+                                pendingText="处理中..."
                                 className="min-h-[38px] w-full cursor-pointer rounded-[12px] border border-slate-200 bg-white px-3 py-2.5 text-xs font-bold text-slate-400 transition-all hover:text-red-500 active:scale-95"
                               >
                                 停用
-                              </button>
+                              </AdminSubmitButton>
                             </form>
                           ) : (
                             <form action={updateAdminInviteCodeAction}>
                               <input type="hidden" name="inviteCodeId" value={row.id} />
                               <input type="hidden" name="returnTo" value={currentHref} />
                               <input type="hidden" name="inviteAction" value="activate" />
-                              <button
-                                type="submit"
+                              <AdminSubmitButton
+                                tone="primary"
+                                pendingText="处理中..."
                                 className="min-h-[38px] w-full cursor-pointer rounded-[12px] border border-blue-100 bg-white px-3 py-2.5 text-xs font-bold text-blue-600 transition-all hover:bg-blue-50 active:scale-95"
                               >
                                 启用
-                              </button>
+                              </AdminSubmitButton>
                             </form>
                           )}
-                          <button
-                            type="submit"
-                            form={`invite-update-${row.id}`}
+                          <form action={updateAdminInviteCodeAction} id={`invite-update-${row.id}`}>
+                            <input type="hidden" name="inviteCodeId" value={row.id} />
+                            <input type="hidden" name="returnTo" value={currentHref} />
+                            <input type="hidden" name="inviteAction" value="update" />
+                            <AdminSubmitButton
+                              tone="primary"
+                              pendingText="更新中..."
                             className={`min-h-[38px] w-full cursor-pointer rounded-[12px] px-3 py-2.5 text-xs font-bold text-white transition-all active:scale-95 ${
                               isUsedUp
                                 ? "bg-blue-600 shadow-sm hover:bg-blue-700"
@@ -345,7 +351,8 @@ export default async function AdminInvitesPage({
                             }`}
                           >
                             {isUsedUp ? "更新权益" : "更新配置"}
-                          </button>
+                            </AdminSubmitButton>
+                          </form>
                         </div>
                       </div>
                     </div>

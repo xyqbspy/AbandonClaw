@@ -11,7 +11,7 @@ import {
   AdminActionBarActions,
   AdminActionBarHint,
 } from "@/components/shared/admin-action-bar";
-import { AdminActionButton, AdminConfirmActionButton } from "@/components/admin/admin-action-button";
+import { AdminConfirmActionButton, AdminSubmitButton } from "@/components/admin/admin-action-button";
 import { AdminNoticeCard } from "@/components/shared/admin-info-card";
 import {
   AdminEmptyState,
@@ -123,21 +123,17 @@ export default async function AdminPhrasesPage({
         </FilterBarForm>
       </FilterBar>
 
-      <form id="admin-phrases-batch-enrich-form" action={enrichAdminPhrasesBatchAction}>
-        <input type="hidden" name="returnTo" value={currentHref} />
-      </form>
-
       <div className="rounded-xl bg-white shadow-sm">
         <AdminActionBar>
           <AdminActionBarHint>{LABELS.batchHint}</AdminActionBarHint>
           <AdminActionBarActions>
-            <AdminActionButton
-              type="submit"
-              form="admin-phrases-batch-enrich-form"
-            >
-              <Wand2 className="size-3.5" />
-              {LABELS.batchAction}
-            </AdminActionButton>
+            <form id="admin-phrases-batch-enrich-form" action={enrichAdminPhrasesBatchAction}>
+              <input type="hidden" name="returnTo" value={currentHref} />
+              <AdminSubmitButton pendingText="处理中...">
+                <Wand2 className="size-3.5" />
+                {LABELS.batchAction}
+              </AdminSubmitButton>
+            </form>
           </AdminActionBarActions>
         </AdminActionBar>
 
@@ -202,15 +198,15 @@ export default async function AdminPhrasesPage({
                     <form action={enrichAdminPhraseAction}>
                       <input type="hidden" name="userPhraseId" value={row.userPhraseId} />
                       <input type="hidden" name="returnTo" value={currentHref} />
-                      <AdminActionButton
-                        type="submit"
+                      <AdminSubmitButton
                         disabled={
                           row.learningItemType !== "expression" || row.enrichmentState === "pending"
                         }
+                        pendingText="处理中..."
                       >
                         <Wand2 className="size-3.5" />
                         补全
-                      </AdminActionButton>
+                      </AdminSubmitButton>
                     </form>
                     <form action={deleteAdminPhraseAction}>
                       <input type="hidden" name="userPhraseId" value={row.userPhraseId} />

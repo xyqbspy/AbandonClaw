@@ -4,6 +4,7 @@ import type { User } from "@supabase/supabase-js";
 import { AppTopbar } from "@/components/layout/app-topbar";
 import { PageShell } from "@/components/layout/page-shell";
 import { PullToRefresh } from "@/components/layout/pull-to-refresh";
+import { RoutePendingOverlay } from "@/components/layout/route-pending-overlay";
 import { getCurrentUser } from "@/lib/server/auth";
 
 function resolveUserDisplay(user: User) {
@@ -41,6 +42,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   return (
     <PageShell>
       <AppTopbar userDisplay={userDisplay} />
+      <RoutePendingOverlay />
       <PullToRefresh>
         <div className="app-container py-6 sm:py-8 lg:px-10">{children}</div>
       </PullToRefresh>

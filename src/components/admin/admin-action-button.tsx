@@ -1,7 +1,8 @@
 "use client";
 
-import type { ComponentProps } from "react";
-import { LoadingButton } from "@/components/shared/action-loading";
+import type { ComponentProps, ReactNode } from "react";
+import { useFormStatus } from "react-dom";
+import { LoadingButton, LoadingContent } from "@/components/shared/action-loading";
 import { ConfirmButton } from "@/components/shared/confirm-action";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -52,6 +53,39 @@ export function AdminActionButton({
       className={composeAdminActionClassName(tone, className)}
       {...props}
     />
+  );
+}
+
+type AdminSubmitButtonProps = AdminActionButtonProps & {
+  pendingText?: ReactNode;
+};
+
+export function AdminSubmitButton({
+  tone = "secondary",
+  variant = tone === "primary" ? "default" : "ghost",
+  size = "sm",
+  className,
+  disabled,
+  children,
+  pendingText = "处理中...",
+  ...props
+}: AdminSubmitButtonProps) {
+  const { pending } = useFormStatus();
+
+  return (
+    <Button
+      type="submit"
+      variant={variant}
+      size={size}
+      className={composeAdminActionClassName(tone, className)}
+      aria-busy={pending}
+      disabled={disabled || pending}
+      {...props}
+    >
+      <LoadingContent loading={pending} loadingText={pendingText}>
+        {children}
+      </LoadingContent>
+    </Button>
   );
 }
 
