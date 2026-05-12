@@ -54,14 +54,17 @@
 - `连续学习` -> `streakDays`
 - `完成场景` -> `completedScenesCount`
 - `学习中场景` -> `inProgressScenesCount`
-- `已收藏短语` -> `savedPhraseCount`
+- `表达资产 / 已收藏表达` -> `savedPhraseCount`
 - `最近 7 天累计学习约 X 分钟` -> `recentStudyMinutes`
 - `复习正确率` -> `reviewAccuracy`
+- `最近 7 天学习趋势` -> 当前先由 `recentStudyMinutes` 派生占位展示，后续若接入逐日事件或每日统计数组，需要先扩展 `LearningOverview`
+- `学习热力图` -> 当前用于呈现近期学习节奏，不改变 `LearningOverview` 的字段契约
 
 这意味着：
 
 - 如果未来要改展示口径，优先改 `getLearningOverview()`
 - 页面层不应自己再拼新的“近 30 天”或“本周”统计
+- 如果要让趋势图或热力图从占位展示变成真实逐日统计，应先在服务端聚合层新增稳定字段，再同步页面和本文档
 
 ## 5. 失败回退或兼容策略
 

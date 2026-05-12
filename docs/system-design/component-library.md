@@ -105,6 +105,8 @@
 
 后台操作按钮统一通过 `AdminActionButton`、`AdminLoadingActionButton` 或 `AdminConfirmActionButton` 表达 `secondary / primary / danger` 三种层级。页面不应继续手拼 `APPLE_BUTTON_* + APPLE_BUTTON_TEXT_*`。
 
+后台 server action 表单提交统一优先使用 `AdminSubmitButton`。它基于 `useFormStatus()` 读取当前 form 的 pending 状态，会禁用按钮并显示“处理中...”或传入的 `pendingText`。如果按钮需要控制当前表单之外的字段，应优先让字段通过原生 `form` 属性关联到该 form，而不是把提交按钮放在 form 外再用 `form=` 触发，否则按钮无法感知 `useFormStatus()`。
+
 按钮样式规则：
 
 - `Button` 的 `variant` 和 `APPLE_BUTTON_*` 外观类必须保持同一语义层级。

@@ -1,5 +1,24 @@
 # UI 样式渐进收口审计
 
+## 2026-05-12 应用壳、admin 与 progress 收口记录
+
+已完成：
+
+- 主应用顶部栏、移动端菜单和全局面包屑收口到 layout 层；页面内容区不再重复展示当前位置说明。
+- `today` 页面简化，保留每日学习入口和任务编排，不继续堆叠过重说明卡片。
+- `progress` 页面重做为学习成就中心，保留热力图和成长足迹，并用“表达资产 / 已收藏表达”“复习正确率”“最近 7 天学习趋势”承接当前聚合字段。
+- `admin` 首页按后台工作台风格重做，并保留用户、邀请码、场景、表达库、导入场景、变体、AI 缓存、TTS 缓存和可观测性入口。
+- `/admin/invites` 表单、列表、空态和操作区继续向 admin 专属样式收口；输入框、下拉框和按钮统一到 12px 圆角。
+- admin 时间展示统一通过 `formatAdminDateTime()` 输出 `2026/5/12 10:42` 这类格式。
+- admin 可点击控件补齐 `cursor-pointer`，focus 去除额外边框颜色但保留背景反馈。
+- 全局 route pending 蒙层和 `AdminSubmitButton` 已接入，admin server action 操作会显示按钮级处理中状态。
+
+维护判断：
+
+- 这些改动属于 UI/交互一致性收口，不改变学习、注册、邀请码、账号处置或高成本能力的服务端语义。
+- 后续 admin 页面新增提交表单时，优先使用 `AdminSubmitButton`；新增危险操作继续使用 `AdminConfirmActionButton`。
+- 后续 progress 若要让热力图或趋势图变成真实逐日统计，必须先扩展 `LearningOverview` 服务端聚合字段，而不是在页面里临时拆原始事件。
+
 ## Scene 页面族专项审计
 
 本轮 OpenSpec change：`standardize-scene-page-style`。

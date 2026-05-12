@@ -96,6 +96,12 @@
 - `src/app/(app)/progress`: 学习概览
 - `src/app/(app)/admin`: 管理后台
 
+主应用外壳：
+
+- `src/components/layout/app-topbar.tsx`: 顶部栏和全局面包屑展示
+- `src/components/layout/mobile-nav.tsx`: 移动端主导航
+- `src/components/layout/route-pending-overlay.tsx`: 应用内路由跳转和表单提交的全局等待反馈
+
 ### 功能层
 
 - `src/features/scene`: 场景学习视图组件
@@ -109,6 +115,7 @@
 - `src/components/ui`: 最基础的 UI primitives
 - `src/components/shared`: 跨 feature 复用的稳定公共组件
 - `src/components/audio`: 音频动作类公共组件
+- `src/components/admin`: 管理后台子域组件，例如 admin 操作按钮、导航、事件面板和 TTS 缓存面板
 
 组件归属与迁移边界优先参考：
 
@@ -224,6 +231,7 @@
 
 - `today` 回答“今天该做什么”
 - `progress` 回答“最近学得怎么样”
+- `progress` 当前页面展示学习节奏、表达资产、复习正确率、最近 7 天趋势、热力图和成长足迹；它仍然只消费服务端聚合字段，不直接解释原始日志。
 
 维护时重点关注：
 

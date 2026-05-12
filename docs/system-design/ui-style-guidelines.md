@@ -32,6 +32,7 @@
 - 学习流程页面：用于推进一个学习任务，例如 `scene`、`lesson`、`review`。应突出当前任务、下一步动作和反馈，不堆无关卡片。
 - 详情或浮层：用于围绕一个表达、句子或任务查看上下文。应复用既有 sheet、detail block、footer action 和音频动作结构。
 - 管理页面：用于维护数据和排查问题。应优先使用统一列表、筛选、菜单和 admin 操作按钮。
+- 顶部导航与面包屑：应用壳负责展示当前页面位置。页面内容区不应重复渲染“管理后台 / 总览”这类位置说明，除非它是页面标题本身。
 
 页面 section 不默认做成大卡片。只有单个重复项、详情浮层、modal 或明确需要框定的工具区才使用 card。
 
@@ -152,6 +153,8 @@
 新增 UI 必须考虑这些状态，不只做 happy path：
 
 - loading：使用已有 loading 文案、skeleton 或按钮 loading 状态，不在页面里重复写一套动画。
+- route pending：应用内路由跳转或表单提交等待较久时，优先使用全局 route pending 蒙层承接整页等待，不在单个页面重复实现全屏 loading。
+- server action 提交：后台表单提交优先使用基于 `useFormStatus()` 的 admin submit 按钮，按钮自身要禁用并显示“处理中...”类文案。
 - empty：说明当前为什么为空，并给出一个合理下一步；不要只显示“暂无数据”。
 - error：错误文案要可恢复，优先提供重试、返回或替代路径。
 - disabled：必须能看出为何不可用，避免把主要动作静默置灰。
@@ -235,7 +238,7 @@
 - 学习主链路按钮优先遵守 `learning-action-button-hierarchy`。
 - 详情页 footer 动作优先遵守 `detail-footer-actions`。
 - 音频动作优先使用 `src/components/audio` 的统一组件。
-- admin 操作优先使用 `AdminActionButton`、`AdminLoadingActionButton` 或 `AdminConfirmActionButton`。
+- admin 操作优先使用 `AdminActionButton`、`AdminSubmitButton`、`AdminLoadingActionButton` 或 `AdminConfirmActionButton`。
 
 ## 11. 组件归属
 

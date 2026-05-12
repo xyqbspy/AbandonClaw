@@ -1,5 +1,33 @@
 # Dev Log
 
+### [2026-05-12] 收口主应用界面、后台 UI 与加载反馈
+- 类型：Fast Track / UI 与交互一致性收口
+- 状态：已完成
+
+#### 背景
+最近几轮围绕主应用顶部导航、`today`、`progress`、`demo` 和 `admin` 做了多次视觉和交互收口。改动不改变学习状态、注册准入、账号处置或高成本能力的业务语义，但属于用户可感知变化，需要同步正式 changelog 和 UI 维护文档，避免后续继续按旧页面结构理解。
+
+#### 本次改动
+- 主应用顶部栏和移动端菜单重做，并把“当前位置”抽成全局面包屑能力。
+- `today` 页面简化为更轻的每日学习入口，减少重复卡片和说明。
+- `progress` 页面按新视觉重做，保留热力图和成长足迹，并把指标口径收口为表达资产、复习正确率和最近 7 天趋势。
+- `demo` 页面按新的产品展示风格重做，强调场景、表达沉淀和复习闭环。
+- `admin` 首页和邀请码页按后台专属 UI 重做，并保留用户、邀请码、场景、表达库、导入场景、变体、AI 缓存、TTS 缓存和可观测性入口。
+- admin 输入框、下拉框、按钮、focus 背景、圆角、cursor 和时间展示做一致性收口。
+- 新增全局 route pending 蒙层，并为 admin server action 表单新增 `AdminSubmitButton`，用 `useFormStatus()` 展示“处理中...”。
+
+#### 已运行验证
+- `pnpm exec eslint "src/components/admin/admin-action-button.tsx" "src/components/layout/route-pending-overlay.tsx" "src/app/(app)/layout.tsx" "src/app/(app)/admin/page.tsx" "src/app/(app)/admin/invites/page.tsx" "src/app/(app)/admin/users/page.tsx" "src/app/(app)/admin/phrases/page.tsx"`
+- `node --import tsx --test "src/app/(app)/admin/invites/page.test.tsx" "src/app/(app)/admin/users/page.test.tsx" "src/app/(app)/admin/page.test.tsx"`
+- `pnpm exec tsc --noEmit --pretty false`
+- `git diff --check`
+
+#### 明确不收项
+- 不改变 admin 账号处置、邀请码使用、注册模式、高成本紧急开关等服务端语义。
+- 不启动本地 dev server。
+- 不提交 `tmp/` 下的本地 cookie、邀请码或 baseline 配置。
+- 不把 `demo.html`、`adminui.html`、`progress.html` 这些参考稿作为正式运行页面。
+
 ### [2026-05-11] 接入注册邮箱验证码
 - 类型：Spec-Driven / 注册邮箱验证码前置校验
 - 状态：实施完成，待 archive `add-email-code-signup-verification`
