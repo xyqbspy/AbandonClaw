@@ -3,6 +3,7 @@
 import { usePathname, useRouter } from "next/navigation";
 import { Bell, ChevronDown, LogOut, Menu } from "lucide-react";
 import { toast } from "sonner";
+import { resolveTopbarBreadcrumb, type TopbarBreadcrumbItem } from "@/components/layout/app-topbar-breadcrumb";
 import { MobileNav } from "@/components/layout/mobile-nav";
 
 type AppTopbarProps = {
@@ -16,7 +17,7 @@ type AppTopbarProps = {
 export function AppTopbar({ userDisplay }: AppTopbarProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const topbarTitle = pathname.startsWith("/admin") ? <AdminTopbarBreadcrumb pathname={pathname} /> : "今日学习空间";
+  const breadcrumbItems = resolveTopbarBreadcrumb(pathname);
 
   const handleLogout = async () => {
     try {
@@ -43,9 +44,7 @@ export function AppTopbar({ userDisplay }: AppTopbarProps) {
           >
             <Menu className="size-5" />
           </div>
-          <h1 className="truncate text-[17px] font-semibold tracking-normal text-[#334155] sm:text-[18px]">
-            {topbarTitle}
-          </h1>
+          <TopbarBreadcrumb items={breadcrumbItems} />
         </div>
         <div className="flex min-w-0 items-center gap-2 sm:gap-4">
           <button
@@ -89,27 +88,20 @@ export function AppTopbar({ userDisplay }: AppTopbarProps) {
   );
 }
 
-const adminBreadcrumbLabels = [
-  { href: "/admin/users", label: "用户" },
-  { href: "/admin/invites", label: "邀请码" },
-  { href: "/admin/scenes", label: "场景" },
-  { href: "/admin/phrases", label: "表达库" },
-  { href: "/admin/imported", label: "导入场景" },
-  { href: "/admin/variants", label: "变体" },
-  { href: "/admin/cache", label: "AI 缓存" },
-  { href: "/admin/tts", label: "TTS 缓存" },
-  { href: "/admin/observability", label: "可观测性" },
-];
-
-function AdminTopbarBreadcrumb({ pathname }: { pathname: string }) {
-  const current =
-    adminBreadcrumbLabels.find((item) => pathname === item.href || pathname.startsWith(`${item.href}/`))?.label ??
-    "总览";
-
+function TopbarBreadcrumb({ items }: { items: TopbarBreadcrumbItem[] }) {
   return (
-    <>
-      管理后台 <span className="text-[#94a3b8]">/</span>{" "}
-      <span className="text-blue-600">{current}</span>
-    </>
+    <nav
+      aria-label="当前位置"
+      className="flex min-w-0 items-center gap-1 truncate text-[17px] font-semibold tracking-normal text-[#334155] sm:text-[18px]"
+    >
+      {items.map((item, index) => (
+        <span key={`${item.label}-${index}`} className="inline-flex min-w-0 items-center gap-1">
+          {index > 0 ? <span className="shrink-0 text-[#94a3b8]">/</span> : null}
+          <span className={item.active ? "truncate text-blue-600" : "truncate text-[#334155]"}>
+            {item.label}
+          </span>
+        </span>
+      ))}
+    </nav>
   );
 }
