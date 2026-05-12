@@ -1,41 +1,38 @@
 import Link from "next/link";
-import { RefreshCw, ShieldAlert } from "lucide-react";
+import {
+  AlertTriangle,
+  HardDrive,
+  Image,
+  Layers,
+  MessageSquareText,
+  Search,
+  RefreshCw,
+  Sparkles,
+  Ticket,
+  UserRound,
+} from "lucide-react";
 import {
   syncSeedScenesAction,
   updateAdminHighCostControlAction,
 } from "@/app/(app)/admin/actions";
 import { readAdminNotice } from "@/app/(app)/admin/admin-page-state";
 import { AdminActionButton } from "@/components/admin/admin-action-button";
-import { AdminInfoCard, AdminInfoList, AdminNoticeCard } from "@/components/shared/admin-info-card";
-import { PageHeader } from "@/components/shared/page-header";
-import { StatCard } from "@/components/shared/stat-card";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { AdminNoticeCard } from "@/components/shared/admin-info-card";
 import { requireAdmin } from "@/lib/server/auth";
 import { getAdminHighCostCapabilityControls, getAdminOverviewStats } from "@/lib/server/admin/service";
-import {
-  APPLE_CARD_INTERACTIVE,
-  APPLE_META_TEXT,
-  APPLE_TITLE_MD,
-} from "@/lib/ui/apple-style";
+import { cn } from "@/lib/utils";
 
 const LABELS = {
-  eyebrow: "\u5185\u90e8\u5de5\u5177",
-  title: "\u7ba1\u7406\u540e\u53f0",
-  description: "\u7528\u4e8e\u6392\u67e5\u548c\u7ef4\u62a4\u5185\u5bb9\u6570\u636e\u7684\u6781\u7b80\u7ba1\u7406\u9875\u3002",
-  syncSeed: "\u540c\u6b65\u5185\u7f6e\u573a\u666f",
-  scenesTitle: "\u5185\u7f6e\u4e0e\u5bfc\u5165\u573a\u666f",
-  scenesHint: "\u5bfc\u5165\u573a\u666f\uff1a",
-  variantsTitle: "\u573a\u666f\u53d8\u4f53",
-  cacheHint: "\u6700\u8fd1\u7f13\u5b58\uff1a",
-  activityTitle: "\u5b66\u4e60\u6d3b\u8dc3\u5ea6",
-  activityUsers: "\u6709\u5b66\u4e60\u8bb0\u5f55\u7528\u6237\uff1a",
-  activityLearning: "\u5b66\u4e60\u4e2d\uff1a",
-  activityDone: "\u5df2\u5b8c\u6210\uff1a",
-  activityRecent: "\u6700\u8fd1\u6d3b\u8dc3\uff1a",
-  adminTitle: "\u5f53\u524d\u7ba1\u7406\u5458",
+  syncSeed: "同步内置场景",
+  scenesTitle: "内置与导入场景",
+  variantsTitle: "场景变体",
+  cacheTitle: "AI 缓存",
+  cacheHint: "最近缓存",
+  activityTitle: "学习活跃度",
+  learning: "学习中",
+  activeUsers: "活跃用户",
   highCostTitle: "高成本紧急开关",
-  highCostDescription: "临时关闭某个生成或 TTS 能力；关闭后会在 quota 预占和上游调用前拒绝。",
+  highCostDescription: "关闭后将会在 Quota 预估和上游调用前拒绝请求",
 } as const;
 
 const HIGH_COST_LABELS: Record<string, string> = {
@@ -51,51 +48,66 @@ const HIGH_COST_LABELS: Record<string, string> = {
 const entries = [
   {
     title: "用户",
-    description:
-      "按邮箱、用户 ID、用户名和账号状态快速查找用户，并执行最小账号处置。",
+    description: "按邮箱、用户 ID、用户名和账号状态快速查找用户，并执行最小账号处置。",
     href: "/admin/users",
+    icon: UserRound,
+    iconClassName: "bg-blue-50 text-blue-600 group-hover:bg-blue-600 group-hover:text-white",
   },
   {
     title: "邀请码",
-    description:
-      "生成、停用和查看注册邀请码，追踪使用账号与最小活动情况。",
+    description: "生成、停用和查看注册邀请码，追踪使用账号与最小活动情况。",
     href: "/admin/invites",
+    icon: Ticket,
+    iconClassName: "bg-purple-50 text-purple-600 group-hover:bg-purple-600 group-hover:text-white",
   },
   {
-    title: "\u573a\u666f",
-    description:
-      "\u67e5\u770b\u5168\u90e8 seed/imported \u573a\u666f\uff0c\u652f\u6301\u641c\u7d22\u548c\u7b5b\u9009\u3002",
+    title: "场景",
+    description: "查看全部 seed/imported 场景，支持搜索和筛选。",
     href: "/admin/scenes",
+    icon: Image,
+    iconClassName: "bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white",
   },
   {
-    title: "\u8868\u8fbe\u5e93",
-    description:
-      "\u7ba1\u7406\u8868\u8fbe\u4e0e\u53e5\u5b50\uff0c\u652f\u6301\u7b5b\u9009\u3001\u8865\u5168\u3001\u5220\u9664\u3002",
+    title: "表达库",
+    description: "管理表达与句子，支持筛选、补全、删除。",
     href: "/admin/phrases",
+    icon: MessageSquareText,
+    iconClassName: "bg-cyan-50 text-cyan-600 group-hover:bg-cyan-600 group-hover:text-white",
   },
   {
-    title: "\u5bfc\u5165\u573a\u666f",
-    description:
-      "\u91cd\u70b9\u6392\u67e5 imported \u573a\u666f\uff0c\u4fbf\u4e8e\u68c0\u67e5\u89e3\u6790\u8d28\u91cf\u3002",
+    title: "导入场景",
+    description: "重点排查 imported 场景，便于检查解析质量。",
     href: "/admin/imported",
+    icon: Layers,
+    iconClassName: "bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white",
   },
   {
-    title: "\u53d8\u4f53",
-    description:
-      "\u67e5\u770b\u5df2\u751f\u6210\u53d8\u4f53\uff0c\u5e76\u8ffd\u6eaf\u5230\u6765\u6e90\u573a\u666f\u3002",
+    title: "变体",
+    description: "查看已生成变体，并追溯到来源场景。",
     href: "/admin/variants",
+    icon: Sparkles,
+    iconClassName: "bg-pink-50 text-pink-600 group-hover:bg-pink-600 group-hover:text-white",
   },
   {
-    title: "AI \u7f13\u5b58",
-    description:
-      "\u53ea\u8bfb\u67e5\u770b\u7f13\u5b58\u8bb0\u5f55\uff0c\u7528\u4e8e parse/variant \u6545\u969c\u6392\u67e5\u3002",
+    title: "AI 缓存",
+    description: "只读查看缓存记录，用于 parse/variant 故障排查。",
     href: "/admin/cache",
+    icon: HardDrive,
+    iconClassName: "bg-amber-50 text-amber-600 group-hover:bg-amber-600 group-hover:text-white",
   },
   {
-    title: "TTS \u7f13\u5b58",
-    description:
-      "\u67e5\u770b\u5f53\u524d\u6d4f\u89c8\u5668\u91cc\u7684\u672c\u5730\u97f3\u9891\u7f13\u5b58\uff0c\u5e76\u652f\u6301\u6309\u9700\u6e05\u7406\u3002",
+    title: "TTS 缓存",
+    description: "查看当前浏览器里的本地音频缓存，并支持按需清理。",
     href: "/admin/tts",
+    icon: HardDrive,
+    iconClassName: "bg-orange-50 text-orange-600 group-hover:bg-orange-600 group-hover:text-white",
+  },
+  {
+    title: "可观测性",
+    description: "查看客户端事件与失败记录，用于回溯异常和排查线上问题。",
+    href: "/admin/observability",
+    icon: Search,
+    iconClassName: "bg-slate-100 text-slate-600 group-hover:bg-slate-700 group-hover:text-white",
   },
 ];
 
@@ -106,90 +118,123 @@ export default async function AdminHomePage({
 }) {
   const params = await searchParams;
   const notice = readAdminNotice(params);
-  const [adminUser, stats, highCostControls] = await Promise.all([
+  const [, stats, highCostControls] = await Promise.all([
     requireAdmin(),
     getAdminOverviewStats(),
     getAdminHighCostCapabilityControls(),
   ]);
+  const disabledControlCount = highCostControls.filter((item) => item.disabled).length;
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        variant="admin"
-        eyebrow={LABELS.eyebrow}
-        title={LABELS.title}
-        description={LABELS.description}
-        actions={
-          <form action={syncSeedScenesAction}>
-            <AdminActionButton type="submit">
-              <RefreshCw className="size-3.5" />
-              {LABELS.syncSeed}
-            </AdminActionButton>
-          </form>
-        }
-      />
+    <div className="space-y-8">
+      <div className="flex justify-end">
+        <form action={syncSeedScenesAction}>
+          <button
+            type="submit"
+            className="flex min-h-10 cursor-pointer items-center gap-2 rounded-xl px-3 text-xs font-bold text-slate-500 transition-all hover:text-blue-600"
+          >
+            <RefreshCw className="size-3.5" aria-hidden="true" />
+            {LABELS.syncSeed}
+          </button>
+        </form>
+      </div>
 
       {notice ? <AdminNoticeCard tone={notice.tone}>{notice.notice}</AdminNoticeCard> : null}
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <StatCard
-          title={LABELS.scenesTitle}
-          value={stats.totalScenes}
-          hint={`${LABELS.scenesHint}${stats.importedScenes}`}
-        />
-        <StatCard title={LABELS.variantsTitle} value={stats.totalVariants} />
-        <StatCard
-          title="AI 缓存"
-          value={stats.totalCacheRows}
-          hint={`${LABELS.cacheHint}${stats.latestCacheCreatedAt ?? "-"}`}
-        />
-        <AdminInfoCard title={LABELS.activityTitle}>
-          <AdminInfoList
-            items={[
-              { label: LABELS.activityUsers, value: stats.totalUsersWithProgress },
-              { label: LABELS.activityLearning, value: stats.scenesInProgressCount },
-              { label: LABELS.activityDone, value: stats.scenesCompletedCount },
-              { label: LABELS.activityRecent, value: stats.latestLearningActivityAt ?? "-", muted: true },
-            ]}
-          />
-        </AdminInfoCard>
-      </div>
+      <section className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
+        <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm transition-transform hover:-translate-y-0.5">
+          <p className="text-xs font-bold tracking-wider text-slate-400 uppercase">{LABELS.scenesTitle}</p>
+          <div className="mt-2 flex items-baseline gap-2">
+            <span className="text-3xl font-bold text-slate-800">{stats.totalScenes}</span>
+            <span className="text-xs font-medium text-green-500">↑ {stats.importedScenes}</span>
+          </div>
+          <div className="mt-4 h-1 w-full overflow-hidden rounded-full bg-slate-100">
+            <div className="h-full w-2/3 bg-blue-500" />
+          </div>
+        </div>
 
-      <AdminInfoCard title={LABELS.adminTitle} contentClassName="text-slate-500">
-        {adminUser.email ?? adminUser.id}
-      </AdminInfoCard>
+        <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm transition-transform hover:-translate-y-0.5">
+          <p className="text-xs font-bold tracking-wider text-slate-400 uppercase">{LABELS.variantsTitle}</p>
+          <div className={cn("mt-2 text-3xl font-bold", stats.totalVariants > 0 ? "text-slate-800" : "text-slate-300")}>
+            {stats.totalVariants}
+          </div>
+          <p className="mt-4 text-[10px] text-slate-400 italic">暂无增长数据</p>
+        </div>
 
-      <section className="space-y-3 rounded-xl bg-white p-5 shadow-sm sm:p-6">
-        <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm transition-transform hover:-translate-y-0.5">
+          <p className="text-xs font-bold tracking-wider text-slate-400 uppercase">{LABELS.cacheTitle}</p>
+          <div className="mt-2 text-3xl font-bold text-slate-800">{stats.totalCacheRows}</div>
+          <p className="mt-4 text-[10px] leading-tight text-slate-400">
+            {LABELS.cacheHint}: {stats.latestCacheCreatedAt ?? "-"}
+          </p>
+        </div>
+
+        <div className="rounded-2xl bg-blue-600 p-6 text-white shadow-lg">
+          <p className="text-xs font-bold tracking-wider uppercase opacity-80">{LABELS.activityTitle}</p>
+          <div className="mt-2 flex items-center gap-4">
+            <div>
+              <span className="text-3xl font-bold">{stats.scenesInProgressCount}</span>
+              <span className="block text-[10px] font-medium tracking-wide italic opacity-70">{LABELS.learning}</span>
+            </div>
+            <div className="h-8 w-px bg-white/20" />
+            <div>
+              <span className="text-3xl font-bold">{stats.totalUsersWithProgress}</span>
+              <span className="block text-[10px] font-medium tracking-wide italic opacity-70">{LABELS.activeUsers}</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="overflow-hidden rounded-2xl border-2 border-orange-100 bg-white shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-orange-100 bg-orange-50 px-6 py-4">
           <div>
-            <h2 className="flex items-center gap-2 text-base font-semibold text-foreground">
-              <ShieldAlert className="size-4" />
+            <h2 className="flex items-center gap-2 text-sm font-bold text-orange-800">
+              <AlertTriangle className="size-4" aria-hidden="true" />
               {LABELS.highCostTitle}
             </h2>
-            <p className={`mt-1 text-sm ${APPLE_META_TEXT}`}>{LABELS.highCostDescription}</p>
+            <p className="mt-1 text-[11px] text-orange-600 opacity-80">{LABELS.highCostDescription}</p>
           </div>
-          <Badge variant={highCostControls.some((item) => item.disabled) ? "destructive" : "secondary"}>
-            {highCostControls.filter((item) => item.disabled).length} 个已关闭
-          </Badge>
+          <span className="rounded bg-orange-200 px-2 py-1 text-[10px] font-black text-orange-800">
+            {disabledControlCount} 个已关闭
+          </span>
         </div>
-        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 p-6 sm:grid-cols-2 xl:grid-cols-4">
           {highCostControls.map((item) => (
             <div
               key={item.capability}
-              className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 p-3"
+              className="group flex items-center justify-between rounded-xl border border-slate-100 p-3 transition-all hover:bg-slate-50"
             >
               <div>
-                <p className="text-sm font-medium text-foreground">
-                  {HIGH_COST_LABELS[item.capability] ?? item.capability}
-                </p>
-                <p className={`text-xs ${APPLE_META_TEXT}`}>{item.capability}</p>
+                <p className="text-xs font-bold text-slate-700">{HIGH_COST_LABELS[item.capability] ?? item.capability}</p>
+                <p className="font-mono text-[10px] text-slate-400">{item.capability}</p>
               </div>
               <form action={updateAdminHighCostControlAction}>
                 <input type="hidden" name="returnTo" value="/admin" />
                 <input type="hidden" name="capability" value={item.capability} />
                 <input type="hidden" name="disabled" value={item.disabled ? "false" : "true"} />
-                <AdminActionButton type="submit" tone={item.disabled ? "primary" : "danger"}>
-                  {item.disabled ? "恢复" : "关闭"}
+                <AdminActionButton
+                  type="submit"
+                  tone={item.disabled ? "primary" : "secondary"}
+                  className={cn(
+                    "min-h-0 rounded-full px-0 py-0 text-[0px]",
+                    item.disabled ? "border-orange-200 bg-orange-50 hover:bg-orange-100" : "border-transparent bg-transparent hover:bg-transparent",
+                  )}
+                  aria-label={item.disabled ? "恢复" : "关闭"}
+                >
+                  <span
+                    aria-hidden="true"
+                    className={cn(
+                      "relative flex h-5 w-10 items-center rounded-full px-1 transition-colors",
+                      item.disabled ? "bg-slate-300" : "bg-green-500",
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "h-3 w-3 rounded-full bg-white shadow-sm transition-transform",
+                        item.disabled ? "translate-x-0" : "translate-x-5",
+                      )}
+                    />
+                  </span>
                 </AdminActionButton>
               </form>
             </div>
@@ -197,18 +242,30 @@ export default async function AdminHomePage({
         </div>
       </section>
 
-      <div className="grid gap-3 sm:grid-cols-2">
-        {entries.map((entry) => (
-          <Link key={entry.href} href={entry.href} className="block cursor-pointer">
-            <Card className={`${APPLE_CARD_INTERACTIVE} rounded-xl bg-white shadow-sm ring-0`}>
-              <CardHeader>
-                <CardTitle className={APPLE_TITLE_MD}>{entry.title}</CardTitle>
-              </CardHeader>
-              <CardContent className={APPLE_META_TEXT}>{entry.description}</CardContent>
-            </Card>
-          </Link>
-        ))}
-      </div>
+      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {entries.map((entry) => {
+          const Icon = entry.icon;
+
+          return (
+            <Link
+              key={entry.href}
+              href={entry.href}
+              className="group cursor-pointer rounded-2xl border border-slate-200 bg-white p-5 transition-all hover:border-blue-500 hover:shadow-md"
+            >
+              <div
+                className={cn(
+                  "mb-4 flex size-10 items-center justify-center rounded-xl transition-all",
+                  entry.iconClassName,
+                )}
+              >
+                <Icon className="size-5" aria-hidden="true" />
+              </div>
+              <h3 className="text-sm font-bold text-slate-800">{entry.title}</h3>
+              <p className="mt-1 text-[11px] leading-relaxed text-slate-400">{entry.description}</p>
+            </Link>
+          );
+        })}
+      </section>
     </div>
   );
 }

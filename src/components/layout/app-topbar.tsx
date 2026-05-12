@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Bell, ChevronDown, LogOut, Menu } from "lucide-react";
 import { toast } from "sonner";
 import { MobileNav } from "@/components/layout/mobile-nav";
@@ -15,6 +15,8 @@ type AppTopbarProps = {
 
 export function AppTopbar({ userDisplay }: AppTopbarProps) {
   const router = useRouter();
+  const pathname = usePathname();
+  const topbarTitle = pathname.startsWith("/admin") ? <AdminTopbarBreadcrumb pathname={pathname} /> : "今日学习空间";
 
   const handleLogout = async () => {
     try {
@@ -42,7 +44,7 @@ export function AppTopbar({ userDisplay }: AppTopbarProps) {
             <Menu className="size-5" />
           </div>
           <h1 className="truncate text-[17px] font-semibold tracking-normal text-[#334155] sm:text-[18px]">
-            今日学习空间
+            {topbarTitle}
           </h1>
         </div>
         <div className="flex min-w-0 items-center gap-2 sm:gap-4">
@@ -84,5 +86,30 @@ export function AppTopbar({ userDisplay }: AppTopbarProps) {
         </div>
       </div>
     </header>
+  );
+}
+
+const adminBreadcrumbLabels = [
+  { href: "/admin/users", label: "用户" },
+  { href: "/admin/invites", label: "邀请码" },
+  { href: "/admin/scenes", label: "场景" },
+  { href: "/admin/phrases", label: "表达库" },
+  { href: "/admin/imported", label: "导入场景" },
+  { href: "/admin/variants", label: "变体" },
+  { href: "/admin/cache", label: "AI 缓存" },
+  { href: "/admin/tts", label: "TTS 缓存" },
+  { href: "/admin/observability", label: "可观测性" },
+];
+
+function AdminTopbarBreadcrumb({ pathname }: { pathname: string }) {
+  const current =
+    adminBreadcrumbLabels.find((item) => pathname === item.href || pathname.startsWith(`${item.href}/`))?.label ??
+    "总览";
+
+  return (
+    <>
+      管理后台 <span className="text-[#94a3b8]">/</span>{" "}
+      <span className="text-blue-600">{current}</span>
+    </>
   );
 }
