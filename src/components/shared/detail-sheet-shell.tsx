@@ -61,7 +61,7 @@ export function DetailSheetShell({
         <button
           type="button"
           aria-label={closeLabel}
-          className="absolute inset-0 bg-[rgba(242,242,247,0.42)] backdrop-blur-[6px] animate-in fade-in-0 duration-200"
+          className="absolute inset-0 cursor-pointer bg-[rgba(242,242,247,0.42)] backdrop-blur-[6px] animate-in fade-in-0 duration-200"
           onClick={() => onOpenChange(false)}
         />
       ) : (

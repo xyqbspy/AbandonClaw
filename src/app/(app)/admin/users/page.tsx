@@ -28,6 +28,7 @@ import { Input } from "@/components/ui/input";
 import { listAdminUsers } from "@/lib/server/admin/service";
 import { UserAccessStatus } from "@/lib/server/db/types";
 import { APPLE_ADMIN_CONTROL, APPLE_ADMIN_SELECT, APPLE_META_TEXT } from "@/lib/ui/apple-style";
+import { formatAdminDateTime } from "@/lib/ui/admin-format";
 
 const ACCESS_STATUS_OPTIONS: Array<{
   value: UserAccessStatus;
@@ -158,7 +159,7 @@ export default async function AdminUsersPage({
                   <p className={`text-sm ${APPLE_META_TEXT}`}>{row.username ?? "-"}</p>
                   <AdminListMeta>
                     <span className="font-mono">用户 ID：{row.userId}</span>
-                    <span>创建时间：{row.createdAt}</span>
+                    <span>创建时间：{formatAdminDateTime(row.createdAt)}</span>
                   </AdminListMeta>
                 </AdminListContent>
                 <AdminListActions>

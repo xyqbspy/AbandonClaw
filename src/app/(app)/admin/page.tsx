@@ -198,7 +198,7 @@ export default async function AdminHomePage({
 
       <div className="grid gap-3 sm:grid-cols-2">
         {entries.map((entry) => (
-          <Link key={entry.href} href={entry.href} className="block">
+          <Link key={entry.href} href={entry.href} className="block cursor-pointer">
             <Card className={APPLE_CARD_INTERACTIVE}>
               <CardHeader>
                 <CardTitle className={APPLE_TITLE_MD}>{entry.title}</CardTitle>

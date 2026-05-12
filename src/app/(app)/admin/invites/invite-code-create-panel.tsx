@@ -1,15 +1,14 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
+import { Wand2, Zap } from "lucide-react";
 import {
   createAdminInviteCodesAction,
   CreateAdminInviteCodesActionState,
 } from "@/app/(app)/admin/actions";
-import { AdminActionButton } from "@/components/admin/admin-action-button";
-import { AdminNoticeCard } from "@/components/shared/admin-info-card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { APPLE_ADMIN_CONTROL, APPLE_ADMIN_SELECT, APPLE_META_TEXT } from "@/lib/ui/apple-style";
+import { ADMIN_BUTTON_DARK, ADMIN_FIELD, ADMIN_SELECT } from "@/lib/ui/admin-style";
 
 const INITIAL_STATE: CreateAdminInviteCodesActionState = {
   notice: null,
@@ -19,54 +18,62 @@ const INITIAL_STATE: CreateAdminInviteCodesActionState = {
 
 export function InviteCodeCreatePanel() {
   const [state, formAction, pending] = useActionState(createAdminInviteCodesAction, INITIAL_STATE);
+  const [mode, setMode] = useState<"auto" | "manual">("auto");
 
   return (
-    <div className="space-y-4 rounded-[var(--app-radius-panel)] border border-[var(--app-border-soft)] bg-[var(--app-surface)] p-4 shadow-[var(--app-shadow-soft)]">
-      <div>
-        <h2 className="text-base font-semibold text-foreground">生成邀请码</h2>
-        <p className={`mt-1 text-sm ${APPLE_META_TEXT}`}>
-          明文只会在生成成功后显示一次；数据库只保存 hash。
-        </p>
-      </div>
+    <section className="space-y-4 rounded-xl bg-white p-5 shadow-sm sm:p-6">
+      <h3 className="mb-5 flex items-center gap-2 text-sm font-bold text-slate-800">
+        <Wand2 className="size-4 text-blue-500" />
+        快速批量生成
+      </h3>
 
-      {state.notice ? <AdminNoticeCard tone={state.tone}>{state.notice}</AdminNoticeCard> : null}
+      {state.notice ? (
+        <div
+          className={`rounded-xl px-3 py-2 text-sm font-medium ${
+            state.tone === "danger"
+              ? "bg-red-50 text-red-700"
+              : "bg-green-50 text-green-700"
+          }`}
+        >
+          {state.notice}
+        </div>
+      ) : null}
 
-      <form action={formAction} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_1fr_auto]">
+      <form action={formAction} className="grid grid-cols-1 gap-4 md:grid-cols-4">
         <div className="space-y-1.5">
-          <Label htmlFor="invite-create-mode">生成方式</Label>
+          <Label htmlFor="invite-create-mode" className="ml-1 text-[11px] font-bold uppercase text-slate-400">
+            生成策略
+          </Label>
           <select
             id="invite-create-mode"
             name="mode"
-            defaultValue="auto"
-            className={APPLE_ADMIN_SELECT}
+            value={mode}
+            onChange={(event) => setMode(event.target.value === "manual" ? "manual" : "auto")}
+            className={ADMIN_SELECT}
           >
-            <option value="auto">自动批量</option>
-            <option value="manual">手动输入</option>
+            <option value="auto">自动随机生成</option>
+            <option value="manual">手动指定前缀</option>
           </select>
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="invite-create-code">手动邀请码</Label>
+          <Label htmlFor="invite-create-code-or-count" className="ml-1 text-[11px] font-bold uppercase text-slate-400">
+            生成数量
+          </Label>
           <Input
-            id="invite-create-code"
-            name="code"
-            placeholder="仅手动输入时填写"
-            className={APPLE_ADMIN_CONTROL}
+            id="invite-create-code-or-count"
+            name={mode === "manual" ? "code" : "count"}
+            type={mode === "manual" ? "text" : "number"}
+            min={mode === "manual" ? undefined : 1}
+            max={mode === "manual" ? undefined : 50}
+            defaultValue={mode === "manual" ? undefined : 5}
+            placeholder={mode === "manual" ? "输入前缀" : "5"}
+            className={ADMIN_FIELD}
           />
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="invite-create-count">生成数量</Label>
-          <Input
-            id="invite-create-count"
-            name="count"
-            type="number"
-            min={1}
-            max={50}
-            defaultValue={5}
-            className={APPLE_ADMIN_CONTROL}
-          />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="invite-create-max-uses">每码可用次数</Label>
+          <Label htmlFor="invite-create-max-uses" className="ml-1 text-[11px] font-bold uppercase text-slate-400">
+            初始可用次数
+          </Label>
           <Input
             id="invite-create-max-uses"
             name="maxUses"
@@ -74,37 +81,30 @@ export function InviteCodeCreatePanel() {
             min={1}
             max={100}
             defaultValue={1}
-            className={APPLE_ADMIN_CONTROL}
+            className={ADMIN_FIELD}
           />
         </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="invite-create-expires-days">有效天数</Label>
-          <Input
-            id="invite-create-expires-days"
-            name="expiresInDays"
-            type="number"
-            min={0}
-            max={90}
-            defaultValue={7}
-            placeholder="0 为永不过期"
-            className={APPLE_ADMIN_CONTROL}
-          />
-        </div>
+        <input id="invite-create-expires-days" name="expiresInDays" type="hidden" value={7} />
         <div className="flex items-end">
-          <AdminActionButton type="submit" tone="primary" disabled={pending}>
-            {pending ? "生成中" : "生成"}
-          </AdminActionButton>
+          <button
+            type="submit"
+            disabled={pending}
+            className={`flex w-full items-center justify-center gap-2 rounded-[12px] ${ADMIN_BUTTON_DARK}`}
+          >
+            <Zap className="size-4" />
+            {pending ? "执行中" : "执行任务"}
+          </button>
         </div>
       </form>
 
       {state.codes.length > 0 ? (
         <div className="space-y-2">
-          <p className={`text-sm ${APPLE_META_TEXT}`}>本次生成的明文邀请码：</p>
+          <p className="text-sm text-slate-500">本次生成的明文邀请码：</p>
           <div className="grid gap-2 sm:grid-cols-2">
             {state.codes.map((item) => (
               <code
                 key={item.id}
-                className="rounded-md border border-[var(--app-border-soft)] bg-muted/50 px-3 py-2 text-sm"
+                className="rounded-xl bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700"
               >
                 {item.code}
               </code>
@@ -112,6 +112,6 @@ export function InviteCodeCreatePanel() {
           </div>
         </div>
       ) : null}
-    </div>
+    </section>
   );
 }

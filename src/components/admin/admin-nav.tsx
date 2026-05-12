@@ -48,7 +48,7 @@ export function AdminNav() {
               href={item.href}
               aria-current={active ? "page" : undefined}
               className={cn(
-                "relative z-[1] inline-flex min-h-10 w-full min-w-0 items-center justify-center rounded-[14px] px-3 py-2.5 text-center text-[14px] font-bold whitespace-nowrap transition-colors",
+                "relative z-[1] inline-flex min-h-10 w-full min-w-0 cursor-pointer items-center justify-center rounded-[14px] px-3 py-2.5 text-center text-[14px] font-bold whitespace-nowrap transition-colors",
                 "[@media(max-height:760px)]:min-h-8 [@media(max-height:760px)]:rounded-[11px] [@media(max-height:760px)]:px-2 [@media(max-height:760px)]:py-1.5 [@media(max-height:760px)]:text-[12px]",
                 active ? "text-[#1A365D]" : "text-[#718096] hover:text-[#1A365D]",
               )}

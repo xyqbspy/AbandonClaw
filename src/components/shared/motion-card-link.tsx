@@ -3,6 +3,7 @@
 import type { ComponentProps, ReactNode } from "react";
 import Link from "next/link";
 import { useCardTapMotion } from "@/hooks/use-card-tap-motion";
+import { cn } from "@/lib/utils";
 
 export type MotionCardStateAttrs = {
   "data-pressed": "true" | "false";
@@ -32,6 +33,7 @@ export function MotionCardLink({
   return (
     <Link
       {...linkProps}
+      className={cn("cursor-pointer", linkProps.className)}
       onPointerDown={tapMotionProps.onPointerDown}
       onPointerUp={tapMotionProps.onPointerUp}
       onPointerCancel={tapMotionProps.onPointerCancel}

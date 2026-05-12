@@ -62,7 +62,7 @@ export function SegmentedControl<T extends string | number>({
             role="tab"
             aria-selected={active}
             className={cn(
-              "relative z-[1] rounded-[14px] px-4 py-2.5 text-center text-[14px] font-bold transition-colors",
+              "relative z-[1] cursor-pointer rounded-[14px] px-4 py-2.5 text-center text-[14px] font-bold transition-colors",
               "[@media(max-height:760px)]:rounded-[11px] [@media(max-height:760px)]:px-1.5 [@media(max-height:760px)]:py-1.5 [@media(max-height:760px)]:text-[12px]",
               active ? "text-[#1A365D]" : "text-[#718096]",
               disabled && "pointer-events-none opacity-50",

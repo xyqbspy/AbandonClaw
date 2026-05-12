@@ -27,6 +27,7 @@ import {
   APPLE_ADMIN_SELECT,
   APPLE_META_TEXT,
 } from "@/lib/ui/apple-style";
+import { formatAdminDateTime } from "@/lib/ui/admin-format";
 
 const LABELS = {
   eyebrow: "\u7ba1\u7406\u540e\u53f0",
@@ -166,7 +167,7 @@ export default async function AdminCachePage({
                   <span>提示词版本：{row.prompt_version ?? "-"}</span>
                   <span className="flex items-center gap-1.5">
                     <CalendarClock className="size-3.5" />
-                    创建时间：{row.created_at}
+                    创建时间：{formatAdminDateTime(row.created_at)}
                   </span>
                 </AdminListMeta>
               </AdminListContent>

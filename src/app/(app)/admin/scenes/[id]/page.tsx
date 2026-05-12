@@ -23,6 +23,7 @@ import {
 import { PageHeader } from "@/components/shared/page-header";
 import { Badge } from "@/components/ui/badge";
 import { getAdminSceneDetail } from "@/lib/server/admin/service";
+import { formatAdminDateTime } from "@/lib/ui/admin-format";
 
 const LABELS = {
   eyebrow: "\u573a\u666f\u7ba1\u7406",
@@ -113,10 +114,10 @@ export default async function AdminSceneDetailPage({
           />
           <AdminDetailItem
             label="最近学习活动："
-            value={diagnostics.progressLastViewedAt ?? "-"}
+            value={formatAdminDateTime(diagnostics.progressLastViewedAt)}
           />
-          <AdminDetailItem className="sm:col-span-2" label="创建时间：" value={scene.created_at} />
-          <AdminDetailItem className="sm:col-span-2" label="更新时间：" value={scene.updated_at} />
+          <AdminDetailItem className="sm:col-span-2" label="创建时间：" value={formatAdminDateTime(scene.created_at)} />
+          <AdminDetailItem className="sm:col-span-2" label="更新时间：" value={formatAdminDateTime(scene.updated_at)} />
         </AdminDetailGrid>
       </AdminDetailSection>
 
@@ -154,7 +155,7 @@ export default async function AdminSceneDetailPage({
                     <span className="font-mono">缓存键：{variant.cache_key ?? "-"}</span>
                     <span className="flex items-center gap-1.5">
                       <CalendarClock className="size-3.5" />
-                      创建时间：{variant.created_at}
+                      创建时间：{formatAdminDateTime(variant.created_at)}
                     </span>
                   </AdminListMeta>
                 </AdminListContent>

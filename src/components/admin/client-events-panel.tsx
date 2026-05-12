@@ -34,6 +34,7 @@ import {
   APPLE_META_TEXT,
   APPLE_PANEL_RAISED,
 } from "@/lib/ui/apple-style";
+import { formatAdminDateTime } from "@/lib/ui/admin-format";
 
 const formatPayload = (payload: Record<string, unknown>) =>
   Object.entries(payload)
@@ -198,7 +199,7 @@ export function ClientEventsPanel() {
                       <AdminListMeta>
                         <span className="flex items-center gap-1.5">
                           <CalendarClock className="size-3.5" />
-                          {new Date(record.at).toLocaleString("zh-CN", { hour12: false })}
+                          {formatAdminDateTime(record.at)}
                         </span>
                         <span className="flex items-center gap-1.5">
                           <FileText className="size-3.5" />

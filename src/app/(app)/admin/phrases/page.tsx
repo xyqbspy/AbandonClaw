@@ -36,6 +36,7 @@ import {
   APPLE_ADMIN_SELECT,
   APPLE_META_TEXT,
 } from "@/lib/ui/apple-style";
+import { formatAdminDateTime } from "@/lib/ui/admin-format";
 
 const LABELS = {
   eyebrow: "\u7ba1\u7406\u540e\u53f0",
@@ -160,7 +161,7 @@ export default async function AdminPhrasesPage({
                       name="userPhraseIds"
                       value={row.userPhraseId}
                       form="admin-phrases-batch-enrich-form"
-                      className="size-4 rounded border-border/70"
+                      className="size-4 cursor-pointer rounded border-border/70"
                       aria-label={`选择 ${row.text}`}
                     />
                   ) : null}
@@ -194,7 +195,7 @@ export default async function AdminPhrasesPage({
                     <AdminListMeta>
                       <span>来源场景：{row.sourceSceneSlug ?? "-"}</span>
                       <span className="font-mono">用户：{row.userId.slice(0, 8)}...</span>
-                      <span>保存时间：{row.savedAt}</span>
+                      <span>保存时间：{formatAdminDateTime(row.savedAt)}</span>
                     </AdminListMeta>
                   </AdminListContent>
                   <AdminListActions>

@@ -36,6 +36,7 @@ import {
   APPLE_META_TEXT,
   APPLE_TITLE_SM,
 } from "@/lib/ui/apple-style";
+import { formatAdminDateTime } from "@/lib/ui/admin-format";
 
 const LABELS = {
   eyebrow: "\u7ba1\u7406\u540e\u53f0",
@@ -230,7 +231,7 @@ export default async function AdminScenesPage({
                   )}
                   <span className="flex items-center gap-1.5">
                     <CalendarClock className="size-3.5" />
-                    {LABELS.updated}: {row.updated_at}
+                    {LABELS.updated}: {formatAdminDateTime(row.updated_at)}
                   </span>
                   <span className="font-mono">创建者：{row.created_by ?? "-"}</span>
                 </AdminListMeta>

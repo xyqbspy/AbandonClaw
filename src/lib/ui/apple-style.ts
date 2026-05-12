@@ -35,10 +35,10 @@ export const APPLE_PANEL_WARNING =
   "app-panel-warning rounded-[var(--app-radius-panel)]";
 
 export const APPLE_BUTTON_BASE =
-  "app-button app-button-secondary border rounded-full";
+  "app-button app-button-secondary cursor-pointer border rounded-full";
 
 export const APPLE_BUTTON_STRONG =
-  "app-button app-button-primary border rounded-full";
+  "app-button app-button-primary cursor-pointer border rounded-full";
 
 export const APPLE_INPUT_BASE =
   "rounded-[var(--app-radius-pill)] border border-[var(--app-border-soft)] bg-[var(--app-surface)] transition-[border-color,box-shadow,background-color] duration-150";
@@ -47,11 +47,11 @@ export const APPLE_ADMIN_CONTROL =
   "h-10 rounded-[12px] border border-[var(--app-border-soft)] bg-[var(--app-surface-subtle)] px-3 text-sm transition-[border-color,box-shadow,background-color] duration-150 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15";
 
 export const APPLE_ADMIN_SELECT =
-  "h-10 rounded-[12px] border border-[var(--app-border-soft)] bg-[var(--app-surface)] px-3 text-sm font-medium text-foreground outline-none transition-[border-color,box-shadow,background-color] duration-150 hover:border-primary/30 focus:border-primary focus:ring-2 focus:ring-primary/15";
+  "h-10 cursor-pointer rounded-[12px] border border-[var(--app-border-soft)] bg-[var(--app-surface)] px-3 text-sm font-medium text-foreground outline-none transition-[border-color,box-shadow,background-color] duration-150 hover:border-primary/30 focus:border-primary focus:ring-2 focus:ring-primary/15";
 
 export const APPLE_BUTTON_TEXT_SM = "px-3 py-1.5 text-xs font-semibold";
 export const APPLE_BUTTON_TEXT_MD = "px-3 py-1.5 text-sm font-semibold";
 export const APPLE_BUTTON_TEXT_LG = "px-3 py-1.5 text-base font-semibold";
 
 export const APPLE_BUTTON_DANGER =
-  "app-button app-button-danger border rounded-full";
+  "app-button app-button-danger cursor-pointer border rounded-full";

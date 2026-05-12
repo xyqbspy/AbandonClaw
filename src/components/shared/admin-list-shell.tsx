@@ -159,7 +159,7 @@ export function AdminPagination({
   prevHref?: string | null;
   nextHref?: string | null;
 }) {
-  const buttonClassName = `${APPLE_BUTTON_BASE} ${APPLE_BUTTON_TEXT_SM} inline-flex size-8 items-center justify-center p-0`;
+  const buttonClassName = `${APPLE_BUTTON_BASE} ${APPLE_BUTTON_TEXT_SM} inline-flex size-8 cursor-pointer items-center justify-center p-0`;
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">

@@ -6,11 +6,10 @@ import { ConfirmButton } from "@/components/shared/confirm-action";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
-  APPLE_BUTTON_BASE,
-  APPLE_BUTTON_DANGER,
-  APPLE_BUTTON_STRONG,
-  APPLE_BUTTON_TEXT_SM,
-} from "@/lib/ui/apple-style";
+  ADMIN_BUTTON_DANGER,
+  ADMIN_BUTTON_PRIMARY,
+  ADMIN_BUTTON_SECONDARY,
+} from "@/lib/ui/admin-style";
 
 type AdminActionTone = "secondary" | "primary" | "danger";
 type AdminActionClassName = ComponentProps<typeof Button>["className"];
@@ -18,13 +17,13 @@ type AdminActionClassNameFunction = Extract<NonNullable<AdminActionClassName>, (
 type AdminActionButtonState = Parameters<AdminActionClassNameFunction>[0];
 
 const adminActionToneClassName: Record<AdminActionTone, string> = {
-  secondary: APPLE_BUTTON_BASE,
-  primary: APPLE_BUTTON_STRONG,
-  danger: APPLE_BUTTON_DANGER,
+  secondary: ADMIN_BUTTON_SECONDARY,
+  primary: ADMIN_BUTTON_PRIMARY,
+  danger: ADMIN_BUTTON_DANGER,
 };
 
 export function adminActionButtonClassName(tone: AdminActionTone = "secondary", className?: string) {
-  return cn(adminActionToneClassName[tone], APPLE_BUTTON_TEXT_SM, "min-h-9 gap-1.5", className);
+  return cn(adminActionToneClassName[tone], "gap-1.5", className);
 }
 
 function composeAdminActionClassName(tone: AdminActionTone, className: AdminActionClassName) {
