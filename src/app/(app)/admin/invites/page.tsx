@@ -123,7 +123,7 @@ export default async function AdminInvitesPage({
                   id="registrationMode"
                   name="registrationMode"
                   defaultValue={registrationMode.mode}
-                  className="h-[46px] flex-1 cursor-pointer rounded-[12px] border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                  className="h-[46px] flex-1 cursor-pointer rounded-[12px] border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:bg-white"
                 >
                   <option value="invite_only">邀请注册模式 (目前推荐)</option>
                   <option value="open">全开放注册</option>
@@ -284,7 +284,7 @@ export default async function AdminInvitesPage({
                                     min={Math.max(row.usedCount, 1)}
                                     max={100}
                                     defaultValue={row.maxUses}
-                                    className="h-[38px] w-full rounded-[12px] border border-blue-100 bg-white p-2 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-400"
+                                    className="h-[38px] w-full rounded-[12px] border border-blue-100 bg-white p-2 text-sm font-bold text-slate-700 outline-none focus:bg-white"
                                   />
                                 </div>
                                 <div className="relative">
@@ -301,7 +301,7 @@ export default async function AdminInvitesPage({
                                     min={0}
                                     max={90}
                                     placeholder="+0"
-                                    className="h-[38px] w-full rounded-[12px] border border-blue-100 bg-white p-2 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-400"
+                                    className="h-[38px] w-full rounded-[12px] border border-blue-100 bg-white p-2 text-sm font-bold text-slate-700 outline-none focus:bg-white"
                                   />
                                 </div>
                               </div>

@@ -530,12 +530,6 @@
       background-color var(--app-motion-fast);
   }
 
-  .app-input-surface:focus-visible {
-    outline: none;
-    border-color: var(--app-border-strong);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 18%, transparent 82%);
-  }
-
   .app-button {
     font-weight: 600;
     transition:

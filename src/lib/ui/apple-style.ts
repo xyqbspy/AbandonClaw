@@ -44,10 +44,10 @@ export const APPLE_INPUT_BASE =
   "rounded-[var(--app-radius-pill)] border border-[var(--app-border-soft)] bg-[var(--app-surface)] transition-[border-color,box-shadow,background-color] duration-150";
 
 export const APPLE_ADMIN_CONTROL =
-  "h-[46px] rounded-[12px] border border-slate-200 bg-slate-50 px-3 text-sm text-slate-700 transition-[border-color,box-shadow,background-color] duration-150 placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100";
+  "h-[46px] rounded-[12px] border border-slate-200 bg-slate-50 px-3 text-sm text-slate-700 outline-none transition-[border-color,box-shadow,background-color] duration-150 placeholder:text-slate-400 focus:bg-white";
 
 export const APPLE_ADMIN_SELECT =
-  "h-[46px] cursor-pointer rounded-[12px] border border-slate-200 bg-slate-50 px-3 text-sm font-medium text-slate-700 outline-none transition-[border-color,box-shadow,background-color] duration-150 hover:border-blue-200 focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100";
+  "h-[46px] cursor-pointer rounded-[12px] border border-slate-200 bg-slate-50 px-3 text-sm font-medium text-slate-700 outline-none transition-[border-color,box-shadow,background-color] duration-150 hover:border-blue-200 focus:bg-white";
 
 export const APPLE_BUTTON_TEXT_SM = "px-3 py-1.5 text-xs font-semibold";
 export const APPLE_BUTTON_TEXT_MD = "px-3 py-1.5 text-sm font-semibold";

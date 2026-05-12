@@ -5,10 +5,10 @@ export const ADMIN_CARD = "rounded-xl border border-slate-200 bg-white shadow-sm
 export const ADMIN_CARD_PADDED = `${ADMIN_CARD} p-5 sm:p-6`;
 
 export const ADMIN_FIELD =
-  "h-[46px] w-full rounded-[12px] border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700 outline-none transition-all placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100";
+  "h-[46px] w-full rounded-[12px] border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700 outline-none transition-all placeholder:text-slate-400 focus:bg-white";
 
 export const ADMIN_SELECT =
-  "h-[46px] w-full cursor-pointer rounded-[12px] border border-slate-200 bg-slate-50 p-3 text-sm font-medium text-slate-700 outline-none transition-all focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100";
+  "h-[46px] w-full cursor-pointer rounded-[12px] border border-slate-200 bg-slate-50 p-3 text-sm font-medium text-slate-700 outline-none transition-all focus:bg-white";
 
 export const ADMIN_BUTTON_PRIMARY =
   "min-h-[46px] cursor-pointer rounded-[12px] border border-blue-600 bg-blue-600 px-6 py-3 text-sm font-bold text-white shadow-none transition-all hover:border-blue-700 hover:bg-blue-700 active:scale-95";
