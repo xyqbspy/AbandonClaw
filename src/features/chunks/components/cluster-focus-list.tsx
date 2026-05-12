@@ -8,11 +8,12 @@ import {
   ExpressionSummaryCard,
   ExpressionSummaryGroup,
   ExpressionSummaryRelatedItem,
+  SimilarExpressionGroupLabel,
 } from "./expression-summary-card";
 import { FocusPreviewItem, SavedRelationRowsBySourceId } from "./types";
 
 const ACTION_ICON_CLASS =
-  "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--app-chunks-sheet-secondary-border)] bg-[var(--app-chunks-sheet-info-soft)] text-[var(--app-chunks-sheet-info-text)]";
+  "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-50 text-slate-300 transition-colors hover:bg-blue-50 hover:text-blue-500";
 
 type ClusterFocusListLabels = {
   loading: string;
@@ -64,7 +65,7 @@ export function ClusterFocusList({
   }
 
   return (
-    <div className="flex flex-col gap-4 [@media(max-height:760px)]:gap-3">
+    <div className="flex flex-col gap-4">
       {rows.map((row) => {
         const isCurrentMain = row.userPhraseId === currentFocusExpressionId;
         const isExpanded = expandedFocusMainId === row.userPhraseId;
@@ -127,7 +128,12 @@ export function ClusterFocusList({
             }
           >
             <ExpressionSummaryGroup
-              label={`🔆 ${labels.similarTab}${previewSimilarItems.length > 0 ? ` · ${previewSimilarItems.length}` : ""}`}
+              label={
+                <SimilarExpressionGroupLabel
+                  label={labels.similarTab}
+                  count={previewSimilarItems.length > 0 ? previewSimilarItems.length : undefined}
+                />
+              }
               actionLabel={labels.openCurrentDetail}
               onAction={() => onOpenMainSimilarTab(row)}
               collapsed={!isExpanded}

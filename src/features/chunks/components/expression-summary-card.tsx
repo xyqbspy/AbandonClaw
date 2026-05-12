@@ -1,24 +1,26 @@
 ﻿"use client";
 
 import { ReactNode } from "react";
+import { ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const CARD_CLASS =
-  "relative overflow-hidden rounded-[24px] border border-[var(--app-chunks-sheet-card-border)] bg-[var(--app-chunks-sheet-card-bg)] p-5 shadow-[var(--app-chunks-hero-shadow)] [@media(max-height:760px)]:rounded-[20px] [@media(max-height:760px)]:p-3.5";
-const HEADER_CLASS = "mb-[10px] flex items-start justify-between gap-3 [@media(max-height:760px)]:mb-2 [@media(max-height:760px)]:gap-2";
-const TITLE_CLASS = "text-[clamp(17px,4.8vw,20px)] font-extrabold tracking-[-0.02em] text-[var(--app-chunks-sheet-title)] [@media(max-height:760px)]:text-[length:var(--mobile-font-title)]";
-const MEANING_CLASS = "mb-4 text-[length:var(--mobile-font-sheet-body)] font-medium text-[var(--app-chunks-sheet-muted)] [@media(max-height:760px)]:mb-3 [@media(max-height:760px)]:text-[length:var(--mobile-font-body)]";
-const GROUP_CLASS = "rounded-[16px] bg-[var(--app-chunks-sheet-bg)] p-3 [@media(max-height:760px)]:rounded-[14px] [@media(max-height:760px)]:p-2.5";
+  "phrase-card relative overflow-hidden rounded-2xl bg-white p-5 shadow-sm transition-all duration-300 hover:translate-x-1 hover:shadow-lg hover:shadow-slate-200/70 [@media(max-height:760px)]:p-4";
+const HEADER_CLASS = "mb-1 flex items-start justify-between gap-3";
+const TITLE_CLASS = "text-xl font-bold text-slate-800";
+const MEANING_CLASS = "mb-4 text-sm font-medium text-slate-500";
+const GROUP_CLASS = "rounded-xl bg-blue-50/50 p-3 transition-colors hover:bg-blue-50";
 const GROUP_COLLAPSED_CLASS =
-  "flex min-h-[44px] items-center px-3 py-0 [@media(max-height:760px)]:px-2.5 [@media(max-height:760px)]:py-0";
-const GROUP_HEADER_CLASS = "mb-[10px] flex items-center justify-between gap-3 px-1 [@media(max-height:760px)]:mb-2 [@media(max-height:760px)]:gap-2";
-const GROUP_HEADER_COLLAPSED_CLASS = "mb-0 h-full w-full px-0";
-const GROUP_LABEL_CLASS = "text-[length:var(--mobile-font-caption)] font-bold text-[var(--app-chunks-sheet-muted)]";
-const GROUP_LINK_CLASS = "inline-flex items-center text-[length:var(--mobile-font-caption)] font-bold leading-none text-[var(--app-feedback-success-text)]";
+  "min-h-[44px] px-3 py-0";
+const GROUP_HEADER_CLASS = "mb-2 grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-3";
+const GROUP_HEADER_COLLAPSED_CLASS = "mb-0 min-h-[44px] w-full px-0";
+const GROUP_LABEL_CLASS = "min-w-0 text-[11px] font-bold tracking-wider text-blue-600/70 uppercase";
+const GROUP_LINK_CLASS =
+  "inline-flex shrink-0 items-center justify-end gap-1 whitespace-nowrap justify-self-end text-right text-[11px] font-bold leading-none text-blue-600";
 const RELATED_ITEM_CLASS =
-  "flex items-center justify-between gap-3 border-b border-[var(--app-chunks-sheet-card-border)] px-1 py-2 last:border-b-0 [@media(max-height:760px)]:gap-2 [@media(max-height:760px)]:py-1.5";
-const RELATED_PRIMARY_CLASS = "text-[length:var(--mobile-font-body)] font-semibold text-[var(--app-chunks-sheet-body)] [@media(max-height:760px)]:text-[length:var(--mobile-font-body-sm)]";
-const RELATED_SECONDARY_CLASS = "text-[length:var(--mobile-font-body-sm)] text-[var(--app-chunks-sheet-muted)] [@media(max-height:760px)]:text-[length:var(--mobile-font-meta)]";
+  "flex items-center justify-between gap-3 px-1 py-2";
+const RELATED_PRIMARY_CLASS = "text-sm font-semibold text-slate-700";
+const RELATED_SECONDARY_CLASS = "text-xs text-slate-400";
 
 export function ExpressionSummaryCard({
   title,
@@ -39,7 +41,7 @@ export function ExpressionSummaryCard({
 }) {
   return (
     <article className={cn(CARD_CLASS, className)}>
-      <span className="pointer-events-none absolute inset-y-5 left-0 w-1 rounded-r bg-[var(--app-feedback-success-text)] opacity-60" />
+      <span className="pointer-events-none absolute inset-y-5 left-0 w-1 rounded-r bg-emerald-500 opacity-90" />
       <div className={HEADER_CLASS}>
         {onTitleClick ? (
           <button type="button" className="min-w-0 flex-1 text-left" onClick={onTitleClick}>
@@ -81,12 +83,34 @@ export function ExpressionSummaryGroup({
         {actionLabel && onAction ? (
           <button type="button" className={GROUP_LINK_CLASS} onClick={onAction}>
             {actionLabel}
+            <ArrowRight className="size-3" aria-hidden="true" />
           </button>
         ) : null}
       </div>
       {children}
       {footer}
     </div>
+  );
+}
+
+export function SimilarExpressionGroupLabel({
+  label,
+  count,
+}: {
+  label: string;
+  count?: number;
+}) {
+  return (
+    <span className="inline-flex min-w-0 items-center gap-1.5">
+      <span className="flex shrink-0 -space-x-1.5" aria-hidden="true">
+        <span className="size-3 rounded-full border-2 border-white bg-blue-200" />
+        <span className="size-3 rounded-full border-2 border-white bg-blue-300" />
+      </span>
+      <span className="truncate">
+        {label}
+        {count && count > 0 ? ` · ${count}` : ""}
+      </span>
+    </span>
   );
 }
 

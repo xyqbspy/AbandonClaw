@@ -13,29 +13,24 @@ import {
   ExpressionSummaryCard,
   ExpressionSummaryGroup,
   ExpressionSummaryRelatedItem,
+  SimilarExpressionGroupLabel,
 } from "@/features/chunks/components/expression-summary-card";
 import {
-  APPLE_BADGE_INFO,
-  APPLE_BADGE_SUBTLE,
   APPLE_BODY_TEXT,
-  APPLE_LIST_ITEM,
   APPLE_META_TEXT,
-  APPLE_PANEL,
-  APPLE_PANEL_INFO,
-  APPLE_TITLE_SM,
 } from "@/lib/ui/apple-style";
 
-const LIST_WRAPPER_CLASS = "flex flex-col gap-[18px] [@media(max-height:760px)]:gap-3";
+const LIST_WRAPPER_CLASS = "flex flex-col gap-4";
 const EXPR_TAG_CLASS =
-  `inline-flex items-center px-2.5 py-1 text-[11px] font-bold [@media(max-height:760px)]:px-2 [@media(max-height:760px)]:py-0.5 [@media(max-height:760px)]:text-[10px] ${APPLE_BADGE_INFO}`;
+  "inline-flex items-center rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-blue-600";
 const EXPAND_BUTTON_CLASS =
-  "mt-3 w-full border-t border-[var(--app-chunks-sheet-card-border)] pt-2 text-center text-[13px] font-semibold text-[var(--app-feedback-success-text)] [@media(max-height:760px)]:mt-2 [@media(max-height:760px)]:pt-1.5 [@media(max-height:760px)]:text-[12px]";
+  "mt-3 w-full cursor-pointer pt-2 text-center text-[13px] font-bold text-blue-600 transition-colors hover:text-blue-700";
 const INFO_FIELD_CLASS = "space-y-0.5";
 const INFO_FIELD_BODY_CLASS = `line-clamp-2 ${APPLE_BODY_TEXT}`;
 const INFO_FIELD_META_BODY_CLASS = `line-clamp-2 text-sm ${APPLE_META_TEXT}`;
 
-const APPLE_STATUS_BADGE = APPLE_BADGE_INFO;
-const APPLE_PENDING_BADGE = APPLE_BADGE_SUBTLE;
+const APPLE_STATUS_BADGE = "rounded-full border-0 bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-blue-600";
+const APPLE_PENDING_BADGE = "rounded-full border-0 bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-400";
 
 function ChunksInfoField({
   label,
@@ -69,7 +64,7 @@ function ChunksPendingInfoBlock({
   similarDiffLabel: string | null;
 }) {
   return (
-    <div className={`space-y-1 p-2.5 ${APPLE_PANEL_INFO}`}>
+    <div className="space-y-1 rounded-xl bg-blue-50/50 p-3">
       <p className={APPLE_META_TEXT}>{labels.learningInfoPending}</p>
       <p className="text-sm font-medium text-foreground">{text}</p>
       <p className={APPLE_META_TEXT}>{labels.learningInfoPendingHint}</p>
@@ -120,7 +115,7 @@ function ChunksSimilarExpressionsPanel({
   const hasSimilarPreview = similarPreview.length > 0;
 
   return (
-    <div className={`space-y-1.5 p-2.5 [@media(max-height:760px)]:space-y-1 [@media(max-height:760px)]:p-2 ${APPLE_PANEL}`}>
+    <div className="space-y-1.5 rounded-xl bg-slate-50 p-3">
       <button
         type="button"
         className="flex w-full items-center justify-between text-left"
@@ -136,7 +131,7 @@ function ChunksSimilarExpressionsPanel({
             {similarPreview.map((similarItem) => (
               <div
                 key={similarItem.userPhraseId}
-                className={`px-2 py-1.5 [@media(max-height:760px)]:px-1.5 [@media(max-height:760px)]:py-1 ${APPLE_LIST_ITEM}`}
+                className="rounded-lg bg-white/70 px-2 py-1.5"
               >
                 <p className={`font-medium ${APPLE_BODY_TEXT}`}>{similarItem.text}</p>
                 <p className={APPLE_META_TEXT}>{buildDifferenceNote(item.text, similarItem.text)}</p>
@@ -214,7 +209,7 @@ function ChunksSentenceExpressionTags({
             return (
               <div
                 key={key}
-                className={`flex items-center gap-1 rounded-full px-2 py-1 [@media(max-height:760px)]:px-1.5 [@media(max-height:760px)]:py-0.5 ${APPLE_BADGE_SUBTLE}`}
+                className="flex items-center gap-1 rounded-full bg-slate-100 px-2 py-1"
               >
                 <span className={APPLE_BODY_TEXT}>{expression}</span>
                 <LoadingButton
@@ -270,7 +265,7 @@ function ChunksSourceSentenceField({
           loading={ttsLoadingText === pronounceText}
           size="icon"
           variant="ghost"
-          className="size-8 border-transparent bg-transparent px-0 text-[var(--app-foreground-muted)] hover:bg-transparent hover:text-[var(--app-foreground)] [@media(max-height:760px)]:size-7"
+          className="size-8 border-0 bg-transparent px-0 text-slate-300 hover:bg-slate-50 hover:text-blue-500 [@media(max-height:760px)]:size-7"
           iconClassName="size-4 [@media(max-height:760px)]:size-3.5"
           onClick={() => handlePronounceSentence(item.exampleSentences[0]?.en ?? item.sourceSentenceText)}
           label={labels.speakSentence}
@@ -511,9 +506,10 @@ export function ChunksListView({
             >
               <ExpressionSummaryGroup
                 label={
-                  hasSimilarPreview
-                    ? `🔗 ${labels.similarExpressions} · ${similarPreview.length}`
-                    : `🔗 ${labels.similarExpressions}`
+                  <SimilarExpressionGroupLabel
+                    label={labels.similarExpressions}
+                    count={hasSimilarPreview ? similarPreview.length : undefined}
+                  />
                 }
                 actionLabel={labels.viewAllSimilar}
                 onAction={() =>
@@ -626,8 +622,11 @@ export function ChunksListView({
         }
 
         return (
-          <Card key={item.userPhraseId} className={`h-full overflow-hidden ${appleSurfaceClassName}`}>
-            <CardHeader className="px-3 py-2.5 [@media(max-height:760px)]:px-2.5 [@media(max-height:760px)]:py-2">
+          <Card
+            key={item.userPhraseId}
+            className={`h-full gap-0 overflow-hidden rounded-2xl border-0 bg-white py-0 shadow-sm ring-0 transition-all duration-300 hover:translate-x-1 hover:shadow-lg hover:shadow-slate-200/70 ${appleSurfaceClassName}`}
+          >
+            <CardHeader className="px-5 py-5">
               <button
                 type="button"
                 className="w-full text-left"
@@ -635,15 +634,15 @@ export function ChunksListView({
                 aria-expanded={Boolean(expandedCardIds[item.userPhraseId])}
                 aria-label={item.text}
               >
-                <div className="flex items-start justify-between gap-2 [@media(max-height:760px)]:gap-1.5">
+                <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className={APPLE_META_TEXT}>
+                    <p className="text-[11px] font-bold tracking-wider text-slate-400 uppercase">
                       {item.learningItemType === "sentence" ? labels.sentenceUnit : labels.expressionUnit}
                     </p>
-                    <p className={`mt-0.5 leading-snug ${APPLE_TITLE_SM} [@media(max-height:760px)]:text-[15px]`}>
+                    <p className="mt-1 text-xl font-bold leading-snug text-slate-800">
                       {item.text}
                     </p>
-                    <p className={`mt-0.5 line-clamp-1 ${APPLE_META_TEXT}`}>
+                    <p className="mt-1 line-clamp-1 text-sm font-medium text-slate-500">
                       {item.translation ??
                         (item.aiEnrichmentStatus === "pending"
                           ? labels.learningInfoPending
@@ -652,7 +651,7 @@ export function ChunksListView({
                             : labels.noTranslation)}
                     </p>
                   </div>
-                  <div className="mt-0.5 flex shrink-0 items-center gap-1.5 [@media(max-height:760px)]:gap-1">
+                  <div className="mt-0.5 flex shrink-0 items-center gap-1.5">
                     <Badge variant="secondary" className={APPLE_STATUS_BADGE}>
                       {reviewStatusLabel[item.reviewStatus]}
                     </Badge>
@@ -677,7 +676,7 @@ export function ChunksListView({
                   : "max-h-0 opacity-0"
               }`}
             >
-              <CardContent className="space-y-3.5 p-3 pb-2 pt-2.5 [@media(max-height:760px)]:space-y-2.5 [@media(max-height:760px)]:p-2.5 [@media(max-height:760px)]:pb-2 [@media(max-height:760px)]:pt-2">
+              <CardContent className="space-y-3.5 px-5 pb-3 pt-0">
                 {item.learningItemType === "sentence" ? (
                   <>
                     <ChunksInfoField label={labels.usageHint}>{getUsageHint(item)}</ChunksInfoField>
@@ -782,7 +781,7 @@ export function ChunksListView({
                   </div>
                 ) : null}
               </CardContent>
-              <CardFooter className="flex flex-wrap gap-2 px-3 py-2.5 [@media(max-height:760px)]:gap-1.5 [@media(max-height:760px)]:px-2.5 [@media(max-height:760px)]:py-2">
+              <CardFooter className="flex flex-wrap gap-2 border-0 bg-transparent px-5 py-4">
                 {item.learningItemType === "sentence" ? (
                   <>
                     <Button
