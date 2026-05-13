@@ -1,4 +1,6 @@
 import fs from "node:fs";
+import http from "node:http";
+import https from "node:https";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -12,6 +14,7 @@ export type RequestConfig = {
   idempotencyKeyPrefix?: string | null;
   extraHeaders?: Record<string, string>;
   redirect?: RequestRedirect;
+  resolveIp?: string | null;
 };
 
 export type RequestResult = {
@@ -140,10 +143,83 @@ const buildHeaders = (config: RequestConfig, requestIndex: number) => {
   return headers;
 };
 
+const headersToRecord = (headers: Headers) => {
+  const output: Record<string, string> = {};
+  headers.forEach((value, key) => {
+    output[key] = value;
+  });
+  return output;
+};
+
+const runRequestWithResolveIp = async (
+  config: RequestConfig,
+  requestIndex: number,
+  resolveIp: string,
+) =>
+  new Promise<RequestResult>((resolve, reject) => {
+    const startedAt = performance.now();
+    const url = new URL(`${config.baseUrl}${config.path}`);
+    const headers = headersToRecord(buildHeaders(config, requestIndex));
+    const client = url.protocol === "http:" ? http : https;
+    const request = client.request(
+      url,
+      {
+        method: config.method,
+        headers,
+        servername: url.hostname,
+        lookup: (_hostname, options, callback) => {
+          const family = resolveIp.includes(":") ? 6 : 4;
+          if (options.all) {
+            callback(null, [{ address: resolveIp, family }]);
+            return;
+          }
+          callback(null, resolveIp, family);
+        },
+        timeout: 20000,
+      },
+      (response) => {
+        const chunks: Buffer[] = [];
+        response.on("data", (chunk) => {
+          chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+        });
+        response.on("end", () => {
+          const bodyText = Buffer.concat(chunks).toString("utf8");
+          const responseHeaders: Record<string, string> = {};
+          for (const [key, value] of Object.entries(response.headers)) {
+            responseHeaders[key] = Array.isArray(value) ? value.join(", ") : (value ?? "");
+          }
+          const status = response.statusCode ?? 0;
+          resolve({
+            status,
+            durationMs: performance.now() - startedAt,
+            ok: status >= 200 && status < 300,
+            requestId: responseHeaders["x-request-id"] ?? null,
+            headers: responseHeaders,
+            bodyText,
+            bodyJson: parseJsonSafely(bodyText),
+          });
+        });
+      },
+    );
+    request.on("timeout", () => {
+      request.destroy(new Error("Request timed out"));
+    });
+    request.on("error", reject);
+    if (config.body) {
+      request.write(config.body);
+    }
+    request.end();
+  });
+
 export const runRequest = async (
   config: RequestConfig,
   requestIndex = 0,
 ): Promise<RequestResult> => {
+  const resolveIp = config.resolveIp ?? process.env.BASELINE_RESOLVE_IP ?? null;
+  if (resolveIp) {
+    return runRequestWithResolveIp(config, requestIndex, resolveIp);
+  }
+
   const startedAt = performance.now();
   const response = await fetch(`${config.baseUrl}${config.path}`, {
     method: config.method,

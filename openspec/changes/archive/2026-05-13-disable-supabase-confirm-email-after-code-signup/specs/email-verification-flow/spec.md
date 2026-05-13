@@ -1,29 +1,4 @@
-# email-verification-flow Specification
-
-## Purpose
-
-定义注册邮箱验证码、Supabase 邮件链接确认兼容入口、未验证拦截和重发验证邮件闭环。注册页主体验是“发送验证码 -> 输入验证码 -> 提交注册”；项目 6 位验证码是新注册主链路的邮箱验证依据。Supabase `/auth/callback` 和 `/verify-email` 继续作为旧账号、手工补救或未来 Supabase 邮件能力的兼容兜底，不再作为新注册后的第二道必需确认。
-
-## Requirements
-
-### Requirement: 注册页邮箱验证必须提供验证码输入体验
-系统 MUST 为注册页提供“发送邮箱验证码 -> 输入验证码 -> 提交注册”的显式体验，而不只依赖注册后的邮件链接确认。
-
-#### Scenario: 注册页发送验证码
-- **WHEN** 用户在注册页输入合法邮箱并点击发送验证码
-- **THEN** 页面 MUST 调用服务端验证码发送入口
-- **AND** 成功后 MUST 提供可理解的发送成功反馈
-- **AND** 页面 MUST 在冷却时间内限制重复发送
-
-#### Scenario: 注册页提交验证码
-- **WHEN** 用户提交注册表单
-- **THEN** 页面 MUST 把邮箱验证码随注册请求提交到服务端
-- **AND** 未填写验证码时 MUST 在客户端给出受控提示
-
-#### Scenario: 注册模式为 invite_only
-- **WHEN** 有效注册模式为 `invite_only`
-- **THEN** 注册页 MUST 同时要求邀请码和邮箱验证码
-- **AND** 两者都不得只依赖前端校验
+## MODIFIED Requirements
 
 ### Requirement: 邮箱注册必须以项目 6 位验证码作为主链路验证依据
 系统 MUST 将注册页提交的 6 位邮箱验证码作为新注册账号的主链路邮箱验证依据。用户通过验证码校验并成功创建账号后，系统 MUST 不再要求用户额外点击 Supabase Confirm email 链接才能进入主应用。
@@ -45,7 +20,7 @@
 
 #### Scenario: 用户点击旧 Supabase 验证邮件
 - **WHEN** Supabase 将用户带到 `/auth/callback?code=...`
-- **THEN** 系统 SHOULD 使用 Supabase server client 交换 code
+- **THEN** 系统 SHOULD 继续使用 Supabase server client 交换 code
 - **AND** 成功或失败后 MUST 只跳转到安全站内目标
 
 #### Scenario: 新注册用户已经通过 6 位验证码

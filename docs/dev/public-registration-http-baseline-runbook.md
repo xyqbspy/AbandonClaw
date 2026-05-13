@@ -104,6 +104,13 @@ Copy-Item scripts/load-samples/public-registration-http-baseline.sample.json tmp
 
 ## 5. 推荐执行顺序
 
+如果目标环境部署在 Vercel，优先从 GitHub deployment status 或 Vercel 控制台确认本次 production deployment 的真实 `target_url` / `environment_url`，不要默认把项目短名拼成 `*.vercel.app`。本仓库可用 GitHub Deployments API 辅助核对：
+
+```bash
+curl.exe -s -H "Accept: application/vnd.github+json" https://api.github.com/repos/xyqbspy/AbandonClaw/deployments?per_page=1
+curl.exe -s -H "Accept: application/vnd.github+json" https://api.github.com/repos/xyqbspy/AbandonClaw/deployments/{deployment_id}/statuses
+```
+
 先做 dry-run：
 
 ```bash
@@ -123,11 +130,64 @@ pnpm run load:public-registration-baseline --dry-run --config-file=tmp/public-re
 pnpm run load:public-registration-baseline --config-file=tmp/public-registration-http-baseline.local.json
 ```
 
+如果当前环境访问 Vercel 需要本地代理，先在同一个 PowerShell 会话里设置：
+
+```powershell
+$env:NODE_OPTIONS="--use-env-proxy"
+$env:HTTPS_PROXY="http://127.0.0.1:7897"
+$env:HTTP_PROXY="http://127.0.0.1:7897"
+```
+
+说明：
+
+- 代理只影响当前终端会话。
+- 如果刚执行过 `signup-ip-rate-limit-hits-429`，注册相关场景可能在同一个窗口内继续返回 `429 RATE_LIMITED`；应等待响应里的 `retryAfterSeconds`，或换等价环境补跑。
+
+有效邀请码注册成功场景需要先拿邮箱验证码：
+
+```powershell
+$email="baseline-signup+invite-ok-20260513@example.com"
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "https://abandon-claw.vercel.app/api/auth/signup/email-code" `
+  -Headers @{ Origin = "https://abandon-claw.vercel.app" } `
+  -ContentType "application/json" `
+  -Body (@{ email = $email } | ConvertTo-Json)
+```
+
+然后从该邮箱收取 6 位验证码，再补跑：
+
+```bash
+pnpm run load:public-registration-baseline --config-file=tmp/public-registration-http-baseline.local.json --scenario=invite-only-signup-with-invite-succeeds --signup-email=baseline-signup+invite-ok-20260513@example.com --signup-email-code=123456 --invite-code=AC-5565ED-0031FE
+```
+
+注意：`signup-email-code` 只对同一个邮箱有效，且会过期；注册成功后验证码和邀请码使用次数都会产生真实环境副作用。该注册成功场景预期返回 `emailVerificationRequired=false`，因为项目 6 位验证码已经是新注册主链路的邮箱验证依据，不再要求用户额外点击 Supabase Confirm email。
+
+也可以用 runner 先验证发送验证码入口：
+
+```bash
+pnpm run load:public-registration-baseline --config-file=tmp/public-registration-http-baseline.local.json --scenario=signup-email-code-sent --signup-email=baseline-signup+invite-ok-20260513@example.com
+```
+
+如果该场景返回 `Email provider is not configured.`，说明目标环境邮件发送依赖未配置，邀请注册成功链路仍是上线阻断项。
+
 如果只想补跑某一项：
 
 ```bash
 pnpm run load:public-registration-baseline --config-file=tmp/public-registration-http-baseline.local.json --scenario=admin-status-shows-backend-and-usage
 ```
+
+如果当前网络的 DNS 解析被污染，但已确认目标部署域名应该走某个固定入口 IP，可临时只对 baseline 进程覆盖解析，不要修改系统 hosts：
+
+```bash
+pnpm run load:public-registration-baseline --config-file=tmp/public-registration-http-baseline.local.json --resolve-ip=76.76.21.21
+```
+
+说明：
+
+- `--resolve-ip` 只影响本次 baseline 请求进程。
+- TLS SNI 和 HTTP Host 仍使用 `baseUrl` 里的域名。
+- 如果覆盖到 Vercel 入口 IP 后仍出现 TLS reset / `ECONNRESET`，应优先检查部署域名是否真实绑定、Vercel alias 是否存在，以及目标环境是否仍可公开访问。
 
 ## 6. 结果如何判断
 

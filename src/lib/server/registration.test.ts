@@ -135,9 +135,9 @@ test("registerWithEmailPassword validates basic signup input", async () => {
   );
 });
 
-test("registerWithEmailPassword passes email redirect to Supabase signup", async () => {
+test("registerWithEmailPassword creates an already confirmed auth user after code verification", async () => {
   process.env.REGISTRATION_MODE = "open";
-  let signupPayload: unknown = null;
+  let createUserPayload: unknown = null;
 
   const result = await registerWithEmailPassword(
     {
@@ -147,15 +147,17 @@ test("registerWithEmailPassword passes email redirect to Supabase signup", async
       emailRedirectTo: "https://app.example.com/auth/callback?next=%2Fscenes",
     },
     {
-      createSupabaseAuthClient: () =>
+      createSupabaseAdminClient: () =>
         ({
           auth: {
-            signUp: async (payload: unknown) => {
-              signupPayload = payload;
-              return {
-                data: { user: { id: "user-1" } },
-                error: null,
-              };
+            admin: {
+              createUser: async (payload: unknown) => {
+                createUserPayload = payload;
+                return {
+                  data: { user: { id: "user-1" } },
+                  error: null,
+                };
+              },
             },
           },
         }) as never,
@@ -163,12 +165,42 @@ test("registerWithEmailPassword passes email redirect to Supabase signup", async
   );
 
   assert.equal(result.userId, "user-1");
-  assert.deepEqual(signupPayload, {
+  assert.deepEqual(createUserPayload, {
     email: "user@example.com",
     password: "password123",
-    options: {
-      data: { username: "Demo" },
-      emailRedirectTo: "https://app.example.com/auth/callback?next=%2Fscenes",
-    },
+    email_confirm: true,
+    user_metadata: { username: "Demo" },
   });
+});
+
+test("registerWithEmailPassword wraps auth create failure without consuming invite", async () => {
+  process.env.REGISTRATION_MODE = "open";
+
+  await assert.rejects(
+    () =>
+      registerWithEmailPassword(
+        {
+          email: "user@example.com",
+          password: "password123",
+        },
+        {
+          createSupabaseAdminClient: () =>
+            ({
+              auth: {
+                admin: {
+                  createUser: async () => ({
+                    data: { user: null },
+                    error: { message: "User already registered" },
+                  }),
+                },
+              },
+            }) as never,
+        },
+      ),
+    (error: unknown) => {
+      assert.ok(error instanceof AuthError);
+      assert.equal(error.message, "User already registered");
+      return true;
+    },
+  );
 });

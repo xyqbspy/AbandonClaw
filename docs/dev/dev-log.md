@@ -1,5 +1,150 @@
 # Dev Log
 
+### [2026-05-13] 收口项目验证码作为注册邮箱验证依据
+- 类型：Spec-Driven / 认证主链路语义收口
+- 状态：实施中，待 archive `disable-supabase-confirm-email-after-code-signup`
+
+#### 背景
+注册页已经有“发送 6 位邮箱验证码 -> 输入验证码 -> 提交注册”的主体验，但 Supabase Confirm email 仍会让新账号在注册后处于未确认状态，导致用户完成项目验证码后还被重复拦到 `/verify-email`，甚至登录失败排查时误以为账号不存在或密码错误。
+
+#### 本次改动
+- 注册服务改为通过 Supabase admin 创建已确认邮箱用户：项目 6 位验证码校验通过且账号创建成功后，用户即满足主应用邮箱验证判定。
+- `/auth/callback` 与 `/verify-email` 保留为旧账号、手工补救或未来 Supabase 邮件能力兼容入口，不再作为新注册主链路必需步骤。
+- 登录页将 `invalid_credentials` 映射为安全中文提示，不拆分邮箱存在性，避免账号枚举。
+- baseline runner 的有效邀请码注册成功场景预期改为 `emailVerificationRequired=false`。
+- 同步 `email-verification-flow`、`auth-api-boundaries` stable spec、认证领域规则、上线 runbook 和上线检查清单。
+
+#### 已运行验证
+- `node --import tsx --test src/lib/server/registration.test.ts src/app/api/auth/signup/route.test.ts middleware.test.ts`
+- `node --import tsx --import ./src/test/setup-dom.ts --test "src/app/(auth)/login/page.test.tsx" "src/app/(auth)/signup/page.test.tsx"`
+- `pnpm exec tsc --noEmit --pretty false`
+
+#### 本轮收口
+- 新注册主链路不再同时依赖项目验证码和 Supabase Confirm email 两套邮箱验证。
+- middleware 继续使用认证层 confirmed 状态作为主应用放行依据，不新增第二套 profile 邮箱验证字段。
+- 登录错误提示更可理解，但仍不泄露邮箱是否存在。
+
+#### 明确不收项
+- 不做密码找回完整流程。
+- 不做邮件投递监控、退信处理、域名信誉或模板系统。
+- 不批量迁移历史未确认账号；如生产已有旧账号，单独通过后台或 Supabase 控制台处理。
+- 不改变邀请码、注册 IP 频控、daily quota 或账号 access_status 语义。
+
+#### 完成态 Review
+- 对照 proposal / design / spec delta，本轮实现已覆盖：项目验证码通过后使用 Supabase admin 创建 `email_confirm=true` 用户、注册响应返回 `emailVerificationRequired=false`、登录错误提示保持安全中文文案、`/auth/callback` 与 `/verify-email` 仅作为兼容入口保留。
+- stable spec 已同步 `email-verification-flow` 与 `auth-api-boundaries`；领域规则、baseline runbook、上线检查清单和正式 `CHANGELOG.md` 已同步本轮用户可感知变化。
+- baseline runner 已支持 `signup-email-code-sent`、`--signup-email`、`--signup-email-code` 与 `--resolve-ip`，但生产邮箱 provider 仍需先配置后才能补齐真实成功链路证据。
+
+#### 最终验证
+- `node --import tsx --test src/lib/server/registration.test.ts src/lib/server/signup-email-code.test.ts src/app/api/auth/signup/route.test.ts src/app/api/auth/signup/email-code/route.test.ts middleware.test.ts scripts/load-public-registration-http-baseline.test.ts`
+- `node --import tsx --import ./src/test/setup-dom.ts --test "src/app/(auth)/login/page.test.tsx" "src/app/(auth)/signup/page.test.tsx"`
+- `pnpm exec openspec validate disable-supabase-confirm-email-after-code-signup --strict --no-interactive`
+- `pnpm exec openspec validate --all --strict --no-interactive`
+- `pnpm exec tsc --noEmit --pretty false`
+- `pnpm run maintenance:check`
+- `git diff --check`
+
+#### 剩余风险
+- 生产环境仍必须配置 `RESEND_API_KEY` 与 `EMAIL_FROM` 并 redeploy，否则 `signup-email-code-sent` 会继续返回 `Email provider is not configured.`。
+- 生产邮件配置修复后，还需要按 runbook 重新获取目标域有效 cookie，补跑 `signup-email-code-sent` 与 `invite-only-signup-with-invite-succeeds` 等真实 HTTP baseline。
+
+### [2026-05-13] 上线前真实 HTTP baseline 阻断核对
+- 类型：Fast Track / 发布前验证留证
+- 状态：阻断，暂不具备公开放行证据
+
+#### 背景
+准备直接补齐公网开放前的真实 HTTP baseline 证据，目标环境为 `https://abandon-claw.vercel.app`，预期注册模式为 `invite_only`。本轮不改业务代码，只验证上线前准备是否具备可放行证据。
+
+#### 已执行
+- `pnpm run maintenance:check`
+  - OpenSpec 全量校验通过。
+  - 乱码检查通过。
+  - 未发现未收尾 active change。
+- `pnpm run load:public-registration-baseline --dry-run --config-file=tmp/public-registration-http-baseline.local.json`
+  - baseline 配置可读取，目标环境、Origin、输出路径和已提供 cookie 字段可预览。
+- 尝试执行安全全量 baseline，并显式置空占位 cookie / 邀请码，避免误把占位值当真实前提。
+- 尝试单独补跑：
+  - `registration-mode-visible`
+  - `invite-only-signup-without-invite-rejected`
+  - `origin-mismatch-rejected`
+  - `admin-status-shows-backend-and-usage`
+- 网络探测：
+  - `Resolve-DnsName abandon-claw.vercel.app`
+  - `Invoke-WebRequest https://abandon-claw.vercel.app/api/auth/signup`
+  - `Test-NetConnection abandon-claw.vercel.app -Port 443`
+- 补强 baseline runner：
+  - 新增 `--resolve-ip` / `BASELINE_RESOLVE_IP`，允许只在 baseline 进程内覆盖目标域名解析。
+  - 已运行 `node --import tsx --test scripts/load-public-registration-http-baseline.test.ts`。
+  - 已运行 `pnpm exec tsc --noEmit --pretty false`。
+- 尝试使用 Vercel 常见入口 IP 补跑：
+  - `pnpm run load:public-registration-baseline --config-file=tmp/public-registration-http-baseline.local.json --resolve-ip=76.76.21.21 --scenario=registration-mode-visible ...`
+  - `curl.exe --resolve abandon-claw.vercel.app:443:76.76.21.21 https://abandon-claw.vercel.app/api/auth/signup`
+- 通过 GitHub Deployments API 核对最新 Vercel production deployment：
+  - 最新 deployment SHA 为 `7fda5251fa5e290b6428c1eadee8fae82327b1ee`，状态为 `success`。
+  - `target_url` / `environment_url` 为 `https://abandon-claw-hcfr4bi22-xyqbspys-projects.vercel.app`。
+- 使用最新 deployment URL 补跑：
+  - `pnpm run load:public-registration-baseline --config-file=tmp/public-registration-http-baseline.local.json --base-url=https://abandon-claw-hcfr4bi22-xyqbspys-projects.vercel.app --origin=https://abandon-claw-hcfr4bi22-xyqbspys-projects.vercel.app --scenario=registration-mode-visible ...`
+  - `curl.exe --resolve abandon-claw-hcfr4bi22-xyqbspys-projects.vercel.app:443:76.76.21.21 https://abandon-claw-hcfr4bi22-xyqbspys-projects.vercel.app/api/auth/signup`
+- 按当前机器访问 Vercel 所需方式设置本地代理后补跑：
+  - `$env:NODE_OPTIONS="--use-env-proxy"`
+  - `$env:HTTPS_PROXY="http://127.0.0.1:7897"`
+  - `$env:HTTP_PROXY="http://127.0.0.1:7897"`
+  - `registration-mode-visible` 使用 `https://abandon-claw.vercel.app` 通过，返回 `mode=invite_only`、`source=runtime`。
+  - `signup-ip-rate-limit-hits-429` 通过，6 次请求中出现 3 次 `429`。
+  - `invite-only-signup-without-invite-rejected` 首轮因 runner 未带 `emailCode` 返回 `400 VALIDATION_ERROR`；修正 runner 后再次执行时被刚才的注册 IP 频控窗口拦截，返回 `429 RATE_LIMITED`，`retryAfterSeconds=510`。
+  - `origin-mismatch-rejected` 返回 `401 Unauthorized`，说明当前 `verifiedCookie` 无效或不适用于目标域，未能实际验证 Origin 拒绝。
+  - `admin-status-shows-backend-and-usage` 返回 `401 Unauthorized`，说明当前 `adminCookie` 无效或不适用于目标域。
+- 补强 baseline runner：
+  - 新增 `signup-email-code-sent` 场景。
+  - 新增 `--signup-email` 与 `--signup-email-code`，让“有效邀请码注册成功”能显式带同一邮箱收到的验证码。
+- 使用 `signup-email-code-sent` 补跑邮箱验证码发送：
+  - 首次被注册 IP 频控挡住，返回 `429 RATE_LIMITED`，`retryAfterSeconds=31`。
+  - 等待窗口后再次补跑，返回 `401 AUTH_UNAUTHORIZED`，错误为 `Email provider is not configured.`。
+- 已运行 `pnpm run build`，本地生产构建通过。
+
+#### 结果
+- baseline 实际执行在连接目标环境时中断，错误为 `fetch failed` / `UND_ERR_CONNECT_TIMEOUT`。
+- 当前机器解析 `abandon-claw.vercel.app` 得到的地址不符合正常 Vercel 入口预期，且 443 连接超时。
+- Vercel 入口 IP `76.76.21.21:443` 本身可连接，但用 `abandon-claw.vercel.app` 作为 Host / SNI 覆盖到该 IP 后仍出现 `ECONNRESET`。
+- 最新 Vercel deployment URL 也被当前网络解析到异常地址；覆盖到 `76.76.21.21` 后仍出现 `ECONNRESET`。
+- GitHub 侧可以证明 Vercel deployment 成功，但当前执行环境无法对 `*.vercel.app` 完成真实 HTTP baseline。
+- 设置本地代理后，短域名 `https://abandon-claw.vercel.app` 可访问，且注册模式与注册 IP 频控通过。
+- 邮箱验证码发送在生产环境失败，错误为 `Email provider is not configured.`，这是邀请注册成功链路的上线阻断项。
+- 仍未形成完整可放行 baseline：当前本地 cookie 已失效或不适用于目标域，登录态 / admin / Origin / 高成本接口相关场景未通过；注册频控窗口内也需要等待后再补跑无邀请码场景。
+
+#### 结论
+- 代码、OpenSpec 收尾检查与本地生产构建通过。
+- 目标短域名在代理下可访问，公网注册模式和注册 IP 频控已有真实 HTTP 证据。
+- 上线前真实环境验证仍未完成；生产环境必须先配置邮箱验证码发送依赖，否则邀请注册成功链路不可用。
+- 邮箱配置修复后，还需要重新获取目标域可用的 verified / admin / unverified / restricted 测试账号 cookie 并补跑完整 baseline。
+
+#### 后续补跑入口
+- 优先使用 GitHub deployment status 里的最新 `target_url`，不要继续假设 `https://abandon-claw.vercel.app` 一定存在。
+- 当前机器访问 Vercel 需要先设置代理：
+  - `$env:NODE_OPTIONS="--use-env-proxy"`
+  - `$env:HTTPS_PROXY="http://127.0.0.1:7897"`
+  - `$env:HTTP_PROXY="http://127.0.0.1:7897"`
+- 使用短域名重新执行：
+  - `pnpm run load:public-registration-baseline --config-file=tmp/public-registration-http-baseline.local.json`
+- 邮箱配置修复后，先补跑：
+  - `pnpm run load:public-registration-baseline --config-file=tmp/public-registration-http-baseline.local.json --scenario=signup-email-code-sent --signup-email=<真实可收信邮箱>`
+  - 收到 6 位验证码后，再跑 `invite-only-signup-with-invite-succeeds`，并传入同一个 `--signup-email`、`--signup-email-code` 和有效 `--invite-code`。
+- 补跑前必须重新准备目标域有效 cookie，并等待注册 IP 频控窗口结束或换等价环境。
+- 若使用当前最新 deployment URL，命令形态为：
+  - `pnpm run load:public-registration-baseline --config-file=tmp/public-registration-http-baseline.local.json --base-url=https://abandon-claw-hcfr4bi22-xyqbspys-projects.vercel.app --origin=https://abandon-claw-hcfr4bi22-xyqbspys-projects.vercel.app`
+- 若只是本机 DNS 污染但目标域名已确认绑定，可临时补跑：
+  - `pnpm run load:public-registration-baseline --config-file=tmp/public-registration-http-baseline.local.json --resolve-ip=76.76.21.21`
+- 若只先恢复核心放行证据，至少补跑并记录：
+  - `registration-mode-visible`
+  - `invite-only-signup-without-invite-rejected`
+  - `signup-ip-rate-limit-hits-429`
+  - `unverified-app-redirects-to-verify-email` 或 `unverified-api-rejected`
+  - `origin-mismatch-rejected`
+  - `practice-generate-normal`
+  - `user-rate-limit-hits-429`
+  - `ip-rate-limit-hits-429`
+  - `admin-status-shows-backend-and-usage`
+
 ### [2026-05-12] 收口主应用界面、后台 UI 与加载反馈
 - 类型：Fast Track / UI 与交互一致性收口
 - 状态：已完成

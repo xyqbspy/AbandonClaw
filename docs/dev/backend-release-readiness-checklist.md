@@ -22,11 +22,12 @@
 - [ ] 管理员可通过 `/admin/invites` 生成、停用和调整邀请码
 - [ ] `/admin/invites` 可查看邀请码使用 email、auth user id、attempt 状态和最小活动摘要
 - [ ] 注册成功或失败均有 `registration_invite_attempts` 记录
-- [ ] Supabase 项目已确认开启邮箱验证策略
-- [ ] Supabase Auth Redirect URLs 已包含目标域名的 `/auth/callback`
-- [ ] `/verify-email` 重发验证邮件可用
-- [ ] 邮箱未验证用户访问主应用会进入 `/verify-email`
-- [ ] 邮箱未验证用户调用受保护 API 返回 403
+- [ ] Supabase 项目已确认关闭 Confirm email；新注册邮箱验证由项目 6 位验证码承担
+- [ ] Supabase Auth Redirect URLs 已包含目标域名的 `/auth/callback`，作为旧账号或手工补救兼容入口
+- [ ] `/verify-email` 重发验证邮件作为兼容补救入口可用，或已明确记录该入口暂不作为新注册主链路
+- [ ] 项目验证码注册成功用户登录后可进入主应用，不会被重复拦到 `/verify-email`
+- [ ] 邮箱未验证的旧账号或异常账号访问主应用会进入 `/verify-email`
+- [ ] 邮箱未验证的旧账号或异常账号调用受保护 API 返回 403
 
 ## 接口治理
 

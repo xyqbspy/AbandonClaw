@@ -79,7 +79,7 @@ test("signup handler 会在 invite 校验和注册前执行 IP 频控", async ()
           userId: "user-1",
           email: "user@example.com",
           mode: "invite_only",
-          emailVerificationRequired: true,
+          emailVerificationRequired: false,
         };
       },
     },
@@ -131,7 +131,7 @@ test("signup handler 命中 IP 频控时返回受控 429 且不会继续注册",
           userId: "user-1",
           email: "user@example.com",
           mode: "open",
-          emailVerificationRequired: true,
+          emailVerificationRequired: false,
         };
       },
     },
@@ -212,7 +212,7 @@ test("signup handler 在实际限流配置下会对同一 IP 返回 429", async 
       userId: "user-1",
       email: "user@example.com",
       mode: "open",
-      emailVerificationRequired: true,
+      emailVerificationRequired: false,
     })) as never,
   };
 
@@ -263,7 +263,7 @@ test("signup handler 缺失验证码时不会创建账号", async () => {
           userId: "user-1",
           email: "user@example.com",
           mode: "open",
-          emailVerificationRequired: true,
+          emailVerificationRequired: false,
         };
       },
     },

@@ -24,10 +24,16 @@ test("config 会解析 invite_only 和 cookie 列表", () => {
   const config = buildPublicRegistrationBaselineConfig([
     "--expected-registration-mode=invite_only",
     "--ip-limit-cookies=cookie-a|||cookie-b|||cookie-c",
+    "--resolve-ip=76.76.21.21",
+    "--signup-email=baseline@example.com",
+    "--signup-email-code=123456",
   ]);
 
   assert.equal(config.expectedRegistrationMode, "invite_only");
   assert.deepEqual(config.ipLimitCookies, ["cookie-a", "cookie-b", "cookie-c"]);
+  assert.equal(config.resolveIp, "76.76.21.21");
+  assert.equal(config.signupEmail, "baseline@example.com");
+  assert.equal(config.signupEmailCode, "123456");
 });
 
 test("summary 会正确统计 passed failed blocked", () => {
@@ -65,4 +71,5 @@ test("summary 会正确统计 passed failed blocked", () => {
 test("baseline 场景列表包含注册 IP 频控验证", () => {
   const names = getScenarioDefinitions().map((item) => item.name);
   assert.ok(names.includes("signup-ip-rate-limit-hits-429"));
+  assert.ok(names.includes("signup-email-code-sent"));
 });

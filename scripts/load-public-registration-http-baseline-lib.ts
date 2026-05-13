@@ -30,6 +30,9 @@ export type PublicBaselineConfig = {
   scenario: string;
   outputPath: string | null;
   dryRun: boolean;
+  resolveIp: string | null;
+  signupEmail: string | null;
+  signupEmailCode: string | null;
   signupEmailPrefix: string | null;
   signupEmailDomain: string | null;
   signupPassword: string | null;
@@ -122,6 +125,7 @@ const buildSignupEmail = (
   label: string,
   timestamp = Date.now(),
 ) => {
+  if (config.signupEmail) return config.signupEmail;
   if (!config.signupEmailPrefix || !config.signupEmailDomain) return null;
   return `${config.signupEmailPrefix}+${label}-${timestamp}@${config.signupEmailDomain}`;
 };
@@ -280,6 +284,7 @@ const buildScenarioDefinitions = (): ScenarioDefinition[] => [
           email,
           password: config.signupPassword,
           username: config.signupUsername ?? "baseline-user",
+          emailCode: "000000",
         }),
       });
       return evaluateResponse({
@@ -347,6 +352,43 @@ const buildScenarioDefinitions = (): ScenarioDefinition[] => [
     },
   },
   {
+    name: "signup-email-code-sent",
+    group: "email-verification",
+    description: "注册邮箱验证码发送成功。",
+    run: async (config) => {
+      const email = buildSignupEmail(config, "email-code");
+      if (!email) {
+        return blocked("email-verification", "signup-email-code-sent", "注册邮箱验证码发送成功。", "缺少 signupEmail 或 signupEmailPrefix/signupEmailDomain。");
+      }
+      const response = await runJsonRequest({
+        baseUrl: config.baseUrl,
+        path: "/api/auth/signup/email-code",
+        method: "POST",
+        origin: config.origin,
+        cookie: null,
+        body: JSON.stringify({ email }),
+      });
+      return evaluateResponse({
+        group: "email-verification",
+        name: "signup-email-code-sent",
+        description: "注册邮箱验证码发送成功。",
+        expected: { status: 200, email },
+        response,
+        extraActual: {
+          email: isObject(response.bodyJson) ? response.bodyJson.email : null,
+          expiresInSeconds: isObject(response.bodyJson) ? response.bodyJson.expiresInSeconds : null,
+        },
+        validate: (current) => {
+          if (current.status !== 200) return "邮箱验证码发送未返回 200。";
+          if (!isObject(current.bodyJson) || current.bodyJson.email !== email) {
+            return "邮箱验证码发送响应邮箱与请求不一致。";
+          }
+          return null;
+        },
+      });
+    },
+  },
+  {
     name: "invite-only-signup-with-invite-succeeds",
     group: "registration",
     description: "`invite_only` 模式下有效邀请码注册成功。",
@@ -355,8 +397,8 @@ const buildScenarioDefinitions = (): ScenarioDefinition[] => [
         return blocked("registration", "invite-only-signup-with-invite-succeeds", "`invite_only` 模式下有效邀请码注册成功。", "当前 expectedRegistrationMode 不是 `invite_only`。");
       }
       const email = buildSignupEmail(config, "invite-ok");
-      if (!email || !config.signupPassword || !config.inviteCode) {
-        return blocked("registration", "invite-only-signup-with-invite-succeeds", "`invite_only` 模式下有效邀请码注册成功。", "缺少 signupEmailPrefix、signupEmailDomain、signupPassword 或 inviteCode。");
+      if (!email || !config.signupPassword || !config.inviteCode || !config.signupEmailCode) {
+        return blocked("registration", "invite-only-signup-with-invite-succeeds", "`invite_only` 模式下有效邀请码注册成功。", "缺少 signupEmail/signupEmailPrefix、signupEmailDomain、signupPassword、inviteCode 或 signupEmailCode。");
       }
       const response = await runJsonRequest({
         baseUrl: config.baseUrl,
@@ -369,18 +411,19 @@ const buildScenarioDefinitions = (): ScenarioDefinition[] => [
           password: config.signupPassword,
           username: config.signupUsername ?? "baseline-user",
           inviteCode: config.inviteCode,
+          emailCode: config.signupEmailCode,
         }),
       });
       return evaluateResponse({
         group: "registration",
         name: "invite-only-signup-with-invite-succeeds",
         description: "`invite_only` 模式下有效邀请码注册成功。",
-        expected: { status: 201, emailVerificationRequired: true },
+        expected: { status: 201, emailVerificationRequired: false },
         response,
         validate: (current) => {
           if (current.status !== 201) return "邀请码注册未返回 201。";
-          if (!isObject(current.bodyJson) || current.bodyJson.emailVerificationRequired !== true) {
-            return "邀请码注册未返回 emailVerificationRequired=true。";
+          if (!isObject(current.bodyJson) || current.bodyJson.emailVerificationRequired !== false) {
+            return "邀请码注册未返回 emailVerificationRequired=false。";
           }
           return null;
         },
@@ -764,6 +807,17 @@ export const buildPublicRegistrationBaselineConfig = (args: string[]): PublicBas
     outputPath:
       pickValue(getCliArg(args, "output"), process.env.PUBLIC_BASELINE_OUTPUT, readFromFile("outputPath")),
     dryRun: args.includes("--dry-run"),
+    resolveIp: pickValue(getCliArg(args, "resolve-ip"), process.env.BASELINE_RESOLVE_IP, readFromFile("resolveIp")),
+    signupEmail: pickValue(
+      getCliArg(args, "signup-email"),
+      process.env.PUBLIC_BASELINE_SIGNUP_EMAIL,
+      readFromFile("signupEmail"),
+    ),
+    signupEmailCode: pickValue(
+      getCliArg(args, "signup-email-code"),
+      process.env.PUBLIC_BASELINE_SIGNUP_EMAIL_CODE,
+      readFromFile("signupEmailCode"),
+    ),
     signupEmailPrefix: pickValue(
       getCliArg(args, "signup-email-prefix"),
       process.env.PUBLIC_BASELINE_SIGNUP_EMAIL_PREFIX,
@@ -873,6 +927,9 @@ export const buildDryRunPreview = (config: PublicBaselineConfig) => ({
 export const runPublicRegistrationBaseline = async (
   config: PublicBaselineConfig,
 ): Promise<BaselineRunResult> => {
+  if (config.resolveIp) {
+    process.env.BASELINE_RESOLVE_IP = config.resolveIp;
+  }
   const startedAt = new Date();
   const selectedDefinitions =
     config.scenario === "all"

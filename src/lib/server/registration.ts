@@ -1,7 +1,5 @@
 import { createHash } from "node:crypto";
-import { createClient } from "@supabase/supabase-js";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { getSupabaseAnonKey, getSupabaseUrl } from "@/lib/supabase/env";
 import { AuthError, ValidationError } from "@/lib/server/errors";
 
 export type RegistrationMode = "closed" | "invite_only" | "open";
@@ -56,18 +54,11 @@ const registrationModeDependencies: RegistrationModeDependencies = {
 };
 
 interface RegisterDependencies {
-  createSupabaseAuthClient: () => ReturnType<typeof createClient>;
+  createSupabaseAdminClient: typeof createSupabaseAdminClient;
 }
 
 const registerDependencies: RegisterDependencies = {
-  createSupabaseAuthClient: () =>
-    createClient(getSupabaseUrl(), getSupabaseAnonKey(), {
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false,
-        detectSessionInUrl: false,
-      },
-    }),
+  createSupabaseAdminClient,
 };
 
 export const parseRegistrationMode = (value: unknown): RegistrationMode | null => {
@@ -262,16 +253,12 @@ export async function registerWithEmailPassword(
     attemptId = await createAttempt(email, "pending", invite.id);
   }
 
-  const supabase = dependencies.createSupabaseAuthClient();
-  const signUpOptions = {
-    ...(username ? { data: { username } } : {}),
-    ...(payload.emailRedirectTo ? { emailRedirectTo: payload.emailRedirectTo } : {}),
-  };
-
-  const { data, error } = await supabase.auth.signUp({
+  const supabase = dependencies.createSupabaseAdminClient();
+  const { data, error } = await supabase.auth.admin.createUser({
     email,
     password,
-    options: Object.keys(signUpOptions).length > 0 ? signUpOptions : undefined,
+    email_confirm: true,
+    user_metadata: username ? { username } : undefined,
   });
 
   if (error) {
@@ -295,6 +282,6 @@ export async function registerWithEmailPassword(
     userId,
     email,
     mode,
-    emailVerificationRequired: true,
+    emailVerificationRequired: false,
   };
 }

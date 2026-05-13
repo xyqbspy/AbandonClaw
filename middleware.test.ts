@@ -104,6 +104,19 @@ test("middleware 会拒绝未验证邮箱用户调用受保护 API", async () =>
   assert.equal(typeof body.requestId, "string");
 });
 
+test("middleware 会放行已确认邮箱用户进入主应用", async () => {
+  const response = await handleMiddleware(
+    createRequest("http://localhost/today"),
+    createDependencies({
+      email: "user@example.com",
+      email_confirmed_at: "2026-05-13T00:00:00.000Z",
+    }),
+  );
+
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("location"), null);
+});
+
 test("middleware 会将已登录用户从登录页安全重定向回站内路径", async () => {
   const response = await handleMiddleware(
     createRequest("http://localhost/login?redirect=%2Freview"),

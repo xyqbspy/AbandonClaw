@@ -12,6 +12,28 @@ import {
 } from "@/lib/shared/auth-redirect";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
+const resolveLoginErrorMessage = (error: unknown) => {
+  if (error && typeof error === "object" && "code" in error) {
+    const code = String((error as { code?: unknown }).code ?? "");
+    if (code === "invalid_credentials") {
+      return "邮箱或密码不正确；如果刚注册，请确认账号已创建并完成邮箱验证。";
+    }
+    if (code === "email_not_confirmed") {
+      return "邮箱尚未验证，请先完成邮箱验证后再登录。";
+    }
+  }
+
+  const message = error instanceof Error ? error.message : "";
+  if (message === "Invalid login credentials") {
+    return "邮箱或密码不正确；如果刚注册，请确认账号已创建并完成邮箱验证。";
+  }
+  if (message.toLowerCase().includes("email not confirmed")) {
+    return "邮箱尚未验证，请先完成邮箱验证后再登录。";
+  }
+
+  return message || "登录失败。";
+};
+
 export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -36,7 +58,7 @@ export default function LoginPage() {
       const supabase = createSupabaseBrowserClient();
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) {
-        throw new Error(error.message);
+        throw error;
       }
 
       await fetch("/api/me", { method: "GET" });
@@ -44,7 +66,7 @@ export default function LoginPage() {
       router.push(loginTarget);
       router.refresh();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "登录失败。");
+      toast.error(resolveLoginErrorMessage(error));
     } finally {
       setSubmitting(false);
     }
