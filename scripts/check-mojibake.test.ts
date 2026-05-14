@@ -17,6 +17,18 @@ test("能识别高置信度乱码片段", () => {
   assert.equal(matches[0]?.path, "sample.md");
 });
 
+test("能识别本轮暴露的 changelog 式乱码片段", () => {
+  const changelogLikeSample = [
+    String.fromCodePoint(0x93c2, 0x626e, 0x6564, 0x93b4),
+    String.fromCodePoint(0x7ec9, 0x8bf2, 0x59e9),
+    String.fromCodePoint(0x93ba, 0x3128, 0x5d18),
+  ].join(" / ");
+
+  const matches = findSuspiciousPatternsInText(changelogLikeSample, "CHANGELOG.md");
+
+  assert.ok(matches.length >= 1);
+});
+
 test("检查器源码不再依赖忽略自身", () => {
   const source = readFileSync(new URL("./check-mojibake.ts", import.meta.url), "utf8");
 
