@@ -2362,3 +2362,36 @@ Today / Review 已完成局部样式常量收口后，`scene` 页面族仍横跨
 - 不重构 Scene/Today 页面 UI。
 - 不扩展新闻、演讲、商务等复杂内容域。
 - 不做 stable spec 同步与 archive；等待后续合并/归档阶段处理。
+### [2026-05-14] 收紧核心文档编码与乱码检查自保护
+
+- 状态：已完成并归档 `stabilize-core-doc-encoding`
+
+#### 背景
+
+本轮发现 `CHANGELOG.md` 文件本体其实是干净 UTF-8，但 shell 文本预览出现了乱码假象；同时 `scripts/check-mojibake.ts` 把一批乱码片段直接写在源码里，只能通过忽略自身来规避检查。这意味着正式发布文档存在误修风险，乱码检查器本身也缺少自检能力。
+
+#### 本轮收口
+
+- 将 `scripts/check-mojibake.ts` 中的高置信度乱码模式与忽略样例改成编码安全表达，不再把脚本自身加入忽略名单。
+- 为乱码检查脚本补最小 Node test，验证常见乱码片段识别和“不得自我豁免”。
+- 同步 `project-maintenance` stable spec 与维护手册，明确先区分文件字节损坏和终端显示异常，再决定是否重写核心维护文档。
+
+#### 明确不收项
+
+- 不做全仓历史文档乱码清理。
+- 不引入新的第三方编码检测依赖。
+- 不改业务功能或页面行为。
+
+#### 验证计划
+
+- `pnpm run text:check-mojibake`
+- `node --import tsx --test scripts/check-mojibake.test.ts`
+- `pnpm run maintenance:check`
+- `pnpm exec openspec validate stabilize-core-doc-encoding --strict`
+
+#### 实际验证
+
+- `pnpm run text:check-mojibake`
+- `node --import tsx --test scripts/check-mojibake.test.ts`
+- `pnpm exec openspec validate stabilize-core-doc-encoding --strict`
+- `pnpm run maintenance:check`

@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { extname, join, relative } from "node:path";
+import { pathToFileURL } from "node:url";
 
 const ROOT_DIR = process.cwd();
 const TARGET_DIRS = ["src", "scripts", "docs", "openspec"];
@@ -22,28 +23,33 @@ const TEXT_FILE_EXTENSIONS = new Set([
   ".yml",
 ]);
 
-const IGNORED_RELATIVE_PATHS = new Set(["scripts/check-mojibake.ts"]);
+const IGNORED_RELATIVE_PATHS = new Set<string>();
+
+const fromCodePoints = (...codePoints: number[]) => String.fromCodePoint(...codePoints);
+
 const IGNORED_LINE_PATTERNS = [
-  "优先拦截 `馃`、`鐐瑰嚮`、`�` 这类高置信度乱码片段。",
+  `优先拦截 \`${fromCodePoints(0x9983)}\`、\`${fromCodePoints(0x9410, 0x7470, 0x56ae)}\`、\`${fromCodePoints(0xfffd)}\` 这类高置信度乱码片段。`,
 ];
 
 const SUSPICIOUS_PATTERNS = [
-  "锟",
-  "棣",
-  "閻愮懓鍤",
-  "缁涘绶",
-  "娴犲﹥妫",
-  "鐎涳缚绡",
-  "濞ｈ濮",
-  "閸忓疇浠",
-  "闁插秵鏌",
-  "閻㈢喐鍨",
-  "鐞涖儱鍙",
-  "瑜版挸澧",
-  "閴",
-  "閿",
-  "鈧拷",
-  "\uFFFD",
+  fromCodePoints(0x9983),
+  fromCodePoints(0x9410, 0x7470, 0x56ae),
+  fromCodePoints(0x951f),
+  fromCodePoints(0x68e3),
+  fromCodePoints(0x95bb, 0x612e, 0x61d3, 0x9364),
+  fromCodePoints(0x7f01, 0x6d98, 0xe62f, 0x7ef6),
+  fromCodePoints(0x5a34, 0x72b2, 0xfe65, 0x59ab),
+  fromCodePoints(0x940e, 0x6db3, 0x7f1a, 0x7ee1),
+  fromCodePoints(0x6fde, 0xff48, 0xe1e7, 0x6fee),
+  fromCodePoints(0x95b8, 0x5fd3, 0x7587, 0x6d60),
+  fromCodePoints(0x95c1, 0x63d2, 0x79f5, 0x93cc),
+  fromCodePoints(0x95bb, 0x3222, 0x5590, 0x9368),
+  fromCodePoints(0x941e, 0x6d96, 0x5131, 0x9359),
+  fromCodePoints(0x745c, 0x7248, 0x6338, 0x6fa7),
+  fromCodePoints(0x95b4),
+  fromCodePoints(0x95bf),
+  fromCodePoints(0x9227, 0xe10a, 0x62f7),
+  fromCodePoints(0xfffd),
 ] as const;
 
 type MatchRecord = {
@@ -91,13 +97,7 @@ function shouldSkipFile(relativePath: string, options: ScanOptions) {
   return false;
 }
 
-function scanFile(filePath: string, options: ScanOptions = {}) {
-  const relativePath = normalizePath(relative(ROOT_DIR, filePath));
-  if (shouldSkipFile(relativePath, options)) {
-    return [];
-  }
-
-  const raw = readFileSync(filePath, "utf8");
+export function findSuspiciousPatternsInText(raw: string, relativePath: string) {
   const lines = raw.split(/\r?\n/);
   const matches: MatchRecord[] = [];
 
@@ -119,6 +119,16 @@ function scanFile(filePath: string, options: ScanOptions = {}) {
   });
 
   return matches;
+}
+
+function scanFile(filePath: string, options: ScanOptions = {}) {
+  const relativePath = normalizePath(relative(ROOT_DIR, filePath));
+  if (shouldSkipFile(relativePath, options)) {
+    return [];
+  }
+
+  const raw = readFileSync(filePath, "utf8");
+  return findSuspiciousPatternsInText(raw, relativePath);
 }
 
 function runGit(args: string[]) {
@@ -156,7 +166,7 @@ function getTouchedArchiveFiles() {
     .filter((filePath) => existsSync(filePath) && statSync(filePath).isFile() && isTextFile(filePath));
 }
 
-function main() {
+export function main() {
   const allMatches: MatchRecord[] = [];
 
   for (const targetDir of TARGET_DIRS) {
@@ -198,4 +208,10 @@ function main() {
   process.exitCode = 1;
 }
 
-main();
+const isDirectRun = process.argv[1]
+  ? pathToFileURL(process.argv[1]).href === import.meta.url
+  : false;
+
+if (isDirectRun) {
+  main();
+}

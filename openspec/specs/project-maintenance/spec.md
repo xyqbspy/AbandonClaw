@@ -299,10 +299,25 @@
 - **THEN** 文档 MUST 只记录用户可感知变化
 - **AND** 开发过程、验证记录或维护收口过程 MUST 记录到 `docs/dev/dev-log.md`
 
+#### Scenario: 终端预览显示疑似乱码但文件本身仍为干净 UTF-8
+- **WHEN** 维护者在 shell、终端面板或命令输出中看到 `CHANGELOG.md` 或其他核心维护文档疑似乱码
+- **AND** 通过 UTF-8 感知的读取方式验证后，文件字节内容仍是可读文本
+- **THEN** 维护流程 MUST 优先修正诊断方式、记录环境差异或改进检查链路
+- **AND** 不得仅因终端显示异常就重写本来干净的正式文档
+
 #### Scenario: 维护者归档或修改 OpenSpec archive 文档
 - **WHEN** 维护者在本轮新建、归档或修改 `openspec/changes/archive/` 下的文本文档
 - **THEN** 这些归档文档 MUST 保持可读 UTF-8
 - **AND** 必须通过乱码检查或在验证记录中明确说明未覆盖原因
+
+### Requirement: 乱码检查器自身不得通过自我忽略规避检查
+维护流程 MUST 保持 `scripts/check-mojibake.ts`、其规则文本和最小测试本身为干净可读 UTF-8，并且不得通过把检查器源码加入忽略名单来规避乱码检查。
+
+#### Scenario: 维护者调整乱码检查模式或忽略规则
+- **WHEN** 维护者修改 `scripts/check-mojibake.ts` 的可疑模式、忽略规则或输出文案
+- **THEN** 检查器源码 MUST 保持干净可读 UTF-8
+- **AND** 不得把 `scripts/check-mojibake.ts` 本身加入忽略列表来通过检查
+- **AND** 必须保留最小验证，确认常见高置信度乱码片段仍能被识别
 
 ### Requirement: CHANGELOG 条件检查必须保守提示而非替代人工判断
 维护检查 MUST 对当前分支为 `main` 且存在可能用户可感知文件变更的情况给出 CHANGELOG 保守提示，但不得把这种提示伪装成完整语义判断。
