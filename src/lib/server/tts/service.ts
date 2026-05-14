@@ -3,6 +3,7 @@ import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { MsEdgeTTS, OUTPUT_FORMAT } from "msedge-tts";
+import { ensureIpv4FirstDns } from "@/lib/server/network/dns";
 import { TtsGenerationError, ValidationError } from "@/lib/server/errors";
 import { logServerEvent } from "@/lib/server/logger";
 import {
@@ -57,6 +58,8 @@ const signedUrlCacheTtlMs = Math.max(60, signedUrlTtlSeconds - 60) * 1000;
 const signedUrlCache = new Map<string, SignedUrlCacheEntry>();
 const pendingSignedUrlRequests = new Map<string, Promise<string>>();
 const REGENERATE_CONCURRENCY = 3;
+
+ensureIpv4FirstDns();
 
 const parseTtsKind = (value: unknown): TtsKind => {
   if (value === "sentence" || value === "chunk" || value === "scene_full") return value;
