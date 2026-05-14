@@ -51,6 +51,7 @@
     "vaul": "^1.1.2"
   },
   "devDependencies": {
+    "@next/env": "^16.2.6",
     "@tailwindcss/postcss": "^4",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
