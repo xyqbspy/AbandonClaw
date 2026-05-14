@@ -14,7 +14,7 @@ const recentPhraseRows = [
     phraseId: "phrase-1",
     text: "burn yourself out",
     normalizedText: "burn yourself out",
-    translation: "把自己熬垮",
+    translation: "把自己耗尽",
     usageNote: null,
     difficulty: null,
     tags: [],
@@ -76,6 +76,7 @@ const createDashboardResponse = () => ({
     },
     outputTask: { done: false, phrasesSavedToday: 1 },
   },
+  starterRecommendation: null,
 });
 
 const defaultDashboardCacheResult = { found: false, isExpired: false, record: null };
@@ -202,7 +203,7 @@ afterEach(() => {
   mockGetScenesFromApi = async () => [];
 });
 
-test("TodayPageClient 会把表达入口压缩成数量摘要", async () => {
+test("TodayPageClient compresses the expressions entry into a lightweight summary", async () => {
   const TodayPageClient = getTodayPageClient();
 
   render(<TodayPageClient displayName="xyqbspy" />);
@@ -213,4 +214,95 @@ test("TodayPageClient 会把表达入口压缩成数量摘要", async () => {
   });
 
   assert.equal(routerPushCalls.length, 0);
+});
+
+test("TodayPageClient renders the starter recommendation as the primary card", async () => {
+  mockGetLearningDashboardFromApi = async () => ({
+    ...createDashboardResponse(),
+    starterRecommendation: {
+      type: "start_starter",
+      title: "Today starts here",
+      reason: "Best first step for a brand-new learner.",
+      ctaLabel: "Start first scene",
+      href: "/scene/daily-greeting",
+      scene: {
+        id: "scene-1",
+        slug: "daily-greeting",
+        title: "Daily Greeting",
+        description: "Learn simple greetings.",
+        level: "L0",
+        category: "starter",
+        estimatedMinutes: 5,
+        learningGoal: "Master everyday greetings.",
+        progressPercent: 0,
+      },
+      completedStarterCount: 0,
+      totalStarterCount: 6,
+    },
+  });
+
+  const TodayPageClient = getTodayPageClient();
+  render(<TodayPageClient displayName="xyqbspy" />);
+
+  await waitFor(() => {
+    screen.getByText("Today starts here");
+    screen.getByText("Daily Greeting");
+    screen.getByText("Best first step for a brand-new learner.");
+  });
+
+  screen.getByRole("button", { name: "Start first scene" }).click();
+  await waitFor(() => {
+    assert.deepEqual(routerPushCalls, ["/scene/daily-greeting"]);
+  });
+});
+
+test("TodayPageClient keeps continue learning as the primary card for existing learners", async () => {
+  mockGetLearningDashboardFromApi = async () => ({
+    ...createDashboardResponse(),
+    continueLearning: {
+      sceneSlug: "coffee-chat",
+      title: "Coffee Chat",
+      subtitle: "Cafe basics",
+      progressPercent: 45,
+      masteryStage: "focus",
+      masteryPercent: 45,
+      currentStep: "practice_sentence",
+      lastViewedAt: "2026-05-14T10:00:00.000Z",
+      lastSentenceIndex: 2,
+      estimatedMinutes: 8,
+      savedPhraseCount: 2,
+      completedSentenceCount: 1,
+    },
+    starterRecommendation: {
+      type: "continue",
+      title: "Continue learning",
+      reason: "You already made progress here.",
+      ctaLabel: "Continue learning",
+      href: "/scene/coffee-chat",
+      scene: {
+        id: "scene-2",
+        slug: "coffee-chat",
+        title: "Coffee Chat",
+        description: "Cafe basics",
+        level: "L0",
+        category: "daily_life",
+        estimatedMinutes: 8,
+        learningGoal: "Practice cafe conversation.",
+        progressPercent: 45,
+      },
+    },
+  });
+
+  const TodayPageClient = getTodayPageClient();
+  render(<TodayPageClient displayName="xyqbspy" />);
+
+  await waitFor(() => {
+    assert.ok(screen.getAllByText("Continue learning").length >= 1);
+    screen.getByText("Coffee Chat");
+  });
+
+  screen.getByRole("button", { name: "Continue learning" }).click();
+  await waitFor(() => {
+    assert.deepEqual(routerPushCalls, ["/scene/coffee-chat"]);
+  });
 });

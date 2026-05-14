@@ -34,6 +34,19 @@ export type TodayPrimaryTaskExplanation = {
   source: NonNullable<DailyTask["explanationSource"]>;
 };
 
+export type TodayPrimaryCardState = {
+  title: string;
+  sceneTitle: string;
+  sceneDescription: string;
+  reason: string;
+  stepLabel: string;
+  metaItems: string[];
+  progressPercent: number;
+  href: string;
+  ctaLabel: string;
+  isPending: boolean;
+};
+
 const buildFallbackContinueLearning = (
   sceneList: SceneListItemResponse[],
 ): ResolvedContinueLearningItem | null => {
@@ -301,6 +314,128 @@ export const getContinueLearningCardState = ({
     helperText: getContinueLearningHelperText(continueLearning, sceneTask),
     href: getContinueLearningHref(continueLearning),
     ctaLabel: continueLearning ? "继续学习" : "去选场景",
+    isPending: false,
+  };
+};
+
+const getPrimaryCardLevelLabel = (level?: string | null) => {
+  if (level === "L0") return "L0 入门";
+  if (level === "L1") return "L1 基础";
+  if (level === "L2") return "L2 进阶";
+  return "";
+};
+
+const getPrimaryCardSceneDescription = (
+  recommendation: NonNullable<LearningDashboardResponse["starterRecommendation"]>,
+) =>
+  recommendation.scene?.learningGoal?.trim() ||
+  recommendation.scene?.description?.trim() ||
+  "从这个场景开始，把今天的输入稳稳接住。";
+
+const getPrimaryCardMetaItems = (
+  recommendation: NonNullable<LearningDashboardResponse["starterRecommendation"]>,
+) => {
+  const items: string[] = [];
+  const levelLabel = getPrimaryCardLevelLabel(recommendation.scene?.level);
+  if (levelLabel) items.push(levelLabel);
+
+  const estimatedMinutes = recommendation.scene?.estimatedMinutes;
+  if (typeof estimatedMinutes === "number" && estimatedMinutes > 0) {
+    items.push(`${estimatedMinutes} 分钟`);
+  }
+
+  const progressPercent = recommendation.scene?.progressPercent;
+  if (typeof progressPercent === "number" && progressPercent > 0) {
+    items.push(`${Math.round(progressPercent)}% 进度`);
+  }
+
+  if (recommendation.type === "next_starter" && recommendation.totalStarterCount) {
+    items.push(
+      `${recommendation.completedStarterCount ?? 0}/${recommendation.totalStarterCount} 已完成`,
+    );
+  }
+
+  return items;
+};
+
+export const getTodayPrimaryCardState = ({
+  dashboard,
+  continueLearning,
+  sceneTask,
+  isPending,
+  emptyTitle,
+  emptyDesc,
+}: {
+  dashboard: LearningDashboardResponse;
+  continueLearning: ResolvedContinueLearningItem | null;
+  sceneTask: LearningDashboardResponse["todayTasks"]["sceneTask"];
+  isPending: boolean;
+  emptyTitle: string;
+  emptyDesc: string;
+}): TodayPrimaryCardState => {
+  if (isPending) {
+    return {
+      title: "正在恢复今天的学习进度",
+      sceneTitle: "稍等一下",
+      sceneDescription: "",
+      reason: "正在同步你上次学习到的场景、步骤和今天的推荐入口。",
+      stepLabel: "正在加载",
+      metaItems: [],
+      progressPercent: 0,
+      href: "#",
+      ctaLabel: "正在恢复进度...",
+      isPending: true,
+    };
+  }
+
+  const recommendation = dashboard.starterRecommendation;
+  if (recommendation) {
+    const stepLabel =
+      recommendation.type === "continue"
+        ? getContinueLearningStepLabel(continueLearning, sceneTask)
+        : recommendation.type === "start_starter"
+          ? "Start Here"
+          : recommendation.type === "next_starter"
+            ? "继续入门"
+            : recommendation.type === "next_daily"
+              ? "日常进阶"
+              : "可浏览";
+
+    return {
+      title: recommendation.title,
+      sceneTitle: recommendation.scene?.title ?? emptyTitle,
+      sceneDescription: recommendation.scene ? getPrimaryCardSceneDescription(recommendation) : emptyDesc,
+      reason: recommendation.reason,
+      stepLabel,
+      metaItems: getPrimaryCardMetaItems(recommendation),
+      progressPercent:
+        typeof recommendation.scene?.progressPercent === "number"
+          ? Math.round(recommendation.scene.progressPercent)
+          : 0,
+      href: recommendation.href,
+      ctaLabel: recommendation.ctaLabel,
+      isPending: false,
+    };
+  }
+
+  const fallback = getContinueLearningCardState({
+    continueLearning,
+    sceneTask,
+    isPending: false,
+    emptyTitle,
+    emptyDesc,
+  });
+
+  return {
+    title: fallback.title,
+    sceneTitle: continueLearning?.title ?? emptyTitle,
+    sceneDescription: continueLearning?.subtitle ?? emptyDesc,
+    reason: fallback.helperText,
+    stepLabel: fallback.stepLabel,
+    metaItems: [],
+    progressPercent: sceneTask.progressPercent ?? continueLearning?.progressPercent ?? 0,
+    href: fallback.href,
+    ctaLabel: fallback.ctaLabel,
     isPending: false,
   };
 };

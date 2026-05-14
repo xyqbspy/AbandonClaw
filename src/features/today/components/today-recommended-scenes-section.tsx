@@ -1,6 +1,40 @@
-import { ChevronRight } from "lucide-react";
+import { CalendarDays, ChevronRight, Coffee, MessageCircleMore, Sparkles } from "lucide-react";
 import { LoadingState } from "@/components/shared/action-loading";
 import { SceneListItemResponse } from "@/lib/utils/scenes-api";
+
+const getRecommendedSceneIcon = (scene: SceneListItemResponse) => {
+  if (scene.category === "daily_life") return Coffee;
+  if (scene.category === "time_plan") return CalendarDays;
+  if (scene.category === "social") return MessageCircleMore;
+  return Sparkles;
+};
+
+const getRecommendedSceneMeta = (scene: SceneListItemResponse) => {
+  const categoryLabel =
+    scene.category === "daily_life"
+      ? "日常生活"
+      : scene.category === "time_plan"
+        ? "时间安排"
+        : scene.category === "social"
+          ? "简单社交"
+          : null;
+
+  if (categoryLabel && typeof scene.estimatedMinutes === "number") {
+    return `${categoryLabel} · ${scene.estimatedMinutes} 分钟`;
+  }
+
+  if (categoryLabel) return categoryLabel;
+  if (scene.subtitle) return scene.subtitle;
+  if (typeof scene.estimatedMinutes === "number") return `${scene.estimatedMinutes} 分钟`;
+  return "继续下一组";
+};
+
+const getRecommendedSceneIconClassName = (scene: SceneListItemResponse) => {
+  if (scene.category === "daily_life") return "text-amber-600";
+  if (scene.category === "time_plan") return "text-sky-600";
+  if (scene.category === "social") return "text-rose-500";
+  return "text-blue-500";
+};
 
 export function TodayRecommendedScenesSection({
   loading,
@@ -20,14 +54,14 @@ export function TodayRecommendedScenesSection({
   const nextScene = recommendedScenes[0];
 
   return (
-    <section className="space-y-3 pt-2">
-      <div className="flex items-center justify-between">
-        <h3 className="text-[16px] font-semibold tracking-normal text-[#86868b]">
+    <section className="space-y-4 pt-1">
+      <div className="flex items-end justify-between">
+        <h3 className="font-sans text-[12px] font-black uppercase tracking-[0.24em] text-slate-400">
           推荐下一组
         </h3>
         <button
           type="button"
-          className="text-[13px] font-medium text-[#007AFF]"
+          className="font-sans text-[11px] font-black text-blue-600"
           onClick={() => {
             if (nextScene) onOpenScene(nextScene.slug);
           }}
@@ -37,28 +71,42 @@ export function TodayRecommendedScenesSection({
       </div>
 
       {loading && !nextScene ? (
-        <div className="rounded-[18px] bg-white p-5">
+        <div className="rounded-[1.5rem] border border-slate-200 bg-white p-5">
           <LoadingState text={loadingText} className="py-0" />
         </div>
       ) : !nextScene ? (
-        <div className="rounded-[18px] bg-white p-5 text-[14px] text-[#86868b]">
+        <div className="rounded-[1.5rem] border border-dashed border-slate-200 bg-slate-900/5 p-5 font-sans text-[15px] text-slate-500">
           {emptyText}
         </div>
       ) : (
         <button
           type="button"
-          className="flex w-full items-center justify-between rounded-[18px] bg-white p-5 text-left shadow-[0_4px_14px_rgba(0,0,0,0.03)] transition active:scale-[0.99]"
+          className="flex w-full items-center justify-between rounded-[1.5rem] border border-dashed border-slate-200 bg-slate-900/5 p-4 text-left transition active:scale-[0.99]"
           onClick={() => onOpenScene(nextScene.slug)}
         >
-          <div className="min-w-0">
-            <span className="block truncate text-[15px] font-semibold text-[#1d1d1f]">
-              {nextScene.title}
-            </span>
-            <span className="mt-1 block text-[12px] text-[#86868b]">
-              {nextScene.estimatedMinutes} 分钟
-            </span>
+          <div className="flex min-w-0 items-center gap-4">
+                <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-white shadow-sm">
+                  {(() => {
+                    const Icon = getRecommendedSceneIcon(nextScene);
+                    return (
+                      <Icon
+                        className={`size-5 ${getRecommendedSceneIconClassName(nextScene)}`}
+                        aria-hidden="true"
+                      />
+                    );
+                  })()}
+                </div>
+            <div className="min-w-0">
+              <span className="block truncate font-sans text-[16px] font-bold text-slate-800">
+                {nextScene.title}
+              </span>
+              <span className="mt-1 block font-sans text-[12px] font-bold text-slate-400">
+                {getRecommendedSceneMeta(nextScene)}
+              </span>
+            </div>
           </div>
-          <ChevronRight className="size-5 shrink-0 text-[#d1d1d6]" aria-hidden="true" />
+
+          <ChevronRight className="size-5 shrink-0 text-blue-500" aria-hidden="true" />
         </button>
       )}
     </section>

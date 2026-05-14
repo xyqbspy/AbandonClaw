@@ -126,7 +126,7 @@ export default async function AdminHomePage({
   const disabledControlCount = highCostControls.filter((item) => item.disabled).length;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 px-6 py-6 sm:py-8 lg:px-10">
       <div className="flex justify-end">
         <form action={syncSeedScenesAction}>
           <AdminSubmitButton

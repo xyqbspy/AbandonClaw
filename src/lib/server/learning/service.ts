@@ -10,9 +10,14 @@ import {
   UserSceneSessionRow,
 } from "@/lib/server/db/types";
 import { getSceneRecordBySlug } from "@/lib/server/scene/service";
+import { listScenes } from "@/lib/server/scene/service";
 import { getUserPhraseSummary } from "@/lib/server/phrases/service";
 import { getReviewSummary } from "@/lib/server/review/service";
 import { NotFoundError } from "@/lib/server/errors";
+import {
+  getTodayPrimaryRecommendation,
+  type TodayPrimaryRecommendation,
+} from "@/lib/server/learning/today-primary-recommendation";
 
 const nowIso = () => new Date().toISOString();
 const todayDate = () => new Date().toISOString().slice(0, 10);
@@ -167,6 +172,13 @@ export interface LearningOverview {
   savedPhraseCount: number;
   recentStudyMinutes: number;
   reviewAccuracy: number | null;
+}
+
+export interface LearningDashboard {
+  overview: LearningOverview;
+  continueLearning: ContinueLearningItem | null;
+  todayTasks: TodayLearningTasks;
+  starterRecommendation: TodayPrimaryRecommendation;
 }
 
 export type SceneTrainingEvent =
@@ -1306,24 +1318,32 @@ export async function getLearningOverview(userId: string): Promise<LearningOverv
   };
 }
 
-export async function getLearningDashboard(userId: string) {
-  const [overview, continueLearning, repeatPracticeContinue, repeatVariantContinue, todayTasks] =
+export async function getLearningDashboard(userId: string): Promise<LearningDashboard> {
+  const [overview, continueLearning, repeatPracticeContinue, repeatVariantContinue, todayTasks, scenes] =
     await Promise.all([
     getLearningOverview(userId),
     getContinueLearningScene(userId),
     getRepeatPracticeContinueScene(userId),
     getRepeatVariantContinueScene(userId),
     getTodayLearningTasks(userId),
+    listScenes({ userId }),
     ]);
+
+  const resolvedContinueLearning = pickMostRecentContinueScene([
+    continueLearning,
+    repeatVariantContinue,
+    repeatPracticeContinue,
+  ]);
 
   return {
     overview,
-    continueLearning: pickMostRecentContinueScene([
-      continueLearning,
-      repeatVariantContinue,
-      repeatPracticeContinue,
-    ]),
+    continueLearning: resolvedContinueLearning,
     todayTasks,
+    starterRecommendation: getTodayPrimaryRecommendation({
+      scenes,
+      continueLearning: resolvedContinueLearning,
+      dueReviewCount: todayTasks.reviewTask.dueReviewCount,
+    }),
   };
 }
 

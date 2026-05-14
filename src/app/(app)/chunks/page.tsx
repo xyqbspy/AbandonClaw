@@ -1756,7 +1756,7 @@ export default function ChunksPage() {
   };
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
+    <div className="mx-auto max-w-2xl space-y-6 px-6 py-6 sm:py-8 lg:px-10">
       <section className="rounded-3xl bg-white p-6 shadow-sm">
         <div className="mb-4 flex items-center gap-4">
           <div className="flex size-12 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-lg shadow-blue-200">

@@ -8,7 +8,7 @@ import { TodayLearningPathSection } from "@/features/today/components/today-lear
 import { todayPageLabels as zh } from "@/features/today/components/today-page-labels";
 import {
   buildTodayTasks,
-  getContinueLearningCardState,
+  getTodayPrimaryCardState,
   getRecommendedScenes,
   resolveTodayPrimaryTaskExplanation,
   resolveTodayLearningSnapshot,
@@ -58,6 +58,7 @@ const EMPTY_DASHBOARD: LearningDashboardResponse = {
     },
     outputTask: { done: false, phrasesSavedToday: 0 },
   },
+  starterRecommendation: null,
 };
 
 const getRecommendationReason = (scene: SceneListItemResponse) => {
@@ -269,23 +270,24 @@ export function TodayPageClient({ displayName }: { displayName: string }) {
   const finalDisplayName = displayName || zh.userFallback;
   const isContinueCardPending =
     loading && dashboardDataSource === "none" && sceneDataSource === "none";
-  const continueCardState = useMemo(
+  const primaryCardState = useMemo(
     () =>
-      getContinueLearningCardState({
+      getTodayPrimaryCardState({
+        dashboard,
         continueLearning,
         sceneTask: dashboard.todayTasks.sceneTask,
         isPending: isContinueCardPending,
         emptyTitle: zh.continueEmptyTitle,
         emptyDesc: zh.continueEmptyDesc,
       }),
-    [continueLearning, dashboard.todayTasks.sceneTask, isContinueCardPending],
+    [continueLearning, dashboard, isContinueCardPending],
   );
   const continueStepIcon = useMemo(
-    () => getContinueStepIcon(continueCardState.stepLabel),
-    [continueCardState.stepLabel],
+    () => getContinueStepIcon(primaryCardState.stepLabel),
+    [primaryCardState.stepLabel],
   );
   const progressPercent = Math.round(
-    todayLearningSnapshot.effectiveProgressPercent,
+    primaryCardState.progressPercent || todayLearningSnapshot.effectiveProgressPercent,
   );
   const continueResultSummary = useMemo(() => {
     const todaySaved = dashboard.todayTasks.outputTask.phrasesSavedToday;
@@ -381,27 +383,31 @@ export function TodayPageClient({ displayName }: { displayName: string }) {
   }, [continueLearning, todayLearningSnapshot.effectiveCurrentStep]);
 
   return (
-    <div className="mx-auto max-w-[800px] space-y-6 px-6 py-6 text-foreground sm:py-8 lg:px-10">
+    <div className="min-h-screen bg-[#f1f5f9] font-['-apple-system','BlinkMacSystemFont','Segoe_UI',sans-serif]">
+      <div className="mx-auto max-w-[760px] space-y-6 px-6 pb-28 pt-10 text-foreground sm:space-y-7 sm:pb-32 sm:pt-12 lg:px-10">
       <TodayWelcomeCard displayName={finalDisplayName} streakDays={dashboard.overview.streakDays} />
 
       <TodayContinueCard
-        title={continueCardState.title}
-        subtitle={continueCardState.subtitle}
-        stepLabel={continueCardState.stepLabel}
+        title={primaryCardState.title}
+        subtitle={primaryCardState.sceneDescription}
+        sceneTitle={primaryCardState.sceneTitle}
+        stepLabel={primaryCardState.stepLabel}
         stepIcon={continueStepIcon}
-        helperText={continueCardState.helperText}
+        helperText={primaryCardState.reason}
         resultSummary={continueResultSummary}
         progressPercent={progressPercent}
-        isPending={continueCardState.isPending}
-        ctaLabel={continueCardState.ctaLabel}
+        isPending={primaryCardState.isPending}
+        ctaLabel={primaryCardState.ctaLabel}
+        metaItems={primaryCardState.metaItems}
         onContinue={() => {
-          if (continueCardState.isPending) return;
+          if (primaryCardState.isPending) return;
           recordClientEvent("today_continue_clicked", {
             sceneSlug: continueLearning?.sceneSlug ?? null,
             currentStep: todayLearningSnapshot.effectiveCurrentStep,
             progressPercent,
+            recommendationType: dashboard.starterRecommendation?.type ?? "fallback",
           });
-          router.push(continueCardState.href);
+          router.push(primaryCardState.href);
         }}
       />
 
@@ -448,6 +454,7 @@ export function TodayPageClient({ displayName }: { displayName: string }) {
           router.push(`/scene/${slug}`);
         }}
       />
+      </div>
     </div>
   );
 }

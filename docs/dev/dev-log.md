@@ -1,5 +1,38 @@
 # Dev Log
 
+### [2026-05-14] Today 新用户默认学习路径推荐
+- 类型：Spec-Driven / Today 主链路推荐与新手承接
+- 状态：实现完成，待后续 archive `today-starter-recommendation`
+
+#### 背景
+P0 已补齐 builtin starter scenes 与元字段，P1 已让 `/scenes` 能展示 Start Here 和新手路径，但 `/today` 对新用户仍可能只有后台式入口或空状态，缺少“今天从这里开始”的明确承接。
+
+#### 本次改动
+- 在 `learning dashboard` 服务端聚合里新增 `starterRecommendation`，由服务端纯函数统一产出 continue / start_starter / next_starter / next_daily / empty 五类结果。
+- 推荐逻辑优先复用已有 `continueLearning`，没有进行中场景时再按 builtin starter 的 `level -> sort_order -> is_featured` 稳定选择首个或下一个场景；starter 全完成后降级到 `daily_life / time_plan / social`。
+- Today 顶部首要任务卡片改为消费服务端 recommendation，展示场景标题、说明、推荐理由、level、预计时长、进度与 CTA，同时保留 review、expressions 与 learning path 现有区块。
+- 补充 Today 主卡片最小交互测试，以及推荐纯函数测试，覆盖新用户、continue、部分 starter、starter 全完成、空场景、字段缺失与 review 共存。
+
+#### 已验证
+- `node --import tsx --test src/lib/server/learning/today-primary-recommendation.test.ts`
+- `node --import tsx --test src/lib/server/learning/service.logic.test.ts`
+- `node --import tsx --import ./src/test/setup-dom.ts --test src/features/today/components/today-page-client.test.tsx`
+- `node --import tsx --import ./src/test/setup-dom.ts --test src/features/today/components/today-sections.test.tsx src/features/today/components/today-page-selectors.test.ts`
+- `pnpm run build`
+
+#### 本轮收口项
+- 收口新用户首次进入 `/today` 没有明确学习入口的问题。
+- 收口 Today 首要任务推荐散落在前端推断中的风险，改为服务端稳定聚合字段。
+- 收口 starter 场景缺失、字段不完整或 scene 删除时的空状态降级。
+
+#### 明确不收项
+- 不重构 review 主流程，不改变 review summary 优先级。
+- 不改 chunks、TTS、scene detail 或 `/scenes` 页面已有主流程。
+- 不新增复杂推荐模型或 AI 推荐。
+
+#### 剩余风险
+- 推荐排序当前依赖 scenes 元字段完整性；若生产环境尚未执行 P0 starter scenes SQL/seed，Today 会安全降级到 empty recommendation，而不是补猜场景。
+
 ### [2026-05-14] Scenes 视觉参考稿收口
 - 类型：Spec-Driven / `/scenes` 移动端视觉与交互收紧
 - 状态：已完成本轮代码与测试收口，仍待 change archive / stable spec / maintenance 收尾

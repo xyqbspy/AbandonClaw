@@ -6,14 +6,18 @@ export function TodayWelcomeCard({
   streakDays: number;
 }) {
   return (
-    <section className="flex items-center justify-between gap-4">
-      <h2 className="min-w-0 truncate text-[24px] font-bold leading-tight tracking-normal text-[#1d1d1f]">
-        欢迎回来，{displayName}
-      </h2>
-      <div className="inline-flex shrink-0 items-center gap-2 rounded-full bg-white px-4 py-2 text-[14px] font-semibold text-[#1d1d1f] shadow-[0_4px_10px_rgba(0,0,0,0.05)]">
-        <span className="text-[#ff9500]" aria-hidden="true">
-          ●
-        </span>
+    <section className="flex items-start justify-between gap-4 pb-1">
+      <div className="min-w-0 space-y-1">
+        <p className="text-[11px] font-black uppercase tracking-[0.28em] text-slate-400">
+          Today&apos;s Focus
+        </p>
+        <h2 className="min-w-0 truncate font-sans text-2xl font-black leading-[1.1] tracking-[-0.03em] text-slate-900">
+          欢迎回来，{displayName}
+        </h2>
+      </div>
+
+      <div className="inline-flex shrink-0 items-center gap-2 rounded-full bg-amber-100 px-3 py-1.5 text-[11px] font-black text-amber-700">
+        <span className="size-2 rounded-full bg-amber-500" aria-hidden="true" />
         <span>{streakDays} 天连续学习</span>
       </div>
     </section>

@@ -167,7 +167,7 @@ test("TodayReviewSummaryCard 会根据待复习数量切换状态文案", async 
   );
 
   screen.getByText("--");
-  screen.getByText("暂无待复习");
+  screen.getByText("暂无待复习内容");
 });
 
 test("TodayRecommendedScenesSection 会处理 loading 和列表点击", async () => {

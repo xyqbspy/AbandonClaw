@@ -1,22 +1,4 @@
-## Purpose
-
-定义 Today 页面承接学习主链路后的聚合展示边界，确保 Today 反馈可追踪、可验收，并与正式聚合字段保持一致。该 capability 负责 Today 的聚合字段映射、入口优先级、解释文案与 fallback 规则，而不重复定义整条学习闭环。
-
-## Requirements
-
-### Requirement: Today 页面数据来源与优先级必须可追踪
-系统 MUST 在 `/today` 页面给出可被真实验收的主链路承接结果，至少让维护者能确认 `today -> scene -> review -> return today` 的反馈仍遵守稳定聚合字段边界，并且首要任务推荐必须来自服务端稳定聚合，而不是前端临时推断。
-
-#### Scenario: 维护者执行真实闭环验收
-- **WHEN** 维护者按验收清单走完整主链路
-- **THEN** `today` 页面 MUST 能基于稳定聚合字段展示结果摘要
-- **AND** 首要任务推荐 MUST 来自服务端 dashboard 聚合输出的稳定字段
-- **AND** 不得因为前端临时状态丢失而出现与主链路不一致的反馈
-
-#### Scenario: 前端消费 starter recommendation 字段
-- **WHEN** `today` 页面收到包含 starter recommendation 的 dashboard 响应
-- **THEN** 前端 MUST 只消费该稳定字段来渲染新用户首要任务卡片
-- **AND** 老前端未消费该字段时，原有 dashboard 字段仍必须保持兼容
+## ADDED Requirements
 
 ### Requirement: Today 必须为新用户提供稳定的 starter recommendation
 系统 MUST 在 `today` 聚合结果中为没有可继续场景的用户返回一个可解释的新手路径推荐，并且该推荐必须基于真实 scenes 数据中的 starter 元字段，而不是页面写死文案或写死 slug。
@@ -60,3 +42,19 @@
 - **WHEN** progress 中引用的 scene 已被删除，或 scene 缺少 `level` / `category` / `learning_goal`
 - **THEN** `today` 聚合 MUST 跳过无效候选并继续寻找下一个可用候选
 - **AND** 若没有可用候选则返回 empty recommendation，而不是返回 500
+
+## MODIFIED Requirements
+
+### Requirement: Today 页面数据来源与优先级必须可追踪
+系统 MUST 在 `/today` 页面给出可被真实验收的主链路承接结果，至少让维护者能确认 `today -> scene -> review -> return today` 的反馈仍遵守稳定聚合字段边界，并且首要任务推荐必须来自服务端稳定聚合，而不是前端临时推断。
+
+#### Scenario: 维护者执行真实闭环验收
+- **WHEN** 维护者按验收清单走完整主链路
+- **THEN** `today` 页面 MUST 能基于稳定聚合字段展示结果摘要
+- **AND** 首要任务推荐 MUST 来自服务端 dashboard 聚合输出的稳定字段
+- **AND** 不得因为前端临时状态丢失而出现与主链路不一致的反馈
+
+#### Scenario: 前端消费 starter recommendation 字段
+- **WHEN** `today` 页面收到包含 starter recommendation 的 dashboard 响应
+- **THEN** 前端 MUST 只消费该稳定字段来渲染新用户首要任务卡片
+- **AND** 老前端未消费该字段时，原有 dashboard 字段仍必须保持兼容

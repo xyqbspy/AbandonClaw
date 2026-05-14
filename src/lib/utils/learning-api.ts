@@ -584,6 +584,30 @@ export interface LearningDashboardResponse {
   overview: LearningDashboardOverviewResponse;
   continueLearning: LearningDashboardContinueResponse | null;
   todayTasks: LearningDashboardTasksResponse;
+  starterRecommendation?: LearningDashboardStarterRecommendationResponse | null;
+}
+
+export interface LearningDashboardStarterRecommendationSceneResponse {
+  id: string;
+  slug: string;
+  title: string;
+  description: string | null;
+  level: string | null;
+  category: string | null;
+  estimatedMinutes: number | null;
+  learningGoal: string | null;
+  progressPercent: number | null;
+}
+
+export interface LearningDashboardStarterRecommendationResponse {
+  type: "continue" | "start_starter" | "next_starter" | "next_daily" | "empty";
+  scene: LearningDashboardStarterRecommendationSceneResponse | null;
+  title: string;
+  reason: string;
+  ctaLabel: string;
+  href: string;
+  completedStarterCount?: number;
+  totalStarterCount?: number;
 }
 
 export async function getLearningDashboardFromApi() {
