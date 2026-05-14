@@ -23,6 +23,7 @@
     "load:api-baseline": "node --import tsx scripts/load-api-baseline.ts",
     "load:public-registration-baseline": "node --import tsx scripts/load-public-registration-http-baseline.ts",
     "load:handler-baseline": "node --import tsx scripts/load-handler-baseline.ts",
+    "seed:builtin-scenes": "node --import tsx scripts/seed-builtin-scenes.ts",
     "validate:db-guardrails": "node --import tsx scripts/validate-db-guardrails.ts",
     "scenes:repair-duplicate-sentences": "npx tsx scripts/repair-generated-scene-duplicate-sentences.ts",
     "tts:warmup": "node scripts/warmup-tts.mjs",

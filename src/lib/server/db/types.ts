@@ -20,6 +20,16 @@ export interface SceneRow {
   translation: string | null;
   difficulty: string | null;
   origin: "seed" | "imported";
+  level: string;
+  category: string;
+  subcategory: string | null;
+  source_type: "builtin" | "user_generated" | "imported" | "ai_generated";
+  is_starter: boolean;
+  is_featured: boolean;
+  sort_order: number;
+  estimated_minutes: number;
+  learning_goal: string | null;
+  tags: unknown;
   is_public: boolean;
   created_by: string | null;
   model: string | null;

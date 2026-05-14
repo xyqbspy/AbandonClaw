@@ -2244,3 +2244,40 @@ Today / Review 已完成局部样式常量收口后，`scene` 页面族仍横跨
 - 当前未连接真实 Supabase/Upstash 生产环境执行完整 HTTP baseline；小范围开放前必须补跑 closed、invite-only、邮箱验证、user/IP 限流、Origin 拒绝和 Redis 后端状态。
 - P0-B 未实现：每日 AI/TTS quota、usage 预占、`generation_limited`、学习时长 delta 上限、今日用量统计和简单封禁能力。
 - 当前限流仍保留 Upstash 失败时 fallback 到 memory 的可用性策略；公网开放前必须在 admin/status 与 baseline 中确认实际为 Upstash。
+### [2026-05-14] 为 Scenes 补齐日常入门默认场景底座
+- 类型：Spec-Driven / scenes 默认内容与列表数据契约
+- 状态：实施完成，待后续 archive 与 stable spec 同步
+
+#### 背景
+新用户注册登录后，`/scenes` 与 `today` 缺少足够的 builtin 内容承接，首屏更像“等待用户自己创建内容”的空工作台，不符合“进入产品即可开始英语场景学习”的产品目标。
+
+#### 本次改动
+- 为 `public.scenes` 新增 `level`、`category`、`subcategory`、`source_type`、`is_starter`、`is_featured`、`sort_order`、`estimated_minutes`、`learning_goal`、`tags` 字段，并保留旧数据与现有 RLS。
+- 新增 `supabase/sql/20260514_phase23_builtin_starter_scenes.sql`，对旧 `seed/imported` 数据做向后兼容回填。
+- 新增 `src/lib/data/builtin-scene-seeds.ts`，以单一数据源维护 24 个 builtin starter/daily scenes。
+- 将现有 `runSeedScenesSync()` 升级为基于 `slug` 的幂等 upsert，并继续只清理 `origin = 'seed'` 的旧内置场景。
+- 扩展 `/api/scenes` 列表返回字段与前端 response type，补齐 `level/category/learningGoal/isStarter/isFeatured/sortOrder/tags`。
+- 调整 scenes 查询默认排序为 `is_starter -> is_featured -> sort_order -> created_at`，保证新用户优先看到入门场景。
+- 新增 `scripts/seed-builtin-scenes.ts` 和 `pnpm run seed:builtin-scenes`，作为可直接执行的 seed 入口。
+
+#### 验证
+- 已运行：
+  - `node --import tsx --test src/lib/data/builtin-scene-seeds.test.ts src/app/api/scenes/route.test.ts`
+  - `pnpm run build`
+- 验证结果：
+  - 24 个默认场景 slug 唯一。
+  - 每个场景都带完整元信息与 4-8 个核心 chunks。
+  - `/api/scenes` 返回 starter scenes 扩展字段。
+  - 项目 `build` 通过。
+
+#### 本轮收口项
+- 收口新用户首屏缺少可直接学习 builtin scenes 的问题。
+- 收口 `scenes` 元字段不足导致 pack/starter/featured 无法稳定排序的问题。
+- 收口 `/api/scenes` 只返回旧白名单字段，导致新增元数据在 API 层丢失的问题。
+
+#### 明确不收项
+- 不做 `today` 个性化推荐或复杂排序策略。
+- 不新增 `content_packs` 等内容运营表。
+- 不重构 Scene/Today 页面 UI。
+- 不扩展新闻、演讲、商务等复杂内容域。
+- 不做 stable spec 同步与 archive；等待后续合并/归档阶段处理。

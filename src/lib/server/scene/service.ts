@@ -1,5 +1,5 @@
 import { mapLessonToParsedScene, mapParsedSceneToLesson } from "@/lib/adapters/scene-parser-adapter";
-import { scenes as seedLessons } from "@/lib/data/mock-lessons";
+import { builtinSceneSeeds } from "@/lib/data/builtin-scene-seeds";
 import { Lesson } from "@/lib/types";
 import { ParsedScene, SceneParserResponse } from "@/lib/types/scene-parser";
 import { normalizeParsedSceneDialogue } from "@/lib/shared/scene-dialogue";
@@ -23,11 +23,19 @@ export interface SceneListItem {
   slug: string;
   title: string;
   subtitle: string;
+  level: string;
+  category: string;
+  subcategory: string | null;
   difficulty: string;
   estimatedMinutes: number;
+  learningGoal: string | null;
+  tags: string[];
   sentenceCount: number;
   sceneType: "dialogue" | "monologue";
-  sourceType: "builtin" | "imported";
+  sourceType: "builtin" | "user_generated" | "imported" | "ai_generated";
+  isStarter: boolean;
+  isFeatured: boolean;
+  sortOrder: number;
   createdAt: string;
   variantLinks: Array<{ id: string; label: string }>;
   learningStatus: "not_started" | "in_progress" | "completed" | "paused";
@@ -36,8 +44,14 @@ export interface SceneListItem {
 }
 
 const SCENE_PARSE_PROMPT_VERSION = "scene-parse-v1";
-const toSceneOriginSourceType = (origin: string): "builtin" | "imported" =>
-  origin === "imported" ? "imported" : "builtin";
+const toSceneSourceType = (
+  row: Pick<SceneRow, "origin" | "source_type">,
+): "builtin" | "user_generated" | "imported" | "ai_generated" =>
+  row.source_type ?? (row.origin === "imported" ? "imported" : "builtin");
+const toLessonSourceType = (
+  row: Pick<SceneRow, "origin" | "source_type">,
+): "builtin" | "imported" =>
+  toSceneSourceType(row) === "imported" ? "imported" : "builtin";
 const hasChinese = (value: string) => /[\u4e00-\u9fff]/.test(value);
 const stripParenSuffix = (value: string) =>
   value.replace(/\s*[\(\（][^)\）]*[\)\）]\s*$/, "").trim();
@@ -88,8 +102,16 @@ const normalizeSceneFromRow = (row: SceneRow): ParsedScene => {
         ? raw.difficulty
         : "Intermediate",
     estimatedMinutes:
-      typeof raw.estimatedMinutes === "number" ? raw.estimatedMinutes : 10,
-    tags: Array.isArray(raw.tags) ? raw.tags : [],
+      typeof row.estimated_minutes === "number"
+        ? row.estimated_minutes
+        : typeof raw.estimatedMinutes === "number"
+          ? raw.estimatedMinutes
+          : 10,
+    tags: Array.isArray(row.tags)
+      ? (row.tags as string[])
+      : Array.isArray(raw.tags)
+        ? raw.tags
+        : [],
     sections: Array.isArray(raw.sections) ? raw.sections : [],
     type: raw.type === "dialogue" || raw.type === "monologue" ? raw.type : "monologue",
   });
@@ -118,25 +140,35 @@ const rowToLesson = (row: SceneRow): Lesson => {
   lesson.id = row.id;
   lesson.slug = row.slug;
   lesson.title = row.title;
-  lesson.sourceType = toSceneOriginSourceType(row.origin);
+  lesson.sourceType = toLessonSourceType(row);
   return lesson;
 };
 
 export async function upsertSeedScenesIfNeeded() {
-  const keepSlugs = seedLessons.map((lesson) => lesson.slug);
+  const keepSlugs = builtinSceneSeeds.map((item) => item.meta.slug);
 
-  for (const lesson of seedLessons) {
+  for (const { lesson, meta } of builtinSceneSeeds) {
     const parsed = mapLessonToParsedScene(lesson);
     await upsertSceneBySlug(
       {
         slug: lesson.slug,
         title: lesson.title,
-        theme: lesson.tags?.[0] ?? null,
+        theme: meta.subcategory ?? lesson.tags?.[0] ?? null,
         source_text: null,
         scene_json: parsed,
         translation: lesson.subtitle,
         difficulty: lesson.difficulty,
         origin: "seed",
+        level: meta.level,
+        category: meta.category,
+        subcategory: meta.subcategory ?? null,
+        source_type: meta.sourceType,
+        is_starter: meta.isStarter,
+        is_featured: meta.isFeatured,
+        sort_order: meta.sortOrder,
+        estimated_minutes: meta.estimatedMinutes,
+        learning_goal: meta.learningGoal,
+        tags: meta.tags,
         is_public: true,
         created_by: null,
         model: process.env.GLM_MODEL ?? "glm-4.6",
@@ -156,7 +188,7 @@ export async function upsertSeedScenesIfNeeded() {
 export async function runSeedScenesSync() {
   await upsertSeedScenesIfNeeded();
   return {
-    total: seedLessons.length,
+    total: builtinSceneSeeds.length,
   };
 }
 
@@ -197,11 +229,19 @@ export async function listScenes(params: { userId: string }) {
       slug: row.slug,
       title: row.title,
       subtitle: scene.subtitle ?? "",
+      level: row.level,
+      category: row.category,
+      subcategory: row.subcategory,
       difficulty: scene.difficulty ?? "Intermediate",
-      estimatedMinutes: scene.estimatedMinutes ?? 8,
+      estimatedMinutes: row.estimated_minutes ?? scene.estimatedMinutes ?? 8,
+      learningGoal: row.learning_goal,
+      tags: Array.isArray(row.tags) ? (row.tags as string[]) : scene.tags ?? [],
       sentenceCount: getSceneSentenceCount(scene),
       sceneType: scene.type ?? "monologue",
-      sourceType: toSceneOriginSourceType(row.origin),
+      sourceType: toSceneSourceType(row),
+      isStarter: row.is_starter,
+      isFeatured: row.is_featured,
+      sortOrder: row.sort_order,
       createdAt: row.created_at,
       variantLinks,
       learningStatus: progressBySceneId.get(row.id)?.status ?? "not_started",
@@ -279,6 +319,16 @@ export async function createImportedScene(params: {
       translation: params.parsedScene.subtitle,
       difficulty: params.parsedScene.difficulty,
       origin: "imported",
+      level: "L1",
+      category: "general",
+      subcategory: null,
+      source_type: "imported",
+      is_starter: false,
+      is_featured: false,
+      sort_order: 0,
+      estimated_minutes: params.parsedScene.estimatedMinutes ?? 8,
+      learning_goal: params.parsedScene.description ?? null,
+      tags: mergedTags,
       is_public: false,
       created_by: params.userId,
       model: params.model ?? process.env.GLM_MODEL ?? "glm-4.6",

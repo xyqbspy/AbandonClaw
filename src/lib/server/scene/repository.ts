@@ -22,6 +22,9 @@ export async function listVisibleScenesByUserId(userId: string) {
     .from("scenes")
     .select("*")
     .or(`is_public.eq.true,created_by.eq.${userId}`)
+    .order("is_starter", { ascending: false })
+    .order("is_featured", { ascending: false })
+    .order("sort_order", { ascending: true })
     .order("created_at", { ascending: false });
   if (error) {
     throw new Error(`Failed to list scenes: ${error.message}`);
