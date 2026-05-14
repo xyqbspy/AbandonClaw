@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import {
   getDailyQuotaLimit,
@@ -94,4 +95,15 @@ test("reserveHighCostUsage 在 capability 被关闭时不会预占 quota", async
       return true;
     },
   );
+});
+
+test("reserve_daily_high_cost_usage SQL 已消除 reserved_count 歧义", () => {
+  const sql = readFileSync("supabase/sql/20260509_public_registration_p0b.sql", "utf8");
+
+  assert.match(sql, /v_reserved_count integer;/);
+  assert.match(sql, /update public\.user_daily_high_cost_usage as h/);
+  assert.match(sql, /set reserved_count = h\.reserved_count \+ 1,/);
+  assert.match(sql, /into v_reserved_count, v_limit_count;/);
+  assert.doesNotMatch(sql, /set reserved_count = reserved_count \+ 1,/);
+  assert.doesNotMatch(sql, /into reserved_count, limit_count;/);
 });

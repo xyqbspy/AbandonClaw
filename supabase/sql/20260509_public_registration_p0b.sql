@@ -61,6 +61,9 @@ set search_path = public
 as $$
 declare
   current_row public.user_daily_high_cost_usage%rowtype;
+  v_allowed boolean;
+  v_reserved_count integer;
+  v_limit_count integer;
 begin
   insert into public.user_daily_high_cost_usage (
     user_id,
@@ -91,24 +94,26 @@ begin
   for update;
 
   if current_row.reserved_count >= p_limit_count then
-    allowed := false;
-    reserved_count := current_row.reserved_count;
-    limit_count := p_limit_count;
-    return next;
+    v_allowed := false;
+    v_reserved_count := current_row.reserved_count;
+    v_limit_count := p_limit_count;
+    return query
+    select v_allowed, v_reserved_count, v_limit_count;
     return;
   end if;
 
-  update public.user_daily_high_cost_usage
-  set reserved_count = reserved_count + 1,
+  update public.user_daily_high_cost_usage as h
+  set reserved_count = h.reserved_count + 1,
       limit_count = p_limit_count,
       last_reserved_at = timezone('utc'::text, now())
-  where id = current_row.id
-  returning user_daily_high_cost_usage.reserved_count,
-            user_daily_high_cost_usage.limit_count
-    into reserved_count, limit_count;
+  where h.id = current_row.id
+  returning h.reserved_count,
+            h.limit_count
+    into v_reserved_count, v_limit_count;
 
-  allowed := true;
-  return next;
+  v_allowed := true;
+  return query
+  select v_allowed, v_reserved_count, v_limit_count;
 end;
 $$;
 
@@ -125,17 +130,17 @@ set search_path = public
 as $$
 begin
   if p_status = 'success' then
-    update public.user_daily_high_cost_usage
-    set success_count = success_count + 1
-    where user_id = p_user_id
-      and usage_date = p_usage_date
-      and capability = p_capability;
+    update public.user_daily_high_cost_usage as h
+    set success_count = h.success_count + 1
+    where h.user_id = p_user_id
+      and h.usage_date = p_usage_date
+      and h.capability = p_capability;
   elsif p_status = 'failed' then
-    update public.user_daily_high_cost_usage
-    set failed_count = failed_count + 1
-    where user_id = p_user_id
-      and usage_date = p_usage_date
-      and capability = p_capability;
+    update public.user_daily_high_cost_usage as h
+    set failed_count = h.failed_count + 1
+    where h.user_id = p_user_id
+      and h.usage_date = p_usage_date
+      and h.capability = p_capability;
   else
     raise exception 'Invalid high cost usage status: %', p_status;
   end if;
