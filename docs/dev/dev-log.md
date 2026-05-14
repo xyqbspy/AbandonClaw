@@ -1,5 +1,53 @@
 # Dev Log
 
+### [2026-05-14] Scenes 视觉参考稿收口
+- 类型：Spec-Driven / `/scenes` 移动端视觉与交互收紧
+- 状态：已完成本轮代码与测试收口，仍待 change archive / stable spec / maintenance 收尾
+
+#### 本次收口
+- 去掉顶部“学习场景”和顶部功能入口，首屏直接以“推荐路径”开头。
+- 将循环播放调整到底部次要动作“复习”按钮位置，主按钮只服务“开始/继续学习”。
+- 将“生成场景 / 导入自定义”收进筛选与操作区的更多菜单，保留现有组件、回刷和错误处理链路。
+- 按 `scenesNew.html` 补齐筛选与操作区：横向分类 pill、等级 / 来源下拉、排序按钮和更多操作按钮。
+- 统一场景卡片、底部按钮和列表文案层级，按 `scenesNew.html` 的移动端视觉方向收紧。
+
+#### 已验证
+- `node --import tsx --test src/app/(app)/scenes/scene-display.test.ts`
+- `node --import tsx --import ./src/test/setup-dom.ts --test src/app/(app)/scenes/page.interaction.test.tsx`
+- `pnpm run build`
+
+### [2026-05-14] Scenes 移动端新手路径与筛选体验改造
+- 类型：Spec-Driven / Scenes 学习入口体验升级
+- 状态：实施完成，等待 archive / stable spec 收尾
+
+#### 背景
+P0 已经补齐 builtin starter scenes 和元字段，但 `/scenes` 首屏仍更像场景管理页。新用户进入后虽然能看到数据，却不清楚应该先学什么，生成 / 导入入口的优先级也高于“开始学习 / 继续学习”主线。
+
+#### 本次改动
+- 将 `/scenes` 改造成移动端优先学习入口：吸顶标题区、推荐路径横滑卡片、粘性筛选区、纵向场景卡片和底部主 CTA。
+- 新增 `scene-display.ts` selector / utility，收口 `level/category/source_type` 筛选、推荐排序、starter packs、状态映射和主 CTA 判定。
+- 推荐路径改为基于真实 scenes 数据组合 `Start Here / Everyday Survival / Time and Plans / Simple Social`，不再写死 mock 内容。
+- 保留并降级展示生成 / 导入 / review pack 入口，复用现有导入、生成、删除、预热和随机复习链路。
+- 场景卡片现在展示 level、分类、来源、时长、学习目标、学习状态、进度条和 CTA。
+
+#### 已运行验证
+- `node --import tsx --test src/app/(app)/scenes/scene-display.test.ts`
+- `node --import tsx --import ./src/test/setup-dom.ts --test src/app/(app)/scenes/page.interaction.test.tsx`
+- `pnpm run build`
+
+#### 本轮收口
+- scenes 首屏主入口从“生成 / 导入优先”调整为“开始学习 / 继续学习优先”。
+- 筛选、排序、pack 组合和底部 CTA 逻辑从页面 JSX 中抽离到稳定 selector 层，后续 P1/P2 不需要继续在页面里堆业务规则。
+
+#### 明确不收项
+- 不做 Today 与 Scenes 的统一推荐引擎。
+- 不改 scene detail、TTS、review、chunks 主逻辑。
+- 不做远程搜索和桌面端完整信息架构重排。
+
+#### 剩余风险
+- 当前底部“复习表达”按钮仍是基于 scene list 完成态做最小降级，不是接入正式 review due 聚合。
+- OpenSpec archive、stable spec sync 和 maintenance 收尾仍需在进入完成态前补齐。
+
 ### [2026-05-13] 收口项目验证码作为注册邮箱验证依据
 - 类型：Spec-Driven / 认证主链路语义收口
 - 状态：实施中，待 archive `disable-supabase-confirm-email-after-code-signup`

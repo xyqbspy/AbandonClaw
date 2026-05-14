@@ -3,7 +3,7 @@
 ## ADDED Requirements
 
 ### Requirement: Scenes 必须为新用户提供可直接开始的内置入门场景
-系统应在 `scenes` 主学习入口中，为没有自建内容的新用户提供一组可直接开始学习的内置日常入门场景，避免用户首次进入时只能看到极少内容或空内容。
+系统 MUST 在 `scenes` 主学习入口中，为没有自建内容的新用户提供一组可直接开始学习的内置日常入门场景，避免用户首次进入时只能看到极少内容或空内容。
 
 #### Scenario: 新用户第一次进入 scenes
 - **WHEN** 新用户首次进入 `/scenes`
@@ -17,7 +17,7 @@
 - **AND** 系统不得把空列表或不适合入门的旧内容作为默认首个学习入口
 
 ### Requirement: 内置入门场景必须能进入表达沉淀闭环
-系统应确保 builtin starter scenes 中的核心 chunks/phrases 继续通过现有场景正文结构进入表达沉淀与后续复习链路，而不是单独维护一套不可追踪的静态展示内容。
+系统 MUST 确保 builtin starter scenes 中的核心 chunks/phrases 继续通过现有场景正文结构进入表达沉淀与后续复习链路，而不是单独维护一套不可追踪的静态展示内容。
 
 #### Scenario: 用户学习 builtin starter scene
 - **WHEN** 用户打开并学习任一 builtin starter scene

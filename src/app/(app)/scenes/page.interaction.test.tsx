@@ -103,8 +103,14 @@ const sceneList: SceneListItemResponse[] = [
   {
     id: "scene-1",
     slug: "coffee-chat",
-    title: "Coffee Chat",
-    subtitle: "subtitle",
+    title: "Coffee Chat（咖啡闲聊）",
+    subtitle: "",
+    level: "L0",
+    category: "starter",
+    isStarter: true,
+    isFeatured: true,
+    sortOrder: 1,
+    learningGoal: "Learn the first scene",
     difficulty: "Beginner" as const,
     estimatedMinutes: 5,
     sentenceCount: 6,
@@ -121,6 +127,12 @@ const sceneList: SceneListItemResponse[] = [
     slug: "imported-scene",
     title: "Imported Scene",
     subtitle: "imported subtitle",
+    level: "L1",
+    category: "social",
+    isStarter: false,
+    isFeatured: false,
+    sortOrder: 20,
+    learningGoal: "Continue the imported scene",
     difficulty: "Intermediate" as const,
     estimatedMinutes: 7,
     sentenceCount: 5,
@@ -353,20 +365,44 @@ test("ScenesPage 点击场景卡片时会显示进入中的覆盖态并预热目
   });
 });
 
-test("ScenesPage 的生成与导入入口保持主次按钮层级一致", async () => {
+test("ScenesPage 会把生成与导入降级到筛选操作区", async () => {
   const ScenesPage = getScenesPage();
   render(<ScenesPage />);
 
-  const generateButton = await screen.findByRole("button", { name: "生成场景" });
-  const importButton = screen.getByRole("button", { name: "导入自定义" });
-  const randomButton = screen.getByRole("button", { name: "暂无可循环播放的场景" });
+  await screen.findByText("推荐路径");
+  assert.equal(screen.queryByText("左右滑动，直接从一组最适合你的场景开始。"), null);
 
-  assert.ok(generateButton.className.includes("app-button-primary"));
-  assert.ok(importButton.className.includes("app-button-secondary"));
+  assert.equal(screen.queryByRole("button", { name: "生成场景" }), null);
+  assert.equal(screen.queryByRole("button", { name: "导入自定义" }), null);
+  assert.equal(screen.queryByText("学习场景"), null);
+  assert.equal(screen.getByRole("button", { name: "排序方式" }).textContent?.includes("推荐优先"), true);
+
+  fireEvent.click(screen.getByRole("button", { name: "更多操作" }));
+  await screen.findByText("生成场景");
+  screen.getByText("导入自定义");
+
+  const randomButton = screen.getByRole("button", { name: "暂无可循环播放的场景" });
+  const primaryActionButtons = screen.getAllByRole("button", { name: "继续学 Imported Scene" });
+
   assert.ok(randomButton.className.includes("app-button-secondary"));
   assert.ok(randomButton.className.includes("bg-white"));
+  assert.equal(primaryActionButtons.length >= 1, true);
+  assert.equal(
+    primaryActionButtons.some((button) => button.className.includes("bg-blue-600")),
+    true,
+  );
   assert.equal(randomButton.querySelector('[data-random-review-icon="loop"]') !== null, true);
   assert.equal(randomButton.querySelector("[data-audio-loop-spin]"), null);
+});
+
+test("ScenesPage 筛选与操作区会保留更多操作入口", async () => {
+  const ScenesPage = getScenesPage();
+  render(<ScenesPage />);
+
+  await screen.findByText("推荐路径");
+  const moreButton = screen.getByRole("button", { name: "更多操作" });
+  assert.equal(moreButton.getAttribute("aria-haspopup"), "menu");
+  assert.equal(moreButton.getAttribute("aria-expanded"), "false");
 });
 
 test("ScenesPage 没有 60% 以上场景时循环播放入口不可启动", async () => {
@@ -413,20 +449,8 @@ test("ScenesPage 循环播放会按固定顺序预准备并优先播放 review p
   const randomButton = screen.getByRole("button", { name: "循环播放场景" });
   await waitFor(() => {
     assert.equal(randomButton.getAttribute("title"), "已准备好，可后台循环 2 个场景");
-    screen.getByText("已准备好，可后台循环");
+    assert.equal(screen.queryByRole("button", { name: "查看循环播放内容" }), null);
   });
-  fireEvent.click(screen.getByRole("button", { name: "查看循环播放内容" }));
-  const packList = screen.getByText("本次循环包含 (2)").closest("[data-random-review-pack-list]");
-  assert.ok(packList instanceof HTMLElement);
-  assert.equal(packList.className.includes("absolute"), true);
-  assert.equal(packList.className.includes("z-30"), true);
-  assert.equal(packList.className.includes("text-left"), true);
-  assert.equal(packList.className.includes("rounded-[18px]"), true);
-  assert.equal(packList.className.includes("backdrop-blur-[20px]"), true);
-  assert.equal(within(packList).getByText("Coffee Chat") instanceof HTMLElement, true);
-  assert.equal(within(packList).getByText("Imported Scene") instanceof HTMLElement, true);
-  assert.equal(within(packList).queryByText("subtitle"), null);
-  assert.equal(within(packList).queryByText("imported subtitle"), null);
 
   fireEvent.click(randomButton);
 
@@ -451,13 +475,9 @@ test("ScenesPage 循环播放会按固定顺序预准备并优先播放 review p
 
   const activeRandomButton = screen.getByRole("button", { name: "停止循环播放" });
   assert.equal(activeRandomButton.getAttribute("title"), "循环播放中：2 个场景");
-  screen.getByText("循环播放中：2 个场景");
   assert.ok(activeRandomButton.className.includes("app-button-secondary"));
   assert.ok(activeRandomButton.className.includes("bg-white"));
-  assert.equal(
-    activeRandomButton.querySelector('[data-audio-icon-family="loop"][data-audio-loop-spin="true"]') !== null,
-    true,
-  );
+  assert.equal(activeRandomButton.querySelector('[data-random-review-icon="loop"]') !== null, true);
 
   fireEvent.click(activeRandomButton);
   assert.equal(stopTtsPlaybackCalls > 0, true);
@@ -529,7 +549,6 @@ test("ScenesPage 弱网或省流量下会跳过 review pack 自动准备，点�
 
   await waitFor(() => {
     assert.equal(randomButton.getAttribute("title"), "点击后准备音频");
-    screen.getByText("点击后准备音频");
     assert.deepEqual(sceneFullPrefetchCalls, []);
     assert.equal(
       clientEvents.some((event) => event.name === "scene_review_pack_prepare_skipped"),
@@ -781,7 +800,8 @@ test("ScenesPage 导入成功后会清缓存并强制重新拉取列表", async 
   await screen.findByText("Coffee Chat");
   getScenesCallOptions.length = 0;
 
-  fireEvent.click(screen.getByRole("button", { name: "导入自定义" }));
+  fireEvent.click(screen.getByRole("button", { name: "更多操作" }));
+  fireEvent.click(await screen.findByText("导入自定义"));
 
   const textarea = await screen.findByLabelText("场景文本");
   fireEvent.change(textarea, {
@@ -851,7 +871,8 @@ test("ScenesPage 生成成功后会清缓存并强制重新拉取列表", async 
   await screen.findByText("Coffee Chat");
   getScenesCallOptions.length = 0;
 
-  fireEvent.click(screen.getByRole("button", { name: "生成场景" }));
+  fireEvent.click(screen.getByRole("button", { name: "更多操作" }));
+  fireEvent.click(await screen.findByText("生成场景"));
   fireEvent.click(await screen.findByRole("button", { name: "触发生成成功" }));
 
   await waitFor(() => {
@@ -872,7 +893,8 @@ test("ScenesPage 导入失败时不会误清缓存或强制刷新列表", async 
   await screen.findByText("Coffee Chat");
   getScenesCallOptions.length = 0;
 
-  fireEvent.click(screen.getByRole("button", { name: "导入自定义" }));
+  fireEvent.click(screen.getByRole("button", { name: "更多操作" }));
+  fireEvent.click(await screen.findByText("导入自定义"));
   const textarea = await screen.findByLabelText("场景文本");
   fireEvent.change(textarea, {
     target: { value: "A: failed import" },

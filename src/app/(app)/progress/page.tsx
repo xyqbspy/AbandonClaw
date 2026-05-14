@@ -42,7 +42,7 @@ export default async function ProgressPage() {
   const studyHours = Math.max(0, Math.round((overview.recentStudyMinutes / 60) * 10) / 10);
 
   return (
-    <main className="mx-auto max-w-6xl space-y-8 p-0">
+    <main className="mx-auto max-w-6xl space-y-8 px-6 py-6 sm:py-8 lg:px-10">
       <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-3xl font-black tracking-tight text-slate-900">你的学习节奏</h1>

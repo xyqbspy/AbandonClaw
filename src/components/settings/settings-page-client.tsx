@@ -69,7 +69,7 @@ export function SettingsPageClient({ canAccessAdmin, userDisplay }: SettingsPage
   }, [draft, initialDraft]);
 
   return (
-    <main className="mx-auto max-w-4xl space-y-8">
+    <main className="mx-auto max-w-4xl space-y-8 px-6 py-6 sm:py-8 lg:px-10">
       <header>
         <h1 className="text-3xl font-black tracking-tight text-slate-900">账号与学习偏好</h1>
         <p className="mt-2 text-sm text-slate-500">管理个人信息、学习节奏和发音相关设置。</p>

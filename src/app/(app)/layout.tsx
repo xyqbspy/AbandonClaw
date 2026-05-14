@@ -44,7 +44,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       <AppTopbar userDisplay={userDisplay} />
       <RoutePendingOverlay />
       <PullToRefresh>
-        <div className="app-container py-6 sm:py-8 lg:px-10">{children}</div>
+        <div className="app-container">{children}</div>
       </PullToRefresh>
     </PageShell>
   );

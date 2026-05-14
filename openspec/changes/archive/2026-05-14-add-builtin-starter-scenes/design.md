@@ -1,7 +1,7 @@
 # 设计说明：补齐 Scenes 日常入门默认场景底座
 
 ## Status
-draft
+completed
 
 ## Current Flow
 当前入口：

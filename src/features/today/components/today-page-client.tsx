@@ -381,7 +381,7 @@ export function TodayPageClient({ displayName }: { displayName: string }) {
   }, [continueLearning, todayLearningSnapshot.effectiveCurrentStep]);
 
   return (
-    <div className="mx-auto max-w-[800px] space-y-6 text-foreground">
+    <div className="mx-auto max-w-[800px] space-y-6 px-6 py-6 text-foreground sm:py-8 lg:px-10">
       <TodayWelcomeCard displayName={finalDisplayName} streakDays={dashboard.overview.streakDays} />
 
       <TodayContinueCard

@@ -1,7 +1,7 @@
 # 变更提案：补齐 Scenes 日常入门默认场景底座
 
 ## Status
-draft
+completed
 
 ## Why
 业务背景：

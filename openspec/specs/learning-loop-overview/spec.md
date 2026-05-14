@@ -33,6 +33,59 @@
 - **AND** `today` 的继续学习卡片、今日任务与相关解释必须遵守稳定的 today 聚合契约
 - **AND** 当服务端聚合结果缺失时，前端不得自行重新定义新的学习完成语义
 
+### Requirement: Scenes 必须为新用户提供可直接开始的内置入门场景
+系统 MUST 在 `scenes` 主学习入口中，为没有自建内容的新用户提供一组可直接开始学习的内置日常入门场景，避免用户首次进入时只能看到极少内容或空内容。
+
+#### Scenario: 新用户第一次进入 scenes
+- **WHEN** 新用户首次进入 `/scenes`
+- **THEN** 系统 MUST 返回一组可见的 builtin starter / daily scenes
+- **AND** 这些场景 MUST 自带稳定 slug、标题、预计时长、学习目标与 starter 排序元信息
+- **AND** 用户不需要先导入、生成或创建内容才能开始一轮场景学习
+
+#### Scenario: today 没有 continue learning 时回退到 scene list
+- **WHEN** `today` 没有进行中的 continue learning 且需要从 scene list 选择 fallback 场景
+- **THEN** fallback MUST 能落到一条可直接学习的 builtin starter scene
+- **AND** 系统不得把空列表或不适合入门的旧内容作为默认首个学习入口
+
+### Requirement: 内置入门场景必须能进入表达沉淀闭环
+系统 MUST 确保 builtin starter scenes 中的核心 chunks/phrases 继续通过现有场景正文结构进入表达沉淀与后续复习链路，而不是单独维护一套不可追踪的静态展示内容。
+
+#### Scenario: 用户学习 builtin starter scene
+- **WHEN** 用户打开并学习任一 builtin starter scene
+- **THEN** 场景正文 MUST 继续承载可追踪的句子与 chunk 信息
+- **AND** 用户后续保存表达、追踪 chunks 或进入 review 时，系统 MUST 复用现有主链路能力
+- **AND** 本轮实现不得为了默认内容单独新增一套与现有 scene/chunks/review 脱节的数据模型
+
+### Requirement: Scenes 必须作为移动端优先的学习入口呈现 starter 路径与学习主 CTA
+系统 MUST 在 `/scenes` 中优先呈现新用户可直接开始的 starter 路径、继续学习入口与推荐场景，而不是把生成、导入或管理动作置于同级主入口。
+
+#### Scenario: 新用户首次进入 scenes
+- **WHEN** 新用户首次打开 `/scenes`
+- **THEN** 页面 MUST 展示可直接开始学习的 starter 路径入口
+- **AND** 页面 MUST 基于真实 scene list 数据给出至少一个可执行的开始学习 CTA
+- **AND** 生成 / 导入等辅助动作 MUST 保留，但不得压过主学习 CTA
+
+#### Scenario: 用户已有继续学习场景
+- **WHEN** 用户存在继续学习或可恢复的场景
+- **THEN** `/scenes` 页面 MUST 优先展示继续学习 CTA
+- **AND** 该 CTA MUST 指向现有 scene detail 学习链路
+- **AND** 页面不得为了新的入口展示重新定义一套与既有学习状态冲突的完成语义
+
+### Requirement: Scenes 必须允许用户按基础学习元字段浏览和筛选默认场景
+系统 MUST 允许用户在 `/scenes` 中基于现有 scene list 元字段浏览、筛选和排序内置默认场景，以便快速找到适合自己的日常入门内容。
+
+#### Scenario: 用户按 level/category/source_type 筛选场景
+- **WHEN** 用户在 `/scenes` 中切换 level、category 或 source_type
+- **THEN** 页面 MUST 立即基于当前 scene list 更新结果
+- **AND** 筛选逻辑 MUST 兼容字段缺失的旧数据，不得导致页面报错
+- **AND** 无结果时 MUST 给出清晰空状态与清除筛选入口
+
+#### Scenario: 页面展示 starter packs
+- **WHEN** `/scenes` 渲染推荐路径或 pack 卡片
+- **THEN** pack 组合 MUST 基于真实 scenes 数据，而不是硬编码静态 mock
+- **AND** Start Here MUST 优先由 starter 类 builtin scenes 组成
+- **AND** pack CTA MUST 指向该 pack 内第一个未完成或排序最靠前的场景
+
 ### Requirement: Scene 必须作为主学习流程工作台
 系统 MUST 允许用户在 `scene` 中完成语境阅读、句子交互、表达提取、练习推进与变体扩展等核心学习行为，并保证用户从其他页面进入场景时，在等待路由或首屏数据期间仍能看到稳定的结构化占位，而不是整页空白。涉及对话气泡下方翻译入口、朗读按钮形态与音频交互编排的专项规则，MUST 分别遵守 `audio-action-button-consistency` 与 `audio-playback-orchestration` capability，而不是在学习闭环总览中重复展开页面交互细节。
 

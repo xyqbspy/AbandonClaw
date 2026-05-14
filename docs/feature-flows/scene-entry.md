@@ -5,6 +5,8 @@
 这份文档说明 `scenes` 页从“列表加载”到“进入场景”的主要链路，重点覆盖：
 
 - 列表缓存与网络刷新
+- 默认 builtin 入门场景与 starter 路径
+- 移动端筛选与底部主 CTA
 - 场景进入前预热
 - 导入、生成、删除
 - 侧滑删除手势
@@ -23,10 +25,27 @@
 只负责页面装配：
 
 - 渲染列表卡片
+- 渲染推荐路径、粘性筛选区和底部主 CTA
 - 连接生成、导入、删除三个弹层
 - 把 loading、opening、top task、swipe offset 这些状态翻译成 UI
 
-### 2.2 `useScenesPageData`
+### 2.2 `scene-display.ts`
+
+负责纯展示派生逻辑：
+
+- `level/category/source_type` 规范化与中文标签
+- 推荐排序、简单优先、最近学习排序
+- 本地筛选与空态判断
+- starter pack 组合与 pack CTA 选择
+- 底部主 CTA 选择
+
+维护约束：
+
+- 不要把这些 selector 规则散回 `page.tsx`
+- 新增场景元字段展示时，优先补这里的纯函数和单测
+- 底部主 CTA 可以使用更短的展示标题，但不得改变真实跳转目标
+
+### 2.3 `useScenesPageData`
 
 负责真正的数据链路：
 
@@ -36,7 +55,7 @@
 - `topTask` 顶部状态提示
 - 下拉刷新事件接入
 
-### 2.3 `useSceneSwipeActions`
+### 2.4 `useSceneSwipeActions`
 
 负责手势层：
 
@@ -62,6 +81,28 @@
 
 - 不要把“命中缓存”理解成“本轮不再发网络”
 - 不要在局部改动里破坏 `preferCache + forceNetwork` 这组刷新语义
+
+## 3.1 默认 builtin 入门场景
+
+`/api/scenes` 列表现在会透出 builtin starter / daily scenes 的展示元字段：
+
+- `level`
+- `category`
+- `sourceType`
+- `isStarter`
+- `isFeatured`
+- `sortOrder`
+- `estimatedMinutes`
+- `learningGoal`
+- `tags`
+
+默认排序由服务端保证 starter / featured / sort order 优先，前端 selector 再做本地 pack、筛选和 CTA 派生。
+
+维护约束：
+
+- 默认场景必须继续通过现有 `scene_json` 承载正文与 chunks，不新增脱离主链路的静态内容模型
+- 扩展 builtin 内容时必须保持 slug 唯一、seed 幂等和 scene list 字段透出
+- today fallback 依赖 scene list 顺序时，应能落到可直接学习的 builtin starter scene
 
 ## 4. 进入场景前预热
 
@@ -228,3 +269,13 @@
 - 不要复用 scene detail 的单场景 loop 行为来实现跨场景队列，否则会停在单个场景内循环。
 - 不要在启动时批量预生成所有合格场景的 scene full 音频，避免一次点击触发过多 TTS 任务。
 - 这里的 review pack 是播放前合并 TTS segments，不是 ffmpeg 文件级拼接，也不把新场景热插入正在播放的旧音频尾部。
+## 10. 2026-05 Scenes 移动端学习入口补充
+
+- `/scenes` 现在不再只承担“场景列表 / 管理”职责，还承担移动端新用户学习入口。
+- 首屏优先级调整为：继续学习 / Start Here / 推荐路径 / 场景筛选，而不是生成 / 导入。
+- 推荐路径必须基于真实 `scene list` 数据组合 starter packs，不能在前端硬编码静态 mock 场景。
+- 筛选与操作区按 `scenesNew.html` 的层级组织：横向分类 pill、等级 / 来源下拉、排序按钮和更多操作按钮。
+- 页面层新增的筛选、排序、pack 组合和主 CTA 逻辑，应继续放在 selector / utility 层，避免散落回页面 JSX。
+- 进入具体场景时，仍必须复用原有 `openSceneRoute()` 的预热、短等待窗口和进入中 overlay，不得因 UI 改造绕过。
+- 导入、生成、删除、review pack 仍保留，但属于次级动作，不能再次提升到与主学习 CTA 同级；生成 / 导入当前从筛选区更多菜单进入。
+- 底部主 CTA 只承载开始 / 继续 / 复习类学习动作，文案优先使用短展示标题，例如 `继续学 Ordering Coffee`。
