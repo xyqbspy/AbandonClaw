@@ -15,7 +15,6 @@ import { SceneListCard } from "./scene-list-card";
 import {
   filterScenes,
   getPrimarySceneAction,
-  groupScenesIntoStarterPacks,
   hasActiveFilters,
   SceneFilters,
   SceneSortOption,
@@ -25,7 +24,6 @@ import {
 import { SceneDeleteDialog } from "./scene-delete-dialog";
 import { SceneImportDialog } from "./scene-import-dialog";
 import { ScenesBottomActionBar } from "./scenes-bottom-action-bar";
-import { StarterPathCarousel } from "./starter-path-carousel";
 import { useSceneRandomReviewPlayback } from "./use-scene-random-review-playback";
 import { useSceneSwipeActions } from "./use-scene-swipe-actions";
 import { useScenesPageData } from "./use-scenes-page-data";
@@ -78,7 +76,6 @@ export default function ScenesPage() {
     toggleRandomReview,
   } = useSceneRandomReviewPlayback(allScenes);
 
-  const packs = useMemo(() => groupScenesIntoStarterPacks(allScenes), [allScenes]);
   const activeScene = useMemo(
     () =>
       sortScenesByRecent(
@@ -129,7 +126,7 @@ export default function ScenesPage() {
 
   return (
     <div className="relative pb-[8rem] font-sans">
-      <main className="space-y-8" onScroll={() => closeOpenedSwipe()}>
+      <main onScroll={() => closeOpenedSwipe()}>
         {topTask ? (
           <div className="px-6">
             <div
@@ -146,14 +143,7 @@ export default function ScenesPage() {
           </div>
         ) : null}
 
-        <StarterPathCarousel
-          packs={packs}
-          onOpenPackScene={(sceneSlug) => {
-            handleOpenScene(sceneSlug);
-          }}
-        />
-
-        <section className="sticky top-0 z-20 border-b border-slate-100 bg-[#f8fafc]/90 py-4 backdrop-blur-md">
+        <section className="sticky top-0 z-20 border-b border-slate-100 bg-[var(--app-page-background)] py-4 backdrop-blur-md">
           <SceneFilterBar
             category={filters.category}
             level={filters.level}

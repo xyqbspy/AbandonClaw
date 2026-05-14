@@ -25,7 +25,7 @@ export function ScenesBottomActionBar({
 }: ScenesBottomActionBarProps) {
   return (
     <div
-      className="fixed bottom-0 left-0 right-0 z-40 bg-white p-6"
+      className="fixed bottom-0 left-0 right-0 z-40 bg-gradient-to-t from-white via-white/95 to-transparent p-6"
       style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 1rem)" }}
     >
       <div className="mx-auto flex w-full max-w-md gap-3">

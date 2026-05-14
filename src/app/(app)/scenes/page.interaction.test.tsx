@@ -365,11 +365,12 @@ test("ScenesPage 点击场景卡片时会显示进入中的覆盖态并预热目
   });
 });
 
-test("ScenesPage 会把生成与导入降级到筛选操作区", async () => {
+test("ScenesPage 会隐藏顶部推荐路径并把生成与导入降级到筛选操作区", async () => {
   const ScenesPage = getScenesPage();
   render(<ScenesPage />);
 
-  await screen.findByText("推荐路径");
+  await screen.findByRole("button", { name: "排序方式" });
+  assert.equal(screen.queryByText("推荐路径"), null);
   assert.equal(screen.queryByText("左右滑动，直接从一组最适合你的场景开始。"), null);
 
   assert.equal(screen.queryByRole("button", { name: "生成场景" }), null);
@@ -395,11 +396,11 @@ test("ScenesPage 会把生成与导入降级到筛选操作区", async () => {
   assert.equal(randomButton.querySelector("[data-audio-loop-spin]"), null);
 });
 
-test("ScenesPage 筛选与操作区会保留更多操作入口", async () => {
+test("ScenesPage 筛选与操作区会保留固定的更多操作入口", async () => {
   const ScenesPage = getScenesPage();
   render(<ScenesPage />);
 
-  await screen.findByText("推荐路径");
+  await screen.findByRole("button", { name: "排序方式" });
   const moreButton = screen.getByRole("button", { name: "更多操作" });
   assert.equal(moreButton.getAttribute("aria-haspopup"), "menu");
   assert.equal(moreButton.getAttribute("aria-expanded"), "false");

@@ -150,6 +150,11 @@ export const splitSceneTitleParts = (title?: string | null) => {
   };
 };
 
+const getScenePrimaryActionTitle = (scene: SceneListItemResponse) => {
+  const titleParts = splitSceneTitleParts(scene.title);
+  return titleParts.englishTitle || scene.title;
+};
+
 export const getSceneStatus = (scene: SceneListItemResponse) => {
   switch (scene.learningStatus) {
     case "in_progress":
@@ -314,8 +319,7 @@ export const getPrimarySceneAction = (scenes: SceneListItemResponse[]): PrimaryS
     scenes.filter((scene) => scene.learningStatus === "in_progress" || scene.learningStatus === "paused" || scene.progressPercent > 0),
   )[0];
   if (continueScene) {
-    const titleParts = splitSceneTitleParts(continueScene.title);
-    const displayTitle = titleParts.englishTitle || continueScene.title;
+    const displayTitle = getScenePrimaryActionTitle(continueScene);
     return {
       kind: continueScene.learningStatus === "completed" ? "review" : "continue",
       label: continueScene.learningStatus === "completed"
@@ -328,9 +332,10 @@ export const getPrimarySceneAction = (scenes: SceneListItemResponse[]): PrimaryS
 
   const starterScene = recommended.find((scene) => scene.isStarter === true);
   if (starterScene) {
+    const displayTitle = getScenePrimaryActionTitle(starterScene);
     return {
       kind: "start",
-      label: `开始 ${starterScene.title}`,
+      label: `开始 ${displayTitle}`,
       href: `/scene/${starterScene.slug}`,
       scene: starterScene,
     };
@@ -340,9 +345,10 @@ export const getPrimarySceneAction = (scenes: SceneListItemResponse[]): PrimaryS
     scenes.filter((scene) => scene.learningStatus === "completed" || scene.progressPercent >= 100),
   )[0];
   if (reviewScene) {
+    const displayTitle = getScenePrimaryActionTitle(reviewScene);
     return {
       kind: "review",
-      label: `复习 ${reviewScene.title}`,
+      label: `复习 ${displayTitle}`,
       href: `/scene/${reviewScene.slug}`,
       scene: reviewScene,
     };
@@ -350,9 +356,10 @@ export const getPrimarySceneAction = (scenes: SceneListItemResponse[]): PrimaryS
 
   const fallbackScene = recommended[0];
   if (fallbackScene) {
+    const displayTitle = getScenePrimaryActionTitle(fallbackScene);
     return {
       kind: "start",
-      label: `开始 ${fallbackScene.title}`,
+      label: `开始 ${displayTitle}`,
       href: `/scene/${fallbackScene.slug}`,
       scene: fallbackScene,
     };

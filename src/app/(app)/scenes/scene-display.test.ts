@@ -170,3 +170,18 @@ test("scene-display 底部继续 CTA 会使用继续学和英文标题", () => {
   assert.equal(action.kind, "continue");
   assert.equal(action.label, "继续学 Ordering Coffee");
 });
+
+test("scene-display 底部开始 CTA 会使用英文标题", () => {
+  const action = getPrimarySceneAction([
+    {
+      ...scenes[0],
+      title: "Daily Greeting（日常问候）",
+      learningStatus: "not_started",
+      progressPercent: 0,
+      lastViewedAt: null,
+    },
+  ]);
+
+  assert.equal(action.kind, "start");
+  assert.equal(action.label, "开始 Daily Greeting");
+});
