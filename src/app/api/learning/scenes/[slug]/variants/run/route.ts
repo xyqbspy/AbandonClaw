@@ -35,7 +35,7 @@ export async function POST(
     });
     return NextResponse.json(result, { status: 200 });
   } catch (error) {
-    return toApiErrorResponse(error, "Failed to start scene variant run.");
+    return toApiErrorResponse(error, "Failed to start scene variant run.", { request });
   }
 }
 
@@ -56,6 +56,6 @@ export async function GET(
     });
     return NextResponse.json(result, { status: 200 });
   } catch (error) {
-    return toApiErrorResponse(error, "Failed to load scene variant run snapshot.");
+    return toApiErrorResponse(error, "Failed to load scene variant run snapshot.", { request });
   }
 }

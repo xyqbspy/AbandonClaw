@@ -51,11 +51,11 @@ test("move handler 缺少必填字段时返回 400", async () => {
   );
 
   assert.equal(response.status, 400);
-  assert.deepEqual(await response.json(), {
-    error: "targetClusterId must be a string.",
-    code: "VALIDATION_ERROR",
-    details: null,
-  });
+  const body = await response.json();
+  assert.equal(body.error, "targetClusterId must be a string.");
+  assert.equal(body.code, "VALIDATION_ERROR");
+  assert.equal(body.details, null);
+  assert.equal(typeof body.requestId, "string");
 });
 
 test("ensure handler 会裁剪 title 并返回 200", async () => {
@@ -133,9 +133,9 @@ test("detach handler 会透传 service 的 ValidationError 为 400", async () =>
   );
 
   assert.equal(response.status, 400);
-  assert.deepEqual(await response.json(), {
-    error: "Cannot detach the only expression in a cluster.",
-    code: "VALIDATION_ERROR",
-    details: null,
-  });
+  const body = await response.json();
+  assert.equal(body.error, "Cannot detach the only expression in a cluster.");
+  assert.equal(body.code, "VALIDATION_ERROR");
+  assert.equal(body.details, null);
+  assert.equal(typeof body.requestId, "string");
 });

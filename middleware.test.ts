@@ -101,6 +101,8 @@ test("middleware 会拒绝未验证邮箱用户调用受保护 API", async () =>
   assert.equal(response.status, 403);
   const body = await response.json();
   assert.equal(body.error, "Email verification required.");
+  assert.equal(body.code, "AUTH_FORBIDDEN");
+  assert.equal(body.details, null);
   assert.equal(typeof body.requestId, "string");
 });
 
@@ -135,7 +137,7 @@ test("middleware 会拦截危险的协议相对 redirect 参数", async () => {
   );
 
   assert.equal(response.status, 307);
-  assert.equal(response.headers.get("location"), "http://localhost/scenes");
+  assert.equal(response.headers.get("location"), "http://localhost/today");
 });
 
 test("middleware 会阻止非管理员访问 /admin", async () => {
@@ -167,6 +169,8 @@ test("middleware 会对未登录的受保护 learning API 返回 401", async () 
   assert.equal(response.status, 401);
   const body = await response.json();
   assert.equal(body.error, "Unauthorized");
+  assert.equal(body.code, "AUTH_UNAUTHORIZED");
+  assert.equal(body.details, null);
   assert.equal(typeof body.requestId, "string");
 });
 
@@ -179,5 +183,7 @@ test("middleware 会对未登录的高成本 explain-selection 返回 401", asyn
   assert.equal(response.status, 401);
   const body = await response.json();
   assert.equal(body.error, "Unauthorized");
+  assert.equal(body.code, "AUTH_UNAUTHORIZED");
+  assert.equal(body.details, null);
   assert.equal(typeof body.requestId, "string");
 });

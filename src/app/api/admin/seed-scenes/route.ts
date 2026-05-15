@@ -3,7 +3,7 @@ import { requireAdmin } from "@/lib/server/auth";
 import { toApiErrorResponse } from "@/lib/server/api-error";
 import { runSeedScenesSync } from "@/lib/server/scene/service";
 
-export async function POST() {
+export async function POST(request: Request) {
   try {
     await requireAdmin();
     const result = await runSeedScenesSync();
@@ -15,6 +15,6 @@ export async function POST() {
       { status: 200 },
     );
   } catch (error) {
-    return toApiErrorResponse(error, "Failed to sync seed scenes.");
+    return toApiErrorResponse(error, "Failed to sync seed scenes.", { request });
   }
 }

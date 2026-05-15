@@ -96,7 +96,8 @@ test("scene learning start handler 对相同幂等 key 只执行一次", async (
   });
 
   const dependencies = {
-    requireCurrentProfile: async () => ({ user: { id: "user-1" } } as never),
+    requireCurrentProfile: async () =>
+      ({ user: { id: "user-1" }, profile: { access_status: "active" } }) as never,
     startSceneLearning: async () => {
       startCount += 1;
       return { started: true, count: startCount } as never;
@@ -126,7 +127,8 @@ test("scene learning start handler 会透传 userId 与 slug", async () => {
   const response = await handleSceneLearningStartPost(
     { params: Promise.resolve({ slug: "scene-1" }) },
     {
-      requireCurrentProfile: async () => ({ user: { id: "user-1" } } as never),
+      requireCurrentProfile: async () =>
+        ({ user: { id: "user-1" }, profile: { access_status: "active" } }) as never,
       startSceneLearning: async (userId, slug) => {
         received = { userId, slug };
         return { started: true } as never;
@@ -144,7 +146,8 @@ test("scene learning pause handler 会透传 ValidationError 并附带 requestId
   const response = await handleSceneLearningPausePost(
     { params: Promise.resolve({ slug: "scene-1" }) },
     {
-      requireCurrentProfile: async () => ({ user: { id: "user-1" } } as never),
+      requireCurrentProfile: async () =>
+        ({ user: { id: "user-1" }, profile: { access_status: "active" } }) as never,
       startSceneLearning: async () => ({ started: true }) as never,
       pauseSceneLearning: async () => {
         throw new ValidationError("pauseSceneLearning is not allowed.");

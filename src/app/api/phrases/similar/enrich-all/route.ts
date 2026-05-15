@@ -64,6 +64,6 @@ export async function POST(request: Request) {
     }
     return NextResponse.json({ items: results }, { status: 200 });
   } catch (error) {
-    return toApiErrorResponse(error, "Failed to enrich similar expressions in batch.");
+    return toApiErrorResponse(error, "Failed to enrich similar expressions in batch.", { request });
   }
 }

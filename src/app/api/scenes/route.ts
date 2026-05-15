@@ -5,7 +5,7 @@ import { listScenes } from "@/lib/server/scene/service";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(request?: Request) {
   try {
     const { user } = await requireCurrentProfile();
     const scenes = await listScenes({ userId: user.id });
@@ -19,6 +19,6 @@ export async function GET() {
       },
     );
   } catch (error) {
-    return toApiErrorResponse(error, "Failed to load scenes.");
+    return toApiErrorResponse(error, "Failed to load scenes.", { request });
   }
 }

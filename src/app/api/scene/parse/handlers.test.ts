@@ -32,14 +32,14 @@ test("scene parse handler 在解析失败时返回 422 和结构化错误", asyn
   );
 
   assert.equal(response.status, 422);
-  assert.deepEqual(await response.json(), {
-    error: "场景解析失败，请稍后重试。",
-    code: "SCENE_PARSE_ERROR",
-    details: {
-      stage: "scene_import_retry_failed",
-      parseError: "Extracted JSON candidate is still invalid JSON.",
-    },
+  const body = await response.json();
+  assert.equal(body.error, "场景解析失败，请稍后重试。");
+  assert.equal(body.code, "SCENE_PARSE_ERROR");
+  assert.deepEqual(body.details, {
+    stage: "scene_import_retry_failed",
+    parseError: "Extracted JSON candidate is still invalid JSON.",
   });
+  assert.equal(typeof body.requestId, "string");
   assert.equal(logs.length, 1);
 });
 
@@ -102,9 +102,9 @@ test("scene parse handler 会拒绝未登录请求", async () => {
   });
 
   assert.equal(response.status, 401);
-  assert.deepEqual(await response.json(), {
-    error: "Unauthorized",
-    code: "AUTH_UNAUTHORIZED",
-    details: null,
-  });
+  const body = await response.json();
+  assert.equal(body.error, "Unauthorized");
+  assert.equal(body.code, "AUTH_UNAUTHORIZED");
+  assert.equal(body.details, null);
+  assert.equal(typeof body.requestId, "string");
 });

@@ -23,13 +23,14 @@ const defaultContinueLearningDependencies: ContinueLearningHandlerDependencies =
 
 export async function handleContinueLearningGet(
   dependencies: ContinueLearningHandlerDependencies = defaultContinueLearningDependencies,
+  request?: Request,
 ) {
   try {
     const { user } = await dependencies.requireCurrentProfile();
     const continueLearning = await dependencies.getContinueLearningScene(user.id);
     return NextResponse.json({ continueLearning }, { status: 200 });
   } catch (error) {
-    return toApiErrorResponse(error, "Failed to load continue learning.");
+    return toApiErrorResponse(error, "Failed to load continue learning.", { request });
   }
 }
 
@@ -62,6 +63,6 @@ export async function handleLearningProgressGet(
     });
     return NextResponse.json(result, { status: 200 });
   } catch (error) {
-    return toApiErrorResponse(error, "Failed to load learning progress.");
+    return toApiErrorResponse(error, "Failed to load learning progress.", { request });
   }
 }

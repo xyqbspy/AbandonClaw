@@ -105,6 +105,6 @@ export async function GET(request: Request) {
       },
     );
   } catch (error) {
-    return toApiErrorResponse(error, "Failed to list user phrases.");
+    return toApiErrorResponse(error, "Failed to list user phrases.", { request });
   }
 }

@@ -211,6 +211,6 @@ export async function POST(request: Request) {
       { status: 200 },
     );
   } catch (error) {
-    return toApiErrorResponse(error, "Manual phrase assist failed.");
+    return toApiErrorResponse(error, "Manual phrase assist failed.", { request });
   }
 }

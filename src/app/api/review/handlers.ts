@@ -54,7 +54,7 @@ export async function handleReviewDueGet(
     ]);
     return NextResponse.json({ rows, total: rows.length, scenePracticeRows }, { status: 200 });
   } catch (error) {
-    return toApiErrorResponse(error, "Failed to load due review items.");
+    return toApiErrorResponse(error, "Failed to load due review items.", { request });
   }
 }
 

@@ -77,7 +77,7 @@ export const handleMoveExpressionClusterMemberPost = async (
     });
     return NextResponse.json(result, { status: 200 });
   } catch (error) {
-    return toApiErrorResponse(error, "Failed to move expression cluster member.");
+    return toApiErrorResponse(error, "Failed to move expression cluster member.", { request });
   }
 };
 
@@ -105,7 +105,7 @@ export const handleEnsureExpressionClusterPost = async (
     });
     return NextResponse.json(result, { status: 200 });
   } catch (error) {
-    return toApiErrorResponse(error, "Failed to ensure expression cluster.");
+    return toApiErrorResponse(error, "Failed to ensure expression cluster.", { request });
   }
 };
 
@@ -144,7 +144,7 @@ export const handleDetachExpressionClusterMemberPost = async (
     });
     return NextResponse.json(result, { status: 200 });
   } catch (error) {
-    return toApiErrorResponse(error, "Failed to detach expression cluster member.");
+    return toApiErrorResponse(error, "Failed to detach expression cluster member.", { request });
   }
 };
 
@@ -187,7 +187,7 @@ export const handleMergeExpressionClustersPost = async (
     });
     return NextResponse.json(result, { status: 200 });
   } catch (error) {
-    return toApiErrorResponse(error, "Failed to merge expression clusters.");
+    return toApiErrorResponse(error, "Failed to merge expression clusters.", { request });
   }
 };
 
@@ -220,6 +220,6 @@ export const handleSetExpressionClusterMainPost = async (
     });
     return NextResponse.json(result, { status: 200 });
   } catch (error) {
-    return toApiErrorResponse(error, "Failed to set expression cluster main.");
+    return toApiErrorResponse(error, "Failed to set expression cluster main.", { request });
   }
 };

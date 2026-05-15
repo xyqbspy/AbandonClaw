@@ -64,6 +64,6 @@ export async function handleSceneParsePost(
         ...(isAppError(error) ? { code: error.code, details: error.details ?? null } : {}),
       });
     }
-    return toApiErrorResponse(error, "Scene parse failed.");
+    return toApiErrorResponse(error, "Scene parse failed.", { request });
   }
 }

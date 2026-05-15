@@ -22,6 +22,6 @@ export async function POST(
     });
     return NextResponse.json(result, { status: 200 });
   } catch (error) {
-    return toApiErrorResponse(error, "Failed to complete scene variant run.");
+    return toApiErrorResponse(error, "Failed to complete scene variant run.", { request });
   }
 }

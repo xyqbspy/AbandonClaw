@@ -50,6 +50,6 @@ export async function POST(
     });
     return NextResponse.json(result, { status: 200 });
   } catch (error) {
-    return toApiErrorResponse(error, "Failed to record scene training event.");
+    return toApiErrorResponse(error, "Failed to record scene training event.", { request });
   }
 }

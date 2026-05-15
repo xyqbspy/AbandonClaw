@@ -25,6 +25,6 @@ export async function GET(
     const items = await getRecommendedPhrasesForScene(user.id, slug, { limit });
     return NextResponse.json({ items }, { status: 200 });
   } catch (error) {
-    return toApiErrorResponse(error, "Failed to load scene phrase recommendations.");
+    return toApiErrorResponse(error, "Failed to load scene phrase recommendations.", { request });
   }
 }

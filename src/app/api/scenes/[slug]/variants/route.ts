@@ -32,7 +32,7 @@ const toSceneVariantsResponse = (variants: ParsedScene[]) => ({
 });
 
 export async function GET(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ slug: string }> },
 ) {
   try {
@@ -62,7 +62,7 @@ export async function GET(
       { status: 200 },
     );
   } catch (error) {
-    return toApiErrorResponse(error, "Failed to load scene variants.");
+    return toApiErrorResponse(error, "Failed to load scene variants.", { request });
   }
 }
 
@@ -122,6 +122,6 @@ export async function POST(
       { status: 200 },
     );
   } catch (error) {
-    return toApiErrorResponse(error, "Failed to generate variants.");
+    return toApiErrorResponse(error, "Failed to generate variants.", { request });
   }
 }

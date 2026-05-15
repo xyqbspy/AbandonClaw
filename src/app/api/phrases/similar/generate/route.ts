@@ -143,6 +143,6 @@ export async function POST(request: Request) {
       { status: 200 },
     );
   } catch (error) {
-    return toApiErrorResponse(error, "Similar expression generate failed.");
+    return toApiErrorResponse(error, "Similar expression generate failed.", { request });
   }
 }

@@ -1,6 +1,6 @@
 import { handleContinueLearningGet } from "../handlers";
 
-export async function GET() {
-  return handleContinueLearningGet();
+export async function GET(request: Request) {
+  return handleContinueLearningGet(undefined, request);
 }
 

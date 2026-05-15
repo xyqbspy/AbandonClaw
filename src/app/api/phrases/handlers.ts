@@ -9,7 +9,7 @@ type RequireCurrentProfile = () => Promise<{ user: { id: string }; profile: Prof
 type DeleteUserPhraseForUser = (userId: string, userPhraseId: string) => Promise<unknown>;
 
 export const handleDeleteUserPhrase = async (
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ userPhraseId: string }> },
   deps: {
     requireCurrentProfile: RequireCurrentProfile;
@@ -29,6 +29,6 @@ export const handleDeleteUserPhrase = async (
     const result = await deps.deleteUserPhraseForUser(user.id, normalizedUserPhraseId);
     return NextResponse.json(result, { status: 200 });
   } catch (error) {
-    return toApiErrorResponse(error, "Failed to delete user phrase.");
+    return toApiErrorResponse(error, "Failed to delete user phrase.", { request });
   }
 };

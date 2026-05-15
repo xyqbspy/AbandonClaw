@@ -31,6 +31,6 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ rows }, { status: 200 });
   } catch (error) {
-    return toApiErrorResponse(error, "Failed to load phrase relations.");
+    return toApiErrorResponse(error, "Failed to load phrase relations.", { request });
   }
 }

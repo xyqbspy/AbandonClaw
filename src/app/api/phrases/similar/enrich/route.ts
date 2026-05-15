@@ -36,6 +36,6 @@ export async function POST(request: Request) {
     });
     return NextResponse.json(result, { status: 200 });
   } catch (error) {
-    return toApiErrorResponse(error, "Failed to enrich similar expression.");
+    return toApiErrorResponse(error, "Failed to enrich similar expression.", { request });
   }
 }

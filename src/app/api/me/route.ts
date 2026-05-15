@@ -15,7 +15,10 @@ const defaultDependencies: MeRouteDependencies = {
   getCurrentProfileForUser,
 };
 
-export async function handleMeGet(dependencies: MeRouteDependencies = defaultDependencies) {
+export async function handleMeGet(
+  dependencies: MeRouteDependencies = defaultDependencies,
+  request?: Request,
+) {
   try {
     const user = await dependencies.getCurrentUser();
     if (!user) {
@@ -25,10 +28,10 @@ export async function handleMeGet(dependencies: MeRouteDependencies = defaultDep
     const profile = await dependencies.getCurrentProfileForUser(user);
     return NextResponse.json({ user, profile }, { status: 200 });
   } catch (error) {
-    return toApiErrorResponse(error, "Failed to load current user.");
+    return toApiErrorResponse(error, "Failed to load current user.", { request });
   }
 }
 
-export async function GET() {
-  return handleMeGet();
+export async function GET(request: Request) {
+  return handleMeGet(defaultDependencies, request);
 }

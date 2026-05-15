@@ -37,7 +37,7 @@ export async function POST(
     });
     return NextResponse.json(result, { status: 200 });
   } catch (error) {
-    return toApiErrorResponse(error, "Failed to start scene practice run.");
+    return toApiErrorResponse(error, "Failed to start scene practice run.", { request });
   }
 }
 
@@ -55,6 +55,6 @@ export async function GET(
     });
     return NextResponse.json(result, { status: 200 });
   } catch (error) {
-    return toApiErrorResponse(error, "Failed to load scene practice run.");
+    return toApiErrorResponse(error, "Failed to load scene practice run.", { request });
   }
 }

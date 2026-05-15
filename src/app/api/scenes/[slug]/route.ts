@@ -5,7 +5,7 @@ import { ForbiddenError, NotFoundError } from "@/lib/server/errors";
 import { deleteImportedScene, getSceneBySlug } from "@/lib/server/scene/service";
 
 export async function GET(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ slug: string }> },
 ) {
   try {
@@ -27,12 +27,12 @@ export async function GET(
       },
     );
   } catch (error) {
-    return toApiErrorResponse(error, "Failed to load scene.");
+    return toApiErrorResponse(error, "Failed to load scene.", { request });
   }
 }
 
 export async function DELETE(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ slug: string }> },
 ) {
   try {
@@ -49,6 +49,6 @@ export async function DELETE(
     await deleteImportedScene({ sceneId: scene.id, userId: user.id });
     return NextResponse.json({ ok: true }, { status: 200 });
   } catch (error) {
-    return toApiErrorResponse(error, "Failed to delete scene.");
+    return toApiErrorResponse(error, "Failed to delete scene.", { request });
   }
 }

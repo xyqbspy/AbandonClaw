@@ -13,6 +13,6 @@ export async function POST(request: Request) {
     const result = await enrichAdminUserPhrasesByIds(userPhraseIds);
     return NextResponse.json(result, { status: 200 });
   } catch (error) {
-    return toApiErrorResponse(error, "Failed to enrich admin phrases in batch.");
+    return toApiErrorResponse(error, "Failed to enrich admin phrases in batch.", { request });
   }
 }

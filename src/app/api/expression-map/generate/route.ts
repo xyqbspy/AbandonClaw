@@ -46,6 +46,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json(response, { status: 200 });
   } catch (error) {
-    return toApiErrorResponse(error, "Failed to generate expression map.");
+    return toApiErrorResponse(error, "Failed to generate expression map.", { request });
   }
 }

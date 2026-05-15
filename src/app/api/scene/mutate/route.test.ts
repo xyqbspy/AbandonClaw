@@ -38,11 +38,11 @@ test("scene mutate handler 会拒绝未登录请求", async () => {
   });
 
   assert.equal(response.status, 401);
-  assert.deepEqual(await response.json(), {
-    error: "Unauthorized",
-    code: "AUTH_UNAUTHORIZED",
-    details: null,
-  });
+  const body = await response.json();
+  assert.equal(body.error, "Unauthorized");
+  assert.equal(body.code, "AUTH_UNAUTHORIZED");
+  assert.equal(body.details, null);
+  assert.equal(typeof body.requestId, "string");
 });
 
 test("scene mutate handler 会返回模型解析后的 variants", async () => {

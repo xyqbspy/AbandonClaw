@@ -172,14 +172,30 @@ export async function handleMiddleware(
 
   if (!user && isProtectedApiPath(pathname)) {
     return attachRequestIdToResponse(
-      dependencies.json({ error: "Unauthorized", requestId }, { status: 401 }),
+      dependencies.json(
+        {
+          error: "Unauthorized",
+          code: "AUTH_UNAUTHORIZED",
+          details: null,
+          requestId,
+        },
+        { status: 401 },
+      ),
       requestId,
     );
   }
 
   if (user && !isEmailVerifiedUser(user) && isProtectedApiPath(pathname)) {
     return attachRequestIdToResponse(
-      dependencies.json({ error: "Email verification required.", requestId }, { status: 403 }),
+      dependencies.json(
+        {
+          error: "Email verification required.",
+          code: "AUTH_FORBIDDEN",
+          details: null,
+          requestId,
+        },
+        { status: 403 },
+      ),
       requestId,
     );
   }

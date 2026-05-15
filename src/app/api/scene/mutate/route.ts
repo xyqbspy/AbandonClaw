@@ -136,7 +136,7 @@ export async function handleSceneMutatePost(
 
     return NextResponse.json(parsed, { status: 200 });
   } catch (error) {
-    return toApiErrorResponse(error, "Scene mutate failed.");
+    return toApiErrorResponse(error, "Scene mutate failed.", { request });
   }
 }
 

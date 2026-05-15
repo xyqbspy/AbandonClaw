@@ -21,6 +21,7 @@ const defaultDependencies: AdminStatusDependencies = {
 
 export async function handleAdminStatusGet(
   dependencies: AdminStatusDependencies = defaultDependencies,
+  request?: Request,
 ) {
   try {
     const adminUser = await dependencies.requireAdmin();
@@ -38,11 +39,11 @@ export async function handleAdminStatusGet(
       { status: 200 },
     );
   } catch (error) {
-    return toApiErrorResponse(error, "Failed to load admin status.");
+    return toApiErrorResponse(error, "Failed to load admin status.", { request });
   }
 }
 
-export async function GET() {
-  return handleAdminStatusGet();
+export async function GET(request: Request) {
+  return handleAdminStatusGet(defaultDependencies, request);
 }
 

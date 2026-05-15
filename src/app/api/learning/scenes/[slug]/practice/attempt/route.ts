@@ -49,6 +49,6 @@ export async function POST(
     });
     return NextResponse.json(result, { status: 200 });
   } catch (error) {
-    return toApiErrorResponse(error, "Failed to record scene practice attempt.");
+    return toApiErrorResponse(error, "Failed to record scene practice attempt.", { request });
   }
 }

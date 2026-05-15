@@ -29,6 +29,7 @@ const scenePracticeSetDependencies: ScenePracticeSetDependencies = {
 export async function handleScenePracticeSetGet(
   context: { params: Promise<{ slug: string }> },
   dependencies: ScenePracticeSetDependencies = scenePracticeSetDependencies,
+  request?: Request,
 ) {
   try {
     const { user, profile } = await dependencies.requireCurrentProfile();
@@ -37,7 +38,7 @@ export async function handleScenePracticeSetGet(
     const result = await dependencies.getLatestScenePracticeSet(user.id, slug);
     return NextResponse.json(result, { status: 200 });
   } catch (error) {
-    return toApiErrorResponse(error, "Failed to load scene practice set.");
+    return toApiErrorResponse(error, "Failed to load scene practice set.", { request });
   }
 }
 
@@ -59,15 +60,15 @@ export async function handleScenePracticeSetPost(
     });
     return NextResponse.json(result, { status: 200 });
   } catch (error) {
-    return toApiErrorResponse(error, "Failed to save scene practice set.");
+    return toApiErrorResponse(error, "Failed to save scene practice set.", { request });
   }
 }
 
 export async function GET(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ slug: string }> },
 ) {
-  return handleScenePracticeSetGet(context);
+  return handleScenePracticeSetGet(context, scenePracticeSetDependencies, request);
 }
 
 export async function POST(
