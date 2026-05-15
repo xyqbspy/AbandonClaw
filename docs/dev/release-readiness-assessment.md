@@ -85,11 +85,15 @@
 
 **验收标准**
 
-- [ ] `cat .env.example` 输出中不包含任何真实 key 字符串。
+- [x] `cat .env.example` 输出中不包含任何真实 key 字符串。
 - [ ] Supabase 后台显示新的 service_role_key 创建时间晚于 rotate 时间。
 - [ ] GLM provider 后台显示旧 key 已撤销。
 - [ ] Vercel project env 中所有 secret 与 Supabase / GLM 后台一致。
-- [ ] dev-log 留存 rotate 摘要。
+- [x] dev-log 留存 rotate 摘要。
+
+**完成时间**：2026-05-15（代码侧）
+
+**完成摘要**：`.env.example` 已重写为完整占位符模板，覆盖 GLM / Supabase / 邮箱 / 注册 / 限流 / quota / 上游 / 备用 provider 全部 env，所有 secret 用 `__REPLACE_ME__`。后台 rotate 动作（Supabase service_role_key、GLM API key、ADMIN 邮箱）需在外部系统执行，未完成前旧 secret 仍可生效，必须立即在 Supabase 后台 → API → Reset service_role 与 GLM provider 后台撤销旧 key，并更新 Vercel project env。
 
 #### P0-2：目标环境真实 HTTP baseline 跑通并留证
 

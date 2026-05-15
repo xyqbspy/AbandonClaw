@@ -1,5 +1,36 @@
 # Dev Log
 
+### [2026-05-15] P0-1 完成：清理 .env.example 真实 secret
+- 类型：Cleanup / 安全收口
+- 状态：代码侧已完成，secret rotate 待用户在外部系统执行
+
+#### 背景
+按 `docs/dev/release-readiness-assessment.md` P0-1，`.env.example` 当前包含真实 GLM_API_KEY、SUPABASE_SERVICE_ROLE_KEY、ADMIN_EMAILS。虽然 `.gitignore` 用 `.env*` 兜住未进 git history，但模板文件含真 secret 极易误传。
+
+#### 本次落地
+- `.env.example` 完全重写为占位符模板：
+  - 所有 secret 用 `__REPLACE_ME__` 标记
+  - 完整覆盖 GLM / Supabase / 域名 / 邮箱 / 注册 / 限流 / quota / 上游 / 备用 provider 全部 env
+  - 每个变量加注释说明用途与配置来源
+- 顶部加警告说明：复制为 .env.local 替换占位符；不要把真实 secret 写入模板。
+
+#### 必须由用户在外部系统执行的后续动作
+1. Supabase 后台 → Project Settings → API → Reset `service_role_key`，旧 key 立即失效。
+2. GLM provider 后台撤销旧 `GLM_API_KEY`，生成新 key。
+3. 在 Vercel project env 中更新对应 secret 为新值。
+4. 检查本地 `.env.local` 是否已用新 key。
+5. 如 `ADMIN_EMAILS` 中的 admin 账号怀疑被钓鱼，重置该账号 Supabase 密码并启用 2FA（如可用）。
+
+未执行前，旧 secret 仍可被任何拿到旧值的人使用。
+
+#### 验证
+- `cat .env.example` 不包含任何 `sb_secret_` / `sk-` 前缀字符串。
+- `pnpm run text:check-mojibake .env.example` 通过。
+
+#### 剩余风险
+- secret rotate 在外部完成前，泄露窗口仍存在。
+- 仓库历史从未 commit 过 .env.example 真值（已确认 git ls-files .env.example 为空），但本地工作目录历史副本可能存在，需用户检查本地 git 客户端 stash 与未提交工作。
+
 ### [2026-05-15] 上线准备评估与缺口跟踪文档落地
 - 类型：Cleanup / 文档新增
 - 状态：文档已提交，缺口处置按节奏推进

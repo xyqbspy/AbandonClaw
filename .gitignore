@@ -34,6 +34,8 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+# .env.example 是占位符模板，不能含真实 secret；允许 commit 进仓库供新人参考
+!.env.example
 
 # vercel
 .vercel
