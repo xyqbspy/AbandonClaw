@@ -27,6 +27,7 @@ export default function SignupPage() {
   const [sendingCode, setSendingCode] = useState(false);
   const [cooldown, setCooldown] = useState(0);
   const [registrationMode, setRegistrationMode] = useState<RegistrationMode>("closed");
+  const [consentAccepted, setConsentAccepted] = useState(false);
   const redirectTo = getAuthRedirectTargetFromSearchParams(searchParams);
 
   useEffect(() => {
@@ -121,6 +122,10 @@ export default function SignupPage() {
     }
     if (registrationMode === "invite_only" && !inviteCode) {
       toast.error("当前为邀请码注册，请填写邀请码");
+      return;
+    }
+    if (!consentAccepted) {
+      toast.error("请先勾选同意《服务条款》和《隐私政策》");
       return;
     }
 
@@ -253,10 +258,42 @@ export default function SignupPage() {
             icon={<Ticket className="size-4" />}
           />
         ) : null}
+        <label
+          htmlFor="consent"
+          className="mb-4 flex cursor-pointer items-start gap-2 text-[13px] text-[#1d1d1f]"
+        >
+          <input
+            id="consent"
+            type="checkbox"
+            checked={consentAccepted}
+            onChange={(event) => setConsentAccepted(event.target.checked)}
+            className="mt-0.5 size-4 cursor-pointer"
+          />
+          <span>
+            我已阅读并同意
+            <Link
+              href="/terms"
+              target="_blank"
+              rel="noopener"
+              className="mx-1 font-semibold text-[#007AFF] underline"
+            >
+              《服务条款》
+            </Link>
+            和
+            <Link
+              href="/privacy"
+              target="_blank"
+              rel="noopener"
+              className="mx-1 font-semibold text-[#007AFF] underline"
+            >
+              《隐私政策》
+            </Link>
+          </span>
+        </label>
         <button
           className="mt-2.5 w-full cursor-pointer rounded-xl border-0 bg-[#007AFF] p-4 text-base font-semibold text-white transition duration-300 hover:bg-[#0056b3] disabled:cursor-not-allowed disabled:opacity-60"
           type="submit"
-          disabled={submitting || registrationMode === "closed"}
+          disabled={submitting || registrationMode === "closed" || !consentAccepted}
         >
           {submitting ? "创建中..." : "创建账号"}
         </button>

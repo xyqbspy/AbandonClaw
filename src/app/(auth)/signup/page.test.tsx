@@ -169,6 +169,7 @@ test("/signup 会把无效邀请码映射为中文提示", async () => {
     await userEvent.type(screen.getByLabelText("密码"), "password123");
     await userEvent.type(screen.getByLabelText("邮箱验证码"), "123456");
     await userEvent.type(screen.getByLabelText("邀请码"), "bad-code");
+    await userEvent.click(screen.getByLabelText(/我已阅读并同意/));
     await userEvent.click(screen.getByRole("button", { name: "创建账号" }));
 
     await waitFor(() => {
@@ -224,11 +225,45 @@ test("/signup 注册成功后会回到登录页并保留合法 redirect", async 
     await userEvent.type(screen.getByLabelText("邮箱地址"), "user@example.com");
     await userEvent.type(screen.getByLabelText("密码"), "password123");
     await userEvent.type(screen.getByLabelText("邮箱验证码"), "123456");
+    await userEvent.click(screen.getByLabelText(/我已阅读并同意/));
     await userEvent.click(screen.getByRole("button", { name: "创建账号" }));
 
     await waitFor(() => {
       assert.deepEqual(routerReplaceCalls, ["/login?redirect=%2Freview"]);
     });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("/signup 未勾选同意条款时按钮 disabled 且无法提交", async () => {
+  installFormDataShim();
+  const fetchCalls: Array<{ url: string }> = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async (url: RequestInfo | URL) => {
+    fetchCalls.push({ url: String(url) });
+    if (String(url) === "/api/auth/signup") {
+      return Response.json({ mode: "open" });
+    }
+    return Response.json({});
+  }) as typeof fetch;
+
+  try {
+    const SignupPage = getSignupPage();
+    render(<SignupPage />);
+
+    await waitFor(() => {
+      assert.ok(screen.getByLabelText(/我已阅读并同意/));
+    });
+
+    const submitButton = screen.getByRole("button", { name: "创建账号" }) as HTMLButtonElement;
+    assert.equal(submitButton.disabled, true);
+
+    await userEvent.click(screen.getByLabelText(/我已阅读并同意/));
+    assert.equal(submitButton.disabled, false);
+
+    await userEvent.click(screen.getByLabelText(/我已阅读并同意/));
+    assert.equal(submitButton.disabled, true);
   } finally {
     globalThis.fetch = originalFetch;
   }

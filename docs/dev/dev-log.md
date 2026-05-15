@@ -1,5 +1,34 @@
 # Dev Log
 
+### [2026-05-15] P2-2 / P2-3 / P2-4 完成节点：合规与 WAF 文档收口，heartbeat 延期
+- 类型：Spec-Driven（P2-4）+ Cleanup（P2-3）+ 节奏说明（P2-2）
+- 状态：代码侧与文档侧已完成；外部账号配置与法律审阅待用户执行
+
+#### P2-4 合规声明（add-compliance-pages 已归档）
+- 新增 `/privacy` 与 `/terms` 占位页面（marketing layout），覆盖隐私 6 项 + 服务条款 7 项核心结构，全部标 `__待法律审阅__`，底部加显眼免责说明。
+- 注册页 `src/app/(auth)/signup/page.tsx` 加 consent checkbox：未勾选时按钮 disabled + 提交时双重 toast 拦截。
+- 测试更新：`page.test.tsx` 5 个用例（含新增 disabled 验证）全过；invite_only 与 redirect 测试加 click consent 步骤。
+- spec delta `auth-api-boundaries` 新增「注册流程必须包含明示同意条款步骤」requirement + 2 scenario。
+- 必须用户在外部执行：找律师审阅 `/privacy` 与 `/terms` 内容并替换 `__待法律审阅__` / `__待用户填写__` 字段（联系邮箱、数据区域、适用法律、仲裁机构）。
+
+#### P2-3 平台层防护与事故响应（incident-response-runbook.md）
+- 新增 `docs/dev/incident-response-runbook.md`：覆盖 Vercel Firewall → Cloudflare → Upstash 3 层防护启用顺序、异常流量关键指标与阈值表、4 类事故响应剧本、周/月/季度巡检节奏。
+- 必须用户在外部执行：启用 Vercel Firewall + 评估 Cloudflare 前置 + 配置 Sentry/Vercel/Supabase 告警接入 oncall。
+
+#### P2-2 服务端学习 session heartbeat 延期
+- 当前小范围内测阶段不引入榜单 / 付费 / 积分 / 公开等级，前端 60s/10s 上限挡板（已在 P0-B 落地）已经足够防止统计被污染。
+- 按 release-readiness-assessment.md 节奏表保留到「引入榜单 / 付费 / 积分前」再启动，届时单独走 OpenSpec change `add-server-side-learning-session-heartbeat` 完整推进 session 状态机 / 数据库表 / 服务端累计 / 前端 delta 降级 / 历史数据迁移。
+
+#### 验证
+- `node --import tsx --import ./src/test/setup-dom.ts --test src/app/(auth)/signup/page.test.tsx`：5/5 通过。
+- `pnpm run build`：通过，新增 `/privacy` 与 `/terms` 路由注册成功。
+- `pnpm run text:check-mojibake`：通过。
+
+#### 剩余风险
+- 占位条款未审阅前不构成法律承诺；如未审阅就上线公开服务存在合规风险。
+- WAF 与告警依赖用户在 Vercel / Cloudflare / Sentry 后台配置；纯文档不能替代真实启用。
+- Sentry / WAF / 告警 oncall 渠道未接入前，事故响应仍依赖用户主动观察。
+
 ### [2026-05-15] P2-1 完成：接入 CSP report-only 与 violation 收集
 - 类型：Spec-Driven / 安全策略
 - 状态：代码侧已完成，观察期与切正式 enforce 待外部执行
