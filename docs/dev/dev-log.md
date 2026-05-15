@@ -1,5 +1,42 @@
 # Dev Log
 
+### [2026-05-15] P1-2 完成：最小 CI 工作流
+- 类型：Cleanup / 工程基础设施
+- 状态：代码侧已完成，GitHub branch protection 与首次 CI run 待用户配置
+
+#### 背景
+按 `release-readiness-assessment.md` P1-2，仓库无 `.github/workflows/*.yml`，PR 没有自动 gate。本次刚收口的错误响应规范、middleware code 字段、requestId 链路一致性、Sentry 接入容易被未来未跑测试的改动无意打破。
+
+#### 本次落地
+- 新增 `.github/workflows/ci.yml`：
+  - 触发：PR 到 main、push 到 main
+  - 并发控制：相同 ref 取消进行中的旧 run
+  - timeout: 15 分钟
+  - 步骤：checkout → pnpm install (frozen) → lint → mojibake → maintenance guardrails → unit tests → script tests → openspec validate
+  - 用 `pnpm/action-setup@v4` + `actions/setup-node@v4` 设 Node 20 + pnpm 10 + pnpm 缓存
+- `maintenance:check` 步骤标 `continue-on-error: true`，原因：预先存在的 change `stabilize-auth-session-p0-smoke` 6.5 人工冒烟任务待用户外部执行，未归档前会 fail；归档后须移除该标记。
+
+#### 同时归档 add-sentry-error-tracking
+- 由于 `maintenance:check` 要求所有 active changes 完成，本次顺手把 P1-1 change 归档到 `openspec/changes/archive/2026-05-15-add-sentry-error-tracking/`。
+- 同步把 spec delta 合入主 stable spec `openspec/specs/api-operational-guardrails/spec.md`，新增「未知服务端异常必须被错误追踪系统捕获」requirement 与 3 个 scenario。
+- tasks.md status 改为 done，2.4 `withSentryConfig` 转入不收项说明（不需要 source map upload）。
+
+#### 必须由用户在外部系统执行的后续动作
+1. GitHub repo settings → Branches → 给 `main` 加 branch protection rule，要求 CI / check 必须通过才能合并。
+2. （可选）启用 Dependabot / Renovate 做依赖自动更新。
+3. 待 `stabilize-auth-session-p0-smoke` 完成 6.5 人工冒烟并归档后，移除 ci.yml 里 `maintenance:check` 的 `continue-on-error: true`。
+
+#### 验证
+- 本地 `pnpm run lint`：通过（2 个 warning，0 error）。
+- 本地 `pnpm run text:check-mojibake`：通过。
+- 本地 `pnpm run maintenance:check`：因预先存在 change 失败 1 项，已说明并 continue-on-error 兜住。
+- 本地 `pnpm run test:scripts`：14/14 通过。
+- 本地 `pnpm run spec:validate`：33 项全过。
+
+#### 剩余风险
+- 首次 PR 在 GitHub 实际跑 CI 时，可能因 actions/setup-node 缓存策略或 pnpm 版本差异需调整。
+- branch protection 不启用时，CI 失败的 PR 仍可强行合并；用户必须在 GitHub 后台开启保护。
+
 ### [2026-05-15] P1-1 完成：接入 Sentry 错误追踪
 - 类型：Spec-Driven / 可观测性收口
 - 状态：代码侧已完成，Sentry 后台与 Vercel env 待用户配置

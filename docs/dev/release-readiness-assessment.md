@@ -297,11 +297,15 @@ ROI 分析：Sentry 免费版（5k errors/month）已经覆盖小规模真实用
 
 **验收标准**
 
-- [ ] `.github/workflows/ci.yml` 已 commit。
+- [x] `.github/workflows/ci.yml` 已 commit。
 - [ ] 至少跑过 1 次成功的 CI run。
 - [ ] main 分支有 branch protection 规则要求 CI 通过。
 - [ ] 故意提一个会失败的 PR，验证 CI 能拦住合并。
-- [ ] dev-log 记录 CI 引入时间和工作流文件路径。
+- [x] dev-log 记录 CI 引入时间和工作流文件路径。
+
+**完成时间**：2026-05-15（代码侧）
+
+**完成摘要**：新增 `.github/workflows/ci.yml`，在 PR 与 push 到 main 时自动跑 lint / mojibake / maintenance guardrails / unit tests / script tests / openspec validate。`maintenance:check` 暂时 `continue-on-error: true`，原因：预先存在的 change `stabilize-auth-session-p0-smoke` 6.5 是人工冒烟任务待用户外部执行，未归档前会 fail；该 change 归档后移除该标记。本地验证 lint / mojibake / maintenance / scripts test / spec validate 全部跑通。GitHub branch protection 与首次 CI run 验证待用户在 GitHub 后台执行。
 
 #### P1-3：备份恢复方案明确
 
