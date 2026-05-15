@@ -1,11 +1,10 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
+import { X } from "lucide-react";
 import { clearAllReviewPageCache, setReviewPageCache } from "@/lib/cache/review-page-cache";
 import { LoadingButton, LoadingContent } from "@/components/shared/action-loading";
-import { PageHeader } from "@/components/shared/page-header";
 import { recordClientEvent } from "@/lib/utils/client-events";
-import { APPLE_BODY_TEXT } from "@/lib/ui/apple-style";
 import {
   buildAcceptedPracticeAnswers,
   getPracticeAssessment,
@@ -49,22 +48,22 @@ import { ReviewPageSummaryCards } from "./review-page-summary-cards";
 import {
   REVIEW_FOOTER_CLASSNAME,
   REVIEW_FOOTER_DANGER_BUTTON_CLASSNAME,
+  REVIEW_FOOTER_HINT_CLASSNAME,
   REVIEW_FOOTER_INNER_CLASSNAME,
-  REVIEW_FOOTER_MUTED_TEXT_CLASSNAME,
   REVIEW_FOOTER_PRIMARY_BUTTON_CLASSNAME,
   REVIEW_FOOTER_PRIMARY_FULL_BUTTON_CLASSNAME,
   REVIEW_FOOTER_REVIEW_GRID_CLASSNAME,
   REVIEW_FOOTER_SECONDARY_BUTTON_CLASSNAME,
-  REVIEW_HERO_BODY_CLASSNAME,
   REVIEW_HERO_CLASSNAME,
-  REVIEW_HERO_HEADER_CLASSNAME,
+  REVIEW_HERO_CLOSE_BUTTON_CLASSNAME,
+  REVIEW_HERO_PROGRESS_FILL_CLASSNAME,
+  REVIEW_HERO_PROGRESS_LABEL_ROW_CLASSNAME,
+  REVIEW_HERO_PROGRESS_TRACK_CLASSNAME,
   REVIEW_HERO_STREAK_PILL_CLASSNAME,
-  REVIEW_HINT_SOURCE_CLASSNAME,
-  REVIEW_HINT_STACK_CLASSNAME,
+  REVIEW_HERO_TOP_ROW_CLASSNAME,
+  REVIEW_MAIN_CLASSNAME,
   REVIEW_PAGE_CLASSNAME,
-  REVIEW_PROGRESS_FILL_CLASSNAME,
-  REVIEW_PROGRESS_HEADER_CLASSNAME,
-  REVIEW_PROGRESS_TRACK_CLASSNAME,
+  REVIEW_PAGE_INNER_CLASSNAME,
   REVIEW_SOURCE_ACTIONS_CLASSNAME,
   REVIEW_SOURCE_ACTIONS_LABEL_CLASSNAME,
   REVIEW_SOURCE_UNAVAILABLE_CLASSNAME,
@@ -328,28 +327,36 @@ export default function ReviewPage() {
 
   return (
     <div className={REVIEW_PAGE_CLASSNAME}>
-      <section className={REVIEW_HERO_CLASSNAME}>
-        <div className={REVIEW_HERO_HEADER_CLASSNAME}>
-          <span className={REVIEW_HERO_STREAK_PILL_CLASSNAME}>
-            {zh.streakSummary}
-          </span>
-        </div>
-        <PageHeader eyebrow={zh.eyebrow} title={zh.title} description={zh.desc} />
-        <div className={REVIEW_HERO_BODY_CLASSNAME}>
+      <div className={REVIEW_PAGE_INNER_CLASSNAME}>
+        <header className={REVIEW_HERO_CLASSNAME}>
+          <div className={REVIEW_HERO_TOP_ROW_CLASSNAME}>
+            <span className={REVIEW_HERO_STREAK_PILL_CLASSNAME}>{zh.streakSummary}</span>
+            <button
+              type="button"
+              className={REVIEW_HERO_CLOSE_BUTTON_CLASSNAME}
+              onClick={() => openScene("/today")}
+              aria-label="关闭复习"
+            >
+              <X className="size-4" />
+            </button>
+          </div>
           <div>
-            <div className={REVIEW_PROGRESS_HEADER_CLASSNAME}>
+            <div className={REVIEW_HERO_PROGRESS_LABEL_ROW_CLASSNAME}>
               <span>{zh.progressLabel}</span>
               <span>
-                {progressModel.completedCount}/{Math.max(progressModel.totalCount, 1)}
+                {progressModel.completedCount} / {Math.max(progressModel.totalCount, 1)}
               </span>
             </div>
-            <div className={REVIEW_PROGRESS_TRACK_CLASSNAME}>
+            <div className={REVIEW_HERO_PROGRESS_TRACK_CLASSNAME}>
               <div
-                className={REVIEW_PROGRESS_FILL_CLASSNAME}
+                className={REVIEW_HERO_PROGRESS_FILL_CLASSNAME}
                 style={{ width: `${progressModel.progressPercent}%` }}
               />
             </div>
           </div>
+        </header>
+
+        <main className={REVIEW_MAIN_CLASSNAME}>
           <ReviewPageSummaryCards
             dueCount={progressModel.dueReviewCount + scenePracticeItems.length}
             reviewedTodayCount={progressModel.reviewedTodayCount}
@@ -359,93 +366,104 @@ export default function ReviewPage() {
             doneLabel={zh.doneToday}
             accuracyLabel={zh.accuracy}
           />
-        </div>
-      </section>
 
-      <div className={REVIEW_HINT_STACK_CLASSNAME}>
-        <p className={APPLE_BODY_TEXT}>{primaryHint}</p>
-        {sourceLabel ? (
-          <p className={REVIEW_HINT_SOURCE_CLASSNAME}>
-            {zh.sourcePrefix}：{sourceLabel}
-          </p>
-        ) : null}
+          {primaryHint || sourceLabel ? (
+            <div className="space-y-1 px-1">
+              {primaryHint ? (
+                <p className="text-sm font-bold text-slate-700">{primaryHint}</p>
+              ) : null}
+              {sourceLabel ? (
+                <p className="text-[11px] font-semibold text-slate-400">
+                  {zh.sourcePrefix}：{sourceLabel}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+
+          <ReviewPageStagePanel
+            loading={loading}
+            activeTaskKind={activeTaskKind}
+            stageMeta={stageMeta}
+            summary={summary}
+            trainingHintSubtle={trainingHintSubtle}
+            currentScenePracticeItem={currentScenePracticeItem}
+            currentPhraseItem={currentPhraseItem}
+            currentPhraseSchedulingReason={currentPhraseSchedulingReason}
+            currentPhraseExampleSentence={currentPhraseExampleSentence}
+            currentRewritePrompt={currentRewritePrompt}
+            phraseRewritePrompts={phraseRewritePrompts}
+            phraseRewritePromptId={phraseRewritePromptId}
+            phraseRewriteDraft={phraseRewriteDraft}
+            phraseDraft={phraseDraft}
+            phraseRecognition={phraseRecognition}
+            phraseOutputConfidence={phraseOutputConfidence}
+            scenePracticeAnswer={scenePracticeAnswer}
+            sceneFeedback={sceneFeedback}
+            showReference={showReference}
+            taskStage={taskStage}
+            labels={zh}
+            setShowReference={setShowReference}
+            setPhraseRecognition={setPhraseRecognition}
+            setPhraseOutputConfidence={setPhraseOutputConfidence}
+            setPhraseRewritePromptId={setPhraseRewritePromptId}
+            setPhraseRewriteDraft={setPhraseRewriteDraft}
+            setPhraseDraft={setPhraseDraft}
+            setScenePracticeAnswer={setScenePracticeAnswer}
+          />
+
+          {activeTaskKind === "scene_practice" && currentScenePracticeItem ? (
+            <div className={REVIEW_SOURCE_ACTIONS_CLASSNAME}>
+              <p className={REVIEW_SOURCE_ACTIONS_LABEL_CLASSNAME}>辅助回看</p>
+              <LoadingButton
+                type="button"
+                variant="outline"
+                loading={openingSceneHref === `/scene/${currentScenePracticeItem.sceneSlug}`}
+                loadingText="进入场景中..."
+                onClick={() => openScene(`/scene/${currentScenePracticeItem.sceneSlug}`)}
+              >
+                {zh.openSourceScene}
+              </LoadingButton>
+              <LoadingButton
+                type="button"
+                variant="outline"
+                loading={
+                  openingSceneHref === `/scene/${currentScenePracticeItem.sceneSlug}?view=practice`
+                }
+                loadingText="进入场景中..."
+                onClick={() =>
+                  openScene(`/scene/${currentScenePracticeItem.sceneSlug}?view=practice`)
+                }
+              >
+                {zh.openScenePractice}
+              </LoadingButton>
+            </div>
+          ) : currentPhraseItem?.sourceSceneSlug ? (
+            <div className={REVIEW_SOURCE_ACTIONS_CLASSNAME}>
+              <p className={REVIEW_SOURCE_ACTIONS_LABEL_CLASSNAME}>辅助回看</p>
+              {currentPhraseItem.sourceSceneAvailable ? (
+                <LoadingButton
+                  type="button"
+                  variant="outline"
+                  loading={openingSceneHref === `/scene/${currentPhraseItem.sourceSceneSlug}`}
+                  loadingText="进入场景中..."
+                  onClick={() => openScene(`/scene/${currentPhraseItem.sourceSceneSlug}`)}
+                >
+                  {zh.openSourceScene}
+                </LoadingButton>
+              ) : (
+                <div className={REVIEW_SOURCE_UNAVAILABLE_CLASSNAME}>
+                  <p className="font-medium">{zh.sourceSceneUnavailable}</p>
+                  <p className={REVIEW_SOURCE_UNAVAILABLE_HINT_CLASSNAME}>
+                    {zh.sourceSceneUnavailableHint}
+                  </p>
+                </div>
+              )}
+            </div>
+          ) : null}
+        </main>
       </div>
 
-      <ReviewPageStagePanel
-        loading={loading}
-        activeTaskKind={activeTaskKind}
-        stageMeta={stageMeta}
-        summary={summary}
-        trainingHintSubtle={trainingHintSubtle}
-        currentScenePracticeItem={currentScenePracticeItem}
-        currentPhraseItem={currentPhraseItem}
-        currentPhraseSchedulingReason={currentPhraseSchedulingReason}
-        currentPhraseExampleSentence={currentPhraseExampleSentence}
-        currentRewritePrompt={currentRewritePrompt}
-        phraseRewritePrompts={phraseRewritePrompts}
-        phraseRewritePromptId={phraseRewritePromptId}
-        phraseRewriteDraft={phraseRewriteDraft}
-        phraseDraft={phraseDraft}
-        phraseRecognition={phraseRecognition}
-        phraseOutputConfidence={phraseOutputConfidence}
-        scenePracticeAnswer={scenePracticeAnswer}
-        sceneFeedback={sceneFeedback}
-        showReference={showReference}
-        taskStage={taskStage}
-        labels={zh}
-        setShowReference={setShowReference}
-        setPhraseRecognition={setPhraseRecognition}
-        setPhraseOutputConfidence={setPhraseOutputConfidence}
-        setPhraseRewritePromptId={setPhraseRewritePromptId}
-        setPhraseRewriteDraft={setPhraseRewriteDraft}
-        setPhraseDraft={setPhraseDraft}
-        setScenePracticeAnswer={setScenePracticeAnswer}
-      />
-      {activeTaskKind === "scene_practice" && currentScenePracticeItem ? (
-        <div className={REVIEW_SOURCE_ACTIONS_CLASSNAME}>
-          <p className={REVIEW_SOURCE_ACTIONS_LABEL_CLASSNAME}>辅助回看</p>
-          <LoadingButton
-            type="button"
-            variant="outline"
-            loading={openingSceneHref === `/scene/${currentScenePracticeItem.sceneSlug}`}
-            loadingText="进入场景中..."
-            onClick={() => openScene(`/scene/${currentScenePracticeItem.sceneSlug}`)}
-          >
-            {zh.openSourceScene}
-          </LoadingButton>
-          <LoadingButton
-            type="button"
-            variant="outline"
-            loading={openingSceneHref === `/scene/${currentScenePracticeItem.sceneSlug}?view=practice`}
-            loadingText="进入场景中..."
-            onClick={() => openScene(`/scene/${currentScenePracticeItem.sceneSlug}?view=practice`)}
-          >
-            {zh.openScenePractice}
-          </LoadingButton>
-        </div>
-      ) : currentPhraseItem?.sourceSceneSlug ? (
-        <div className={REVIEW_SOURCE_ACTIONS_CLASSNAME}>
-          <p className={REVIEW_SOURCE_ACTIONS_LABEL_CLASSNAME}>辅助回看</p>
-          {currentPhraseItem.sourceSceneAvailable ? (
-            <LoadingButton
-              type="button"
-              variant="outline"
-              loading={openingSceneHref === `/scene/${currentPhraseItem.sourceSceneSlug}`}
-              loadingText="进入场景中..."
-              onClick={() => openScene(`/scene/${currentPhraseItem.sourceSceneSlug}`)}
-            >
-              {zh.openSourceScene}
-            </LoadingButton>
-          ) : (
-            <div className={REVIEW_SOURCE_UNAVAILABLE_CLASSNAME}>
-              <p className="font-medium">{zh.sourceSceneUnavailable}</p>
-              <p className={REVIEW_SOURCE_UNAVAILABLE_HINT_CLASSNAME}>{zh.sourceSceneUnavailableHint}</p>
-            </div>
-          )}
-        </div>
-      ) : null}
-
-      <div className={REVIEW_FOOTER_CLASSNAME}>
+      <footer className={REVIEW_FOOTER_CLASSNAME}>
         <div className={REVIEW_FOOTER_INNER_CLASSNAME}>
           {activeTaskKind === null ? (
             <LoadingButton
@@ -563,12 +581,12 @@ export default function ReviewPage() {
               {zh.phraseFeedbackCta}
             </button>
           ) : (
-            <div className={REVIEW_FOOTER_MUTED_TEXT_CLASSNAME}>
+            <div className={REVIEW_FOOTER_HINT_CLASSNAME}>
               选择一个复习判断后会自动进入下一项。
             </div>
           )}
         </div>
-      </div>
+      </footer>
     </div>
   );
 }

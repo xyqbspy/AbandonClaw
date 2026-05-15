@@ -416,7 +416,7 @@ test("ReviewPage 普通表达复习会按微回忆 -> 熟悉度 -> 改写 -> 输
 
   fireEvent.click(screen.getByRole("button", { name: "进入熟悉度判断" }));
   await screen.findByRole("button", { name: "眼熟，能认出来" });
-  assert.ok(screen.getByText("STEP 2. 熟悉度判断"));
+  assert.ok(screen.getByText("熟悉度判断"));
 
   fireEvent.click(screen.getByRole("button", { name: "眼熟，能认出来" }));
   fireEvent.click(screen.getByRole("button", { name: "能主动说出来" }));
@@ -535,7 +535,7 @@ test("ReviewPage 场景回补会进入阶段式复现并在完成后刷新列表
   fireEvent.click(screen.getByRole("button", { name: "检查这次复现" }));
 
   await screen.findByRole("button", { name: "进入下一项复习" });
-  assert.ok(screen.getByText("STEP 3. 反馈与下一步"));
+  assert.ok(screen.getByText("反馈与下一步"));
 
   fireEvent.click(screen.getByRole("button", { name: "进入下一项复习" }));
 

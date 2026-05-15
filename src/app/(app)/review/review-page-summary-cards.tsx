@@ -1,6 +1,12 @@
 "use client";
 
-import { APPLE_META_TEXT, APPLE_SUMMARY_CARD } from "@/lib/ui/apple-style";
+import {
+  REVIEW_SUMMARY_CARD_CLASSNAME,
+  REVIEW_SUMMARY_CARD_LABEL_CLASSNAME,
+  REVIEW_SUMMARY_CARD_VALUE_ACCENT_CLASSNAME,
+  REVIEW_SUMMARY_CARD_VALUE_CLASSNAME,
+  REVIEW_SUMMARY_GRID_CLASSNAME,
+} from "./review-page-styles";
 
 export function ReviewPageSummaryCards({
   dueCount,
@@ -20,20 +26,20 @@ export function ReviewPageSummaryCards({
   accuracyLabel: string;
 }) {
   return (
-    <div className="grid grid-cols-3 gap-3">
-      <div className={APPLE_SUMMARY_CARD}>
-        <p className={APPLE_META_TEXT}>{dueLabel}</p>
-        <p className="mt-1 text-xl font-semibold text-foreground">{loading ? "..." : dueCount}</p>
+    <div className={REVIEW_SUMMARY_GRID_CLASSNAME}>
+      <div className={REVIEW_SUMMARY_CARD_CLASSNAME}>
+        <p className={REVIEW_SUMMARY_CARD_LABEL_CLASSNAME}>{dueLabel}</p>
+        <p className={REVIEW_SUMMARY_CARD_VALUE_CLASSNAME}>{loading ? "..." : dueCount}</p>
       </div>
-      <div className={APPLE_SUMMARY_CARD}>
-        <p className={APPLE_META_TEXT}>{doneLabel}</p>
-        <p className="mt-1 text-xl font-semibold text-foreground">
+      <div className={REVIEW_SUMMARY_CARD_CLASSNAME}>
+        <p className={REVIEW_SUMMARY_CARD_LABEL_CLASSNAME}>{doneLabel}</p>
+        <p className={REVIEW_SUMMARY_CARD_VALUE_ACCENT_CLASSNAME}>
           {loading ? "..." : reviewedTodayCount}
         </p>
       </div>
-      <div className={APPLE_SUMMARY_CARD}>
-        <p className={APPLE_META_TEXT}>{accuracyLabel}</p>
-        <p className="mt-1 text-xl font-semibold text-foreground">
+      <div className={REVIEW_SUMMARY_CARD_CLASSNAME}>
+        <p className={REVIEW_SUMMARY_CARD_LABEL_CLASSNAME}>{accuracyLabel}</p>
+        <p className={REVIEW_SUMMARY_CARD_VALUE_CLASSNAME}>
           {loading ? "..." : accuracyText}
         </p>
       </div>
