@@ -38,6 +38,8 @@
   - 上线准备评估与缺口跟踪：业务防护层之外、平台运维层缺口的统一入口。每个缺口包含背景、原因、方案、效果、验收。
 - [disaster-recovery.md](/d:/WorkCode/AbandonClaw/docs/dev/disaster-recovery.md)
   - 灾备与数据恢复手册：备份策略、RPO/RTO、恢复操作步骤、自建 pg_dump 兜底、季度演练 checklist。
+- [incident-response-runbook.md](/d:/WorkCode/AbandonClaw/docs/dev/incident-response-runbook.md)
+  - 平台层防护与事故响应手册：Vercel/Cloudflare WAF 推荐配置、异常流量识别、4 类事故响应剧本、日常巡检节奏。
 - [public-registration-http-baseline-runbook.md](/d:/WorkCode/AbandonClaw/docs/dev/public-registration-http-baseline-runbook.md)
   - 公网开放注册相关 baseline 的准备、执行、blocked 判断和结果留证手册。
 - [public-registration-feature-verification-guide.md](/d:/WorkCode/AbandonClaw/docs/dev/public-registration-feature-verification-guide.md)

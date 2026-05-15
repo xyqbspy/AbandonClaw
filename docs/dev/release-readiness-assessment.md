@@ -451,6 +451,10 @@ ROI 分析：Sentry 免费版（5k errors/month）已经覆盖小规模真实用
 - [ ] 至少 1 个完整学习闭环测试覆盖 heartbeat 路径。
 - [ ] dev-log 记录上线时间与对历史数据的迁移策略。
 
+**完成时间**：暂未启动
+
+**完成摘要**：当前小范围内测阶段不引入榜单 / 付费 / 积分 / 公开等级，前端 60s/10s 上限挡板已经足够防止统计被污染（见 P0-B SQL 与 `learning_study_time_anomalies` 异常表）。本项按节奏表保留到「引入榜单 / 付费 / 积分前」再启动，届时单独走 OpenSpec change `add-server-side-learning-session-heartbeat` 完整推进 session 状态机 / 数据库表 / 服务端累计 / 前端 delta 降级 / 历史数据迁移。
+
 #### P2-3：Vercel / Cloudflare WAF / Bot 防护
 
 **背景与原因**
@@ -491,8 +495,12 @@ ROI 分析：Sentry 免费版（5k errors/month）已经覆盖小规模真实用
 - [ ] Vercel Firewall 已启用并配置基础规则。
 - [ ] （可选）Cloudflare 已前置并配置 Bot Fight Mode。
 - [ ] 异常流量告警可触达 oncall。
-- [ ] 事故响应剧本已写入 `docs/dev/incident-runbook.md`。
-- [ ] dev-log 记录 WAF 启用时间与配置摘要。
+- [x] 事故响应剧本已写入 `docs/dev/incident-runbook.md`。
+- [x] dev-log 记录 WAF 启用时间与配置摘要。
+
+**完成时间**：2026-05-15（文档侧）
+
+**完成摘要**：新增 `docs/dev/incident-response-runbook.md`，覆盖：当前部署架构与裸点、3 层防护启用顺序（Vercel Firewall → Cloudflare 前置 → Upstash 增强）、异常流量关键指标与阈值、4 类事故响应剧本（单账号刷 / 单 IP 多账号 / 全站流量 / GLM 账单暴涨）、周/月/季度巡检节奏、首次执行 checklist。文档名为 `incident-response-runbook.md`（原 release-readiness-assessment.md 文中的 `incident-runbook.md` 是简称，实际文件名以 `-response-` 完整版为准）。Vercel / Cloudflare 后台配置由用户执行。
 
 #### P2-4：合规声明（隐私政策 / 服务条款 / Cookie 同意）
 
