@@ -1,5 +1,28 @@
 # Dev Log
 
+### [2026-05-15] 上线准备评估与缺口跟踪文档落地
+- 类型：Cleanup / 文档新增
+- 状态：文档已提交，缺口处置按节奏推进
+
+#### 背景
+当前业务防护层（限流 / quota / 邀请码 / 邮箱验证 / access_status / requestId / admin 紧急开关）已经达到 `invite_only` 小范围内测可放行的标准。但平台运维层（可观测性聚合 / CI / 备份恢复 / 安全策略 / 合规）仍有较明显缺口，且散落在多份文档中，缺统一入口。
+
+#### 本次落地
+- 新增 `docs/dev/release-readiness-assessment.md`，覆盖业务防护层之外的 10 个缺口：
+  - P0：`.env.example` secret 清理 + rotate、目标环境 baseline 跑通、邮箱 provider 配置确认。
+  - P1：Sentry 接入、最小 CI 工作流、备份恢复方案与演练。
+  - P2：CSP、服务端学习 session heartbeat、WAF / Bot 防护、合规声明。
+- 每个缺口记录背景、为什么必须做、怎么做、预期效果、验收标准。
+- 在 `docs/dev/README.md` 添加文档入口。
+
+#### 验证
+- 文档结构与 `backend-release-readiness-checklist.md` / `public-registration-readiness-plan.md` 平行，不重复语义。
+- 引用其他文档的链接路径与现有约定一致。
+
+#### 剩余风险
+- 文档只是评估和处置指引，缺口本身尚未实际处置；按节奏表逐项推进。
+- 上线前 P0 三项必须先完成，否则不建议放行任何外部用户。
+
 ### [2026-05-15] Today starter、Scene 保存来源与 Review 消费链路收尾
 - 类型：完成态收尾 / 主学习闭环测试与文档同步
 - 状态：已完成，准备提交到 `main`
