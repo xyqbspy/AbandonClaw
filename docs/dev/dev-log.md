@@ -1,5 +1,36 @@
 # Dev Log
 
+### [2026-05-15] 文档 audit：腾讯云部署修正 + 命名/引用收口
+- 类型：Cleanup / 文档修正
+- 状态：已完成
+
+#### 背景
+本周新增的 `release-readiness-assessment.md` / `disaster-recovery.md` / `incident-response-runbook.md` 三份文档全部基于 Vercel 假设，但项目实际生产部署是腾讯云 CVM + PM2 + Supabase（`ecosystem.config.js` 已经是 PM2 配置）。同时还有命名错位（`incident-runbook` vs `incident-response-runbook`）与文档入口缺失。
+
+#### 本次落地
+- 新增 `docs/dev/docs-audit-2026-05-15.md`：6 类问题（部署平台冲突 / 路径死链 / 命名错位 / 关联缺失 / CI 假设 / 平台特定缺口）的盘点与处置方案，含 Vercel→腾讯云对应翻译表。
+- `docs/dev/incident-response-runbook.md` 重写：架构改为「腾讯云 CVM + PM2 + Nginx + Supabase」，新增 Nginx 反向代理示例、腾讯云 WAF / DDoS 高防接入说明、4 层防护启用顺序、事故响应剧本中的 PM2 reload / git checkout 回滚步骤。
+- `docs/dev/disaster-recovery.md`：新增 2.0 章节（应用进程崩溃 / 部署回滚），新增 4.2 腾讯云 CVM cron + COS 上传备份示例，4.3 备份保留策略调整为腾讯云 COS lifecycle，应急联系人模板把 Vercel 改为腾讯云 CVM。
+- `docs/dev/release-readiness-assessment.md` 修正 14 处 Vercel 表述：rotate 步骤改为「生产 CVM `.env.local` / PM2 ecosystem env + `pm2 reload`」，P2-3 整段重写为腾讯云 WAF 主线，P1-2 加 GitHub 平台假设说明，加 ICP 备案合规备注，修复 `incident-runbook.md` → `incident-response-runbook.md` 命名错位。
+- `docs/dev/dev-log.md` 本周条目（P0-1 / P0-3 / P1-1 / P2-3）的 Vercel 表述统一改为腾讯云 CVM；2026-05-13 历史 baseline 验证条目保留作历史快照。
+- `docs/README.md` 高频问题入口表新增 4 行：上线准备评估 / 灾备 / 平台层防护 / docs audit。
+- `docs/dev/README.md` 新增 docs-audit-2026-05-15 入口；incident-response-runbook 描述改为 Nginx / 腾讯云 WAF / Cloudflare。
+
+#### 不修改的事项（按 audit 第 9 节决定）
+- 200+ 处历史 dev-log / backend-release-readiness-checklist 的 `/d:/WorkCode/AbandonClaw/...` 死链路径：保留作历史快照，按 AGENTS.md「不顺手改无关代码」原则不动。
+- 已归档 OpenSpec change（`add-sentry-error-tracking` / `add-csp-report-only`）内的 Vercel 提及：按 OpenSpec workflow「archive 后不修内容」原则不动；冲突由 audit 文档兜底说明。
+- `AbandonClaw` 与 `abandon-en` 项目名分裂：留待项目正式 rename 时统一。
+- `*.vercel.app` 在 `public-registration-http-baseline-runbook.md` 作为可选环境提示：保留。
+
+#### 验证
+- `pnpm run text:check-mojibake`：通过。
+- `pnpm run maintenance:check`：active changes 状态不变（`stabilize-auth-session-p0-smoke` 6.5 仍待用户外部执行，与本轮无关）。
+- 全文搜索 Vercel 在新 3 文档与本周 dev-log 条目中：只剩「可选 / 备用环境」语义，主线全部为「腾讯云 + Supabase」。
+
+#### 剩余风险
+- 用户实际部署细节（Nginx 配置 / 域名 / 证书 / WAF 规则）仍依赖用户在腾讯云控制台与 CVM 执行；纯文档不能替代真实部署。
+- audit 文档自身留作 future tracking，下次发现新冲突时在这里追加，避免散落。
+
 ### [2026-05-15] P2-2 / P2-3 / P2-4 完成节点：合规与 WAF 文档收口，heartbeat 延期
 - 类型：Spec-Driven（P2-4）+ Cleanup（P2-3）+ 节奏说明（P2-2）
 - 状态：代码侧与文档侧已完成；外部账号配置与法律审阅待用户执行
@@ -12,8 +43,8 @@
 - 必须用户在外部执行：找律师审阅 `/privacy` 与 `/terms` 内容并替换 `__待法律审阅__` / `__待用户填写__` 字段（联系邮箱、数据区域、适用法律、仲裁机构）。
 
 #### P2-3 平台层防护与事故响应（incident-response-runbook.md）
-- 新增 `docs/dev/incident-response-runbook.md`：覆盖 Vercel Firewall → Cloudflare → Upstash 3 层防护启用顺序、异常流量关键指标与阈值表、4 类事故响应剧本、周/月/季度巡检节奏。
-- 必须用户在外部执行：启用 Vercel Firewall + 评估 Cloudflare 前置 + 配置 Sentry/Vercel/Supabase 告警接入 oncall。
+- 新增 `docs/dev/incident-response-runbook.md`：覆盖 Nginx 基础防护 → 腾讯云 WAF/DDoS → Cloudflare 前置 → Upstash 应用层 4 层防护启用顺序、异常流量关键指标与阈值表、4 类事故响应剧本、周/月/季度巡检节奏。
+- 必须用户在外部执行：部署 Nginx 反向代理 + 启用腾讯云 WAF + 评估 Cloudflare 前置 + 配置 Sentry / 腾讯云监控 / Supabase 告警接入 oncall。
 
 #### P2-2 服务端学习 session heartbeat 延期
 - 当前小范围内测阶段不引入榜单 / 付费 / 积分 / 公开等级，前端 60s/10s 上限挡板（已在 P0-B 落地）已经足够防止统计被污染。
@@ -26,7 +57,7 @@
 
 #### 剩余风险
 - 占位条款未审阅前不构成法律承诺；如未审阅就上线公开服务存在合规风险。
-- WAF 与告警依赖用户在 Vercel / Cloudflare / Sentry 后台配置；纯文档不能替代真实启用。
+- WAF 与告警依赖用户在腾讯云 / Cloudflare / Sentry 后台配置；纯文档不能替代真实启用。
 - Sentry / WAF / 告警 oncall 渠道未接入前，事故响应仍依赖用户主动观察。
 
 ### [2026-05-15] P2-1 完成：接入 CSP report-only 与 violation 收集
@@ -97,7 +128,7 @@
 
 ### [2026-05-15] P1-1 完成：接入 Sentry 错误追踪
 - 类型：Spec-Driven / 可观测性收口
-- 状态：代码侧已完成，Sentry 后台与 Vercel env 待用户配置
+- 状态：代码侧已完成，Sentry 后台与生产 CVM env 待用户配置
 
 #### 背景
 按 `release-readiness-assessment.md` P1-1，服务端 5xx 错误此前只走 console，缺事故告警与聚合。requestId 链路本周已完整收口，是接入 Sentry 的最佳时机。
@@ -124,7 +155,7 @@
 1. Sentry.io 注册账号或登录现有 organization。
 2. 创建项目（platform 选 Next.js）。
 3. 复制 DSN（Settings → Projects → Client Keys）。
-4. Vercel project env 配置 `NEXT_PUBLIC_SENTRY_DSN`。
+4. 生产 CVM `.env.local` / PM2 ecosystem env 配置 `NEXT_PUBLIC_SENTRY_DSN`，`pm2 reload abandonclaw` 生效。
 5. 在 Sentry Alerts 配置至少 1 条告警规则：
    - 单一错误 5 分钟出现 > 10 次 → 告警
    - 错误率 > 1% 持续 5 分钟 → 告警
@@ -137,7 +168,7 @@
 - `pnpm run build`：通过，Sentry SDK 集成无影响。
 
 #### 剩余风险
-- DSN 未配置前 Sentry 是 no-op，生产事故仍只能看 Vercel logs；用户必须先完成上述后台动作。
+- DSN 未配置前 Sentry 是 no-op，生产事故仍只能看 PM2 logs；用户必须先完成上述后台动作。
 - 未启用 Sentry Performance / Tracing：等真有 p95 监控需求再开，避免免费额度被消耗。
 - 告警规则与 oncall 渠道在 Sentry 后台手工配置，不在代码内固化，避免与运维耦合。
 
@@ -159,7 +190,7 @@
 #### P0-3 邮箱 provider 验证就绪
 - 代码侧无改动；Resend / EMAIL_FROM / EMAIL_VERIFICATION_CODE_SECRET 在 .env.example 已列出。
 - 实际执行需要用户：
-  1. Vercel project env 配置 `RESEND_API_KEY`、`EMAIL_FROM`、`EMAIL_VERIFICATION_CODE_SECRET`。
+  1. 生产 CVM `.env.local` / PM2 ecosystem env 配置 `RESEND_API_KEY`、`EMAIL_FROM`、`EMAIL_VERIFICATION_CODE_SECRET`，`pm2 reload abandonclaw` 生效。
   2. Resend 后台 → Domains → 完成 SPF/DKIM 验证。
   3. 用真实可收件邮箱跑 `signup-email-code-sent` 场景验证收件成功。
   4. 用收到的验证码补跑 `invite-only-signup-with-invite-succeeds`。
@@ -185,7 +216,7 @@
 #### 必须由用户在外部系统执行的后续动作
 1. Supabase 后台 → Project Settings → API → Reset `service_role_key`，旧 key 立即失效。
 2. GLM provider 后台撤销旧 `GLM_API_KEY`，生成新 key。
-3. 在 Vercel project env 中更新对应 secret 为新值。
+3. 在生产 CVM `.env.local` / PM2 ecosystem env 中更新对应 secret 为新值，`pm2 reload abandonclaw` 生效。
 4. 检查本地 `.env.local` 是否已用新 key。
 5. 如 `ADMIN_EMAILS` 中的 admin 账号怀疑被钓鱼，重置该账号 Supabase 密码并启用 2FA（如可用）。
 

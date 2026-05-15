@@ -37,6 +37,16 @@ Supabase 不同计划下的自动备份能力：
 
 ## 2. 触发恢复的事故类型
 
+### 2.0 应用进程崩溃 / 部署回滚（不涉及数据库）
+
+- PM2 进程异常退出、CPU/内存爆掉、新部署版本有 bug。
+- **响应**：
+  - `pm2 status` 看进程状态。
+  - `pm2 logs abandonclaw --lines 500` 查最近日志。
+  - 异常时 `pm2 reload abandonclaw` 软重载（保持连接），或 `pm2 restart abandonclaw` 硬重启。
+  - 新部署版本有 bug 时回滚：`git checkout <stable-tag> && pnpm install --frozen-lockfile && pnpm run build && pm2 reload abandonclaw`。
+  - 始终保留至少 1 个已知稳定的 build 目录或 git tag 作为回滚目标。
+
 ### 2.1 误删数据（最常见）
 
 - 管理员或脚本误执行 DELETE / TRUNCATE。
@@ -71,10 +81,12 @@ Supabase 不同计划下的自动备份能力：
 ### 3.1 从 Supabase 后台快照恢复（最常见路径）
 
 1. **识别事故**：
-   - 进入 Sentry / Vercel logs / 用户反馈渠道，确认事故时间窗口。
+   - 进入 Sentry / PM2 logs (`pm2 logs abandonclaw --lines 500`) / 用户反馈渠道，确认事故时间窗口。
    - 在 Supabase 后台 Project Settings → Logs 查看异常 SQL。
 2. **暂停应用**（可选，避免新写入污染）：
-   - 在 Vercel 后台把 production deployment 切到 maintenance 模式（如果有），或临时把 `REGISTRATION_MODE=closed` + 关闭高成本 capability。
+   - 在 `/admin/invites` 把 `REGISTRATION_MODE=closed`。
+   - 在 `/admin` 关闭高成本 capability。
+   - 必要时直接 `pm2 stop abandonclaw` 停应用，等 Nginx 返回 502；恢复时 `pm2 start abandonclaw`。
 3. **打开 Supabase 后台 → Project Settings → Backups**：
    - 选择事故发生前最近的快照。
    - 点 Restore，确认目标 project（**绝不能选错 project**）。
@@ -84,7 +96,8 @@ Supabase 不同计划下的自动备份能力：
    - 跑 `pnpm run validate:db-guardrails` 确认 RLS / 表结构完整。
    - 检查关键表行数与事故前是否一致。
 6. **恢复应用**：
-   - 取消 maintenance 模式。
+   - 重新打开注册模式 / 高成本 capability。
+   - 如果之前 `pm2 stop` 过，`pm2 start abandonclaw && pm2 logs --lines 100` 确认健康。
    - 在 dev-log 记录事故时间、影响范围、恢复时间、根因。
 7. **复盘**：
    - 24 小时内补 post-mortem（`docs/dev/incidents/YYYY-MM-DD-<title>.md`）。
@@ -121,7 +134,7 @@ Supabase 不同计划下的自动备份能力：
 
 依赖 Supabase 备份是单点风险。建议在 GitHub Actions 配置定时任务做异地备份。
 
-### 4.1 GitHub Action 示例
+### 4.1 GitHub Action 示例（如代码托管在 GitHub）
 
 ```yaml
 # .github/workflows/db-backup.yml
@@ -146,8 +159,9 @@ jobs:
             -d ${{ secrets.SUPABASE_DB_NAME }} \
             --no-owner --no-acl --format=custom \
             -f backup-$(date +%Y%m%d).dump
-      - name: Upload to S3
+      - name: Upload to S3 / OSS / COS
         run: |
+          # 视存储后端选用对应 CLI
           aws s3 cp backup-$(date +%Y%m%d).dump \
             s3://${{ secrets.BACKUP_BUCKET }}/supabase/$(date +%Y/%m/)/
         env:
@@ -155,25 +169,68 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 ```
 
-### 4.2 备份保留策略
+### 4.2 腾讯云 CVM cron + COS 上传（推荐：与生产部署同台节省网络）
+
+适合腾讯云部署主线。在生产 CVM（或单独的备份 CVM）上配 cron：
+
+```bash
+# 安装依赖
+sudo apt-get install -y postgresql-client-16
+# 安装 COS CLI（coscmd）
+pip3 install coscmd
+coscmd config -a <SecretId> -s <SecretKey> -b <bucket-name> -r <region>
+```
+
+`/usr/local/bin/abandonclaw-backup.sh`：
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+DATE=$(date +%Y%m%d-%H%M%S)
+DUMP_DIR=/var/backups/abandonclaw
+DUMP_FILE="$DUMP_DIR/backup-$DATE.dump"
+
+mkdir -p "$DUMP_DIR"
+
+# Supabase 连接信息从 systemd EnvironmentFile 或 .env 读取
+source /etc/abandonclaw/backup.env
+
+PGPASSWORD="$SUPABASE_DB_PASSWORD" pg_dump \
+  -h "$SUPABASE_DB_HOST" \
+  -U "$SUPABASE_DB_USER" \
+  -d "$SUPABASE_DB_NAME" \
+  --no-owner --no-acl --format=custom \
+  -f "$DUMP_FILE"
+
+# 上传到腾讯云 COS
+coscmd upload "$DUMP_FILE" "/supabase-backup/$(date +%Y/%m/)/"
+
+# 本地保留最近 7 天
+find "$DUMP_DIR" -name "backup-*.dump" -mtime +7 -delete
+```
+
+crontab：
+
+```
+13 3 * * * /usr/local/bin/abandonclaw-backup.sh >> /var/log/abandonclaw-backup.log 2>&1
+```
+
+`/etc/abandonclaw/backup.env` 权限设为 600，仅 root 可读。
+
+### 4.3 备份保留策略
 
 - 7 天日备份：保留全部
 - 4 周周备份：每周第一份保留
 - 12 个月月备份：每月第一份保留
 
-S3 lifecycle 规则可自动归档到 Glacier 降低成本。
+腾讯云 COS lifecycle 规则可自动归档到「归档存储 / 深度归档存储」降低成本（控制台 → COS → 存储桶 → 生命周期）。S3 同理。
 
-### 4.3 必需 secrets
+### 4.4 必需配置
 
-在 GitHub repo Settings → Secrets and variables 添加：
+GitHub Action 模式（4.1）：在 GitHub repo Settings → Secrets and variables 添加 `SUPABASE_DB_HOST` / `SUPABASE_DB_USER` / `SUPABASE_DB_PASSWORD` / `SUPABASE_DB_NAME` / `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` / `BACKUP_BUCKET`。
 
-- `SUPABASE_DB_HOST`
-- `SUPABASE_DB_USER`
-- `SUPABASE_DB_PASSWORD`
-- `SUPABASE_DB_NAME`
-- `AWS_ACCESS_KEY_ID`
-- `AWS_SECRET_ACCESS_KEY`
-- `BACKUP_BUCKET`
+腾讯云 cron 模式（4.2）：在 `/etc/abandonclaw/backup.env`（root 600）配置 `SUPABASE_DB_HOST` / `SUPABASE_DB_USER` / `SUPABASE_DB_PASSWORD` / `SUPABASE_DB_NAME`，并通过 `coscmd config` 配置 COS 凭证。
 
 ## 5. 演练
 
@@ -204,8 +261,8 @@ S3 lifecycle 规则可自动归档到 Glacier 降低成本。
 | 角色 | 联系人 | 备注 |
 | --- | --- | --- |
 | Supabase 项目 owner | __待用户填写__ | 拥有 Supabase 后台完整权限 |
-| Vercel 项目 owner | __待用户填写__ | 拥有 Vercel deployment 权限 |
-| 域名管理 | __待用户填写__ | DNS 切换权限 |
+| 腾讯云 CVM owner | __待用户填写__ | SSH / PM2 / Nginx 权限 |
+| 域名管理 | __待用户填写__ | DNS 切换权限（腾讯云 / Cloudflare） |
 | 灾备演练负责人 | __待用户填写__ | 季度演练 + 文档维护 |
 
 ## 7. 不解决的事情

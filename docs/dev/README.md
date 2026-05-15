@@ -39,7 +39,9 @@
 - [disaster-recovery.md](/d:/WorkCode/AbandonClaw/docs/dev/disaster-recovery.md)
   - 灾备与数据恢复手册：备份策略、RPO/RTO、恢复操作步骤、自建 pg_dump 兜底、季度演练 checklist。
 - [incident-response-runbook.md](/d:/WorkCode/AbandonClaw/docs/dev/incident-response-runbook.md)
-  - 平台层防护与事故响应手册：Vercel/Cloudflare WAF 推荐配置、异常流量识别、4 类事故响应剧本、日常巡检节奏。
+  - 平台层防护与事故响应手册：Nginx / 腾讯云 WAF / Cloudflare 推荐配置、异常流量识别、4 类事故响应剧本、日常巡检节奏。
+- [docs-audit-2026-05-15.md](/d:/WorkCode/AbandonClaw/docs/dev/docs-audit-2026-05-15.md)
+  - 文档与 OpenSpec 关联性 / 冲突 audit：腾讯云 vs Vercel 部署平台对应翻译表、路径死链、命名错位、需求覆盖缺口的处置结论。
 - [public-registration-http-baseline-runbook.md](/d:/WorkCode/AbandonClaw/docs/dev/public-registration-http-baseline-runbook.md)
   - 公网开放注册相关 baseline 的准备、执行、blocked 判断和结果留证手册。
 - [public-registration-feature-verification-guide.md](/d:/WorkCode/AbandonClaw/docs/dev/public-registration-feature-verification-guide.md)

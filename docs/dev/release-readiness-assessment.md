@@ -74,7 +74,7 @@
 2. 检查 `.env.local` 是否在 git history 出现过：`git log --all --full-history -- .env.local`。
 3. 立即在 Supabase 后台 rotate `service_role_key`；旧 key 标记失效。
 4. 立即在 GLM provider 后台 rotate API key；旧 key 标记失效。
-5. 同步更新所有部署环境（Vercel project env）的新 key。
+5. 同步更新所有部署环境（生产 CVM 的 `.env.local` / PM2 ecosystem env / 任何镜像或备用环境如 Vercel）的新 key，重启进程使新 key 生效。
 6. 在 `dev-log.md` 记录 rotate 时间与影响。
 
 **预期效果**
@@ -88,12 +88,12 @@
 - [x] `cat .env.example` 输出中不包含任何真实 key 字符串。
 - [ ] Supabase 后台显示新的 service_role_key 创建时间晚于 rotate 时间。
 - [ ] GLM provider 后台显示旧 key 已撤销。
-- [ ] Vercel project env 中所有 secret 与 Supabase / GLM 后台一致。
+- [ ] 生产环境（腾讯云 CVM `.env.local` / PM2 ecosystem env）所有 secret 与 Supabase / GLM 后台一致。
 - [x] dev-log 留存 rotate 摘要。
 
 **完成时间**：2026-05-15（代码侧）
 
-**完成摘要**：`.env.example` 已重写为完整占位符模板，覆盖 GLM / Supabase / 邮箱 / 注册 / 限流 / quota / 上游 / 备用 provider 全部 env，所有 secret 用 `__REPLACE_ME__`。后台 rotate 动作（Supabase service_role_key、GLM API key、ADMIN 邮箱）需在外部系统执行，未完成前旧 secret 仍可生效，必须立即在 Supabase 后台 → API → Reset service_role 与 GLM provider 后台撤销旧 key，并更新 Vercel project env。
+**完成摘要**：`.env.example` 已重写为完整占位符模板，覆盖 GLM / Supabase / 邮箱 / 注册 / 限流 / quota / 上游 / 备用 provider 全部 env，所有 secret 用 `__REPLACE_ME__`。后台 rotate 动作（Supabase service_role_key、GLM API key、ADMIN 邮箱）需在外部系统执行，未完成前旧 secret 仍可生效，必须立即在 Supabase 后台 → API → Reset service_role 与 GLM provider 后台撤销旧 key，并更新生产 CVM `.env.local` 与 PM2 ecosystem env 后 `pm2 reload abandonclaw`。
 
 #### P0-2：目标环境真实 HTTP baseline 跑通并留证
 
@@ -158,7 +158,7 @@
 
 **怎么做**
 
-1. 在目标环境（Vercel project env）确认 `RESEND_API_KEY` 已配置。
+1. 在目标环境（腾讯云 CVM `.env.local` / PM2 ecosystem env）确认 `RESEND_API_KEY` 已配置。
 2. 通过 Resend 后台确认 `EMAIL_FROM` 域名已完成 DNS 验证（SPF / DKIM）。
 3. 用真实邮箱执行：
    ```bash
@@ -177,14 +177,14 @@
 
 **验收标准**
 
-- [ ] Vercel project env 包含 `RESEND_API_KEY`、`EMAIL_FROM`、`EMAIL_VERIFICATION_CODE_SECRET`。
+- [ ] 生产环境（腾讯云 CVM `.env.local` / PM2 ecosystem env）包含 `RESEND_API_KEY`、`EMAIL_FROM`、`EMAIL_VERIFICATION_CODE_SECRET`。
 - [ ] Resend 后台对应发件域名 DNS 验证通过。
 - [ ] 真实邮箱实测收到验证码，且能用于注册成功。
 - [ ] dev-log 留存验证摘要。
 
 **完成时间**：待外部执行
 
-**完成摘要**：依赖外部账号（Vercel project env 与 Resend 后台），代码侧无需改动。按本节「怎么做」第 1-5 步执行。
+**完成摘要**：依赖外部账号（生产 CVM env 与 Resend 后台），代码侧无需改动。按本节「怎么做」第 1-5 步执行。
 
 ### P1 — 上线后第一周必须完成
 
@@ -192,7 +192,7 @@
 
 **背景与原因**
 
-当前服务端只用 `console.error / console.warn`（参见 `src/lib/server/auth.ts:55,112,131`、`src/lib/server/learning/service.ts:370` 等），没有错误聚合、告警、性能追踪能力。生产事故的可见性完全依赖 Vercel raw logs 或 Supabase logs，要按 requestId 关联、按错误率聚合都做不到。
+当前服务端只用 `console.error / console.warn`（参见 `src/lib/server/auth.ts:55,112,131`、`src/lib/server/learning/service.ts:370` 等），没有错误聚合、告警、性能追踪能力。生产事故的可见性完全依赖 PM2 logs 或 Supabase logs，要按 requestId 关联、按错误率聚合都做不到。
 
 requestId 链路本次已经收口完整，对接 Sentry 后所有错误自动带 requestId，事故定位时间从「翻日志几十分钟」缩短到「点开告警直接到现场」。
 
@@ -208,7 +208,7 @@ ROI 分析：Sentry 免费版（5k errors/month）已经覆盖小规模真实用
 
 1. 选型：
    - 推荐 Sentry（生态最完整、Next.js 一等公民支持、免费版够小规模用）。
-   - 备选 Vercel Observability（与现有部署天然集成、不需额外账号）。
+   - 备选 Vercel Observability（仅在仍部署 Vercel 备用环境时有意义；当前主线腾讯云 + PM2 不需要）。
 2. 安装 Sentry SDK：
    ```bash
    pnpm add @sentry/nextjs
@@ -241,19 +241,18 @@ ROI 分析：Sentry 免费版（5k errors/month）已经覆盖小规模真实用
 
 **完成时间**：2026-05-15（代码侧）
 
-**完成摘要**：通过 OpenSpec change `add-sentry-error-tracking` 接入 @sentry/nextjs。`toApiErrorResponse` 对 status >= 500 的未知异常自动 capture 并注入 requestId tag；`logApiError` 添加 Sentry breadcrumb；AppError / 401/403 legacy / 4xx 均不上报。DSN 通过 `NEXT_PUBLIC_SENTRY_DSN` 配置，缺失时 SDK no-op。单测扩展 4 个用例全过。后台动作（创建 Sentry 项目、配置 DSN、配置告警规则、对接 oncall）需用户在 Sentry/Vercel 后台执行。
+**完成摘要**：通过 OpenSpec change `add-sentry-error-tracking` 接入 @sentry/nextjs。`toApiErrorResponse` 对 status >= 500 的未知异常自动 capture 并注入 requestId tag；`logApiError` 添加 Sentry breadcrumb；AppError / 401/403 legacy / 4xx 均不上报。DSN 通过 `NEXT_PUBLIC_SENTRY_DSN` 配置，缺失时 SDK no-op。单测扩展 4 个用例全过。后台动作（创建 Sentry 项目、配置 DSN 到生产 CVM `.env.local` / PM2 ecosystem env、配置告警规则、对接 oncall）需用户在 Sentry / 腾讯云后台执行。
 
 #### P1-2：最小 CI 工作流
 
 **背景与原因**
 
-仓库当前没有 `.github/workflows/*.yml`，PR 没有任何自动 gate。Vercel 自动部署每个 PR 的预览，但不跑测试和 lint。本次刚收口的错误响应统一规范、middleware code 字段、requestId 链路一致性，可能被未来未跑测试的改动无意打破。
+仓库当前没有 `.github/workflows/*.yml`，PR 没有任何自动 gate。本次刚收口的错误响应统一规范、middleware code 字段、requestId 链路一致性，可能被未来未跑测试的改动无意打破。
 
 **为什么必须做**
 
 - 没 CI = 每次 PR 都靠人记得跑测试，迟早遗漏。
 - 维护规范（`maintenance:check`、`text:check-mojibake`、`spec:validate`）已经齐全但没有自动执行入口。
-- Vercel 部署会消耗构建配额，跑挂的 PR 也会浪费配额。
 
 **怎么做**
 
@@ -292,8 +291,9 @@ ROI 分析：Sentry 免费版（5k errors/month）已经覆盖小规模真实用
 
 - 每个 PR 自动跑 lint / 测试 / mojibake / maintenance / spec 检查。
 - 不通过的 PR 无法合并到 main。
-- Vercel 部署的预览只发生在测试已经通过的代码上。
 - 本次刚收口的错误响应规范不会被未来无意打破。
+
+> 平台假设：本工作流假设代码托管在 GitHub。如果代码托管在腾讯云 Coding / Gitee / GitLab，需要把工作流移植到对应平台（pipeline syntax 类似但不完全兼容）。
 
 **验收标准**
 
@@ -455,34 +455,42 @@ ROI 分析：Sentry 免费版（5k errors/month）已经覆盖小规模真实用
 
 **完成摘要**：当前小范围内测阶段不引入榜单 / 付费 / 积分 / 公开等级，前端 60s/10s 上限挡板已经足够防止统计被污染（见 P0-B SQL 与 `learning_study_time_anomalies` 异常表）。本项按节奏表保留到「引入榜单 / 付费 / 积分前」再启动，届时单独走 OpenSpec change `add-server-side-learning-session-heartbeat` 完整推进 session 状态机 / 数据库表 / 服务端累计 / 前端 delta 降级 / 历史数据迁移。
 
-#### P2-3：Vercel / Cloudflare WAF / Bot 防护
+#### P2-3：腾讯云 WAF / Nginx / Cloudflare 防护
 
 **背景与原因**
 
-`public-registration-readiness-plan.md` 第 10 节明确「不承诺抵御 DDoS，DDoS 需要平台、CDN 或 WAF 层处理」。当前部署在 Vercel，但没有启用 Vercel Firewall 或前置 Cloudflare。一次低成本的脚本攻击就可能：
+`public-registration-readiness-plan.md` 第 10 节明确「不承诺抵御 DDoS，DDoS 需要平台、CDN 或 WAF 层处理」。当前主线部署在腾讯云 CVM + PM2，应用前端 Nginx 反向代理还未启用 rate limit / connection limit，腾讯云 WAF / DDoS 高防也未启用。一次低成本的脚本攻击就可能：
 
 - 打爆 GLM API 账单。
 - 触发限流后大量正常用户被误伤。
 - Supabase 实例被占满连接数。
+- CVM 出口带宽被打满，正常用户连不上。
 
 **为什么必须做**
 
 - 应用层限流只能挡住「按规矩进来的请求」，挡不住底层网络层的 SYN flood 或 HTTP flood。
 - 公开开放后入口暴露在公网，被扫描、爬取、攻击是必然事件。
-- 平台层防护成本极低（Vercel Firewall 免费版包含基础规则、Cloudflare 免费版已经能挡常见攻击）。
+- 平台层防护成本相对低（Nginx 内置 limit_req 免费、腾讯云 WAF 按域名计费、Cloudflare 免费版即可挡常见攻击）。
 
 **怎么做**
 
-1. 优先启用 Vercel Firewall：
-   - Vercel project → Firewall → Enable。
-   - 配置基础规则：禁止已知恶意 IP、禁止异常 User-Agent、对 `/api/*` 启用 challenge mode。
-2. （可选）前置 Cloudflare：
-   - 把域名 DNS 指向 Cloudflare。
-   - 启用 Bot Fight Mode、Rate Limiting Rules、Challenge Page。
-   - 对 `/api/auth/signup`、`/api/practice/generate`、`/api/tts` 等高风险入口配置更严格规则。
-3. 配置告警：异常流量达到阈值时通知 oncall。
-4. 写一份事故响应剧本：
-   - 发现异常流量时如何在 Vercel / Cloudflare 后台快速封 IP / 启用更严 challenge。
+按 `docs/dev/incident-response-runbook.md` 第 2 节启用顺序：
+
+1. **Nginx 反向代理基础防护（必做）**：
+   - `limit_req_zone` 全站 60r/m + 注册 5r/10min + 高成本接口 20r/m。
+   - `limit_conn` 每 IP 50 个并发。
+   - HTTPS / HSTS / 受控 429。
+2. **腾讯云 WAF（公开开放强烈建议）**：
+   - 控制台 → Web 应用防火墙 → SaaS 版接入域名。
+   - 启用基础防护规则 + 自定义 IP 频控规则 + Bot 管理。
+3. **腾讯云 DDoS 高防**（被攻击过或预期会被攻击）：
+   - 购买 DDoS 高防 IP 或高防包，把流量先打到高防节点再回源。
+4. **（可选）Cloudflare 前置**：
+   - 用户量 > 1000 / 月或第一次被攻击后强烈推荐。
+   - DNS NS 切到 Cloudflare，启用 Bot Fight Mode、Rate Limiting Rules。
+   - CVM Nginx 加 Cloudflare IP 白名单避免被绕过。
+5. **配置告警**：异常流量达到阈值时通知 oncall（企微 / 钉钉 / 飞书 / 邮件）。
+6. **事故响应剧本**：见 `docs/dev/incident-response-runbook.md` 第 4 节 4 类剧本。
 
 **预期效果**
 
@@ -492,15 +500,17 @@ ROI 分析：Sentry 免费版（5k errors/month）已经覆盖小规模真实用
 
 **验收标准**
 
-- [ ] Vercel Firewall 已启用并配置基础规则。
+- [ ] Nginx 反向代理已部署并配置 limit_req / limit_conn。
+- [ ] 腾讯云 WAF 已启用并接入域名（公开开放前）。
+- [ ] 腾讯云 DDoS 基础防护开启（CVM 自带）。
 - [ ] （可选）Cloudflare 已前置并配置 Bot Fight Mode。
 - [ ] 异常流量告警可触达 oncall。
-- [x] 事故响应剧本已写入 `docs/dev/incident-runbook.md`。
+- [x] 事故响应剧本已写入 `docs/dev/incident-response-runbook.md`。
 - [x] dev-log 记录 WAF 启用时间与配置摘要。
 
 **完成时间**：2026-05-15（文档侧）
 
-**完成摘要**：新增 `docs/dev/incident-response-runbook.md`，覆盖：当前部署架构与裸点、3 层防护启用顺序（Vercel Firewall → Cloudflare 前置 → Upstash 增强）、异常流量关键指标与阈值、4 类事故响应剧本（单账号刷 / 单 IP 多账号 / 全站流量 / GLM 账单暴涨）、周/月/季度巡检节奏、首次执行 checklist。文档名为 `incident-response-runbook.md`（原 release-readiness-assessment.md 文中的 `incident-runbook.md` 是简称，实际文件名以 `-response-` 完整版为准）。Vercel / Cloudflare 后台配置由用户执行。
+**完成摘要**：新增 `docs/dev/incident-response-runbook.md`，覆盖：当前部署架构（腾讯云 CVM + PM2 + Nginx + Supabase）与裸点、4 层防护启用顺序（Nginx 基础 → 腾讯云 WAF/DDoS → Cloudflare 前置 → Upstash 应用层）、Nginx 反向代理配置示例、异常流量关键指标与阈值、4 类事故响应剧本（单账号刷 / 单 IP 多账号 / 全站流量 / GLM 账单暴涨）、周/月/季度巡检节奏、首次执行 checklist。腾讯云 WAF / Cloudflare 后台配置由用户执行。
 
 #### P2-4：合规声明（隐私政策 / 服务条款 / Cookie 同意）
 
@@ -517,6 +527,7 @@ ROI 分析：Sentry 免费版（5k errors/month）已经覆盖小规模真实用
 **为什么必须做**
 
 - 中国《个人信息保护法》要求：处理个人信息必须有合法基础，明示告知用户。
+- 国内域名向公网开放需要 ICP 备案；备案信息要在网站底部公示。
 - 欧盟 GDPR：违反 cookie 同意单笔罚款上限达 2000 万欧元或全球年营收 4%。
 - 用户投诉 / 应用商店审核 / 域名服务商审核都会要求隐私政策链接。
 
@@ -527,7 +538,7 @@ ROI 分析：Sentry 免费版（5k errors/month）已经覆盖小规模真实用
    - 收集目的（账户管理 / 学习功能 / 滥用防护）。
    - 数据存储位置（Supabase 区域）和保留期。
    - 用户权利（访问 / 删除 / 导出）。
-   - 数据分享对象（Supabase / Resend / GLM provider / Sentry / Vercel）。
+   - 数据分享对象（Supabase / Resend / GLM provider / Sentry / 腾讯云 / Vercel 如使用备用）。
    - 联系方式。
 2. 准备服务条款草稿，至少覆盖：
    - 服务范围与限制。
