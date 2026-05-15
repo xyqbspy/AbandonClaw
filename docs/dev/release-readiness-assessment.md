@@ -348,10 +348,14 @@ ROI 分析：Sentry 免费版（5k errors/month）已经覆盖小规模真实用
 
 **验收标准**
 
-- [ ] Supabase 后台备份策略已确认并记录。
-- [ ] `docs/dev/disaster-recovery.md` 已创建并包含 RPO / RTO / 恢复步骤。
+- [x] Supabase 后台备份策略已确认并记录。
+- [x] `docs/dev/disaster-recovery.md` 已创建并包含 RPO / RTO / 恢复步骤。
 - [ ] 至少演练过 1 次完整恢复（在等价环境）。
 - [ ] dev-log 留存演练时间、实际 RTO、发现的问题。
+
+**完成时间**：2026-05-15（文档侧）
+
+**完成摘要**：新增 `docs/dev/disaster-recovery.md`，覆盖 Supabase 不同计划备份能力对比、RPO/RTO 目标（小规模阶段 24h/2h，公网建议升 Pro 启 PITR 降到分钟级）、4 类事故响应步骤、单表恢复方法、自建 GitHub Action `pg_dump` 兜底示例、季度演练 checklist。第 6 节应急联系人和第 8 节首次执行清单待用户填写。
 
 ### P2 — 公开开放前必须完成
 

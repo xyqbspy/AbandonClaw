@@ -36,6 +36,8 @@
   - 服务端上线前检查、运行护栏和真实 HTTP baseline。
 - [release-readiness-assessment.md](/d:/WorkCode/AbandonClaw/docs/dev/release-readiness-assessment.md)
   - 上线准备评估与缺口跟踪：业务防护层之外、平台运维层缺口的统一入口。每个缺口包含背景、原因、方案、效果、验收。
+- [disaster-recovery.md](/d:/WorkCode/AbandonClaw/docs/dev/disaster-recovery.md)
+  - 灾备与数据恢复手册：备份策略、RPO/RTO、恢复操作步骤、自建 pg_dump 兜底、季度演练 checklist。
 - [public-registration-http-baseline-runbook.md](/d:/WorkCode/AbandonClaw/docs/dev/public-registration-http-baseline-runbook.md)
   - 公网开放注册相关 baseline 的准备、执行、blocked 判断和结果留证手册。
 - [public-registration-feature-verification-guide.md](/d:/WorkCode/AbandonClaw/docs/dev/public-registration-feature-verification-guide.md)
