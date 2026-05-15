@@ -140,6 +140,10 @@
 - [ ] dev-log 留存执行摘要，包含目标环境、注册模式、通过 / blocked 场景列表。
 - [ ] 至少演练过一次 `/admin` 紧急关闭高成本 capability、`/admin/users` 切换 access_status、`/admin/invites` 切换 closed。
 
+**完成时间**：待外部执行
+
+**完成摘要**：baseline runner 已确认可执行（`pnpm run load:public-registration-baseline --dry-run` 通过），sample 配置完整。实际跑通需要用户在浏览器登录目标环境拿到 verified/unverified/generation_limited/readonly/quota/admin/3 个 IP 限流账号 cookie，并在 `/admin/invites` 生成有效邀请码。按 `public-registration-http-baseline-runbook.md` 第 3-7 节执行。
+
 #### P0-3：邮箱 provider 配置确认
 
 **背景与原因**
@@ -177,6 +181,10 @@
 - [ ] Resend 后台对应发件域名 DNS 验证通过。
 - [ ] 真实邮箱实测收到验证码，且能用于注册成功。
 - [ ] dev-log 留存验证摘要。
+
+**完成时间**：待外部执行
+
+**完成摘要**：依赖外部账号（Vercel project env 与 Resend 后台），代码侧无需改动。按本节「怎么做」第 1-5 步执行。
 
 ### P1 — 上线后第一周必须完成
 

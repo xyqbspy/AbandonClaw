@@ -1,5 +1,32 @@
 # Dev Log
 
+### [2026-05-15] P0-2 / P0-3 状态：工具就绪，待外部执行
+- 类型：Cleanup / 验证收口
+- 状态：代码侧无改动，工具链已确认可执行
+
+#### P0-2 baseline 工具就绪
+- `pnpm run load:public-registration-baseline --dry-run --config-file=scripts/load-samples/public-registration-http-baseline.sample.json` 输出正常，所有 cookie/邀请码字段以 `[provided]` 脱敏预览展示。
+- sample 配置完整覆盖 16 个场景。
+- 实际执行需要用户准备：
+  1. 复制 sample 到 `tmp/public-registration-http-baseline.local.json`，替换真实 baseUrl/origin/cookies/inviteCode/outputPath。
+  2. 在浏览器登录目标环境拿到 verified、unverified、generation_limited、readonly、quota_exhausted、admin 共 6 个 cookie。
+  3. 至少 3 个不同账号的 cookie 用于 IP 限流验证（cookieA|||cookieB|||cookieC 拼接）。
+  4. 在 `/admin/invites` 生成有效邀请码。
+  5. 跑全量：`pnpm run load:public-registration-baseline --config-file=tmp/public-registration-http-baseline.local.json`。
+  6. 第一层场景必须全部 `passed`，并把结果摘要写回 dev-log。
+
+#### P0-3 邮箱 provider 验证就绪
+- 代码侧无改动；Resend / EMAIL_FROM / EMAIL_VERIFICATION_CODE_SECRET 在 .env.example 已列出。
+- 实际执行需要用户：
+  1. Vercel project env 配置 `RESEND_API_KEY`、`EMAIL_FROM`、`EMAIL_VERIFICATION_CODE_SECRET`。
+  2. Resend 后台 → Domains → 完成 SPF/DKIM 验证。
+  3. 用真实可收件邮箱跑 `signup-email-code-sent` 场景验证收件成功。
+  4. 用收到的验证码补跑 `invite-only-signup-with-invite-succeeds`。
+
+#### 剩余风险
+- baseline 与邮件链路在外部完成前，「目标环境真的可放行」尚不可证。
+- P0-2 + P0-3 验收 checkbox 在 release-readiness-assessment 中保留为未勾，待用户实际执行后回写。
+
 ### [2026-05-15] P0-1 完成：清理 .env.example 真实 secret
 - 类型：Cleanup / 安全收口
 - 状态：代码侧已完成，secret rotate 待用户在外部系统执行
