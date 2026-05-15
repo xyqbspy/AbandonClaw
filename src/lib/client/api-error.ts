@@ -17,6 +17,8 @@ type ReadableMessageContext =
   | "login"
   | "signup"
   | "send-email-code"
+  | "learning"
+  | "phrases"
   | "review-submit"
   | "review-load"
   | "scenes-load"

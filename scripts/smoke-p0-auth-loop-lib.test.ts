@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   extractFirstSceneChunk,
   getStarterSlugFromDashboard,
+  isAdminAccessDeniedResult,
 } from "./smoke-p0-auth-loop-lib";
 
 test("extractFirstSceneChunk 会从 scene lesson 中取出第一个 builtin chunk", () => {
@@ -94,5 +95,44 @@ test("getStarterSlugFromDashboard 读取 starter recommendation scene slug", () 
       },
     }),
     "daily-greeting",
+  );
+});
+
+test("isAdminAccessDeniedResult accepts redirect or 403 only", () => {
+  assert.equal(
+    isAdminAccessDeniedResult({
+      status: 302,
+      durationMs: 10,
+      ok: false,
+      requestId: "req-redirect",
+      headers: { location: "/" },
+      bodyText: "",
+      bodyJson: null,
+    }),
+    true,
+  );
+  assert.equal(
+    isAdminAccessDeniedResult({
+      status: 403,
+      durationMs: 10,
+      ok: false,
+      requestId: "req-forbidden",
+      headers: {},
+      bodyText: "",
+      bodyJson: null,
+    }),
+    true,
+  );
+  assert.equal(
+    isAdminAccessDeniedResult({
+      status: 200,
+      durationMs: 10,
+      ok: true,
+      requestId: "req-ok",
+      headers: {},
+      bodyText: "",
+      bodyJson: null,
+    }),
+    false,
   );
 });

@@ -73,7 +73,7 @@ pnpm run test:scripts
 - `reset:test-user` 需要：
   - `ALLOW_TEST_USER_RESET=true`
   - 上述测试账号 email 白名单，或 `TEST_USER_ALLOWED_DOMAIN`
-- `smoke:p0-auth-loop` 会先 reset `TEST_NORMAL_EMAIL`，再用正式 Supabase 登录 session 跑 `/today -> scene -> save phrase -> review -> complete scene -> today` 的 API 级闭环。
+- `smoke:p0-auth-loop` 会先 reset `TEST_NORMAL_EMAIL`，再用正式 Supabase 登录 session 跑 `/today -> scene -> save phrase -> review -> complete scene -> today` 的 API 级闭环，并验证 admin 可访问 `/admin`、restricted 访问 `/admin` 被拒绝或重定向。
 - `TEST_ADMIN_EMAIL` 还需要同时出现在 `ADMIN_EMAILS`，否则账号虽然会被 seed，但仍不能访问 `/admin`。
 
 ## 深读触发

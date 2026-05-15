@@ -36,7 +36,11 @@ type SmokePhaseName =
   | "review-submit"
   | "review-db-check"
   | "scene-complete"
-  | "today-final";
+  | "today-final"
+  | "admin-login"
+  | "admin-page"
+  | "restricted-login"
+  | "restricted-admin-denied";
 
 export interface SmokePhaseResult {
   phase: SmokePhaseName;
@@ -236,6 +240,23 @@ const expectRedirectToToday = (result: RequestResult) => {
   return result.status >= 300 && result.status < 400 && /\/today\/?$/.test(location);
 };
 
+export const isAdminAccessDeniedResult = (result: RequestResult) =>
+  result.status === 403 ||
+  (result.status >= 300 && result.status < 400 && Boolean(result.headers.location?.trim()));
+
+const loginWithPhase = async (
+  phase: SmokePhaseName,
+  target: string,
+  email: string,
+  password: string,
+) => {
+  try {
+    return await loginWithPassword(email, password);
+  } catch (error) {
+    throw new SmokePhaseError(phase, target, error instanceof Error ? error.message : String(error));
+  }
+};
+
 const loginWithPassword = async (email: string, password: string) => {
   const cookieStore = new MemoryCookieStore();
   const client = createBrowserClient(getSupabaseUrl(), getSupabaseAnonKey(), {
@@ -343,7 +364,12 @@ export async function runP0AuthLoopSmoke(config: P0SmokeConfig): Promise<P0Smoke
     summary: `已清空 ${reset.tables.reduce((sum, item) => sum + item.count, 0)} 条测试数据`,
   });
 
-  const { cookieHeader } = await loginWithPassword(config.email, config.password);
+  const { cookieHeader } = await loginWithPhase(
+    "login",
+    "supabase.auth.signInWithPassword",
+    config.email,
+    config.password,
+  );
   pushPhase(phases, "login", "supabase.auth.signInWithPassword", {
     ok: true,
     summary: "已拿到正式 session cookie",
@@ -628,6 +654,78 @@ export async function runP0AuthLoopSmoke(config: P0SmokeConfig): Promise<P0Smoke
     summary: "完成 daily-greeting 后推荐 self-introduction",
     status: dashboardFinalResult.status,
     requestId: dashboardFinalResult.requestId,
+  });
+
+  const { cookieHeader: adminCookie } = await loginWithPhase(
+    "admin-login",
+    "supabase.auth.signInWithPassword",
+    config.resetConfig.adminEmail,
+    config.password,
+  );
+  pushPhase(phases, "admin-login", "supabase.auth.signInWithPassword", {
+    ok: true,
+    summary: `admin 账号 ${config.resetConfig.adminEmail} 登录成功`,
+  });
+
+  const adminPageResult = await runAuthedRequest(
+    config,
+    adminCookie,
+    "/admin",
+    "GET",
+    undefined,
+    undefined,
+    "manual",
+  );
+  if (adminPageResult.status !== 200) {
+    throw new SmokePhaseError(
+      "admin-page",
+      "/admin",
+      requestSummary(adminPageResult),
+      adminPageResult.status,
+      adminPageResult.requestId,
+    );
+  }
+  pushPhase(phases, "admin-page", "/admin", {
+    ok: true,
+    summary: "admin 账号访问 /admin = 200",
+    status: adminPageResult.status,
+    requestId: adminPageResult.requestId,
+  });
+
+  const { cookieHeader: restrictedCookie } = await loginWithPhase(
+    "restricted-login",
+    "supabase.auth.signInWithPassword",
+    config.resetConfig.restrictedEmail,
+    config.password,
+  );
+  pushPhase(phases, "restricted-login", "supabase.auth.signInWithPassword", {
+    ok: true,
+    summary: `restricted 账号 ${config.resetConfig.restrictedEmail} 登录成功`,
+  });
+
+  const restrictedAdminResult = await runAuthedRequest(
+    config,
+    restrictedCookie,
+    "/admin",
+    "GET",
+    undefined,
+    undefined,
+    "manual",
+  );
+  if (!isAdminAccessDeniedResult(restrictedAdminResult)) {
+    throw new SmokePhaseError(
+      "restricted-admin-denied",
+      "/admin",
+      requestSummary(restrictedAdminResult),
+      restrictedAdminResult.status,
+      restrictedAdminResult.requestId,
+    );
+  }
+  pushPhase(phases, "restricted-admin-denied", "/admin", {
+    ok: true,
+    summary: `restricted 账号访问 /admin 被拒绝或重定向${restrictedAdminResult.status ? ` status=${restrictedAdminResult.status}` : ""}${restrictedAdminResult.headers.location ? ` location=${restrictedAdminResult.headers.location}` : ""}`,
+    status: restrictedAdminResult.status,
+    requestId: restrictedAdminResult.requestId,
   });
 
   return {

@@ -228,6 +228,18 @@ function createGettingBackOnTrackLesson(): Lesson {
   };
 }
 
+function getFixtureSentence(lesson: Lesson, sentenceIndex: number) {
+  const sentence = lesson.sections[0]?.blocks[0]?.sentences[sentenceIndex];
+  assert.ok(sentence, `fixture sentence ${sentenceIndex} should exist`);
+  return sentence;
+}
+
+function getFixtureChunk(lesson: Lesson, sentenceIndex: number, chunkIndex = 0) {
+  const chunk = getFixtureSentence(lesson, sentenceIndex).chunkDetails?.[chunkIndex];
+  assert.ok(chunk, `fixture chunk ${sentenceIndex}:${chunkIndex} should exist`);
+  return chunk;
+}
+
 function createGroupedMobileLesson(): Lesson {
   return {
     id: "grouped-mobile-1",
@@ -301,36 +313,44 @@ function getTrainingCard() {
   return card;
 }
 
-async function activateChunkInDesktopReader() {
-  fireEvent.click(screen.getByRole("button", { name: "went to bed pretty late" }));
+async function activateChunkInDesktopReader(lesson: Lesson) {
+  const sentence = getFixtureSentence(lesson, 0);
+  const chunk = getFixtureChunk(lesson, 0);
+  fireEvent.click(screen.getByRole("button", { name: chunk.text }));
   await waitFor(() => {
-    assert.ok(screen.getByText("睡得挺晚"));
+    assert.ok(screen.getByText(chunk.translation));
   });
+  return { sentence, chunk };
 }
 
 test("LessonReader 在桌面端点击句子后会切换右侧详情", async () => {
   mockMatchMedia(false);
   const lesson = createGettingBackOnTrackLesson();
+  const firstSentence = getFixtureSentence(lesson, 0);
+  const secondSentence = getFixtureSentence(lesson, 1);
+  const secondChunk = getFixtureChunk(lesson, 1);
 
   render(<LessonReader lesson={lesson} />);
 
-  assert.ok(screen.getAllByText("I went to bed pretty late yesterday.").length >= 1);
+  assert.ok(screen.getAllByText(firstSentence.text).length >= 1);
 
-  fireEvent.click(screen.getByText("I kept watching videos instead of studying English."));
+  fireEvent.click(screen.getByText(secondSentence.text));
 
   await waitFor(() => {
-    assert.ok(screen.getAllByText("instead of").length >= 1);
+    assert.ok(screen.getAllByText(secondChunk.text).length >= 1);
   });
 });
 
 test("LessonReader 在桌面端选中文本后点击释义会切换句子上下文并清空工具栏", async () => {
   mockMatchMedia(false);
   const lesson = createGettingBackOnTrackLesson();
+  const secondSentence = getFixtureSentence(lesson, 1);
+  const secondChunk = getFixtureChunk(lesson, 1);
 
   render(<LessonReader lesson={lesson} />);
 
-  const sentenceElement = screen.getByText("I kept watching videos instead of studying English.");
-  const selection = createSelectionState(sentenceElement, "instead of");
+  const sentenceElement = screen.getByText(secondSentence.text);
+  const selection = createSelectionState(sentenceElement, secondChunk.text);
   Object.defineProperty(window, "getSelection", {
     configurable: true,
     writable: true,
@@ -347,7 +367,7 @@ test("LessonReader 在桌面端选中文本后点击释义会切换句子上下�
   fireEvent.click(within(toolbar).getByRole("button", { name: "释义" }));
 
   await waitFor(() => {
-    assert.ok(screen.getAllByText("instead of").length >= 1);
+    assert.ok(screen.getAllByText(secondChunk.text).length >= 1);
     assert.match(toolbar.className, /pointer-events-none/);
   });
 });
@@ -482,10 +502,11 @@ test("LessonReader 收藏当前短语时会透传 payload 并更新已收藏状�
   mockMatchMedia(false);
   const toastCalls = installToastSpies();
   const savePayloads: Array<Record<string, unknown>> = [];
+  const lesson = createGettingBackOnTrackLesson();
 
   render(
     <LessonReader
-      lesson={createGettingBackOnTrackLesson()}
+      lesson={lesson}
       onSavePhrase={async (payload) => {
         savePayloads.push(payload);
         return { created: true };
@@ -493,20 +514,20 @@ test("LessonReader 收藏当前短语时会透传 payload 并更新已收藏状�
     />,
   );
 
-  await activateChunkInDesktopReader();
+  const { sentence, chunk } = await activateChunkInDesktopReader(lesson);
   fireEvent.click(screen.getByRole("button", { name: "收藏短语" }));
 
   await waitFor(() => {
     assert.deepEqual(savePayloads, [
       {
-        text: "went to bed pretty late",
-        translation: "睡得挺晚",
-        usageNote: "很自然地描述前一天作息拖晚了。",
-        sourceSceneSlug: "getting-back-on-track",
+        text: chunk.text,
+        translation: chunk.translation,
+        usageNote: chunk.usageNote,
+        sourceSceneSlug: lesson.slug,
         sourceType: "scene",
         sourceSentenceIndex: 0,
-        sourceSentenceText: "I went to bed pretty late yesterday.",
-        sourceChunkText: "went to bed pretty late",
+        sourceSentenceText: sentence.text,
+        sourceChunkText: chunk.text,
       },
     ]);
     assert.ok(screen.getByRole("button", { name: "已收藏" }));
@@ -517,15 +538,16 @@ test("LessonReader 收藏当前短语时会透传 payload 并更新已收藏状�
 test("LessonReader 收藏已存在短语时会提示已在收藏中", async () => {
   mockMatchMedia(false);
   const toastCalls = installToastSpies();
+  const lesson = createGettingBackOnTrackLesson();
 
   render(
     <LessonReader
-      lesson={createGettingBackOnTrackLesson()}
+      lesson={lesson}
       onSavePhrase={async () => ({ created: false })}
     />,
   );
 
-  await activateChunkInDesktopReader();
+  await activateChunkInDesktopReader(lesson);
   fireEvent.click(screen.getByRole("button", { name: "收藏短语" }));
 
   await waitFor(() => {
@@ -537,17 +559,18 @@ test("LessonReader 收藏已存在短语时会提示已在收藏中", async () =
 test("LessonReader 加入复习失败时会显示错误提示", async () => {
   mockMatchMedia(false);
   const toastCalls = installToastSpies();
+  const lesson = createGettingBackOnTrackLesson();
 
   render(
     <LessonReader
-      lesson={createGettingBackOnTrackLesson()}
+      lesson={lesson}
       onReviewPhrase={async () => {
         throw new Error("review failed");
       }}
     />,
   );
 
-  await activateChunkInDesktopReader();
+  await activateChunkInDesktopReader(lesson);
   fireEvent.click(screen.getByRole("button", { name: "加入复习" }));
 
   await waitFor(() => {

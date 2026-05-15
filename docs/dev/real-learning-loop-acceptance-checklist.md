@@ -8,10 +8,26 @@
 
 - [ ] 已登录真实用户
 - [ ] 本地开发服务或目标环境已启动
-- [ ] 当前账号至少有一个可继续的场景
+- [ ] 当前账号是新账号，或已清空学习进度与相关 user_phrase 测试数据
 - [ ] 当前账号允许从场景里保存表达并进入 review
 - [ ] 浏览器已打开 `console`
 - [ ] 如需回看事件，已打开 `/admin/observability`
+
+## P0 发布前冒烟
+
+- [ ] 新账号或清空进度账号进入 `/today`，能看到 starter recommendation。
+- [ ] 点击 Today 主卡片后进入 `/scene/daily-greeting`。
+- [ ] Scene 页面能看到核心 chunks。
+- [ ] 保存一个 chunk，并看到成功提示。
+- [ ] 进入 `/chunks`，能看到刚保存的表达。
+- [ ] 进入 `/review`，能看到该表达进入 due。
+- [ ] 提交一次 Review，提交成功且状态推进。
+- [ ] 回到 `/today`，页面能正常承接下一步。
+- [ ] 完成 `daily-greeting` 后，Today 推荐 `self-introduction`。
+- [ ] 进入 `/scenes`，切换 L2 筛选；无内容时显示空状态和清除筛选入口。
+- [ ] admin 测试账号访问 `/admin` 返回 200。
+- [ ] restricted 测试账号访问 `/admin` 被拒绝或重定向。
+- [ ] 登录、注册、验证码、Review submit 的错误不裸露 `failed fetch` 或 Supabase 英文错误。
 
 ## 验收步骤
 
