@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { BookMarked, PlusCircle, Search } from "lucide-react";
+import { ArrowRight, BookMarked, Compass, Feather, PlusCircle, Search } from "lucide-react";
 import { clearAllPhraseListCache } from "@/lib/cache/phrase-list-cache";
 import { prefetchSceneDetail } from "@/lib/cache/scene-prefetch";
 import { useTtsPlaybackController } from "@/hooks/use-tts-playback-controller";
@@ -23,7 +23,6 @@ import {
 import { startReviewSession } from "@/lib/utils/review-session";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { EmptyState } from "@/components/shared/empty-state";
 import { LoadingState } from "@/components/shared/action-loading";
 import { ExampleSentenceCards } from "@/components/shared/example-sentence-cards";
 import { buildExpressionMapViewModel } from "@/features/chunks/components/expression-map-selectors";
@@ -171,7 +170,7 @@ const SIMILAR_LABEL_FALLBACK = [
 const appleButtonClassName = `${APPLE_BUTTON_BASE} ${APPLE_BUTTON_TEXT_SM}`;
 const appleButtonStrongClassName = `${APPLE_BUTTON_STRONG} ${APPLE_BUTTON_TEXT_SM}`;
 const chunksButtonClassName =
-  "cursor-pointer rounded-xl bg-white px-3 py-1.5 text-xs font-bold text-slate-500 shadow-sm transition-all hover:bg-slate-50 hover:text-blue-600";
+  "cursor-pointer rounded-xl bg-white px-4 py-2 text-[10px] font-black text-slate-500 shadow-sm transition-all hover:bg-slate-50 hover:text-blue-600";
 const normalizeSimilarLabel = (label: string | null | undefined) => {
   const trimmed = (label ?? "").trim();
   if (!trimmed) return zh.diffRelated;
@@ -1843,63 +1842,69 @@ export default function ChunksPage() {
   );
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6 px-6 py-6 sm:py-8 lg:px-10">
-      <section className="rounded-[2rem] bg-white p-6 shadow-sm">
-        <div className="mb-6 flex items-center gap-4">
-          <div className="flex size-12 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-lg shadow-blue-200">
-            <BookMarked className="size-5" aria-hidden="true" />
+    <div className="min-h-screen bg-[#f8fafc] font-sans">
+      <header className="sticky top-0 z-50 border-b border-slate-100 bg-white/80 backdrop-blur-xl">
+        <div className="mx-auto max-w-[760px] px-3 pt-3 pb-4 sm:pt-4 lg:px-5">
+          <div className="mb-6 flex items-center gap-3">
+            <div className="flex size-10 items-center justify-center rounded-xl bg-blue-600 text-white shadow-lg shadow-blue-100">
+              <BookMarked className="size-5" aria-hidden="true" />
+            </div>
+            <div className="min-w-0">
+              <h1 className="font-sans text-lg font-black text-slate-900">{zh.heroTitle}</h1>
+              <p className="text-[10px] font-bold text-slate-400">
+                {libraryTab === "builtin"
+                  ? zh.builtinHeroSubtitle
+                  : `${zh.heroSubtitle} · ${summary}`}
+              </p>
+            </div>
           </div>
-          <div className="min-w-0">
-            <h1 className="font-sans text-lg font-black text-slate-900">{zh.heroTitle}</h1>
-            <p className="text-[11px] font-bold text-slate-400">
-              {libraryTab === "builtin" ? zh.builtinHeroSubtitle : `${zh.heroSubtitle} · ${summary}`}
-            </p>
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-slate-300" />
+            <Input
+              className="h-12 rounded-2xl border-0 bg-slate-50 py-3 pl-11 pr-4 text-sm text-slate-700 shadow-none outline-none transition-all placeholder:text-slate-300 focus:bg-white focus-visible:ring-2 focus-visible:ring-blue-500/20"
+              placeholder={`${zh.searchPlaceholder}...`}
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+            />
+          </div>
+          <div className="mt-6 flex items-center gap-8 px-2">
+            {[
+              { key: "mine" as const, label: zh.tabMine },
+              { key: "builtin" as const, label: zh.tabBuiltin },
+            ].map((tab) => {
+              const active = libraryTab === tab.key;
+              return (
+                <button
+                  key={tab.key}
+                  type="button"
+                  className={`relative whitespace-nowrap text-[13px] font-black transition ${
+                    active ? "text-blue-600" : "text-slate-400 hover:text-slate-600"
+                  }`}
+                  onClick={() => setLibraryTab(tab.key)}
+                >
+                  {tab.label}
+                  {active ? (
+                    <span className="absolute left-1/2 top-full mt-2 block h-[3px] w-4 -translate-x-1/2 rounded-full bg-blue-600" />
+                  ) : null}
+                </button>
+              );
+            })}
+            <div className="flex-1" />
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="h-8 cursor-pointer gap-1 rounded-xl px-2 text-[11px] font-bold text-blue-600 hover:bg-blue-50 hover:text-blue-700"
+              onClick={() => setAddSheetOpen(true)}
+            >
+              <PlusCircle className="size-3.5" aria-hidden="true" />
+              {zh.addLearningContent}
+            </Button>
           </div>
         </div>
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-slate-300" />
-          <Input
-            className="h-12 rounded-2xl border-0 bg-slate-50 py-3 pl-11 pr-4 text-sm text-slate-700 shadow-none outline-none transition-all placeholder:text-slate-300 focus:bg-white focus-visible:ring-2 focus-visible:ring-blue-500/20"
-            placeholder={`${zh.searchPlaceholder}...`}
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-          />
-        </div>
-        <div className="mt-6 flex items-center gap-8 px-2">
-          {[
-            { key: "mine" as const, label: zh.tabMine },
-            { key: "builtin" as const, label: zh.tabBuiltin },
-          ].map((tab) => {
-            const active = libraryTab === tab.key;
-            return (
-              <button
-                key={tab.key}
-                type="button"
-                className={`relative text-sm font-black transition ${
-                  active ? "text-blue-600" : "text-slate-400 hover:text-slate-600"
-                }`}
-                onClick={() => setLibraryTab(tab.key)}
-              >
-                {tab.label}
-                {active ? (
-                  <span className="absolute left-1/2 top-full mt-2 block h-[3px] w-4 -translate-x-1/2 rounded-full bg-blue-600" />
-                ) : null}
-              </button>
-            );
-          })}
-          <div className="flex-1" />
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            className="h-8 cursor-pointer gap-1 rounded-xl px-2 text-xs font-bold text-blue-600 hover:bg-blue-50 hover:text-blue-700"
-            onClick={() => setAddSheetOpen(true)}
-          >
-            <PlusCircle className="size-3.5" aria-hidden="true" />
-            {zh.addLearningContent}
-          </Button>
-        </div>
-      </section>
+      </header>
+
+      <main className="mx-auto max-w-[760px] space-y-6 px-3 pb-32 pt-3 sm:pt-4 lg:px-5">
 
       {libraryTab === "mine" ? (
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -2018,12 +2023,47 @@ export default function ChunksPage() {
         loading ? (
           <LoadingState text={zh.listLoading} className="justify-center py-8 text-slate-400" />
         ) : phrases.length === 0 ? (
-          <div className="rounded-2xl bg-white p-8 shadow-sm">
-            <EmptyState
-              title={zh.emptyTitle}
-              description={hasResolvedInitialLibraryTabRef.current ? zh.emptyDescWithBuiltin : zh.emptyDesc}
-            />
-          </div>
+          <section className="rounded-[2.5rem] border border-slate-100 bg-white p-10 text-center shadow-sm">
+            <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-[radial-gradient(circle_at_center,_#eff6ff_0%,_#ffffff_70%)]">
+              <div className="relative">
+                <Feather className="size-10 text-blue-200" aria-hidden="true" />
+                <span className="absolute -right-1 -top-1 block h-3 w-3 rounded-full border-2 border-white bg-blue-500" />
+              </div>
+            </div>
+
+            <div className="mb-10 space-y-2">
+              <h2 className="font-sans text-xl font-black text-slate-900">
+                开始建立你的表达资产
+              </h2>
+              <p className="text-sm font-bold leading-6 text-slate-400">
+                {hasResolvedInitialLibraryTabRef.current ? zh.emptyDescWithBuiltin : zh.emptyDesc}
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <button
+                type="button"
+                className="flex h-14 w-full items-center justify-center gap-3 rounded-2xl bg-blue-600 text-sm font-black text-white shadow-xl shadow-blue-100 transition active:scale-[0.98]"
+                onClick={() => setLibraryTab("builtin")}
+              >
+                去“必备表达”看看
+                <ArrowRight className="size-3.5" aria-hidden="true" />
+              </button>
+
+              <button
+                type="button"
+                className="flex h-14 w-full items-center justify-center gap-3 rounded-2xl border-2 border-slate-50 bg-white text-sm font-bold text-slate-500 transition active:scale-[0.98]"
+                onClick={() => router.push("/scenes")}
+              >
+                从“场景”中获取
+                <Compass className="size-3.5 opacity-40" aria-hidden="true" />
+              </button>
+            </div>
+
+            <p className="mt-8 text-[10px] font-bold uppercase tracking-widest text-slate-300">
+              Abridge Phrase Bank
+            </p>
+          </section>
         ) : contentFilter === "expression" && expressionViewMode === "focus" && focusExpression ? (
         <div className="space-y-4">
           <ClusterFocusList
@@ -2098,7 +2138,7 @@ export default function ChunksPage() {
           ttsPlaybackText={speakingText}
           ttsLoadingText={loadingText}
           appleButtonClassName={chunksButtonClassName}
-          appleSurfaceClassName="rounded-2xl border-0 bg-white shadow-sm ring-0"
+          appleSurfaceClassName="rounded-[2rem] border border-slate-50 bg-white shadow-sm ring-0"
           labels={{
             sentenceUnit: zh.sentenceUnit,
             expressionUnit: zh.expressionUnit,
@@ -2176,6 +2216,8 @@ export default function ChunksPage() {
           已显示全部 {total} 条内容
         </p>
       ) : null}
+
+      </main>
 
       <ChunksPageSheets
         manual={{

@@ -32,17 +32,17 @@ export type ScenePack = {
 
 export type PrimarySceneAction =
   | {
-      kind: "continue" | "start" | "review";
-      label: string;
-      href: string;
-      scene: SceneListItemResponse;
-    }
+    kind: "continue" | "start" | "review";
+    label: string;
+    href: string;
+    scene: SceneListItemResponse;
+  }
   | {
-      kind: "browse";
-      label: string;
-      href: "/scenes";
-      scene: null;
-    };
+    kind: "browse";
+    label: string;
+    href: "/scenes";
+    scene: null;
+  };
 
 type SceneNormalizedLevel = "L0" | "L1" | "L2" | "unknown";
 
@@ -380,7 +380,7 @@ export const hasActiveFilters = (filters: SceneFilters) =>
   filters.search.trim().length > 0;
 
 export const CATEGORY_FILTER_OPTIONS: Array<{ value: SceneCategoryFilter; label: string }> = [
-  { value: "all", label: "全部" },
+  { value: "all", label: "全部场景" },
   { value: "starter", label: "新手" },
   { value: "daily_life", label: "日常生活" },
   { value: "time_plan", label: "时间安排" },

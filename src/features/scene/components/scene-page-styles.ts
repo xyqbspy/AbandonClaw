@@ -11,7 +11,8 @@ import {
   APPLE_PANEL_RAISED,
 } from "@/lib/ui/apple-style";
 
-export const SCENE_PAGE_STACK_CLASSNAME = "space-y-[var(--mobile-adapt-space-2xl)]";
+export const SCENE_PAGE_STACK_CLASSNAME =
+  "min-h-screen space-y-[var(--mobile-adapt-space-2xl)] bg-[#f8fafc] px-3 pt-3 pb-28 lg:px-5";
 
 export const SCENE_PAGE_ERROR_TEXT_CLASSNAME =
   "text-[length:var(--mobile-adapt-font-body-sm)] text-destructive";
@@ -33,7 +34,8 @@ export const SCENE_DANGER_ACTION_BUTTON_SM_CLASSNAME = `${APPLE_BUTTON_DANGER} $
 
 export const SCENE_DANGER_ACTION_BUTTON_LG_CLASSNAME = `${APPLE_BUTTON_DANGER} ${APPLE_BUTTON_TEXT_LG}`;
 
-export const SCENE_MOBILE_SURFACE_CLASSNAME = "bg-[var(--app-page-background)] pb-10";
+export const SCENE_MOBILE_SURFACE_CLASSNAME =
+  "min-h-screen bg-[#f8fafc] px-3 pt-3 pb-10 lg:px-5";
 
 export const SCENE_MOBILE_NARROW_STACK_CLASSNAME =
   "mx-auto w-full max-w-[480px] space-y-[var(--mobile-space-md)]";

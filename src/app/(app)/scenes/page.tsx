@@ -125,10 +125,10 @@ export default function ScenesPage() {
   };
 
   return (
-    <div className="relative pb-[8rem] font-sans">
+    <div className="relative min-h-screen bg-[#f8fafc] px-3 pb-[8rem] font-sans lg:px-5">
       <main onScroll={() => closeOpenedSwipe()}>
         {topTask ? (
-          <div className="px-6">
+          <div>
             <div
               className={`text-sm ${
                 topTask.status === "running"
@@ -143,7 +143,7 @@ export default function ScenesPage() {
           </div>
         ) : null}
 
-        <section className="sticky top-0 z-20 border-b border-slate-100 bg-[var(--app-page-background)] py-4 backdrop-blur-md">
+        <section className="sticky top-0 z-20 -mx-3 border-b border-slate-100 bg-[#f8fafc]/90 px-3 py-4 backdrop-blur-md lg:-mx-5 lg:px-5">
           <SceneFilterBar
             category={filters.category}
             level={filters.level}
@@ -210,18 +210,18 @@ export default function ScenesPage() {
           </div>
 
           {showInitialLoading ? (
-            <div className="px-6">
+            <div>
               <LoadingState text="场景加载中..." className="py-10" />
             </div>
           ) : allScenes.length === 0 ? (
-            <div className="px-6">
+            <div>
               <SceneEmptyState
                 title="还没有可学习的场景"
                 description="可以从筛选区的更多操作生成或导入一个新场景。"
               />
             </div>
           ) : filteredScenes.length === 0 ? (
-            <div className="px-6">
+            <div>
               <SceneEmptyState
                 title="没有符合条件的场景"
                 description="换一个分类、等级或来源试试，或者清除筛选回到推荐列表。"

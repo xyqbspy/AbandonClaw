@@ -17,7 +17,8 @@ const REVIEW_HERO_SURFACE_CLASSNAME =
 const REVIEW_PROGRESS_FILL_SURFACE_CLASSNAME =
   "bg-[linear-gradient(90deg,#3b82f6,#2563eb)]";
 
-export const REVIEW_PAGE_CLASSNAME = "space-y-6 px-6 py-6 pb-28 sm:py-8 lg:px-10";
+export const REVIEW_PAGE_CLASSNAME =
+  "min-h-screen space-y-6 bg-[#f8fafc] px-3 pt-3 pb-28 sm:pt-4 lg:px-5";
 
 export const REVIEW_HERO_CLASSNAME =
   `overflow-hidden p-5 ${REVIEW_HERO_SURFACE_CLASSNAME}`;

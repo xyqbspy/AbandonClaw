@@ -35,7 +35,7 @@ export function SceneVariantStudyView({
   onSentencePlayback?: (payload: { lesson: Lesson; sentence: import("@/lib/types").LessonSentence }) => void;
 }) {
   return (
-    <div className="space-y-[var(--mobile-adapt-space-xl)]">
+    <div className="min-h-screen space-y-[var(--mobile-adapt-space-xl)] bg-[#f8fafc] px-3 pt-3 pb-28 lg:px-5">
       <LessonReader
         lesson={lesson}
         minimalHeader

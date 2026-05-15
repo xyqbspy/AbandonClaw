@@ -383,8 +383,8 @@ export function TodayPageClient({ displayName }: { displayName: string }) {
   }, [continueLearning, todayLearningSnapshot.effectiveCurrentStep]);
 
   return (
-    <div className="min-h-screen bg-[#f1f5f9] font-['-apple-system','BlinkMacSystemFont','Segoe_UI',sans-serif]">
-      <div className="mx-auto max-w-[760px] space-y-6 px-6 pb-28 pt-10 text-foreground sm:space-y-7 sm:pb-32 sm:pt-12 lg:px-10">
+    <div className="min-h-screen bg-[#f8fafc] font-['-apple-system','BlinkMacSystemFont','Segoe_UI',sans-serif]">
+      <div className="mx-auto max-w-[760px] space-y-6 px-3 pb-28 pt-3 text-foreground sm:space-y-7 sm:pb-32 sm:pt-4 lg:px-5">
       <TodayWelcomeCard displayName={finalDisplayName} streakDays={dashboard.overview.streakDays} />
 
       <TodayContinueCard

@@ -6,6 +6,11 @@ import {
 } from "@/features/today/components/today-page-styles";
 
 const clampProgress = (value: number) => Math.max(0, Math.min(100, value));
+const stripChineseSuffix = (value: string) =>
+  value
+    .replace(/\s*[（(][^）)]*[\u4e00-\u9fff][^）)]*[）)]\s*$/, "")
+    .replace(/\s*[-/]\s*[\u4e00-\u9fff].*$/, "")
+    .trim();
 
 export function TodayContinueCard({
   title,
@@ -33,7 +38,7 @@ export function TodayContinueCard({
   onContinue: () => void;
 }) {
   const safeProgress = clampProgress(progressPercent);
-  const displaySceneTitle = sceneTitle || subtitle;
+  const displaySceneTitle = stripChineseSuffix(sceneTitle || subtitle);
   const durationLabel =
     metaItems?.find((item) => item.includes("分钟") || item.toLowerCase().includes("min")) ??
     stepLabel;
@@ -62,39 +67,42 @@ export function TodayContinueCard({
               </div>
             </div>
 
-            <div className="flex items-center gap-5 sm:gap-6">
-              <div
-                className="relative flex size-20 shrink-0 items-center justify-center sm:size-24"
-                style={{ "--today-progress": `${safeProgress}%` } as CSSProperties}
-              >
-                <div className="absolute inset-0 rounded-full bg-[conic-gradient(#2563eb_var(--today-progress),#e2e8f0_0)]" />
-                <div className="absolute inset-[6px] rounded-full bg-white" />
-                <div className="relative z-10 flex flex-col items-center justify-center">
-                  <span className="font-sans text-[18px] font-black leading-none text-slate-900 sm:text-[22px]">
-                    {isPending ? "--" : `${safeProgress}%`}
-                  </span>
-                </div>
-              </div>
+            <div className="space-y-4">
+              <h3 className="truncate font-sans text-xl font-black tracking-[-0.03em] text-slate-900">
+                {displaySceneTitle}
+              </h3>
 
-              <div className="min-w-0 flex-1">
-                <h3 className="truncate font-sans text-xl font-black tracking-[-0.03em] text-slate-900">
-                  {displaySceneTitle}
-                </h3>
-                <p className="mt-1 line-clamp-2 font-sans text-xs font-medium leading-5 text-slate-500">
-                  {subtitle}
-                </p>
-                {chips.length > 0 ? (
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {chips.map((item) => (
-                      <span
-                        key={item}
-                        className="inline-flex rounded-full bg-slate-100 px-3 py-1 font-sans text-[12px] font-black text-slate-600"
-                      >
-                        {item}
-                      </span>
-                    ))}
+              <div className="flex items-center gap-5 sm:gap-6">
+                <div
+                  className="relative flex size-20 shrink-0 items-center justify-center sm:size-24"
+                  style={{ "--today-progress": `${safeProgress}%` } as CSSProperties}
+                >
+                  <div className="absolute inset-0 rounded-full bg-[conic-gradient(#2563eb_var(--today-progress),#e2e8f0_0)]" />
+                  <div className="absolute inset-[6px] rounded-full bg-white" />
+                  <div className="relative z-10 flex flex-col items-center justify-center">
+                    <span className="font-sans text-[18px] font-black leading-none text-slate-900 sm:text-[22px]">
+                      {isPending ? "--" : `${safeProgress}%`}
+                    </span>
                   </div>
-                ) : null}
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <p className="line-clamp-2 font-sans text-xs font-medium leading-5 text-slate-500">
+                    {subtitle}
+                  </p>
+                  {chips.length > 0 ? (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {chips.map((item) => (
+                        <span
+                          key={item}
+                          className="inline-flex rounded-full bg-slate-100 px-3 py-1 font-sans text-[12px] font-black text-slate-600"
+                        >
+                          {item}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
               </div>
             </div>
           </>
