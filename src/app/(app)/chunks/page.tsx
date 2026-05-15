@@ -78,6 +78,8 @@ import { useSavedRelations } from "./use-saved-relations";
 import { useFocusDetailController } from "./use-focus-detail-controller";
 import { ChunksListView } from "./chunks-list-view";
 import { useChunksPageActions } from "./use-chunks-page-actions";
+import { useBuiltinPhrasesData } from "./use-builtin-phrases-data";
+import { BuiltinPhrasesSection } from "./builtin-phrases-section";
 
 import { buildChunksFocusDetailLabels } from "./chunks-focus-detail-messages";
 import {
@@ -114,6 +116,11 @@ import {
   notifyChunksSentenceReviewPending,
   notifyChunksSpeechUnsupported,
 } from "./chunks-page-notify";
+import {
+  BuiltinPhraseFilterKey,
+  filterBuiltinPhrases,
+  sortBuiltinPhrases,
+} from "@/features/chunks/builtin-phrases";
 
 const reviewStatusLabel: Record<PhraseReviewStatus, string> = {
   saved: zh.tabs.saved,
@@ -347,7 +354,11 @@ export default function ChunksPage() {
     searchParams,
     router,
   });
+  const [libraryTab, setLibraryTab] = useState<"mine" | "builtin">("mine");
+  const [builtinFilter, setBuiltinFilter] = useState<BuiltinPhraseFilterKey>("all");
+  const [savingBuiltinPhraseId, setSavingBuiltinPhraseId] = useState<string | null>(null);
   const [expressionViewMode, setExpressionViewMode] = useState<"list" | "focus">("focus");
+  const hasResolvedInitialLibraryTabRef = useRef(false);
 
   // 地图与列表展示
   const [mapOpen, setMapOpen] = useState(false);
@@ -422,6 +433,20 @@ export default function ChunksPage() {
       notifyChunksLoadFailed(message);
     },
   });
+  const {
+    loading: builtinLoading,
+    phrases: builtinPhrases,
+    setPhrases: setBuiltinPhrases,
+    error: builtinLoadError,
+  } = useBuiltinPhrasesData();
+
+  useEffect(() => {
+    if (hasResolvedInitialLibraryTabRef.current || loading) return;
+    if (total === 0) {
+      setLibraryTab("builtin");
+    }
+    hasResolvedInitialLibraryTabRef.current = true;
+  }, [loading, total]);
 
   useEffect(() => {
     const handlePullRefresh = async (event: Event) => {
@@ -455,6 +480,14 @@ export default function ChunksPage() {
       },
     });
   }, [loading, total]);
+
+  const filteredBuiltinPhrases = useMemo(() => {
+    const filtered = filterBuiltinPhrases(builtinPhrases, {
+      activeFilter: builtinFilter,
+      search: query,
+    });
+    return sortBuiltinPhrases(filtered);
+  }, [builtinFilter, builtinPhrases, query]);
 
   const phraseByNormalized = useMemo(() => {
     const map = new Map<string, UserPhraseItemResponse>();
@@ -1755,32 +1788,121 @@ export default function ChunksPage() {
     onSubmit: () => void handleMoveSelectedIntoCurrentCluster(),
   };
 
+  const handleSaveBuiltinPhrase = useCallback(
+    async (phrase: {
+      id: string;
+      text: string;
+      translation: string | null;
+      usageNote: string | null;
+      level: string | null;
+      category: string | null;
+      tags: string[];
+      sourceScene: { slug: string; title: string } | null;
+    }) => {
+      setSavingBuiltinPhraseId(phrase.id);
+      try {
+        await savePhraseFromApi({
+          text: phrase.text,
+          translation: phrase.translation ?? undefined,
+          usageNote: phrase.usageNote ?? undefined,
+          difficulty: phrase.level ?? undefined,
+          tags: Array.from(
+            new Set([
+              ...phrase.tags,
+              "builtin",
+              "core_phrase",
+              ...(phrase.category ? [phrase.category] : []),
+            ]),
+          ),
+          sourceSceneSlug: phrase.sourceScene?.slug ?? undefined,
+          sourceType: phrase.sourceScene?.slug ? "scene" : "manual",
+          sourceChunkText: phrase.text,
+        });
+
+        setBuiltinPhrases((current) =>
+          current.map((item) => (item.id === phrase.id ? { ...item, isSaved: true } : item)),
+        );
+        notifyChunksActionSucceeded("已加入“我的表达”，并进入后续复习。");
+        await loadPhrases(query, reviewFilter, contentFilter, expressionClusterFilterId, {
+          preferCache: false,
+        });
+      } catch (error) {
+        notifyChunksLoadFailed(error instanceof Error ? error.message : "保存必备表达失败。");
+      } finally {
+        setSavingBuiltinPhraseId(null);
+      }
+    },
+    [
+      contentFilter,
+      expressionClusterFilterId,
+      loadPhrases,
+      query,
+      reviewFilter,
+      setBuiltinPhrases,
+    ],
+  );
+
   return (
     <div className="mx-auto max-w-2xl space-y-6 px-6 py-6 sm:py-8 lg:px-10">
-      <section className="rounded-3xl bg-white p-6 shadow-sm">
-        <div className="mb-4 flex items-center gap-4">
+      <section className="rounded-[2rem] bg-white p-6 shadow-sm">
+        <div className="mb-6 flex items-center gap-4">
           <div className="flex size-12 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-lg shadow-blue-200">
             <BookMarked className="size-5" aria-hidden="true" />
           </div>
           <div className="min-w-0">
-            <h1 className="text-lg font-bold text-slate-800">{zh.heroTitle}</h1>
-            <p className="text-xs font-medium text-slate-400">
-              {zh.heroSubtitle} · {summary}
+            <h1 className="font-sans text-lg font-black text-slate-900">{zh.heroTitle}</h1>
+            <p className="text-[11px] font-bold text-slate-400">
+              {libraryTab === "builtin" ? zh.builtinHeroSubtitle : `${zh.heroSubtitle} · ${summary}`}
             </p>
           </div>
         </div>
         <div className="relative">
           <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-slate-300" />
           <Input
-            className="h-11 rounded-xl border-0 bg-slate-50 py-3 pl-11 pr-4 text-sm text-slate-700 shadow-none outline-none transition-all placeholder:text-slate-300 focus:bg-white focus-visible:ring-2 focus-visible:ring-blue-500/20"
+            className="h-12 rounded-2xl border-0 bg-slate-50 py-3 pl-11 pr-4 text-sm text-slate-700 shadow-none outline-none transition-all placeholder:text-slate-300 focus:bg-white focus-visible:ring-2 focus-visible:ring-blue-500/20"
             placeholder={`${zh.searchPlaceholder}...`}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
           />
         </div>
+        <div className="mt-6 flex items-center gap-8 px-2">
+          {[
+            { key: "mine" as const, label: zh.tabMine },
+            { key: "builtin" as const, label: zh.tabBuiltin },
+          ].map((tab) => {
+            const active = libraryTab === tab.key;
+            return (
+              <button
+                key={tab.key}
+                type="button"
+                className={`relative text-sm font-black transition ${
+                  active ? "text-blue-600" : "text-slate-400 hover:text-slate-600"
+                }`}
+                onClick={() => setLibraryTab(tab.key)}
+              >
+                {tab.label}
+                {active ? (
+                  <span className="absolute left-1/2 top-full mt-2 block h-[3px] w-4 -translate-x-1/2 rounded-full bg-blue-600" />
+                ) : null}
+              </button>
+            );
+          })}
+          <div className="flex-1" />
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className="h-8 cursor-pointer gap-1 rounded-xl px-2 text-xs font-bold text-blue-600 hover:bg-blue-50 hover:text-blue-700"
+            onClick={() => setAddSheetOpen(true)}
+          >
+            <PlusCircle className="size-3.5" aria-hidden="true" />
+            {zh.addLearningContent}
+          </Button>
+        </div>
       </section>
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      {libraryTab === "mine" ? (
+        <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex gap-1 rounded-xl bg-slate-100 p-1">
           {[
             { value: "focus" as const, label: zh.viewModeFocus },
@@ -1809,20 +1931,10 @@ export default function ChunksPage() {
             );
           })}
         </div>
+        </div>
+      ) : null}
 
-        <Button
-          type="button"
-          size="sm"
-          variant="ghost"
-          className="h-8 cursor-pointer gap-1 rounded-xl px-2 text-xs font-bold text-blue-600 hover:bg-blue-50 hover:text-blue-700"
-          onClick={() => setAddSheetOpen(true)}
-        >
-          <PlusCircle className="size-3.5" aria-hidden="true" />
-          {zh.addLearningContent}
-        </Button>
-      </div>
-
-      {expressionViewMode === "list" ? (
+      {libraryTab === "mine" && expressionViewMode === "list" ? (
         <div className="flex gap-1 rounded-xl bg-slate-100 p-1">
           {[
             { value: "expression" as const, label: zh.contentTabExpression },
@@ -1850,7 +1962,7 @@ export default function ChunksPage() {
         </div>
       ) : null}
 
-      {!(contentFilter === "expression" && expressionViewMode === "focus") ? (
+      {libraryTab === "mine" && !(contentFilter === "expression" && expressionViewMode === "focus") ? (
         <div className="flex flex-wrap gap-1 rounded-xl bg-slate-100 p-1">
           {[
             { key: "all", label: zh.tabs.all },
@@ -1874,7 +1986,7 @@ export default function ChunksPage() {
         </div>
       ) : null}
 
-      {expressionClusterFilterId ? (
+      {libraryTab === "mine" && expressionClusterFilterId ? (
         <div className="flex flex-wrap items-center gap-2 rounded-xl bg-white px-4 py-3 text-xs text-slate-400 shadow-sm">
           <p className="font-bold text-slate-400">{zh.viewingClusterFilter}</p>
           {clusterFilterExpressionLabel ? (
@@ -1890,11 +2002,27 @@ export default function ChunksPage() {
         </div>
       ) : null}
 
-        {loading ? (
+      {libraryTab === "builtin" ? (
+        <BuiltinPhrasesSection
+          loading={builtinLoading}
+          phrases={filteredBuiltinPhrases}
+          activeFilter={builtinFilter}
+          onFilterChange={setBuiltinFilter}
+          onSave={handleSaveBuiltinPhrase}
+          savingPhraseId={savingBuiltinPhraseId}
+          error={builtinLoadError}
+        />
+      ) : null}
+
+      {libraryTab === "mine" ? (
+        loading ? (
           <LoadingState text={zh.listLoading} className="justify-center py-8 text-slate-400" />
         ) : phrases.length === 0 ? (
           <div className="rounded-2xl bg-white p-8 shadow-sm">
-            <EmptyState title={zh.emptyTitle} description={zh.emptyDesc} />
+            <EmptyState
+              title={zh.emptyTitle}
+              description={hasResolvedInitialLibraryTabRef.current ? zh.emptyDescWithBuiltin : zh.emptyDesc}
+            />
           </div>
         ) : contentFilter === "expression" && expressionViewMode === "focus" && focusExpression ? (
         <div className="space-y-4">
@@ -2040,9 +2168,10 @@ export default function ChunksPage() {
           openGenerateSimilarSheet={openGenerateSimilarSheet}
         />
         </section>
-      )}
+      )
+      ) : null}
 
-      {!loading && phrases.length > 0 ? (
+      {libraryTab === "mine" && !loading && phrases.length > 0 ? (
         <p className="pt-4 text-center text-[10px] font-medium tracking-widest text-slate-400 uppercase">
           已显示全部 {total} 条内容
         </p>

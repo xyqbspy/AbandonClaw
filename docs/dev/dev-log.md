@@ -2395,3 +2395,47 @@ Today / Review 已完成局部样式常量收口后，`scene` 页面族仍横跨
 - `node --import tsx --test scripts/check-mojibake.test.ts`
 - `pnpm exec openspec validate stabilize-core-doc-encoding --strict`
 - `pnpm run maintenance:check`
+
+### [2026-05-15] P3 Chunks 必备表达与 builtin core phrase
+
+- 类型：Spec-Driven / Chunks 表达资产闭环
+- 状态：实施完成，待 archive
+
+#### 背景
+
+P0/P1/P2 已经让新用户可以从 builtin starter scenes 和 Today 推荐进入学习，但 `Chunks` 仍主要展示 `user_phrases`。新用户未主动保存表达时，表达资产层容易像空后台，无法看到“哪些高频表达值得长期掌握”。
+
+#### 本次改动
+
+- 为 `phrases` 增加 builtin/core phrase 最小元字段：`is_builtin`、`is_core`、`level`、`category`、`phrase_type`、`source_scene_slug`、`frequency_rank`。
+- 新增 `supabase/sql/20260514_phase24_builtin_core_phrases.sql`。
+- 新增 `src/lib/server/phrases/builtin-service.ts` 和 `GET /api/phrases/builtin`，从 starter/builtin scenes 同步 109 条 core phrase 到共享 `phrases`，并返回当前用户的 `isSaved`。
+- 改造 `/chunks` 顶层为“我的表达 / 必备表达”双入口；“我的表达”保留现有 workbench，“必备表达”展示高频表达卡片、筛选条、来源场景和保存 CTA。
+- 复用 `POST /api/phrases/save` 保存 builtin phrase，只在用户主动点击后才 upsert `user_phrases`。
+- 抽出 `resolveSavedPhraseReviewState`，确保新 expression 保存后进入 due review，重复保存不会重置已有 review/mastery 状态。
+- 补 `src/features/chunks/builtin-phrases.ts` selector：筛选、分组、排序、标签文案、已保存判断和推荐结果。
+
+#### 验证
+
+- `node --import tsx --test "src/lib/server/phrases/builtin-service.test.ts"`
+- `node --import tsx --test "src/lib/server/phrases/logic.test.ts" "src/features/chunks/builtin-phrases.test.ts"`
+- `pnpm run build`
+
+#### 本轮收口项
+
+- builtin/core phrase 与用户资产边界：浏览不写 `user_phrases`。
+- 用户主动保存后进入“我的表达”、review due、today/progress 既有聚合。
+- builtin phrase 第一批来自真实 starter/builtin scene seed，当前为 109 条唯一表达。
+- Chunks 新用户空态有“必备表达”承接。
+
+#### 明确不收项
+
+- 不重构 review 调度算法。
+- 不重构 expression cluster。
+- 不做复杂词典或 AI 自动推荐。
+- 不把 builtin phrase 批量自动塞进 `user_phrases`。
+
+#### 剩余风险
+
+- `GET /api/phrases/builtin` 首次请求会触发 builtin scene / phrase 同步；如果生产环境数据库未先执行 phase23/phase24 SQL，会返回受控错误并展示必备表达空/失败状态。
+- 当前未做浏览器端真实账号手动点击验证；build 与最小服务/selector 测试已通过。

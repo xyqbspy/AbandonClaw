@@ -1,6 +1,9 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { ensureExpressionClusterForPhrase } from "@/lib/server/expression-clusters/service";
-import { resolveDeleteExpressionClusterResult } from "@/lib/server/phrases/logic";
+import {
+  resolveDeleteExpressionClusterResult,
+  resolveSavedPhraseReviewState,
+} from "@/lib/server/phrases/logic";
 import {
   completeUserPhraseAiEnrichment,
   ensureSharedPhraseEntity,
@@ -789,27 +792,24 @@ export async function savePhraseForUser(userId: string, input: SavePhraseInput) 
   const requestedClusterId = shouldTreatAsContrastOnly
     ? null
     : parseOptionalTrimmed(input.expressionClusterId, 120);
+  const reviewState = resolveSavedPhraseReviewState({
+    learningItemType,
+    existingReviewStatus: existing?.review_status ?? null,
+    existingNextReviewAt: existing?.next_review_at ?? null,
+    now,
+  });
   const nextPayload = {
     user_id: userId,
     phrase_id: phrase.id,
     status: "saved" as const,
     // MVP review loop: new saved phrases should be immediately due once,
     // so users can see "today due" and complete their first review quickly.
-    review_status:
-      learningItemType === "sentence"
-        ? ("archived" as const)
-        : existing?.review_status === "archived"
-          ? ("saved" as const)
-          : (existing?.review_status ?? ("saved" as const)),
+    review_status: reviewState.reviewStatus,
     review_count: existing?.review_count ?? 0,
     correct_count: existing?.correct_count ?? 0,
     incorrect_count: existing?.incorrect_count ?? 0,
     last_reviewed_at: existing?.last_reviewed_at ?? null,
-    next_review_at:
-      learningItemType === "sentence"
-        ? null
-        : existing?.next_review_at ??
-          (existing?.review_status === "mastered" ? null : now),
+    next_review_at: reviewState.nextReviewAt,
     mastered_at: existing?.mastered_at ?? null,
     source_scene_id: sourceSceneId ?? existing?.source_scene_id ?? null,
     source_scene_slug: sourceSceneSlug ?? existing?.source_scene_slug ?? null,

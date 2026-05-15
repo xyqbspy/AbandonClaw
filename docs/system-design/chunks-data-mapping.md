@@ -15,6 +15,7 @@
 - expression cluster 维护
 - expression map 批量导入
 - review 入口
+- 必备表达保存
 
 维护原则：
 
@@ -30,6 +31,8 @@
 
 - 保存标准化后的表达或句子实体
 - 负责 `normalized_text`、翻译、usage note、tags 等基础信息
+- 同时承载系统内置必备表达的共享实体字段：`is_builtin`、`is_core`、`level`、`category`、`phrase_type`、`source_scene_slug`、`frequency_rank`
+- builtin/core phrase 只是共享推荐资产；浏览它不会创建 `user_phrases`
 
 ### 2.2 `user_phrases`
 
@@ -37,6 +40,7 @@
 - `learning_item_type` 区分 `expression` / `sentence`
 - `source_*` 字段记录来源句子、来源场景、来源片段
 - review 状态、AI enrich 状态、学习附加信息也落在这里
+- 用户主动点击“保存到我的表达”后，builtin phrase 才会通过 `POST /api/phrases/save` 幂等写入这里
 
 ### 2.3 `user_phrase_relations`
 
@@ -112,6 +116,42 @@
 - 关闭 sheet
 - 重新加载 `chunks` 列表
 - 如选择“保存并复习”，进入 review session
+
+### 4.1.1 必备表达保存
+
+入口：
+
+- `chunks` 页面顶部 `必备表达` tab
+- [builtin-phrases-section.tsx](/d:/WorkCode/AbandonClaw/src/app/(app)/chunks/builtin-phrases-section.tsx)
+- [use-builtin-phrases-data.ts](/d:/WorkCode/AbandonClaw/src/app/(app)/chunks/use-builtin-phrases-data.ts)
+
+读取链路：
+
+- `GET /api/phrases/builtin`
+- [builtin-service.ts](/d:/WorkCode/AbandonClaw/src/lib/server/phrases/builtin-service.ts)
+- 读取 `phrases` 中 `is_builtin = true` 且 `is_core = true` 的共享表达，并按当前 `user_id` 查询是否已有 `user_phrases`，返回 `isSaved`
+- 支持 `level`、`category`、`search`、`limit`
+
+保存规则：
+
+- 前端点击“保存到我的表达”后复用 `savePhraseFromApi`
+- payload 只传表达文本、翻译、usage note、level、tags、source scene 与 source chunk
+- 不把中文释义写入 `source_sentence_text`
+- 不新建专用保存接口，不绕过 `/api/phrases/save`
+
+后端语义：
+
+- `savePhraseForUser` 先复用或创建共享 `phrases`
+- 再按 `unique(user_id, phrase_id)` 幂等 upsert `user_phrases`
+- 新 expression 的 `review_status = saved` 且 `next_review_at = now`，因此立即可被 review due 查询消费
+- 重复保存不会覆盖已有 `review_count`、`correct_count`、`incorrect_count`、`last_reviewed_at`、`next_review_at` 或 `mastered_at`
+- 只有新建 `user_phrase` 时才递增 `user_daily_learning_stats.phrases_saved` 与来源 scene 的 `saved_phrase_count`
+
+页面反馈：
+
+- 保存成功后 builtin card 切换为“已保存 / 已加入复习”
+- 重新加载“我的表达”列表，切回后可见
+- 后续 `review`、`today`、`progress` 继续只消费 `user_phrases` 与既有聚合结果，不直接消费共享 builtin phrase
 
 ### 4.2 手动新建表达 + AI assist
 

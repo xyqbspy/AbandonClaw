@@ -231,6 +231,13 @@ export interface PhraseRow {
   usage_note: string | null;
   difficulty: string | null;
   tags: unknown;
+  is_builtin: boolean;
+  is_core: boolean;
+  level: string | null;
+  category: string | null;
+  phrase_type: string | null;
+  source_scene_slug: string | null;
+  frequency_rank: number | null;
   created_at: string;
   updated_at: string;
 }

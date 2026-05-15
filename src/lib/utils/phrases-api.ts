@@ -62,6 +62,25 @@ export interface UserPhraseItemResponse {
   masteredAt: string | null;
 }
 
+export interface BuiltinPhraseItemResponse {
+  id: string;
+  text: string;
+  normalizedText: string;
+  translation: string | null;
+  usageNote: string | null;
+  level: string | null;
+  category: string | null;
+  phraseType: string | null;
+  isCore: boolean;
+  frequencyRank: number | null;
+  tags: string[];
+  sourceScene: {
+    slug: string;
+    title: string;
+  } | null;
+  isSaved: boolean;
+}
+
 export type UserPhraseRelationType = "similar" | "contrast";
 
 export interface UserPhraseRelationItemResponse {
@@ -214,6 +233,31 @@ export async function getMyPhrasesFromApi(params?: {
     total: number;
     page: number;
     limit: number;
+  };
+}
+
+export async function getBuiltinPhrasesFromApi(params?: {
+  level?: string;
+  category?: string;
+  search?: string;
+  limit?: number;
+}) {
+  const search = new URLSearchParams();
+  if (params?.level) search.set("level", params.level);
+  if (params?.category) search.set("category", params.category);
+  if (params?.search) search.set("search", params.search);
+  if (params?.limit) search.set("limit", String(params.limit));
+  const suffix = search.toString();
+  const response = await fetch(`/api/phrases/builtin${suffix ? `?${suffix}` : ""}`, {
+    method: "GET",
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    throw await toApiError(response, "加载必备表达失败。");
+  }
+  return (await response.json()) as {
+    items: BuiltinPhraseItemResponse[];
+    total: number;
   };
 }
 
