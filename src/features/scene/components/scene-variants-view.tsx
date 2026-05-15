@@ -30,6 +30,7 @@ type SceneVariantsViewProps = {
   labels: SceneVariantsViewLabels;
   onBack: () => void;
   onComplete: () => void;
+  completing?: boolean;
   onRepeatVariants?: () => void;
   onDeleteSet: () => void;
   onOpenExpressionMap: () => void;
@@ -48,6 +49,7 @@ function SceneVariantsActionRow({
   labels,
   onBack,
   onComplete,
+  completing = false,
   onRepeatVariants,
   onDeleteSet,
 }: {
@@ -57,6 +59,7 @@ function SceneVariantsActionRow({
   labels: Pick<SceneVariantsViewLabels, "back" | "repeat" | "complete" | "deleteSet">;
   onBack: () => void;
   onComplete: () => void;
+  completing?: boolean;
   onRepeatVariants?: () => void;
   onDeleteSet: () => void;
 }) {
@@ -82,9 +85,12 @@ function SceneVariantsActionRow({
           type="button"
           className={`h-[var(--mobile-control-height)] whitespace-nowrap ${appleButtonSmClassName} disabled:opacity-60`}
           onClick={onComplete}
-          disabled={!variantSet || variantSet.status === "completed"}
+          disabled={!variantSet || variantSet.status === "completed" || completing}
+          aria-busy={completing}
         >
-          {labels.complete}
+          <LoadingContent loading={completing} loadingText={`${labels.complete}...`}>
+            {labels.complete}
+          </LoadingContent>
         </button>
       )}
       <button
@@ -165,6 +171,7 @@ export function SceneVariantsView({
   labels,
   onBack,
   onComplete,
+  completing = false,
   onRepeatVariants,
   onDeleteSet,
   onOpenExpressionMap,
@@ -185,6 +192,7 @@ export function SceneVariantsView({
           labels={labels}
           onBack={onBack}
           onComplete={onComplete}
+          completing={completing}
           onRepeatVariants={onRepeatVariants}
           onDeleteSet={onDeleteSet}
         />

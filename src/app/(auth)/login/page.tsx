@@ -6,6 +6,11 @@ import { Mail, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { AuthCard, AuthField } from "@/app/(auth)/auth-card";
+import { LoadingContent } from "@/components/shared/action-loading";
+import {
+  ClientActionTimeoutError,
+  withClientActionTimeout,
+} from "@/lib/client/action-timeout";
 import {
   clientErrorMessages,
   normalizeClientError,
@@ -17,7 +22,14 @@ import {
 } from "@/lib/shared/auth-redirect";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
+const LOGIN_TIMEOUT_MS = 20000;
+const LOGIN_TIMEOUT_MESSAGE = "登录超时，请检查网络后重试";
+
 const resolveLoginErrorMessage = (error: unknown) => {
+  if (error instanceof ClientActionTimeoutError) {
+    return error.message;
+  }
+
   if (error && typeof error === "object" && "code" in error) {
     const code = String((error as { code?: unknown }).code ?? "");
     if (code === "invalid_credentials") {
@@ -64,7 +76,10 @@ export default function LoginPage() {
     setSubmitting(true);
     try {
       const supabase = createSupabaseBrowserClient();
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      const { error } = await withClientActionTimeout(
+        supabase.auth.signInWithPassword({ email, password }),
+        { timeoutMs: LOGIN_TIMEOUT_MS, timeoutMessage: LOGIN_TIMEOUT_MESSAGE },
+      );
       if (error) {
         throw error;
       }
@@ -131,8 +146,11 @@ export default function LoginPage() {
           className="mt-2.5 w-full cursor-pointer rounded-xl border-0 bg-[#007AFF] p-4 text-base font-semibold text-white transition duration-300 hover:bg-[#0056b3] disabled:cursor-not-allowed disabled:opacity-60"
           type="submit"
           disabled={submitting}
+          aria-busy={submitting}
         >
-          {submitting ? "登录中..." : "登录"}
+          <LoadingContent loading={submitting} loadingText="登录中...">
+            登录
+          </LoadingContent>
         </button>
       </form>
     </AuthCard>

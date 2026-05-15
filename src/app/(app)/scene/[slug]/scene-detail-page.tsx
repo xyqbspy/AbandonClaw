@@ -335,6 +335,7 @@ export default function SceneDetailClientPage({
     handleOpenExpressionMap,
     setShowAnswerMap,
     resetRouteScopedState,
+    sceneCompleting,
   } = useSceneDetailActions({
     baseLesson,
     latestPracticeSet,
@@ -1191,6 +1192,7 @@ export default function SceneDetailClientPage({
         onDelete={handleDeletePracticeSet}
         onRegenerate={handleRegeneratePracticeFromView}
         onComplete={handlePracticeComplete}
+        completing={sceneCompleting}
         onSentenceCompleted={handleSentenceCompleted}
         onPracticeRunStart={handlePracticeRunStart}
         onPracticeAttempt={handlePracticeAttempt}
@@ -1214,6 +1216,7 @@ export default function SceneDetailClientPage({
         labels={sceneViewLabels.variants}
         onBack={handleBackToSceneView}
         onComplete={handleMarkVariantSetComplete}
+        completing={sceneCompleting}
         onRepeatVariants={handleRepeatVariants}
         onDeleteSet={handleDeleteVariantSet}
         onOpenExpressionMap={handleOpenExpressionMapView}

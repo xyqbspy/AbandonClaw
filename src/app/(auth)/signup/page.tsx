@@ -6,6 +6,11 @@ import { KeyRound, Mail, ShieldCheck, Ticket, User } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { AuthCard, AuthField } from "@/app/(auth)/auth-card";
+import { LoadingContent } from "@/components/shared/action-loading";
+import {
+  ClientActionTimeoutError,
+  withClientActionTimeout,
+} from "@/lib/client/action-timeout";
 import {
   createClientApiError,
   normalizeClientError,
@@ -19,6 +24,10 @@ import {
 type RegistrationMode = "closed" | "invite_only" | "open";
 
 const CODE_COOLDOWN_SECONDS = 60;
+const SIGNUP_TIMEOUT_MS = 20000;
+const SIGNUP_TIMEOUT_MESSAGE = "注册请求超时，请检查网络后重试";
+const SEND_CODE_TIMEOUT_MS = 15000;
+const SEND_CODE_TIMEOUT_MESSAGE = "验证码发送超时，请稍后再试";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -72,13 +81,16 @@ export default function SignupPage() {
 
     setSendingCode(true);
     try {
-      const response = await fetch("/api/auth/signup/email-code", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email }),
-      });
+      const response = await withClientActionTimeout(
+        fetch("/api/auth/signup/email-code", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ email }),
+        }),
+        { timeoutMs: SEND_CODE_TIMEOUT_MS, timeoutMessage: SEND_CODE_TIMEOUT_MESSAGE },
+      );
 
       if (!response.ok) {
         throw await createClientApiError(response, {
@@ -90,6 +102,10 @@ export default function SignupPage() {
       setCooldown(CODE_COOLDOWN_SECONDS);
       toast.success("验证码已发送，请查收邮箱");
     } catch (error) {
+      if (error instanceof ClientActionTimeoutError) {
+        toast.error(error.message);
+        return;
+      }
       toast.error(
         normalizeClientError(error, {
           context: "send-email-code",
@@ -131,19 +147,22 @@ export default function SignupPage() {
 
     setSubmitting(true);
     try {
-      const response = await fetch("/api/auth/signup", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          username,
-          email,
-          password,
-          emailCode,
-          inviteCode,
+      const response = await withClientActionTimeout(
+        fetch("/api/auth/signup", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            username,
+            email,
+            password,
+            emailCode,
+            inviteCode,
+          }),
         }),
-      });
+        { timeoutMs: SIGNUP_TIMEOUT_MS, timeoutMessage: SIGNUP_TIMEOUT_MESSAGE },
+      );
 
       if (!response.ok) {
         throw await createClientApiError(response, {
@@ -159,6 +178,10 @@ export default function SignupPage() {
           : "/login",
       );
     } catch (error) {
+      if (error instanceof ClientActionTimeoutError) {
+        toast.error(error.message);
+        return;
+      }
       toast.error(
         normalizeClientError(error, {
           context: "signup",
@@ -233,9 +256,12 @@ export default function SignupPage() {
               type="button"
               onClick={sendEmailCode}
               disabled={sendingCode || cooldown > 0 || registrationMode === "closed"}
+              aria-busy={sendingCode}
               className="min-h-12 shrink-0 rounded-xl border border-[#007AFF] px-4 text-sm font-semibold text-[#007AFF] transition hover:bg-[#e5f1ff] disabled:cursor-not-allowed disabled:border-[#d2d2d7] disabled:text-[#86868b]"
             >
-              {sendingCode ? "发送中..." : cooldown > 0 ? `${cooldown}s 后重发` : "发送验证码"}
+              <LoadingContent loading={sendingCode} loadingText="发送中...">
+                {cooldown > 0 ? `${cooldown}s 后重发` : "发送验证码"}
+              </LoadingContent>
             </button>
           </div>
         </div>
@@ -294,8 +320,11 @@ export default function SignupPage() {
           className="mt-2.5 w-full cursor-pointer rounded-xl border-0 bg-[#007AFF] p-4 text-base font-semibold text-white transition duration-300 hover:bg-[#0056b3] disabled:cursor-not-allowed disabled:opacity-60"
           type="submit"
           disabled={submitting || registrationMode === "closed" || !consentAccepted}
+          aria-busy={submitting}
         >
-          {submitting ? "创建中..." : "创建账号"}
+          <LoadingContent loading={submitting} loadingText="创建中...">
+            创建账号
+          </LoadingContent>
         </button>
       </form>
     </AuthCard>

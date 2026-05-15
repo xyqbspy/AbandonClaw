@@ -30,6 +30,7 @@ function ScenePracticeHeaderMenu({
   labels,
   onCloseMenu,
   onComplete,
+  completing = false,
   onDelete,
   onRegenerate,
   onToggleMenu,
@@ -41,6 +42,7 @@ function ScenePracticeHeaderMenu({
   labels: Pick<ScenePracticeViewLabels, "regenerating" | "regenerate" | "delete" | "complete">;
   onCloseMenu: () => void;
   onComplete: () => void;
+  completing?: boolean;
   onDelete: () => void;
   onRegenerate?: () => void;
   onToggleMenu: () => void;
@@ -99,9 +101,10 @@ function ScenePracticeHeaderMenu({
                 onCloseMenu();
                 onComplete();
               }}
-              disabled={!practiceSet || practiceSet.status === "completed" || !allModulesCompleted}
+              disabled={!practiceSet || practiceSet.status === "completed" || !allModulesCompleted || completing}
+              aria-busy={completing}
             >
-              <span>{labels.complete}</span>
+              <span>{completing ? `${labels.complete}...` : labels.complete}</span>
             </button>
           </div>
         </>
@@ -118,6 +121,7 @@ export function ScenePracticeHeader({
   onBack,
   onCloseMenu,
   onComplete,
+  completing = false,
   onDelete,
   onRegenerate,
   onToggleMenu,
@@ -131,6 +135,7 @@ export function ScenePracticeHeader({
   onBack: () => void;
   onCloseMenu: () => void;
   onComplete: () => void;
+  completing?: boolean;
   onDelete: () => void;
   onRegenerate?: () => void;
   onToggleMenu: () => void;
@@ -153,6 +158,7 @@ export function ScenePracticeHeader({
         labels={labels}
         onCloseMenu={onCloseMenu}
         onComplete={onComplete}
+        completing={completing}
         onDelete={onDelete}
         onRegenerate={onRegenerate}
         onToggleMenu={onToggleMenu}

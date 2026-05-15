@@ -110,6 +110,8 @@ export function useLessonReaderController({
   const [mobileActiveGroup, setMobileActiveGroup] = useState<MobileSentenceGroup | null>(null);
   const suppressSelectionClearRef = useRef(false);
   const trackedEncounterKeysRef = useRef<Set<string>>(new Set());
+  const savingRef = useRef(false);
+  const addingReviewRef = useRef(false);
   const relatedChunks = useMemo(
     () =>
       isMobile && !isDialogueScene
@@ -476,8 +478,10 @@ export function useLessonReaderController({
   }, [dispatchAction, extractSelectionInReader, isMobile, readerRef, toolbarRef]);
 
   const handleSave = useCallback(async () => {
+    if (savingRef.current) return;
     const payload = buildPhrasePayload();
     if (!payload) return;
+    savingRef.current = true;
     try {
       const result = await onSavePhrase?.(payload);
       setLocalSavedPhraseTexts((prev) => {
@@ -492,12 +496,16 @@ export function useLessonReaderController({
       toast.success("已收藏短语");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "收藏短语失败");
+    } finally {
+      savingRef.current = false;
     }
   }, [buildPhrasePayload, onSavePhrase, setLocalSavedPhraseTexts]);
 
   const handleAddReview = useCallback(async () => {
+    if (addingReviewRef.current) return;
     const payload = buildPhrasePayload();
     if (!payload) return;
+    addingReviewRef.current = true;
     try {
       if (onReviewPhrase) {
         await onReviewPhrase(payload);
@@ -512,6 +520,8 @@ export function useLessonReaderController({
       toast.success("已加入复习");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "加入复习失败");
+    } finally {
+      addingReviewRef.current = false;
     }
   }, [buildPhrasePayload, onReviewPhrase, onSavePhrase, setLocalSavedPhraseTexts]);
 

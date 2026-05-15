@@ -86,7 +86,7 @@ const getContinueStepIcon = (stepLabel: string) => {
 
 export function TodayPageClient({ displayName }: { displayName: string }) {
   const router = useRouter();
-  const [loading, setLoading] = useState(true);
+  const [, setLoading] = useState(true);
   const [dashboard, setDashboard] = useState<LearningDashboardResponse>(EMPTY_DASHBOARD);
   const [sceneList, setSceneList] = useState<SceneListItemResponse[]>([]);
   const [recentPhrases, setRecentPhrases] = useState<UserPhraseItemResponse[]>([]);
@@ -274,8 +274,7 @@ export function TodayPageClient({ displayName }: { displayName: string }) {
 
   const recommendedScenes = useMemo(() => getRecommendedScenes(sceneList), [sceneList]);
   const finalDisplayName = displayName || zh.userFallback;
-  const isContinueCardPending =
-    loading && dashboardDataSource === "none" && sceneDataSource === "none";
+  const isContinueCardPending = dashboardDataSource === "none";
   const primaryCardState = useMemo(
     () =>
       getTodayPrimaryCardState({
@@ -450,7 +449,7 @@ export function TodayPageClient({ displayName }: { displayName: string }) {
       </div>
 
       <TodayRecommendedScenesSection
-        loading={loading}
+        loading={sceneDataSource === "none"}
         recommendedScenes={recommendedScenes}
         emptyText={zh.recEmpty}
         loadingText={zh.sceneLoading}

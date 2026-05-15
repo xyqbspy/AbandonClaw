@@ -3,6 +3,14 @@
 import { useState } from "react";
 import { Mail } from "lucide-react";
 import { toast } from "sonner";
+import { LoadingContent } from "@/components/shared/action-loading";
+import {
+  ClientActionTimeoutError,
+  withClientActionTimeout,
+} from "@/lib/client/action-timeout";
+
+const RESEND_TIMEOUT_MS = 15000;
+const RESEND_TIMEOUT_MESSAGE = "验证邮件发送超时，请稍后再试";
 
 export function VerifyEmailForm() {
   const [submitting, setSubmitting] = useState(false);
@@ -21,13 +29,16 @@ export function VerifyEmailForm() {
 
     setSubmitting(true);
     try {
-      const response = await fetch("/api/auth/resend-verification", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email }),
-      });
+      const response = await withClientActionTimeout(
+        fetch("/api/auth/resend-verification", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ email }),
+        }),
+        { timeoutMs: RESEND_TIMEOUT_MS, timeoutMessage: RESEND_TIMEOUT_MESSAGE },
+      );
 
       if (!response.ok) {
         const body = (await response.json().catch(() => null)) as { error?: string } | null;
@@ -36,6 +47,10 @@ export function VerifyEmailForm() {
 
       toast.success("验证邮件已发送，请检查邮箱。");
     } catch (error) {
+      if (error instanceof ClientActionTimeoutError) {
+        toast.error(error.message);
+        return;
+      }
       toast.error(error instanceof Error ? error.message : "验证邮件发送失败。");
     } finally {
       setSubmitting(false);
@@ -62,8 +77,11 @@ export function VerifyEmailForm() {
         className="w-full rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:cursor-not-allowed disabled:opacity-60"
         type="submit"
         disabled={submitting}
+        aria-busy={submitting}
       >
-        {submitting ? "发送中..." : "重新发送验证邮件"}
+        <LoadingContent loading={submitting} loadingText="发送中...">
+          重新发送验证邮件
+        </LoadingContent>
       </button>
     </form>
   );

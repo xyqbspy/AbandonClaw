@@ -65,7 +65,7 @@ export const REVIEW_STAGE_PROGRESS_DOT_CURRENT_CLASSNAME =
   "h-1 w-2 rounded-full bg-blue-600";
 
 export const REVIEW_TARGET_CARD_CLASSNAME =
-  "space-y-3 rounded-3xl bg-white py-3 text-center shadow-sm";
+  "space-y-3 rounded-3xl bg-white px-3 py-3 text-center shadow-sm";
 
 export const REVIEW_TARGET_EYEBROW_CLASSNAME =
   "text-[10px] font-black uppercase tracking-widest text-blue-500";
@@ -83,7 +83,7 @@ export const REVIEW_TARGET_META_PILL_CLASSNAME =
   "inline-flex rounded-full bg-slate-100 px-3 py-1 text-[10px] font-black uppercase tracking-wide text-slate-500";
 
 export const REVIEW_INPUT_PANEL_CLASSNAME =
-  "space-y-4 rounded-3xl bg-slate-900/5 py-3";
+  "space-y-4 rounded-3xl bg-slate-900/5 px-3 py-3";
 
 export const REVIEW_INPUT_PROMPT_LABEL_CLASSNAME =
   "text-[10px] font-black uppercase tracking-widest text-slate-500";
@@ -115,7 +115,7 @@ export const REVIEW_INPUT_ICON_BUTTON_CLASSNAME =
   "flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-400 transition hover:text-slate-600";
 
 export const REVIEW_REFERENCE_BLOCK_CLASSNAME =
-  "rounded-2xl bg-blue-50/40 py-3 text-sm leading-6 text-slate-700";
+  "rounded-2xl bg-blue-50/40 px-3 py-3 text-sm leading-6 text-slate-700";
 
 export const REVIEW_REFERENCE_LABEL_CLASSNAME =
   "text-[10px] font-black uppercase tracking-widest text-blue-500";
@@ -126,7 +126,7 @@ export const REVIEW_REFERENCE_BODY_CLASSNAME =
 export const REVIEW_REFERENCE_NOTE_CLASSNAME = "mt-2 break-words text-xs text-slate-500";
 
 export const REVIEW_INFO_BANNER_CLASSNAME =
-  "flex items-start gap-3 rounded-2xl bg-amber-50 py-3";
+  "flex items-start gap-3 rounded-2xl bg-amber-50 px-3 py-3";
 
 export const REVIEW_INFO_BANNER_LABEL_CLASSNAME =
   "text-[10px] font-black uppercase tracking-widest text-amber-700";
@@ -135,7 +135,7 @@ export const REVIEW_INFO_BANNER_BODY_CLASSNAME =
   "mt-1 break-words text-[11px] font-bold leading-relaxed text-amber-700";
 
 export const REVIEW_SCENE_BLOCK_CLASSNAME =
-  "rounded-2xl bg-white py-3 text-left";
+  "rounded-2xl bg-white px-3 py-3 text-left";
 
 export const REVIEW_SCENE_TITLE_CLASSNAME = "text-base font-black text-slate-900";
 
@@ -164,7 +164,7 @@ export const REVIEW_FEEDBACK_PILL_SUCCESS_CLASSNAME =
   `${REVIEW_FEEDBACK_PILL_BASE_CLASSNAME} bg-emerald-100 text-emerald-700`;
 
 export const REVIEW_SOURCE_ACTIONS_CLASSNAME =
-  "flex flex-wrap items-center gap-2 rounded-2xl bg-slate-50 py-3";
+  "flex flex-wrap items-center gap-2 rounded-2xl bg-slate-50 px-3 py-3";
 
 export const REVIEW_SOURCE_ACTIONS_LABEL_CLASSNAME =
   "w-full text-[10px] font-black uppercase tracking-widest text-slate-400";
@@ -175,7 +175,7 @@ export const REVIEW_SOURCE_UNAVAILABLE_CLASSNAME =
 export const REVIEW_SOURCE_UNAVAILABLE_HINT_CLASSNAME = "text-[11px] text-amber-600";
 
 export const REVIEW_QUEUE_DONE_CARD_CLASSNAME =
-  "space-y-4 rounded-3xl bg-white py-3 text-center shadow-sm";
+  "space-y-4 rounded-3xl bg-white px-3 py-3 text-center shadow-sm";
 
 export const REVIEW_QUEUE_DONE_TITLE_CLASSNAME = "text-lg font-black text-slate-900";
 

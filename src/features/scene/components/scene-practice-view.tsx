@@ -35,6 +35,7 @@ type ScenePracticeViewProps = {
   onDelete: () => void;
   onRegenerate?: () => void;
   onComplete: () => void;
+  completing?: boolean;
   onSentenceCompleted?: (payload: {
     exerciseId: string;
     sentenceId?: string | null;
@@ -78,6 +79,7 @@ export function ScenePracticeView({
   onDelete,
   onRegenerate,
   onComplete,
+  completing = false,
   onSentenceCompleted,
   onPracticeRunStart,
   onPracticeAttempt,
@@ -163,6 +165,7 @@ export function ScenePracticeView({
           onBack={onBack}
           onCloseMenu={closeHeaderMenu}
           onComplete={onComplete}
+          completing={completing}
           onDelete={onDelete}
           onRegenerate={onRegenerate}
           onToggleMenu={toggleHeaderMenu}
