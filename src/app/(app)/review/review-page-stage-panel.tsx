@@ -97,7 +97,6 @@ export function ReviewPageStagePanel({
   activeTaskKind,
   stageMeta,
   summary,
-  trainingHintSubtle,
   currentScenePracticeItem,
   currentPhraseItem,
   currentPhraseSchedulingReason,
@@ -129,7 +128,6 @@ export function ReviewPageStagePanel({
   summary: {
     reviewedTodayCount: number;
   } | null;
-  trainingHintSubtle: string;
   currentScenePracticeItem: DueScenePracticeReviewItemResponse | null;
   currentPhraseItem: DueReviewItemResponse | null;
   currentPhraseSchedulingReason: string | null;
@@ -307,14 +305,6 @@ export function ReviewPageStagePanel({
                       sceneFeedback.assessment as keyof typeof assessmentLabelMap
                     ] ?? sceneFeedback.assessment}`}
               </p>
-              <div className="mt-4 rounded-2xl border border-slate-100 bg-slate-50 p-3">
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">
-                  {labels.sceneFeedbackGuidanceTitle}
-                </p>
-                <p className="mt-1 text-xs leading-relaxed text-slate-600">
-                  {labels.sceneFeedbackGuidanceBody}
-                </p>
-              </div>
             </div>
           ) : null}
         </>
@@ -348,10 +338,6 @@ export function ReviewPageStagePanel({
 
           {taskStage === "recall" ? (
             <div className={REVIEW_INPUT_PANEL_CLASSNAME}>
-              <div className="space-y-1">
-                <p className={REVIEW_INPUT_PROMPT_LABEL_CLASSNAME}>{labels.phraseMicroRecallTitle}</p>
-                <p className={REVIEW_INPUT_PROMPT_BODY_CLASSNAME}>{labels.phraseMicroRecallBody}</p>
-              </div>
               <button
                 type="button"
                 onClick={() => setShowReference((prev) => !prev)}
@@ -436,12 +422,7 @@ export function ReviewPageStagePanel({
 
           {taskStage === "rewrite" ? (
             <div className={REVIEW_INPUT_PANEL_CLASSNAME}>
-              <div className="space-y-1">
-                <p className={REVIEW_INPUT_PROMPT_LABEL_CLASSNAME}>{labels.phraseRewritePromptLabel}</p>
-                {currentRewritePrompt?.description ? (
-                  <p className={REVIEW_INPUT_PROMPT_BODY_CLASSNAME}>{currentRewritePrompt.description}</p>
-                ) : null}
-              </div>
+              <p className={REVIEW_INPUT_PROMPT_LABEL_CLASSNAME}>{labels.phraseRewritePromptLabel}</p>
               <div className={REVIEW_INPUT_BUTTON_GROUP_CLASSNAME}>
                 {phraseRewritePrompts.map((prompt) => (
                   <button
@@ -484,23 +465,12 @@ export function ReviewPageStagePanel({
                   <p className={REVIEW_REFERENCE_BODY_CLASSNAME}>{currentPhraseExampleSentence}</p>
                 </div>
               ) : null}
-              <div className="rounded-2xl border border-slate-200/60 bg-white/40 p-3">
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">
-                  {labels.phraseRewriteGuidanceTitle}
-                </p>
-                <p className="mt-1 text-xs leading-relaxed text-slate-600">
-                  {labels.phraseRewriteGuidanceBody}
-                </p>
-              </div>
             </div>
           ) : null}
 
           {taskStage === "practice" ? (
             <div className={REVIEW_INPUT_PANEL_CLASSNAME}>
-              <div className="space-y-1">
-                <p className={REVIEW_INPUT_PROMPT_LABEL_CLASSNAME}>{labels.phraseOutputLabel}</p>
-                <p className={REVIEW_INPUT_PROMPT_BODY_CLASSNAME}>{labels.phraseOutputPlaceholder}</p>
-              </div>
+              <p className={REVIEW_INPUT_PROMPT_LABEL_CLASSNAME}>{labels.phraseOutputLabel}</p>
               <textarea
                 placeholder={labels.phraseOutputPlaceholder}
                 value={phraseDraft}
@@ -562,20 +532,8 @@ export function ReviewPageStagePanel({
                 {labels.reviewStats} {currentPhraseItem.reviewCount}，{labels.correct}{" "}
                 {currentPhraseItem.correctCount}，{labels.incorrect} {currentPhraseItem.incorrectCount}
               </p>
-              <div className="mt-4 rounded-2xl border border-slate-100 bg-slate-50 p-3">
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">
-                  {labels.phraseFeedbackGuidanceTitle}
-                </p>
-                <p className="mt-1 text-xs leading-relaxed text-slate-600">
-                  {labels.phraseFeedbackGuidanceBody}
-                </p>
-              </div>
             </div>
           ) : null}
-
-          <div className="text-center">
-            <span className="text-xs font-semibold text-slate-400">{trainingHintSubtle}</span>
-          </div>
         </>
       ) : null}
     </section>

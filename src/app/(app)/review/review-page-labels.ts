@@ -142,7 +142,7 @@ export const reviewPageLabels: ReviewPageLabels = {
   phraseRecallScenarioLabel: "当前语境",
   phraseReferenceLabel: "参考句",
   phraseReferenceHint: "想不起来时再展开参考句，尽量先自己回想。",
-  phraseMaskedExpression: "先别看表达本体，试着只根据语境和释义回想。",
+  phraseMaskedExpression: "• • • • •",
   phraseMicroRecallTitle: "先只看语境，不看表达本体",
   phraseMicroRecallBody: "在脑中默说一遍你会怎么表达，确认想不起来时再展开参考。",
   phraseConfidenceLabel: "STEP 2. 熟悉度与输出信心",

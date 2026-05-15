@@ -39,7 +39,6 @@ import {
   buildReviewTaskStageMeta,
   getReviewSchedulingReason,
   PhraseRewritePrompt,
-  resolveReviewHints,
   resolveReviewSourceLabel,
   ReviewTaskStage,
 } from "./review-page-selectors";
@@ -147,17 +146,6 @@ export default function ReviewPage() {
       fromExpressionMap: zh.fromExpressionMap,
       fromTodayTask: zh.fromTodayTask,
       fromSelected: zh.fromSelected,
-    },
-  });
-  const { primaryHint, trainingHintSubtle } = resolveReviewHints({
-    isSessionReview,
-    sessionSource,
-    labels: {
-      defaultHint: zh.defaultHint,
-      sessionHint: zh.sessionHint,
-      manualSessionHint: zh.manualSessionHint,
-      trainingHintSubtle: zh.trainingHintSubtle,
-      manualTrainingHintSubtle: zh.manualTrainingHintSubtle,
     },
   });
   const currentPhraseExampleSentence = currentPhraseItem
@@ -367,17 +355,10 @@ export default function ReviewPage() {
             accuracyLabel={zh.accuracy}
           />
 
-          {primaryHint || sourceLabel ? (
-            <div className="space-y-1 px-1">
-              {primaryHint ? (
-                <p className="text-sm font-bold text-slate-700">{primaryHint}</p>
-              ) : null}
-              {sourceLabel ? (
-                <p className="text-[11px] font-semibold text-slate-400">
-                  {zh.sourcePrefix}：{sourceLabel}
-                </p>
-              ) : null}
-            </div>
+          {sourceLabel ? (
+            <p className="text-[11px] font-semibold text-slate-400">
+              {zh.sourcePrefix}：{sourceLabel}
+            </p>
           ) : null}
 
           <ReviewPageStagePanel
@@ -385,7 +366,6 @@ export default function ReviewPage() {
             activeTaskKind={activeTaskKind}
             stageMeta={stageMeta}
             summary={summary}
-            trainingHintSubtle={trainingHintSubtle}
             currentScenePracticeItem={currentScenePracticeItem}
             currentPhraseItem={currentPhraseItem}
             currentPhraseSchedulingReason={currentPhraseSchedulingReason}

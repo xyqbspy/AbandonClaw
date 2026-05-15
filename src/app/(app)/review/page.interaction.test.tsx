@@ -416,7 +416,7 @@ test("ReviewPage 普通表达复习会按微回忆 -> 熟悉度 -> 改写 -> 输
 
   fireEvent.click(screen.getByRole("button", { name: "进入熟悉度判断" }));
   await screen.findByRole("button", { name: "眼熟，能认出来" });
-  assert.ok(screen.getByText("熟悉度判断"));
+  assert.ok(screen.getByText("熟悉度（眼熟还是会说）"));
 
   fireEvent.click(screen.getByRole("button", { name: "眼熟，能认出来" }));
   fireEvent.click(screen.getByRole("button", { name: "能主动说出来" }));

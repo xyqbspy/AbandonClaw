@@ -182,7 +182,7 @@ export const buildReviewTaskStageMeta = ({
   if (taskKind === "scene_practice") {
     if (stage === "recall") {
       return {
-        stepTag: "STEP 1. 场景回补",
+        stepTag: "STEP 1. 场景回补（再现这句）",
         title: "先回忆这句该怎么接",
         stepIndex: 1,
         totalSteps: 3,
@@ -190,7 +190,7 @@ export const buildReviewTaskStageMeta = ({
     }
     if (stage === "practice") {
       return {
-        stepTag: "STEP 2. 当场再练一次",
+        stepTag: "STEP 2. 当场再练（重新输出）",
         title: "把这句重新说出来",
         stepIndex: 2,
         totalSteps: 3,
@@ -206,7 +206,7 @@ export const buildReviewTaskStageMeta = ({
 
   if (stage === "recall") {
     return {
-      stepTag: "STEP 1. 微回忆",
+      stepTag: "STEP 1. 微回忆（看中文回想）",
       title: "先只看语境，试着把表达主动提起来",
       stepIndex: 1,
       totalSteps: 5,
@@ -214,7 +214,7 @@ export const buildReviewTaskStageMeta = ({
   }
   if (stage === "confidence") {
     return {
-      stepTag: "STEP 2. 熟悉度判断",
+      stepTag: "STEP 2. 熟悉度（眼熟还是会说）",
       title: "区分这条表达是眼熟，还是已经能主动说出来",
       stepIndex: 2,
       totalSteps: 5,
@@ -222,7 +222,7 @@ export const buildReviewTaskStageMeta = ({
   }
   if (stage === "rewrite") {
     return {
-      stepTag: "STEP 3. 变体改写",
+      stepTag: "STEP 3. 改写练习（换对象时态）",
       title: "换一个对象、时态或视角，把表达重新组织一遍",
       stepIndex: 3,
       totalSteps: 5,
@@ -230,14 +230,14 @@ export const buildReviewTaskStageMeta = ({
   }
   if (stage === "practice") {
     return {
-      stepTag: "STEP 4. 完整输出",
+      stepTag: "STEP 4. 完整输出（脱稿说一遍）",
       title: "脱离填空，直接把整句或两句完整说出来",
       stepIndex: 4,
       totalSteps: 5,
     };
   }
   return {
-    stepTag: "STEP 5. 复习判断",
+    stepTag: "STEP 5. 复习判断（标记掌握度）",
     title: "结合前面的表现，给这次复习一个明确判断",
     stepIndex: 5,
     totalSteps: 5,
