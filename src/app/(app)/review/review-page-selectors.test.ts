@@ -205,18 +205,36 @@ test("buildReviewProgressModel 会稳定计算进度百分比和正确率文本"
   assert.equal(progress.accuracyText, "80%");
 });
 
-test("buildReviewTaskStageMeta 会为两类任务返回稳定阶段标题", () => {
+test("buildReviewTaskStageMeta 会为两类任务返回稳定阶段标题与进度索引", () => {
   assert.deepEqual(buildReviewTaskStageMeta({ taskKind: "phrase_review", stage: "rewrite" }), {
     stepTag: "STEP 3. 变体改写",
     title: "换一个对象、时态或视角，把表达重新组织一遍",
+    stepIndex: 3,
+    totalSteps: 5,
   });
   assert.deepEqual(buildReviewTaskStageMeta({ taskKind: "phrase_review", stage: "practice" }), {
     stepTag: "STEP 4. 完整输出",
     title: "脱离填空，直接把整句或两句完整说出来",
+    stepIndex: 4,
+    totalSteps: 5,
   });
   assert.deepEqual(buildReviewTaskStageMeta({ taskKind: "scene_practice", stage: "feedback" }), {
     stepTag: "STEP 3. 反馈与下一步",
     title: "根据结果决定继续回场景还是进入下一题",
+    stepIndex: 3,
+    totalSteps: 3,
+  });
+  assert.deepEqual(buildReviewTaskStageMeta({ taskKind: "scene_practice", stage: "recall" }), {
+    stepTag: "STEP 1. 场景回补",
+    title: "先回忆这句该怎么接",
+    stepIndex: 1,
+    totalSteps: 3,
+  });
+  assert.deepEqual(buildReviewTaskStageMeta({ taskKind: "phrase_review", stage: "feedback" }), {
+    stepTag: "STEP 5. 复习判断",
+    title: "结合前面的表现，给这次复习一个明确判断",
+    stepIndex: 5,
+    totalSteps: 5,
   });
 });
 

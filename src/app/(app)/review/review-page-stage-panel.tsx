@@ -21,6 +21,8 @@ import {
   REVIEW_STAGE_FEEDBACK_SCORING_HINT_CLASSNAME,
   REVIEW_STAGE_FIELD_LABEL_CLASSNAME,
   REVIEW_STAGE_FIELD_LABEL_SPACED_CLASSNAME,
+  REVIEW_STAGE_HEADER_CLASSNAME,
+  REVIEW_STAGE_HEADER_TOP_CLASSNAME,
   REVIEW_STAGE_MODE_PILL_CLASSNAME,
   REVIEW_STAGE_PANEL_CLASSNAME,
   REVIEW_STAGE_PHRASE_EXPRESSION_CLASSNAME,
@@ -35,6 +37,11 @@ import {
   REVIEW_STAGE_SCENE_INLINE_TEXT_CLASSNAME,
   REVIEW_STAGE_SCENE_TITLE_CLASSNAME,
   REVIEW_STAGE_SCHEDULING_REASON_CLASSNAME,
+  REVIEW_STAGE_STEP_PROGRESS_CLASSNAME,
+  REVIEW_STAGE_STEP_PROGRESS_DOT_CLASSNAME,
+  REVIEW_STAGE_STEP_PROGRESS_DOT_CURRENT_CLASSNAME,
+  REVIEW_STAGE_STEP_PROGRESS_DOT_DONE_CLASSNAME,
+  REVIEW_STAGE_STEP_PROGRESS_TEXT_CLASSNAME,
   REVIEW_STAGE_STEP_TAG_CLASSNAME,
   REVIEW_STAGE_STRONG_DASHED_BLOCK_CLASSNAME,
   REVIEW_STAGE_TITLE_CLASSNAME,
@@ -46,6 +53,8 @@ import {
 type StageMeta = {
   stepTag: string;
   title: string;
+  stepIndex?: number;
+  totalSteps?: number;
 } | null;
 
 type SceneFeedbackState = {
@@ -152,11 +161,32 @@ export function ReviewPageStagePanel({
 
   return (
     <section className={REVIEW_STAGE_PANEL_CLASSNAME}>
-      <div className={REVIEW_STAGE_STEP_TAG_CLASSNAME}>
-        {stageMeta.stepTag}
-      </div>
-      <h2 className={REVIEW_STAGE_TITLE_CLASSNAME}>{stageMeta.title}</h2>
-      <p className={`mt-2 ${APPLE_META_TEXT}`}>{trainingHintSubtle}</p>
+      <header className={REVIEW_STAGE_HEADER_CLASSNAME}>
+        <div className={REVIEW_STAGE_HEADER_TOP_CLASSNAME}>
+          <div className={REVIEW_STAGE_STEP_TAG_CLASSNAME}>
+            {stageMeta.stepTag}
+          </div>
+          {stageMeta.totalSteps && stageMeta.stepIndex ? (
+            <div className={REVIEW_STAGE_STEP_PROGRESS_CLASSNAME} aria-label={`第 ${stageMeta.stepIndex} 步，共 ${stageMeta.totalSteps} 步`}>
+              {Array.from({ length: stageMeta.totalSteps }, (_, index) => {
+                const stepNumber = index + 1;
+                if (stepNumber === stageMeta.stepIndex) {
+                  return <span key={stepNumber} className={REVIEW_STAGE_STEP_PROGRESS_DOT_CURRENT_CLASSNAME} />;
+                }
+                if (stepNumber < (stageMeta.stepIndex ?? 0)) {
+                  return <span key={stepNumber} className={REVIEW_STAGE_STEP_PROGRESS_DOT_DONE_CLASSNAME} />;
+                }
+                return <span key={stepNumber} className={REVIEW_STAGE_STEP_PROGRESS_DOT_CLASSNAME} />;
+              })}
+              <span className={REVIEW_STAGE_STEP_PROGRESS_TEXT_CLASSNAME}>
+                {stageMeta.stepIndex} / {stageMeta.totalSteps}
+              </span>
+            </div>
+          ) : null}
+        </div>
+        <h2 className={REVIEW_STAGE_TITLE_CLASSNAME}>{stageMeta.title}</h2>
+        <p className={APPLE_META_TEXT}>{trainingHintSubtle}</p>
+      </header>
 
       {activeTaskKind === "scene_practice" && currentScenePracticeItem ? (
         <div className="mt-6 space-y-4">

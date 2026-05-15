@@ -73,19 +73,40 @@ export const REVIEW_FOOTER_PRIMARY_FULL_BUTTON_CLASSNAME = buttonVariants({
 
 export const REVIEW_FOOTER_SECONDARY_BUTTON_CLASSNAME = buttonVariants({
   variant: "secondary",
-  className: "w-full",
+  className: "h-14 w-full rounded-full text-base",
 });
 
 export const REVIEW_FOOTER_DANGER_BUTTON_CLASSNAME = buttonVariants({
   variant: "destructive",
-  className: "w-full",
+  className: "h-14 w-full rounded-full text-base",
 });
 
 export const REVIEW_STAGE_PANEL_CLASSNAME =
   "rounded-[24px] border border-[var(--app-border-soft)] bg-white p-5 shadow-[0_16px_50px_rgba(15,23,42,0.08)]";
 
+export const REVIEW_STAGE_HEADER_CLASSNAME =
+  "mb-4 flex flex-col gap-3 border-l-4 border-sky-500 pl-4";
+
+export const REVIEW_STAGE_HEADER_TOP_CLASSNAME =
+  "flex flex-wrap items-center justify-between gap-2";
+
 export const REVIEW_STAGE_STEP_TAG_CLASSNAME =
-  "mb-4 inline-flex rounded-xl bg-sky-50 px-3 py-1 text-xs font-bold text-sky-700";
+  "inline-flex items-center gap-2 rounded-full bg-sky-100 px-3 py-1.5 text-sm font-bold text-sky-700 shadow-sm";
+
+export const REVIEW_STAGE_STEP_PROGRESS_CLASSNAME =
+  "flex items-center gap-1.5";
+
+export const REVIEW_STAGE_STEP_PROGRESS_DOT_CLASSNAME =
+  "h-2 w-2 rounded-full bg-slate-200 transition-colors";
+
+export const REVIEW_STAGE_STEP_PROGRESS_DOT_DONE_CLASSNAME =
+  "h-2 w-2 rounded-full bg-sky-300 transition-colors";
+
+export const REVIEW_STAGE_STEP_PROGRESS_DOT_CURRENT_CLASSNAME =
+  "h-2.5 w-6 rounded-full bg-sky-500 shadow-sm transition-colors";
+
+export const REVIEW_STAGE_STEP_PROGRESS_TEXT_CLASSNAME =
+  "ml-1 text-xs font-medium text-slate-500";
 
 export const REVIEW_STAGE_TITLE_CLASSNAME =
   `text-2xl font-semibold tracking-tight ${REVIEW_TEXT_STRONG_CLASSNAME}`;
