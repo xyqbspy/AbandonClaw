@@ -206,6 +206,82 @@ test("useChunksListData 会忽略旧请求的迟到回填", async () => {
   });
 });
 
+test("useChunksListData 会通过 mine 查询读取用户态 scene 表达，而不是 builtin 原始 chunk", async () => {
+  const timers = new Map<number, () => void>();
+  let timerId = 0;
+  const scenePhrase: UserPhraseItemResponse = {
+    ...rows[0],
+    userPhraseId: "scene-user-phrase-1",
+    phraseId: "phrase-scene-1",
+    text: "call it a day",
+    normalizedText: "call it a day",
+    sourceSceneSlug: "daily-greeting",
+    sourceType: "scene",
+    sourceSentenceIndex: 0,
+    sourceSentenceText: "Let's call it a day.",
+    sourceChunkText: "call it a day",
+  };
+  const requestedParams: Array<Record<string, unknown>> = [];
+  const deps: ChunksListDeps = {
+    getPhraseListCache: async () => ({ found: false, record: null, isExpired: false }),
+    setPhraseListCache: async () => undefined,
+    getMyPhrasesFromApi: async (params) => {
+      requestedParams.push((params ?? {}) as Record<string, unknown>);
+      return { rows: [scenePhrase], total: 1, page: 1, limit: 100 };
+    },
+    buildChunksListRequestParams: ({ query, reviewFilter, contentFilter, expressionClusterFilterId }) => ({
+      query: query.trim(),
+      limit: 100,
+      page: 1,
+      status: "saved",
+      reviewStatus: reviewFilter,
+      learningItemType: contentFilter,
+      expressionClusterId: expressionClusterFilterId || undefined,
+    }),
+    resolveChunksCachePresentation: ({ cacheFound }) => ({
+      hasCacheFallback: cacheFound,
+      nextDataSource: cacheFound ? "cache" : "none",
+      shouldStopLoading: cacheFound,
+    }),
+    resolveChunksNetworkFailure: ({ error }) => ({
+      shouldClearRows: true,
+      shouldStopLoading: true,
+      message: error instanceof Error ? error.message : "load failed",
+    }),
+    setTimeoutFn: (callback: () => void) => {
+      timerId += 1;
+      timers.set(timerId, callback);
+      return timerId;
+    },
+    clearTimeoutFn: (handle) => {
+      timers.delete(handle as number);
+    },
+  };
+
+  const { result } = renderHook(() =>
+    useChunksListData({
+      query: "",
+      reviewFilter: "all",
+      contentFilter: "expression",
+      expressionClusterFilterId: "",
+      deps,
+    }),
+  );
+
+  Array.from(timers.values()).forEach((callback) => callback());
+
+  await waitFor(() => {
+    assert.equal(result.current.listDataSource, "network");
+    assert.equal(result.current.total, 1);
+    assert.equal(result.current.phrases[0]?.userPhraseId, "scene-user-phrase-1");
+  });
+  assert.equal(requestedParams[0]?.status, "saved");
+  assert.equal(requestedParams[0]?.learningItemType, "expression");
+  assert.equal(result.current.phrases[0]?.sourceType, "scene");
+  assert.equal(result.current.phrases[0]?.sourceSceneSlug, "daily-greeting");
+  assert.equal(result.current.phrases[0]?.sourceChunkText, "call it a day");
+});
+
 test("useChunksListData 在无缓存且网络失败时会清空列表并上报错误", async () => {
   const timers = new Map<number, () => void>();
   let timerId = 0;

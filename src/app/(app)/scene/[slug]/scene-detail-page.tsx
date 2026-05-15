@@ -100,6 +100,7 @@ type SavePhrasePayload = {
   text: string;
   translation?: string;
   usageNote?: string;
+  sourceType?: "scene" | "manual";
   sourceSentenceIndex?: number;
   sourceSentenceText?: string;
   sourceChunkText?: string;
@@ -518,6 +519,7 @@ export default function SceneDetailClientPage({
         translation: payload.translation,
         usageNote: payload.usageNote,
         sourceSceneSlug: baseLesson.slug,
+        sourceType: payload.sourceType ?? "scene",
         sourceSentenceIndex: payload.sourceSentenceIndex,
         sourceSentenceText: payload.sourceSentenceText,
         sourceChunkText: payload.sourceChunkText ?? payload.text,

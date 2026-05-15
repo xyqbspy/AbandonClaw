@@ -34,6 +34,7 @@ export interface SceneListItem {
   sceneType: "dialogue" | "monologue";
   sourceType: "builtin" | "user_generated" | "imported" | "ai_generated";
   isStarter: boolean;
+  starterOrder?: number | null;
   isFeatured: boolean;
   sortOrder: number;
   createdAt: string;
@@ -240,6 +241,7 @@ export async function listScenes(params: { userId: string }) {
       sceneType: scene.type ?? "monologue",
       sourceType: toSceneSourceType(row),
       isStarter: row.is_starter,
+      starterOrder: row.is_starter ? row.sort_order : null,
       isFeatured: row.is_featured,
       sortOrder: row.sort_order,
       createdAt: row.created_at,

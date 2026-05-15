@@ -5,6 +5,7 @@ import { Clock3 } from "lucide-react";
 import { LoadingOverlay } from "@/components/shared/action-loading";
 import type { SceneListItemResponse } from "@/lib/utils/scenes-api";
 import {
+  getSceneCategoryLabel,
   getSceneLevelLabel,
   getSceneSourceLabel,
   getSceneStatus,
@@ -112,6 +113,9 @@ export function SceneListCard({
         <div className="mt-4 flex flex-wrap items-center gap-2 text-[10px] font-bold text-slate-400">
           <span className={`rounded px-2 py-1 ${featured ? "bg-blue-50 text-blue-600" : "bg-slate-50 text-slate-500"}`}>
             {scene.level ?? "L?"} {getSceneLevelLabel(scene.level)}
+          </span>
+          <span className="rounded bg-slate-50 px-2 py-1 text-slate-500">
+            {getSceneCategoryLabel(scene.category)}
           </span>
           <span className="rounded bg-slate-50 px-2 py-1 text-slate-500">
             {getSceneSourceLabel(scene.sourceType)}

@@ -97,6 +97,28 @@ const scenes: SceneListItemResponse[] = [
     progressPercent: 25,
     lastViewedAt: "2026-05-14T10:00:00.000Z",
   },
+  {
+    id: "scene-5",
+    slug: "making-small-talk",
+    title: "Making Small Talk（简单寒暄）",
+    subtitle: "学会开启轻松话题",
+    level: "L1",
+    category: "social",
+    difficulty: "Intermediate",
+    estimatedMinutes: 6,
+    learningGoal: "学会开启轻松话题",
+    sentenceCount: 12,
+    sceneType: "dialogue",
+    sourceType: "builtin",
+    isStarter: false,
+    isFeatured: false,
+    sortOrder: 20,
+    createdAt: "2026-05-10T00:00:00.000Z",
+    variantLinks: [],
+    learningStatus: "not_started",
+    progressPercent: 0,
+    lastViewedAt: null,
+  },
 ];
 
 test("scene-display 会标准化 level 和标签", () => {
@@ -122,7 +144,7 @@ test("scene-display 会按推荐排序", () => {
   const result = sortScenes(scenes, "recommended");
   assert.deepEqual(
     result.map((scene) => scene.slug),
-    ["daily-greeting", "ordering-coffee", "my-custom-scene", "rescheduling-a-meeting"],
+    ["daily-greeting", "ordering-coffee", "my-custom-scene", "making-small-talk", "rescheduling-a-meeting"],
   );
 });
 
@@ -134,6 +156,65 @@ test("scene-display 会按分类、等级、来源和搜索过滤", () => {
     search: "coffee",
   });
   assert.deepEqual(result.map((scene) => scene.slug), ["ordering-coffee"]);
+});
+
+test("scene-display level filter 能筛出 L0 / L1 且 L2 无内容时返回空结果", () => {
+  const filterByLevel = (level: "L0" | "L1" | "L2") =>
+    filterScenes(scenes, {
+      category: "all",
+      level,
+      source: "builtin",
+      search: "",
+    });
+
+  const l0Scenes = filterByLevel("L0");
+  const l1Scenes = filterByLevel("L1");
+  const l2Scenes = filterByLevel("L2");
+
+  assert.deepEqual(l0Scenes.map((scene) => scene.slug), ["daily-greeting", "ordering-coffee"]);
+  assert.deepEqual(l1Scenes.map((scene) => scene.slug), ["rescheduling-a-meeting", "making-small-talk"]);
+  assert.equal(l2Scenes.length, 0);
+});
+
+test("scene-display category filter 能筛出 builtin 入门场景分类", () => {
+  const filterByCategory = (category: "starter" | "daily_life" | "time_plan" | "social") =>
+    filterScenes(scenes, {
+      category,
+      level: "all",
+      source: "builtin",
+      search: "",
+    });
+
+  assert.deepEqual(filterByCategory("starter").map((scene) => scene.slug), ["daily-greeting"]);
+  assert.deepEqual(filterByCategory("daily_life").map((scene) => scene.slug), ["ordering-coffee"]);
+  assert.deepEqual(filterByCategory("time_plan").map((scene) => scene.slug), ["rescheduling-a-meeting"]);
+  assert.deepEqual(filterByCategory("social").map((scene) => scene.slug), ["making-small-talk"]);
+});
+
+test("scene-display 筛选后保留 scene card 需要的基础 metadata", () => {
+  const result = filterScenes(scenes, {
+    category: "starter",
+    level: "L0",
+    source: "builtin",
+    search: "",
+  });
+
+  assert.deepEqual(
+    result.map((scene) => ({
+      slug: scene.slug,
+      title: scene.title,
+      level: scene.level,
+      category: scene.category,
+    })),
+    [
+      {
+        slug: "daily-greeting",
+        title: "Daily Greeting（日常问候）",
+        level: "L0",
+        category: "starter",
+      },
+    ],
+  );
 });
 
 test("scene-display 会组合 starter packs 并给出首个场景", () => {

@@ -59,14 +59,25 @@ const levelRank = (level?: string | null) => {
 const isSceneCompleted = (scene: Pick<SceneListItem, "learningStatus" | "progressPercent">) =>
   scene.learningStatus === "completed" || scene.progressPercent >= 100;
 
-const isStarterScene = (scene: Pick<SceneListItem, "sourceType" | "isStarter" | "category">) =>
-  scene.sourceType === "builtin" && (scene.isStarter === true || scene.category === "starter");
+const isStarterScene = (scene: Pick<SceneListItem, "sourceType" | "isStarter">) =>
+  scene.sourceType === "builtin" && scene.isStarter === true;
+
+const isStartedStarterScene = (scene: Pick<SceneListItem, "learningStatus" | "progressPercent">) =>
+  !isSceneCompleted(scene) &&
+  (scene.learningStatus === "in_progress" ||
+    scene.learningStatus === "paused" ||
+    scene.progressPercent > 0);
 
 const isDailyPathScene = (scene: Pick<SceneListItem, "sourceType" | "category">) =>
   scene.sourceType === "builtin" &&
   (scene.category === "daily_life" || scene.category === "time_plan" || scene.category === "social");
 
 const compareStarterCandidate = (left: SceneListItem, right: SceneListItem) => {
+  const starterOrderDelta =
+    (left.starterOrder ?? left.sortOrder ?? Number.MAX_SAFE_INTEGER) -
+    (right.starterOrder ?? right.sortOrder ?? Number.MAX_SAFE_INTEGER);
+  if (starterOrderDelta !== 0) return starterOrderDelta;
+
   const levelDelta = levelRank(left.level) - levelRank(right.level);
   if (levelDelta !== 0) return levelDelta;
 
@@ -77,6 +88,18 @@ const compareStarterCandidate = (left: SceneListItem, right: SceneListItem) => {
   if (featuredDelta !== 0) return featuredDelta;
 
   return new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime();
+};
+
+export const getStarterPathScenes = (scenes: SceneListItem[]) =>
+  scenes.filter(isStarterScene).sort(compareStarterCandidate);
+
+export const getNextStarterScene = (params: {
+  scenes: SceneListItem[];
+}): SceneListItem | null => {
+  const starterScenes = getStarterPathScenes(params.scenes);
+  const startedScene = starterScenes.find(isStartedStarterScene);
+  if (startedScene) return startedScene;
+  return starterScenes.find((scene) => !isSceneCompleted(scene)) ?? null;
 };
 
 const compareDailyCandidate = (left: SceneListItem, right: SceneListItem) => {
@@ -173,13 +196,13 @@ export const getTodayPrimaryRecommendation = (params: {
     return buildContinueRecommendation(continueLearning, matchedScene);
   }
 
-  const starterScenes = scenes.filter(isStarterScene).sort(compareStarterCandidate);
+  const starterScenes = getStarterPathScenes(scenes);
   const totalStarterCount = starterScenes.length;
   const completedStarterScenes = starterScenes.filter(isSceneCompleted);
   const completedStarterCount = completedStarterScenes.length;
 
   if (starterScenes.length > 0) {
-    const nextStarter = starterScenes.find((scene) => !isSceneCompleted(scene)) ?? null;
+    const nextStarter = getNextStarterScene({ scenes });
     if (nextStarter) {
       if (completedStarterCount === 0) {
         return {

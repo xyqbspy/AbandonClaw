@@ -98,6 +98,43 @@ test("review submit handler 对相同幂等 key 只执行一次提交", async ()
   assert.deepEqual(await first.json(), await second.json());
 });
 
+test("review submit handler 无显式幂等 key 时会按用户与 payload 去重", async () => {
+  let submitCount = 0;
+  let summaryCount = 0;
+  const dependencies = {
+    requireCurrentProfile: async () => ({ user: { id: "user-1" } } as never),
+    submitPhraseReview: async () => {
+      submitCount += 1;
+      return { id: "phrase-1", reviewResult: "good" } as never;
+    },
+    getReviewSummary: async () => {
+      summaryCount += 1;
+      return { dueCount: 2 } as never;
+    },
+  };
+
+  const first = await handleReviewSubmitPost(
+    createJsonRequest("http://localhost/api/review/submit", {
+      userPhraseId: "phrase-1",
+      reviewResult: "good",
+    }),
+    dependencies,
+  );
+  const second = await handleReviewSubmitPost(
+    createJsonRequest("http://localhost/api/review/submit", {
+      userPhraseId: " phrase-1 ",
+      reviewResult: "good",
+    }),
+    dependencies,
+  );
+
+  assert.equal(first.status, 200);
+  assert.equal(second.status, 200);
+  assert.equal(submitCount, 1);
+  assert.equal(summaryCount, 1);
+  assert.deepEqual(await first.json(), await second.json());
+});
+
 test("review submit handler 会裁剪 payload 并返回 item 与 summary", async () => {
   let submitArgs: Record<string, unknown> | null = null;
   let summaryUserId: string | null = null;

@@ -249,6 +249,7 @@ const trainingEventCalls: Array<{
     selectedBlockId?: string;
   };
 }> = [];
+const savePhraseCalls: Array<Record<string, unknown>> = [];
 
 const originalConfirm = window.confirm;
 const originalToastError = toast.error;
@@ -279,6 +280,7 @@ const mockedModules = {
       headerTools,
       trainingTopPanel,
       onChunkEncounter,
+      onSavePhrase,
       onSceneLoopPlayback,
     }: {
       headerTools?: React.ReactNode;
@@ -293,6 +295,16 @@ const mockedModules = {
         chunkText: string;
         blockId?: string;
         source?: "direct" | "related";
+      }) => void;
+      onSavePhrase?: (payload: {
+        text: string;
+        translation?: string;
+        usageNote?: string;
+        sourceSceneSlug?: string;
+        sourceType?: "scene" | "manual";
+        sourceSentenceIndex?: number;
+        sourceSentenceText?: string;
+        sourceChunkText?: string;
       }) => void;
       onSceneLoopPlayback?: (payload: { lesson: Lesson }) => void;
     }) => (
@@ -343,6 +355,23 @@ const mockedModules = {
           }
         >
           encounter-related-chunk
+        </button>
+        <button
+          type="button"
+          onClick={() =>
+            onSavePhrase?.({
+              text: "call it a day",
+              translation: "今天先到这里",
+              usageNote: "用于自然结束一段工作或练习。",
+              sourceSceneSlug: baseLesson.slug,
+              sourceType: "scene",
+              sourceSentenceIndex: 0,
+              sourceSentenceText: "Let's call it a day.",
+              sourceChunkText: "call it a day",
+            })
+          }
+        >
+          save-base-chunk
         </button>
         {headerTools}
       </div>
@@ -712,7 +741,10 @@ const mockedModules = {
   },
   "@/lib/utils/phrases-api": {
     getSavedNormalizedPhraseTextsFromApi: async () => [],
-    savePhraseFromApi: async () => ({ created: true }),
+    savePhraseFromApi: async (payload: Record<string, unknown>) => {
+      savePhraseCalls.push(payload);
+      return { created: true };
+    },
   },
   "@/lib/utils/tts-api": {
     playChunkAudio: async () => undefined,
@@ -927,6 +959,7 @@ afterEach(() => {
   generatedPracticeCalls.length = 0;
   generatedVariantCalls.length = 0;
   trainingEventCalls.length = 0;
+  savePhraseCalls.length = 0;
   toastMessageCalls.length = 0;
   window.confirm = originalConfirm;
   toast.error = originalToastError;
@@ -959,6 +992,27 @@ function getNextStepActionButton() {
   const nextStep = screen.getByRole("region", { name: "当前下一步" });
   return within(nextStep).getByRole("button", { name: "执行当前下一步" });
 }
+
+test("SceneDetailPage 保存 scene chunk 时会走用户态 phrase 保存接口并保留 scene 来源", async () => {
+  const SceneDetailPage = getSceneDetailPage();
+  render(<SceneDetailPage initialLesson={baseLesson} />);
+
+  fireEvent.click(await screen.findByRole("button", { name: "save-base-chunk" }));
+
+  await waitFor(() => {
+    assert.equal(savePhraseCalls.length, 1);
+  });
+  assert.deepEqual(savePhraseCalls[0], {
+    text: "call it a day",
+    translation: "今天先到这里",
+    usageNote: "用于自然结束一段工作或练习。",
+    sourceSceneSlug: "test-scene",
+    sourceType: "scene",
+    sourceSentenceIndex: 0,
+    sourceSentenceText: "Let's call it a day.",
+    sourceChunkText: "call it a day",
+  });
+});
 
 test("SceneDetailPage 在 practice 路由下删除练习后会回到 scene 路由", async () => {
   currentSearchParams = new URLSearchParams("view=practice");

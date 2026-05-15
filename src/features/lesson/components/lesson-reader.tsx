@@ -90,6 +90,7 @@ export function LessonReader({
     translation?: string;
     usageNote?: string;
     sourceSceneSlug?: string;
+    sourceType?: "scene" | "manual";
     sourceSentenceIndex?: number;
     sourceSentenceText?: string;
     sourceChunkText?: string;
@@ -99,6 +100,7 @@ export function LessonReader({
     translation?: string;
     usageNote?: string;
     sourceSceneSlug?: string;
+    sourceType?: "scene" | "manual";
     sourceSentenceIndex?: number;
     sourceSentenceText?: string;
     sourceChunkText?: string;

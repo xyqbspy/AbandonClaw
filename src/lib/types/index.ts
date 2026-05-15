@@ -34,6 +34,9 @@ export interface SentenceChunkDetail {
   id?: string;
   text: string;
   translation: string;
+  order?: number;
+  chunkType?: "chunk" | "core_phrase";
+  type?: "chunk" | "core_phrase";
   grammarLabel: string;
   meaningInSentence: string;
   usageNote: string;
@@ -65,6 +68,9 @@ export interface AIExplanation {
   key: string;
   text: string;
   translation: string;
+  order?: number;
+  chunkType?: "chunk" | "core_phrase";
+  type?: "chunk" | "core_phrase";
   explanation: string;
   examples: string[];
   exampleTranslations: string[];

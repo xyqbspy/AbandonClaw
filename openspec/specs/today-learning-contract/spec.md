@@ -22,10 +22,16 @@
 系统 MUST 在 `today` 聚合结果中为没有可继续场景的用户返回一个可解释的新手路径推荐，并且该推荐必须基于真实 scenes 数据中的 starter 元字段，而不是页面写死文案或写死 slug。
 
 #### Scenario: 新用户首次进入 Today
-- **WHEN** 用户没有进行中的 scene、没有已完成 scene，且系统能查询到至少一个 `source_type = builtin` 且 `is_starter = true` 或 `category = starter` 的可见场景
+- **WHEN** 用户没有进行中的 scene、没有已完成 scene，且系统能查询到至少一个 `source_type = builtin` 且 `is_starter = true` 的可见场景
 - **THEN** `today` 聚合 MUST 返回一个 starter recommendation
-- **AND** 推荐场景 MUST 优先按 `level` 的 `L0 -> L1 -> L2 -> unknown`、`sort_order asc`、`is_featured desc` 选择第一个可见 starter scene
+- **AND** 推荐场景 MUST 优先按 `starter_order asc`（缺失时回退 `sort_order asc`）、`level` 的 `L0 -> L1 -> L2 -> unknown`、`sort_order asc`、`is_featured desc` 选择第一个可见 starter scene
 - **AND** 推荐结果 MUST 包含标题、理由、CTA 文案、目标 href、场景标题、level、estimatedMinutes 与 learningGoal/说明的稳定字段
+
+#### Scenario: 用户已有未完成 starter 进度但没有 continueLearning 对象
+- **WHEN** 用户存在已开始但未完成的 starter scene
+- **AND** dashboard 没有返回 `continueLearning`
+- **THEN** `today` 聚合 MUST 优先推荐该已开始 starter scene
+- **AND** 不得因为排序中仍有更早未开始 starter scene，就把用户从当前入门路径进度拉回第一步
 
 #### Scenario: 用户完成部分 starter 场景
 - **WHEN** 用户已完成至少一个 starter scene，且仍有未完成的 starter scene

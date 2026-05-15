@@ -18,6 +18,7 @@ export interface SceneListItemResponse {
   sceneType: "dialogue" | "monologue";
   sourceType: "builtin" | "user_generated" | "imported" | "ai_generated";
   isStarter?: boolean;
+  starterOrder?: number | null;
   isFeatured?: boolean;
   sortOrder?: number;
   createdAt: string;

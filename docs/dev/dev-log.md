@@ -1,5 +1,30 @@
 # Dev Log
 
+### [2026-05-15] Today starter、Scene 保存来源与 Review 消费链路收尾
+- 类型：完成态收尾 / 主学习闭环测试与文档同步
+- 状态：已完成，准备提交到 `main`
+
+#### 背景
+本轮在已完成 builtin starter / Today 推荐 / scene chunk 保存 / Chunks 用户态读取后，继续确认 `user_phrase -> Review due -> Review submit` 的最小消费链路，同时收口 starter path 顺序和 scene 来源字段的稳定口径。
+
+#### 本次收口
+- Today starter recommendation 改为以 `isStarter = true` 的 starter path 为准，优先按 `starterOrder` 推荐；已开始但未完成的 starter 在没有 `continueLearning` 对象时会被优先接回。
+- builtin scene seed 补齐 `title`、`starterOrder`、core phrase `order/chunkType/type`，scene list API 透出 `starterOrder`。
+- Scene 保存 chunk 时明确透传 `sourceType: "scene"`，并补测试锁定保存 payload 保留来源场景、来源句子和来源 chunk。
+- Chunks 列表测试锁定从 `/api/phrases/mine` 读取用户态 scene 表达，而不是读取 builtin 原始 chunk。
+- Review service 测试锁定 due 来源为 `user_phrases`、`next_review_at <= now` 或 `null` 可消费、builtin-only phrase 不直接进入 due。
+- Review submit 测试锁定写 `phrase_review_logs`、推进 `user_phrases` 状态，并补无显式 idempotency key 时按用户与 normalized payload 去重。
+- 同步 `today-learning-contract`、`scene-entry`、`today-recommendation` 与正式 `CHANGELOG.md`。
+
+#### 验证
+- `pnpm exec node --import tsx --test src/lib/server/review/service.user-phrase-flow.test.ts`
+- `pnpm exec node --import tsx --test src/app/api/review/handlers.test.ts`
+- `pnpm exec node --import tsx --test src/lib/server/phrases/logic.test.ts src/lib/server/review/service.logic.test.ts`
+
+#### 剩余风险
+- 本轮仍未连接真实 Supabase 环境做浏览器账号级端到端验收；已通过服务端与交互层测试锁定最小数据契约。
+- starter / builtin phrase 仍依赖生产环境已执行对应 SQL 与 seed；未执行时会按既有空态或受控错误降级。
+
 ### [2026-05-14] Today 新用户默认学习路径推荐
 - 类型：Spec-Driven / Today 主链路推荐与新手承接
 - 状态：实现完成，待后续 archive `today-starter-recommendation`

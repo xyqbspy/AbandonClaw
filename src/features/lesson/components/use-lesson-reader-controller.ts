@@ -59,6 +59,7 @@ type UseLessonReaderControllerProps = {
     translation?: string;
     usageNote?: string;
     sourceSceneSlug?: string;
+    sourceType?: "scene" | "manual";
     sourceSentenceIndex?: number;
     sourceSentenceText?: string;
     sourceChunkText?: string;
@@ -68,6 +69,7 @@ type UseLessonReaderControllerProps = {
     translation?: string;
     usageNote?: string;
     sourceSceneSlug?: string;
+    sourceType?: "scene" | "manual";
     sourceSentenceIndex?: number;
     sourceSentenceText?: string;
     sourceChunkText?: string;
@@ -133,6 +135,7 @@ export function useLessonReaderController({
       translation: chunkDetail.translation,
       usageNote: chunkDetail.usageNote,
       sourceSceneSlug: lesson.slug,
+      sourceType: "scene" as const,
       sourceSentenceIndex: sentenceIndex >= 0 ? sentenceIndex : undefined,
       sourceSentenceText: currentSentence?.text,
       sourceChunkText: chunkDetail.text,

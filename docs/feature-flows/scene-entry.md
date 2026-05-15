@@ -90,19 +90,21 @@
 - `category`
 - `sourceType`
 - `isStarter`
+- `starterOrder`
 - `isFeatured`
 - `sortOrder`
 - `estimatedMinutes`
 - `learningGoal`
 - `tags`
 
-默认排序由服务端保证 starter / featured / sort order 优先，前端 selector 再做本地 pack、筛选和 CTA 派生。
+默认排序由服务端保证 starter / featured / sort order 优先，前端 selector 再做本地 pack、筛选和 CTA 派生。`starterOrder` 只用于明确的 starter path 顺序；非 starter 的 builtin daily scenes 应保持 `starterOrder = null`，避免被误并入 Start Here。
 
 维护约束：
 
 - 默认场景必须继续通过现有 `scene_json` 承载正文与 chunks，不新增脱离主链路的静态内容模型
 - 扩展 builtin 内容时必须保持 slug 唯一、seed 幂等和 scene list 字段透出
 - today fallback 依赖 scene list 顺序时，应能落到可直接学习的 builtin starter scene
+- starter path 必须以 `isStarter = true` 为准，不能只因为 `category = starter` 或其它展示分类就进入新手路径
 
 ## 4. 进入场景前预热
 

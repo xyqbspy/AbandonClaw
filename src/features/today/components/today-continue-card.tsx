@@ -90,6 +90,11 @@ export function TodayContinueCard({
                   <p className="line-clamp-2 font-sans text-xs font-medium leading-5 text-slate-500">
                     {subtitle}
                   </p>
+                  {helperText ? (
+                    <p className="mt-2 line-clamp-2 font-sans text-[11px] font-bold leading-5 text-slate-400">
+                      {helperText}
+                    </p>
+                  ) : null}
                   {chips.length > 0 ? (
                     <div className="mt-3 flex flex-wrap gap-2">
                       {chips.map((item) => (

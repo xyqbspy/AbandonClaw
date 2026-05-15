@@ -141,6 +141,17 @@
 - `reviewTask` 只有在场景链路已推进后才可用
 - repeat continue 不得把场景任务直接标记为已完成
 
+#### Starter recommendation
+
+服务端 `starterRecommendation` 是 `/today` 新用户首要入口的稳定来源：
+
+- 已有 `continueLearning` 时，continue 永远优先。
+- starter path 只消费 `sourceType = builtin` 且 `isStarter = true` 的场景。
+- 排序优先 `starterOrder`，缺失时回退 `sortOrder`，再看 level、featured 和创建时间。
+- 如果某个 starter 已开始但 dashboard 暂时没有 `continueLearning`，优先接回这个未完成 starter。
+- starter 全完成后，才降级推荐 `daily_life`、`time_plan`、`social` 中的 builtin daily path。
+- 没有可用候选时返回 empty recommendation，页面只能展示安全空态，不得自行写死 slug。
+
 ### 4.3 页面展示块与字段来源
 
 #### 继续学习卡片

@@ -1,15 +1,27 @@
 import { AIExplanation, Lesson, SentenceChunkDetail } from "@/lib/types";
 import { normalizeLessonStructure } from "@/lib/shared/lesson-content";
 
+export type BuiltinSceneLevel = "L0" | "L1" | "L2";
+export type BuiltinSceneSourceType = "builtin";
+export type BuiltinSceneCategory =
+  | "starter"
+  | "daily_life"
+  | "time_plan"
+  | "social"
+  | "general";
+export type BuiltinSceneChunkType = "core_phrase";
+
 export interface BuiltinSceneSeedMeta {
   slug: string;
+  title: string;
   englishTitle: string;
   chineseTitle: string;
-  level: "L0" | "L1" | "L2";
-  category: "starter" | "daily_life" | "time_plan" | "social" | "general";
+  level: BuiltinSceneLevel;
+  category: BuiltinSceneCategory;
   subcategory?: string;
-  sourceType: "builtin";
+  sourceType: BuiltinSceneSourceType;
   isStarter: boolean;
+  starterOrder: number | null;
   isFeatured: boolean;
   sortOrder: number;
   estimatedMinutes: number;
@@ -25,6 +37,9 @@ export interface BuiltinSceneSeed {
 interface ChunkDefinition {
   text: string;
   translation: string;
+  order?: number;
+  chunkType?: BuiltinSceneChunkType;
+  type?: BuiltinSceneChunkType;
 }
 
 interface DialogueSentenceDefinition {
@@ -35,7 +50,7 @@ interface DialogueSentenceDefinition {
 }
 
 interface SceneDefinition {
-  meta: Omit<BuiltinSceneSeedMeta, "sourceType">;
+  meta: Omit<BuiltinSceneSeedMeta, "sourceType" | "title" | "starterOrder">;
   chunks: ChunkDefinition[];
   sentences: DialogueSentenceDefinition[];
 }
@@ -52,16 +67,19 @@ const findChunkRange = (sentenceText: string, chunkText: string) => {
 
 const buildChunkDetail = (
   sentenceText: string,
-  chunkText: string,
-  translation: string,
+  chunk: Required<ChunkDefinition>,
 ): SentenceChunkDetail => {
+  const chunkText = chunk.text;
   const range = findChunkRange(sentenceText, chunkText);
   return {
     id: chunkText,
     text: chunkText,
-    translation,
+    translation: chunk.translation,
+    order: chunk.order,
+    chunkType: chunk.chunkType,
+    type: chunk.type,
     grammarLabel: "Chunk",
-    meaningInSentence: `这句话里表示“${translation}”。`,
+    meaningInSentence: `这句话里表示“${chunk.translation}”。`,
     usageNote: "先记住这个短语怎么开口，再放回整句里跟读和复述。",
     examples: [
       {
@@ -80,29 +98,46 @@ const buildChunkDetail = (
 };
 
 const buildExplanations = (chunks: ChunkDefinition[]): AIExplanation[] =>
-  chunks.map((chunk) => ({
-    key: chunk.text,
-    text: chunk.text,
-    translation: chunk.translation,
-    explanation: "这是一个很常见的日常表达，可直接用于口语交流。",
-    examples: [
-      `I used "${chunk.text}" in a short dialogue.`,
-      `She tried "${chunk.text}" in a real conversation.`,
-    ],
-    exampleTranslations: [
-      `我在一段短对话里用了“${chunk.text}”。`,
-      `她在真实对话里试着用了“${chunk.text}”。`,
-    ],
-    breakdown: ["高频", "日常", "可迁移"],
-    pronunciation: "",
-    grammarLabel: "Chunk",
-  }));
+  chunks.map((chunk, index) => {
+    const order = chunk.order ?? index + 1;
+    const chunkType = chunk.chunkType ?? "core_phrase";
+    return {
+      key: chunk.text,
+      text: chunk.text,
+      translation: chunk.translation,
+      order,
+      chunkType,
+      type: chunk.type ?? chunkType,
+      explanation: "这是一个很常见的日常表达，可直接用于口语交流。",
+      examples: [
+        `I used "${chunk.text}" in a short dialogue.`,
+        `She tried "${chunk.text}" in a real conversation.`,
+      ],
+      exampleTranslations: [
+        `我在一段短对话里用了“${chunk.text}”。`,
+        `她在真实对话里试着用了“${chunk.text}”。`,
+      ],
+      breakdown: ["高频", "日常", "可迁移"],
+      pronunciation: "",
+      grammarLabel: "Chunk",
+    };
+  });
 
 const difficultyByLevel = (level: BuiltinSceneSeedMeta["level"]): Lesson["difficulty"] =>
   level === "L2" ? "Intermediate" : "Beginner";
 
 const buildLesson = (definition: SceneDefinition): Lesson => {
-  const chunkMap = new Map(definition.chunks.map((chunk) => [chunk.text, chunk.translation]));
+  const chunks = definition.chunks.map((chunk, index): Required<ChunkDefinition> => {
+    const order = chunk.order ?? index + 1;
+    const chunkType = chunk.chunkType ?? "core_phrase";
+    return {
+      ...chunk,
+      order,
+      chunkType,
+      type: chunk.type ?? chunkType,
+    };
+  });
+  const chunkMap = new Map(chunks.map((chunk) => [chunk.text, chunk]));
   return normalizeLessonStructure({
     id: definition.meta.slug,
     slug: definition.meta.slug,
@@ -137,8 +172,13 @@ const buildLesson = (definition: SceneDefinition): Lesson => {
               chunkDetails: (sentence.chunks ?? []).map((chunkText) =>
                 buildChunkDetail(
                   sentence.text,
-                  chunkText,
-                  chunkMap.get(chunkText) ?? "常用表达",
+                  chunkMap.get(chunkText) ?? {
+                    text: chunkText,
+                    translation: "常用表达",
+                    order: 0,
+                    chunkType: "core_phrase",
+                    type: "core_phrase",
+                  },
                 ),
               ),
             },
@@ -146,7 +186,7 @@ const buildLesson = (definition: SceneDefinition): Lesson => {
         })),
       },
     ],
-    explanations: buildExplanations(definition.chunks),
+    explanations: buildExplanations(chunks),
   });
 };
 
@@ -1001,6 +1041,8 @@ export const builtinSceneSeeds: BuiltinSceneSeed[] = sceneDefinitions.map((defin
   lesson: buildLesson(definition),
   meta: {
     ...definition.meta,
+    title: `${definition.meta.englishTitle}（${definition.meta.chineseTitle}）`,
     sourceType: "builtin",
+    starterOrder: definition.meta.isStarter ? definition.meta.sortOrder : null,
   },
 }));

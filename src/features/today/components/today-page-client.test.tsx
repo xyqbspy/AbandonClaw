@@ -3,6 +3,7 @@ import { createRequire } from "node:module";
 import test, { afterEach } from "node:test";
 import React from "react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import type { LearningDashboardResponse } from "@/lib/utils/learning-api";
 
 const localRequire = createRequire(import.meta.url);
 const nodeModule = localRequire("node:module") as typeof import("node:module");
@@ -45,7 +46,7 @@ const recentPhraseRows = [
   },
 ];
 
-const createDashboardResponse = () => ({
+const createDashboardResponse = (): LearningDashboardResponse => ({
   overview: {
     streakDays: 3,
     completedScenesCount: 2,
