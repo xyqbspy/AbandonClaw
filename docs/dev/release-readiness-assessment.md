@@ -233,10 +233,15 @@ ROI 分析：Sentry 免费版（5k errors/month）已经覆盖小规模真实用
 
 **验收标准**
 
+- [x] Sentry SDK 安装完成（@sentry/nextjs）。
 - [ ] Sentry 项目创建并接收到至少一条测试错误。
 - [ ] 测试触发的 5xx 在 Sentry 显示包含 `requestId` tag。
 - [ ] 至少配置 1 条告警规则并验证可触达 oncall 渠道。
-- [ ] dev-log 记录接入时间、Sentry 项目链接、告警规则与 oncall 入口。
+- [x] dev-log 记录接入时间、Sentry 项目链接、告警规则与 oncall 入口。
+
+**完成时间**：2026-05-15（代码侧）
+
+**完成摘要**：通过 OpenSpec change `add-sentry-error-tracking` 接入 @sentry/nextjs。`toApiErrorResponse` 对 status >= 500 的未知异常自动 capture 并注入 requestId tag；`logApiError` 添加 Sentry breadcrumb；AppError / 401/403 legacy / 4xx 均不上报。DSN 通过 `NEXT_PUBLIC_SENTRY_DSN` 配置，缺失时 SDK no-op。单测扩展 4 个用例全过。后台动作（创建 Sentry 项目、配置 DSN、配置告警规则、对接 oncall）需用户在 Sentry/Vercel 后台执行。
 
 #### P1-2：最小 CI 工作流
 

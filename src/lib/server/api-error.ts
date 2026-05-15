@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/nextjs";
 import { NextResponse } from "next/server";
 import { isAppError } from "@/lib/server/errors";
 import {
@@ -11,15 +12,27 @@ const mapLegacyMessageToStatus = (message: string) => {
   return 500;
 };
 
+type CaptureUnknownServerError = (error: unknown, requestId: string) => void;
+
+const defaultCaptureUnknownServerError: CaptureUnknownServerError = (error, requestId) => {
+  Sentry.withScope((scope) => {
+    scope.setTag("requestId", requestId);
+    Sentry.captureException(error);
+  });
+};
+
 export const toApiErrorResponse = (
   error: unknown,
   fallbackMessage: string,
   options?: {
     request?: Request | Headers | null;
     requestId?: string;
+    captureUnknownServerError?: CaptureUnknownServerError;
   },
 ) => {
   const requestId = options?.requestId ?? getOrCreateRequestId(options?.request);
+  const captureUnknownServerError =
+    options?.captureUnknownServerError ?? defaultCaptureUnknownServerError;
 
   if (isAppError(error)) {
     return attachRequestIdToResponse(
@@ -45,6 +58,8 @@ export const toApiErrorResponse = (
       );
     }
 
+    captureUnknownServerError(error, requestId);
+
     return attachRequestIdToResponse(
       NextResponse.json(
         {
@@ -58,6 +73,8 @@ export const toApiErrorResponse = (
       requestId,
     );
   }
+
+  captureUnknownServerError(error, requestId);
 
   return attachRequestIdToResponse(
     NextResponse.json(

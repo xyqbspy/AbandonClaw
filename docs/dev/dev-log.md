@@ -1,5 +1,51 @@
 # Dev Log
 
+### [2026-05-15] P1-1 完成：接入 Sentry 错误追踪
+- 类型：Spec-Driven / 可观测性收口
+- 状态：代码侧已完成，Sentry 后台与 Vercel env 待用户配置
+
+#### 背景
+按 `release-readiness-assessment.md` P1-1，服务端 5xx 错误此前只走 console，缺事故告警与聚合。requestId 链路本周已完整收口，是接入 Sentry 的最佳时机。
+
+#### OpenSpec change
+- `openspec/changes/add-sentry-error-tracking/` 包含 proposal / design / tasks / spec delta。
+- 已修改 capability：`api-operational-guardrails` 增加 3 个 scenario：未知异常必须上报、AppError 不上报、DSN 缺失 no-op。
+
+#### 本次落地
+- 安装 `@sentry/nextjs@10.53.1`。
+- 新增 `sentry.client.config.ts` / `sentry.server.config.ts` / `sentry.edge.config.ts` / `instrumentation.ts`。
+- `src/lib/server/api-error.ts`：对 status >= 500 的未知异常调用 `Sentry.captureException` 并注入 `requestId` tag；用 dependency injection 让单测可隔离。
+- `src/lib/server/logger.ts`：`logApiError` 增加 Sentry breadcrumb，保留原 console 输出。
+- `beforeSend` hook 过滤 cookie / authorization / *token* 字段，避免 PII 上报。
+- `.env.example` 增加 `NEXT_PUBLIC_SENTRY_DSN` 占位与说明。
+- 扩展 `api-error.test.ts` 4 个 case：5xx 未知异常上报、AppError 不上报、legacy Unauthorized/Forbidden 不上报、非 Error 类型上报。
+
+#### 不上报的错误
+- AppError 子类（ValidationError / AuthError / ForbiddenError / NotFoundError / RateLimitError / DailyQuotaExceededError / SceneParseError / TtsGenerationError）。
+- 通过 `mapLegacyMessageToStatus` 识别为 401/403 的 legacy `new Error("Unauthorized" | "Forbidden")`。
+- 4xx 业务错误。
+
+#### 必须由用户在外部系统执行的后续动作
+1. Sentry.io 注册账号或登录现有 organization。
+2. 创建项目（platform 选 Next.js）。
+3. 复制 DSN（Settings → Projects → Client Keys）。
+4. Vercel project env 配置 `NEXT_PUBLIC_SENTRY_DSN`。
+5. 在 Sentry Alerts 配置至少 1 条告警规则：
+   - 单一错误 5 分钟出现 > 10 次 → 告警
+   - 错误率 > 1% 持续 5 分钟 → 告警
+6. 把告警渠道接到 oncall 入口（Slack / 邮件 / 微信机器人）。
+7. 触发一次 5xx（任何 unauthenticated 路由打异常 body 即可）确认 Sentry 收到事件且 tag 包含 requestId。
+
+#### 验证
+- `node --import tsx --test src/lib/server/api-error.test.ts`：4/4 通过。
+- 全量 70 个相关测试无 regression。
+- `pnpm run build`：通过，Sentry SDK 集成无影响。
+
+#### 剩余风险
+- DSN 未配置前 Sentry 是 no-op，生产事故仍只能看 Vercel logs；用户必须先完成上述后台动作。
+- 未启用 Sentry Performance / Tracing：等真有 p95 监控需求再开，避免免费额度被消耗。
+- 告警规则与 oncall 渠道在 Sentry 后台手工配置，不在代码内固化，避免与运维耦合。
+
 ### [2026-05-15] P0-2 / P0-3 状态：工具就绪，待外部执行
 - 类型：Cleanup / 验证收口
 - 状态：代码侧无改动，工具链已确认可执行

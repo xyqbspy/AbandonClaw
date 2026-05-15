@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/nextjs";
 import { getOrCreateRequestId } from "@/lib/server/request-context";
 
 type LogLevel = "info" | "warn" | "error";
@@ -41,8 +42,25 @@ export const logApiError = (
   error: unknown,
   context: Omit<LogContext, "module" | "error"> = {},
 ) => {
+  const requestId = context.requestId ?? getOrCreateRequestId(context.request);
+
+  Sentry.addBreadcrumb({
+    category: "api",
+    message: `${module} failed`,
+    level: "error",
+    data: {
+      requestId,
+      path: context.path ?? context.request?.url,
+      method: context.method ?? context.request?.method,
+      userId: context.userId ?? null,
+      errorCode: context.errorCode,
+      errorMessage: toErrorMessage(error),
+    },
+  });
+
   logServerEvent("error", `${module} failed`, {
     ...context,
+    requestId,
     module,
     error,
   });
