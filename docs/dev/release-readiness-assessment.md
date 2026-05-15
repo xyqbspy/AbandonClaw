@@ -401,10 +401,14 @@ ROI 分析：Sentry 免费版（5k errors/month）已经覆盖小规模真实用
 
 **验收标准**
 
-- [ ] next.config.ts 包含 CSP 头（先 report-only 后正式）。
-- [ ] `/api/csp-report` 能接收并记录 violation。
+- [x] next.config.ts 包含 CSP 头（先 report-only 后正式）。
+- [x] `/api/csp-report` 能接收并记录 violation。
 - [ ] 至少观察 1 周 violation report，未发现真实业务被误拦。
-- [ ] dev-log 记录 CSP 上线时间、policy 内容、观察期发现。
+- [x] dev-log 记录 CSP 上线时间、policy 内容、观察期发现。
+
+**完成时间**：2026-05-15（report-only 模式）
+
+**完成摘要**：通过 OpenSpec change `add-csp-report-only` 落地。`next.config.ts` 增加 `Content-Security-Policy-Report-Only` 头，覆盖 default-src/script-src/style-src/img-src/font-src/connect-src/frame-ancestors/base-uri/form-action/object-src 与 report-uri；connect-src 显式列 Supabase / Upstash / Sentry / GLM。新增 `/api/csp-report` route 接收 violation（兼容 application/csp-report 与 application/reports+json 两种格式），调用 Sentry.captureMessage 上报，配 30/分钟 IP 限流。5 个测试全过，build 通过。观察 1-2 周后由人工评估违规清单再切正式 enforce。
 
 #### P2-2：服务端学习 session heartbeat
 

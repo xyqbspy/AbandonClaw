@@ -1,5 +1,34 @@
 # Dev Log
 
+### [2026-05-15] P2-1 完成：接入 CSP report-only 与 violation 收集
+- 类型：Spec-Driven / 安全策略
+- 状态：代码侧已完成，观察期与切正式 enforce 待外部执行
+
+#### 背景
+按 `release-readiness-assessment.md` P2-1，next.config.ts 安全头此前没有 CSP，浏览器层 XSS 防御缺失。直接上线严格 policy 风险高，OWASP 推荐 report-only 收集真实违规后再切正式。
+
+#### OpenSpec change
+- `openspec/changes/archive/2026-05-15-add-csp-report-only/`（已归档）。
+- 修改 capability：`api-operational-guardrails` 增加「浏览器层 XSS 防御必须由 CSP 提供」requirement + 2 scenario。
+
+#### 本次落地
+- `next.config.ts` 增加 `Content-Security-Policy-Report-Only` 头，覆盖 default-src/script-src/style-src/img-src/font-src/connect-src/media-src/frame-ancestors/base-uri/form-action/object-src 与 report-uri；connect-src 显式列 Supabase / Upstash / Sentry / GLM / OpenAI / 自定义 GLM provider。
+- 新增 `src/app/api/csp-report/route.ts`：兼容 application/csp-report（旧标准）与 application/reports+json（新 Reporting API）；解析 violation → Sentry.captureMessage("CSP violation") + console.warn；IP 维度 30/分钟 限流，防垃圾上报刷爆 Sentry quota；返回 204 / 400 / 429 受控状态码。
+
+#### 测试
+- 新增 `src/app/api/csp-report/route.test.ts` 5 个用例：两种 payload 格式 + 非法 JSON + 非法字段 + 限流命中。5/5 通过。
+- `pnpm run build`：通过，新路由注册成功。
+
+#### 必须由用户在外部系统执行的后续动作
+1. 上线后 1-2 周观察 Sentry 中 CSP violation 数量与分布。
+2. 真实业务无误拦后，把 next.config.ts 的 `Content-Security-Policy-Report-Only` 切为 `Content-Security-Policy`。
+3. 评估去掉 'unsafe-inline' / 'unsafe-eval'（需要 Next.js script tag 重构 + nonce 支持，工作量较大）。
+4. 在 Mozilla Observatory 检查安全评分变化。
+
+#### 剩余风险
+- report-only 模式不阻塞资源，但仍可能触发用户浏览器 console 警告；普通用户察觉不到。
+- 当前 connect-src 列表是基于已知上游域名；若未来引入新上游，需要更新 policy。
+
 ### [2026-05-15] P1-2 完成：最小 CI 工作流
 - 类型：Cleanup / 工程基础设施
 - 状态：代码侧已完成，GitHub branch protection 与首次 CI run 待用户配置
