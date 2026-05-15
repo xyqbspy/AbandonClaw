@@ -1,7 +1,10 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { getSupabaseAnonKey, getSupabaseUrl } from "@/lib/supabase/env";
-import { resolveSafeRedirectTarget } from "@/lib/shared/auth-redirect";
+import {
+  getAuthRedirectTargetFromSearchParams,
+  resolveSafeRedirectTarget,
+} from "@/lib/shared/auth-redirect";
 import { isAdminEmail } from "@/lib/shared/admin";
 import {
   attachRequestIdToResponse,
@@ -133,7 +136,7 @@ export async function handleMiddleware(
   }
 
   if (user && AUTH_PAGE_PATHS.has(pathname)) {
-    const redirectTarget = request.nextUrl.searchParams.get("redirect");
+    const redirectTarget = getAuthRedirectTargetFromSearchParams(request.nextUrl.searchParams);
     const safeTarget = resolveSafeRedirectTarget(redirectTarget);
     return attachRequestIdToResponse(
       dependencies.redirect(new URL(safeTarget, request.url)),
@@ -142,7 +145,7 @@ export async function handleMiddleware(
   }
 
   if (user && pathname === VERIFY_EMAIL_PATH && isEmailVerifiedUser(user)) {
-    const redirectTarget = request.nextUrl.searchParams.get("redirect");
+    const redirectTarget = getAuthRedirectTargetFromSearchParams(request.nextUrl.searchParams);
     const safeTarget = resolveSafeRedirectTarget(redirectTarget);
     return attachRequestIdToResponse(
       dependencies.redirect(new URL(safeTarget, request.url)),

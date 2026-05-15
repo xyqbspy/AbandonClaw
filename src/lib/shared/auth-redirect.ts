@@ -1,4 +1,11 @@
-const DEFAULT_REDIRECT_TARGET = "/scenes";
+const DEFAULT_REDIRECT_TARGET = "/today";
+
+export const getAuthRedirectTargetFromSearchParams = (
+  searchParams: Pick<URLSearchParams, "get">,
+) =>
+  searchParams.get("redirectTo") ??
+  searchParams.get("redirect") ??
+  searchParams.get("next");
 
 export const isSafeRedirectTarget = (
   redirectTarget: string | null | undefined,

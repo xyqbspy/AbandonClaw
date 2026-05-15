@@ -1,21 +1,18 @@
+import { createClientApiError, normalizeClientError } from "@/lib/client/api-error";
 import { normalizePhraseText } from "@/lib/shared/phrases";
 import { invalidateAfterPhraseMutation } from "@/lib/utils/cache-actions";
 
-interface ApiErrorBody {
-  error?: string;
-}
+const toPhraseError = (error: unknown, fallbackMessage: string) =>
+  normalizeClientError(error, {
+    context: "phrases",
+    fallbackMessage,
+  });
 
-const toApiError = async (response: Response, fallback: string) => {
-  try {
-    const body = (await response.json()) as ApiErrorBody;
-    if (typeof body.error === "string" && body.error.trim()) {
-      return new Error(body.error);
-    }
-  } catch {
-    // Ignore parse error.
-  }
-  return new Error(fallback);
-};
+const toApiError = async (response: Response, fallbackMessage: string) =>
+  createClientApiError(response, {
+    context: "phrases",
+    fallbackMessage,
+  });
 
 export interface PhraseSummaryResponse {
   totalSavedPhrases: number;
@@ -115,22 +112,26 @@ export async function savePhraseFromApi(payload: {
   relationSourceUserPhraseId?: string;
   relationType?: UserPhraseRelationType;
 }) {
-  const response = await fetch("/api/phrases/save", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  if (!response.ok) {
-    throw await toApiError(response, "\u6536\u85cf\u77ed\u8bed\u5931\u8d25\u3002");
+  try {
+    const response = await fetch("/api/phrases/save", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      throw await toApiError(response, "保存表达失败，请稍后再试");
+    }
+    const data = (await response.json()) as {
+      created: boolean;
+      phrase: { id: string; normalized_text: string; display_text: string };
+      userPhrase: { id: string };
+      expressionClusterId: string | null;
+    };
+    invalidateAfterPhraseMutation();
+    return data;
+  } catch (error) {
+    throw toPhraseError(error, "保存表达失败，请稍后再试");
   }
-  const data = (await response.json()) as {
-    created: boolean;
-    phrase: { id: string; normalized_text: string; display_text: string };
-    userPhrase: { id: string };
-    expressionClusterId: string | null;
-  };
-  invalidateAfterPhraseMutation();
-  return data;
 }
 
 export async function savePhrasesBatchFromApi(payload: {
@@ -212,28 +213,32 @@ export async function getMyPhrasesFromApi(params?: {
   learningItemType?: "expression" | "sentence" | "all";
   expressionClusterId?: string;
 }) {
-  const search = new URLSearchParams();
-  if (params?.query) search.set("query", params.query);
-  if (params?.page) search.set("page", String(params.page));
-  if (params?.limit) search.set("limit", String(params.limit));
-  if (params?.status) search.set("status", params.status);
-  if (params?.reviewStatus) search.set("reviewStatus", params.reviewStatus);
-  if (params?.learningItemType) search.set("learningItemType", params.learningItemType);
-  if (params?.expressionClusterId) search.set("expressionClusterId", params.expressionClusterId);
-  const suffix = search.toString();
-  const response = await fetch(`/api/phrases/mine${suffix ? `?${suffix}` : ""}`, {
-    method: "GET",
-    cache: "no-store",
-  });
-  if (!response.ok) {
-    throw await toApiError(response, "\u52a0\u8f7d\u6536\u85cf\u77ed\u8bed\u5931\u8d25\u3002");
+  try {
+    const search = new URLSearchParams();
+    if (params?.query) search.set("query", params.query);
+    if (params?.page) search.set("page", String(params.page));
+    if (params?.limit) search.set("limit", String(params.limit));
+    if (params?.status) search.set("status", params.status);
+    if (params?.reviewStatus) search.set("reviewStatus", params.reviewStatus);
+    if (params?.learningItemType) search.set("learningItemType", params.learningItemType);
+    if (params?.expressionClusterId) search.set("expressionClusterId", params.expressionClusterId);
+    const suffix = search.toString();
+    const response = await fetch(`/api/phrases/mine${suffix ? `?${suffix}` : ""}`, {
+      method: "GET",
+      cache: "no-store",
+    });
+    if (!response.ok) {
+      throw await toApiError(response, "加载收藏表达失败，请稍后再试");
+    }
+    return (await response.json()) as {
+      rows: UserPhraseItemResponse[];
+      total: number;
+      page: number;
+      limit: number;
+    };
+  } catch (error) {
+    throw toPhraseError(error, "加载收藏表达失败，请稍后再试");
   }
-  return (await response.json()) as {
-    rows: UserPhraseItemResponse[];
-    total: number;
-    page: number;
-    limit: number;
-  };
 }
 
 export async function getBuiltinPhrasesFromApi(params?: {

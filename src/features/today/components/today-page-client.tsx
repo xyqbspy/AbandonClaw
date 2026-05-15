@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { normalizeClientError } from "@/lib/client/api-error";
 import { TodayContinueCard } from "@/features/today/components/today-continue-card";
 import { TodayLearningPathSection } from "@/features/today/components/today-learning-path-section";
 import { todayPageLabels as zh } from "@/features/today/components/today-page-labels";
@@ -210,7 +211,12 @@ export function TodayPageClient({ displayName }: { displayName: string }) {
             : scenesResult.status === "rejected"
               ? scenesResult.reason
               : new Error("unknown");
-      toast.error(reason instanceof Error ? reason.message : zh.loadFail);
+      toast.error(
+        normalizeClientError(reason, {
+          context: "generic",
+          fallbackMessage: zh.loadFail,
+        }).message,
+      );
     }
 
     setLoading(false);

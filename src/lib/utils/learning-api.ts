@@ -2,23 +2,20 @@ import {
   invalidateAfterSceneLearningMutation,
   invalidateAfterScenePracticeMutation,
 } from "@/lib/utils/cache-actions";
+import { createClientApiError, normalizeClientError } from "@/lib/client/api-error";
 import { PracticeSet } from "@/lib/types/learning-flow";
 
-interface ApiErrorBody {
-  error?: string;
-}
+const toApiError = async (response: Response, fallback: string) =>
+  createClientApiError(response, {
+    context: "learning",
+    fallbackMessage: fallback,
+  });
 
-const toApiError = async (response: Response, fallback: string) => {
-  try {
-    const body = (await response.json()) as ApiErrorBody;
-    if (typeof body.error === "string" && body.error.trim()) {
-      return new Error(body.error);
-    }
-  } catch {
-    // Ignore parse error.
-  }
-  return new Error(fallback);
-};
+const toLearningError = (error: unknown, fallbackMessage: string) =>
+  normalizeClientError(error, {
+    context: "learning",
+    fallbackMessage,
+  });
 
 export interface SceneLearningProgressResponse {
   progress: {
@@ -611,9 +608,13 @@ export interface LearningDashboardStarterRecommendationResponse {
 }
 
 export async function getLearningDashboardFromApi() {
-  const response = await fetch("/api/learning/dashboard", { method: "GET" });
-  if (!response.ok) {
-    throw await toApiError(response, "\u52a0\u8f7d\u4eca\u65e5\u5b66\u4e60\u6570\u636e\u5931\u8d25\u3002");
+  try {
+    const response = await fetch("/api/learning/dashboard", { method: "GET" });
+    if (!response.ok) {
+      throw await toApiError(response, "加载今日学习数据失败，请稍后再试");
+    }
+    return (await response.json()) as LearningDashboardResponse;
+  } catch (error) {
+    throw toLearningError(error, "加载今日学习数据失败，请稍后再试");
   }
-  return (await response.json()) as LearningDashboardResponse;
 }

@@ -12,9 +12,9 @@ test("auth redirect helper 会保留合法站内路径", () => {
   assert.equal(buildAuthRedirectHref("/login", "/review"), "/login?redirect=%2Freview");
 });
 
-test("auth redirect helper 会拒绝协议相对与外部路径", () => {
+test("auth redirect helper 会拒绝协议相对与外部路径，并默认回退 /today", () => {
   assert.equal(isSafeRedirectTarget("//evil.example"), false);
   assert.equal(isSafeRedirectTarget("https://evil.example"), false);
-  assert.equal(resolveSafeRedirectTarget("//evil.example"), "/scenes");
+  assert.equal(resolveSafeRedirectTarget("//evil.example"), "/today");
   assert.equal(buildAuthRedirectHref("/signup", "//evil.example"), "/signup");
 });

@@ -2,12 +2,17 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
 import { Mail, ShieldCheck } from "lucide-react";
+import { useState } from "react";
 import { toast } from "sonner";
 import { AuthCard, AuthField } from "@/app/(auth)/auth-card";
 import {
+  clientErrorMessages,
+  normalizeClientError,
+} from "@/lib/client/api-error";
+import {
   buildAuthRedirectHref,
+  getAuthRedirectTargetFromSearchParams,
   resolveSafeRedirectTarget,
 } from "@/lib/shared/auth-redirect";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
@@ -16,29 +21,32 @@ const resolveLoginErrorMessage = (error: unknown) => {
   if (error && typeof error === "object" && "code" in error) {
     const code = String((error as { code?: unknown }).code ?? "");
     if (code === "invalid_credentials") {
-      return "邮箱或密码不正确；如果刚注册，请确认账号已创建并完成邮箱验证。";
+      return clientErrorMessages.invalidCredentials;
     }
     if (code === "email_not_confirmed") {
-      return "邮箱尚未验证，请先完成邮箱验证后再登录。";
+      return "邮箱尚未验证，请先完成邮箱验证后再登录";
     }
   }
 
   const message = error instanceof Error ? error.message : "";
   if (message === "Invalid login credentials") {
-    return "邮箱或密码不正确；如果刚注册，请确认账号已创建并完成邮箱验证。";
+    return clientErrorMessages.invalidCredentials;
   }
   if (message.toLowerCase().includes("email not confirmed")) {
-    return "邮箱尚未验证，请先完成邮箱验证后再登录。";
+    return "邮箱尚未验证，请先完成邮箱验证后再登录";
   }
 
-  return message || "登录失败。";
+  return normalizeClientError(error, {
+    context: "login",
+    fallbackMessage: "登录失败，请稍后再试",
+  }).message;
 };
 
 export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [submitting, setSubmitting] = useState(false);
-  const redirectTo = searchParams.get("redirect");
+  const redirectTo = getAuthRedirectTargetFromSearchParams(searchParams);
   const loginTarget = resolveSafeRedirectTarget(redirectTo);
 
   const onSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -49,7 +57,7 @@ export default function LoginPage() {
     const email = String(formData.get("email") ?? "").trim();
     const password = String(formData.get("password") ?? "");
     if (!email || !password) {
-      toast.error("邮箱和密码不能为空。");
+      toast.error("邮箱和密码不能为空");
       return;
     }
 
@@ -61,9 +69,7 @@ export default function LoginPage() {
         throw error;
       }
 
-      await fetch("/api/me", { method: "GET" });
-      toast.success("登录成功。");
-      router.push(loginTarget);
+      router.replace(loginTarget);
       router.refresh();
     } catch (error) {
       toast.error(resolveLoginErrorMessage(error));
@@ -126,7 +132,7 @@ export default function LoginPage() {
           type="submit"
           disabled={submitting}
         >
-          {submitting ? "登录中..." : "登 录"}
+          {submitting ? "登录中..." : "登录"}
         </button>
       </form>
     </AuthCard>

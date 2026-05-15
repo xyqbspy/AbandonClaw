@@ -2,12 +2,17 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
 import { KeyRound, Mail, ShieldCheck, Ticket, User } from "lucide-react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { AuthCard, AuthField } from "@/app/(auth)/auth-card";
 import {
+  createClientApiError,
+  normalizeClientError,
+} from "@/lib/client/api-error";
+import {
   buildAuthRedirectHref,
+  getAuthRedirectTargetFromSearchParams,
   isSafeRedirectTarget,
 } from "@/lib/shared/auth-redirect";
 
@@ -22,7 +27,7 @@ export default function SignupPage() {
   const [sendingCode, setSendingCode] = useState(false);
   const [cooldown, setCooldown] = useState(0);
   const [registrationMode, setRegistrationMode] = useState<RegistrationMode>("closed");
-  const redirectTo = searchParams.get("redirect");
+  const redirectTo = getAuthRedirectTargetFromSearchParams(searchParams);
 
   useEffect(() => {
     let cancelled = false;
@@ -59,7 +64,7 @@ export default function SignupPage() {
     const emailInput = document.getElementById("email") as HTMLInputElement | null;
     const email = emailInput?.value.trim() ?? "";
     if (!email) {
-      toast.error("请先填写邮箱地址。");
+      toast.error("请先填写邮箱地址");
       emailInput?.focus();
       return;
     }
@@ -75,14 +80,21 @@ export default function SignupPage() {
       });
 
       if (!response.ok) {
-        const body = (await response.json().catch(() => null)) as { error?: string } | null;
-        throw new Error(body?.error ?? "验证码发送失败。");
+        throw await createClientApiError(response, {
+          context: "send-email-code",
+          fallbackMessage: "验证码发送失败，请稍后再试",
+        });
       }
 
       setCooldown(CODE_COOLDOWN_SECONDS);
-      toast.success("验证码已发送，请查看邮箱。");
+      toast.success("验证码已发送，请查收邮箱");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "验证码发送失败。");
+      toast.error(
+        normalizeClientError(error, {
+          context: "send-email-code",
+          fallbackMessage: "验证码发送失败，请稍后再试",
+        }).message,
+      );
     } finally {
       setSendingCode(false);
     }
@@ -100,15 +112,15 @@ export default function SignupPage() {
     const inviteCode = String(formData.get("inviteCode") ?? "").trim();
 
     if (!email || !password) {
-      toast.error("邮箱和密码不能为空。");
+      toast.error("邮箱和密码不能为空");
       return;
     }
     if (!emailCode) {
-      toast.error("请填写邮箱验证码。");
+      toast.error("请填写邮箱验证码");
       return;
     }
     if (registrationMode === "invite_only" && !inviteCode) {
-      toast.error("当前为邀请注册，请填写邀请码。");
+      toast.error("当前为邀请码注册，请填写邀请码");
       return;
     }
 
@@ -129,18 +141,25 @@ export default function SignupPage() {
       });
 
       if (!response.ok) {
-        const body = (await response.json().catch(() => null)) as { error?: string } | null;
-        throw new Error(body?.error ?? "注册失败。");
+        throw await createClientApiError(response, {
+          context: "signup",
+          fallbackMessage: "注册失败，请稍后再试",
+        });
       }
 
-      toast.success("账号已创建，请登录继续。");
-      router.push(
+      toast.success("账号已创建，请登录继续");
+      router.replace(
         isSafeRedirectTarget(redirectTo)
           ? `/login?redirect=${encodeURIComponent(redirectTo)}`
           : "/login",
       );
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "注册失败。");
+      toast.error(
+        normalizeClientError(error, {
+          context: "signup",
+          fallbackMessage: "注册失败，请稍后再试",
+        }).message,
+      );
     } finally {
       setSubmitting(false);
     }
@@ -153,7 +172,7 @@ export default function SignupPage() {
         registrationMode === "closed"
           ? "当前暂未开放注册。"
           : registrationMode === "invite_only"
-            ? "当前为邀请注册，请使用邮箱验证码和有效邀请码创建账号。"
+            ? "当前为邀请码注册，请使用邮箱验证码和有效邀请码创建账号。"
             : "使用邮箱验证码创建账号并开始场景化学习。"
       }
       footer={

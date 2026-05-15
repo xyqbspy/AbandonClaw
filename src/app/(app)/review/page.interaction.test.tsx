@@ -11,6 +11,7 @@ let dueRequestCount = 0;
 let summaryRequestCount = 0;
 let clearReviewPageCacheCalls = 0;
 const toastSuccessCalls: Array<{ message?: string; description?: string }> = [];
+const toastErrorCalls: string[] = [];
 const clientEventCalls: Array<{ name: string; payload: Record<string, unknown> }> = [];
 const setReviewPageCacheCalls: Array<{
   payload: {
@@ -40,6 +41,7 @@ const recordScenePracticeAttemptPayloads: Array<Record<string, unknown>> = [];
 const markScenePracticeModeCompletePayloads: Array<Record<string, unknown>> = [];
 const completeScenePracticeRunPayloads: Array<Record<string, unknown>> = [];
 let startScenePracticeRunError: Error | null = null;
+let submitPhraseReviewError: Error | null = null;
 let currentDueRows: Array<{
   userPhraseId: string;
   phraseId: string;
@@ -124,7 +126,11 @@ let currentSummary = {
 const mockedModules = {
   sonner: {
     toast: {
-      error: () => undefined,
+      error: (message?: string) => {
+        if (message) {
+          toastErrorCalls.push(message);
+        }
+      },
       success: (message?: string, options?: { description?: string }) => {
         toastSuccessCalls.push({ message, description: options?.description });
       },
@@ -176,6 +182,9 @@ const mockedModules = {
     },
     submitPhraseReviewFromApi: async (payload: Record<string, unknown>) => {
       submitPhraseReviewPayloads.push(payload);
+      if (submitPhraseReviewError) {
+        throw submitPhraseReviewError;
+      }
       return {
       item: null,
       summary: {
@@ -251,6 +260,7 @@ afterEach(() => {
   summaryRequestCount = 0;
   clearReviewPageCacheCalls = 0;
   toastSuccessCalls.length = 0;
+  toastErrorCalls.length = 0;
   clientEventCalls.length = 0;
   setReviewPageCacheCalls.length = 0;
   submitPhraseReviewPayloads.length = 0;
@@ -263,6 +273,7 @@ afterEach(() => {
   markScenePracticeModeCompletePayloads.length = 0;
   completeScenePracticeRunPayloads.length = 0;
   startScenePracticeRunError = null;
+  submitPhraseReviewError = null;
   currentDueRows = [
     {
       userPhraseId: "p1",
@@ -587,6 +598,43 @@ test("ReviewPage 场景回补提交失败时不会误刷新列表", async () => 
     assert.equal(clearReviewPageCacheCalls, 0);
     assert.equal(dueRequestCount, 1);
     assert.equal(summaryRequestCount, 1);
+  });
+});
+
+test("ReviewPage submit 失败时展示可读错误并保留当前题目", async () => {
+  submitPhraseReviewError = new Error("网络请求失败，请刷新后重试");
+
+  const ReviewPage = getReviewPage();
+  render(<ReviewPage />);
+
+  await screen.findByRole("button", { name: "进入熟悉度判断" });
+  fireEvent.click(screen.getByRole("button", { name: "进入熟悉度判断" }));
+  await screen.findByRole("button", { name: "眼熟，能认出来" });
+  fireEvent.click(screen.getByRole("button", { name: "眼熟，能认出来" }));
+  fireEvent.click(screen.getByRole("button", { name: "能主动说出来" }));
+  fireEvent.click(screen.getByRole("button", { name: "继续做变体改写" }));
+  fireEvent.change(
+    await screen.findByPlaceholderText("根据改写提示，先写一个局部变体。先把自己的版本写下来，再对照语境判断是否自然。"),
+    {
+      target: { value: "Don't push yourself too hard today." },
+    },
+  );
+  fireEvent.click(screen.getByRole("button", { name: "继续进入完整输出" }));
+  fireEvent.change(
+    await screen.findByPlaceholderText("不用填空，直接写出一整句或两整句。先把完整输出写下来，再对照参考句检查表达是否到位。"),
+    {
+      target: { value: "We should call it a day now." },
+    },
+  );
+  fireEvent.click(screen.getByRole("button", { name: "进入复习判断" }));
+  await screen.findByRole("button", { name: "能用出来" });
+  fireEvent.click(screen.getByRole("button", { name: "能用出来" }));
+
+  await waitFor(() => {
+    assert.ok(toastErrorCalls.includes("网络请求失败，请刷新后重试"));
+    assert.equal(submitPhraseReviewPayloads.length, 1);
+    assert.equal(screen.getByText("call it a day") !== null, true);
+    assert.equal(setReviewPageCacheCalls.length, 1);
   });
 });
 

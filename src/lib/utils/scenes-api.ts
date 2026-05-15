@@ -1,5 +1,9 @@
-import { Lesson } from "@/lib/types";
 import { mapParsedSceneToLesson } from "@/lib/adapters/scene-parser-adapter";
+import {
+  createClientApiError,
+  normalizeClientError,
+} from "@/lib/client/api-error";
+import { Lesson } from "@/lib/types";
 import { ParsedScene } from "@/lib/types/scene-parser";
 
 export interface SceneListItemResponse {
@@ -31,18 +35,11 @@ export interface SceneListItemResponse {
 let scenesListInFlightPromise: Promise<SceneListItemResponse[]> | null = null;
 const sceneDetailInFlightPromiseMap = new Map<string, Promise<Lesson>>();
 
-const extractError = async (response: Response, fallback: string) => {
-  let message = fallback;
-  try {
-    const body = (await response.json()) as { error?: string };
-    if (typeof body.error === "string" && body.error.trim()) {
-      message = body.error;
-    }
-  } catch {
-    // Ignore JSON parsing failure.
-  }
-  return message;
-};
+const toSceneError = (error: unknown, fallbackMessage: string) =>
+  normalizeClientError(error, {
+    context: "scenes-load",
+    fallbackMessage,
+  });
 
 export async function getScenesFromApi(options?: { noStore?: boolean }) {
   const noStore = options?.noStore === true;
@@ -52,15 +49,22 @@ export async function getScenesFromApi(options?: { noStore?: boolean }) {
 
   const url = noStore ? `/api/scenes?_t=${Date.now()}` : "/api/scenes";
   const task = (async () => {
-    const response = await fetch(url, {
-      method: "GET",
-      cache: "no-store",
-    });
-    if (!response.ok) {
-      throw new Error(await extractError(response, "Failed to load scenes."));
+    try {
+      const response = await fetch(url, {
+        method: "GET",
+        cache: "no-store",
+      });
+      if (!response.ok) {
+        throw await createClientApiError(response, {
+          context: "scenes-load",
+          fallbackMessage: "加载场景列表失败，请稍后再试",
+        });
+      }
+      const data = (await response.json()) as { scenes?: SceneListItemResponse[] };
+      return data.scenes ?? [];
+    } catch (error) {
+      throw toSceneError(error, "加载场景列表失败，请稍后再试");
     }
-    const data = (await response.json()) as { scenes?: SceneListItemResponse[] };
-    return data.scenes ?? [];
   })();
 
   if (noStore) {
@@ -81,16 +85,25 @@ export async function getSceneDetailBySlugFromApi(slug: string): Promise<Lesson>
   }
 
   const task = (async () => {
-    const response = await fetch(`/api/scenes/${encodeURIComponent(normalizedSlug)}`, {
-      method: "GET",
-      cache: "no-store",
-    });
-    if (!response.ok) {
-      throw new Error(await extractError(response, "Failed to load scene detail."));
+    try {
+      const response = await fetch(`/api/scenes/${encodeURIComponent(normalizedSlug)}`, {
+        method: "GET",
+        cache: "no-store",
+      });
+      if (!response.ok) {
+        throw await createClientApiError(response, {
+          context: "scenes-load",
+          fallbackMessage: "加载场景详情失败，请稍后再试",
+        });
+      }
+      const data = (await response.json()) as { scene?: Lesson };
+      if (!data.scene) {
+        throw new Error("Invalid scene detail response.");
+      }
+      return data.scene;
+    } catch (error) {
+      throw toSceneError(error, "加载场景详情失败，请稍后再试");
     }
-    const data = (await response.json()) as { scene?: Lesson };
-    if (!data.scene) throw new Error("Invalid scene detail response.");
-    return data.scene;
   })().finally(() => {
     sceneDetailInFlightPromiseMap.delete(normalizedSlug);
   });
@@ -104,27 +117,43 @@ export async function importSceneFromApi(payload: {
   title?: string;
   theme?: string;
 }) {
-  const response = await fetch("/api/scenes/import", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload),
-  });
-  if (!response.ok) {
-    throw new Error(await extractError(response, "Failed to import scene."));
+  try {
+    const response = await fetch("/api/scenes/import", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      throw await createClientApiError(response, {
+        context: "scenes-load",
+        fallbackMessage: "导入场景失败，请稍后再试",
+      });
+    }
+    const data = (await response.json()) as { scene?: Lesson };
+    if (!data.scene) {
+      throw new Error("Invalid import response.");
+    }
+    return data.scene;
+  } catch (error) {
+    throw toSceneError(error, "导入场景失败，请稍后再试");
   }
-  const data = (await response.json()) as { scene?: Lesson };
-  if (!data.scene) throw new Error("Invalid import response.");
-  return data.scene;
 }
 
 export async function deleteSceneBySlugFromApi(slug: string) {
-  const response = await fetch(`/api/scenes/${encodeURIComponent(slug)}`, {
-    method: "DELETE",
-  });
-  if (!response.ok) {
-    throw new Error(await extractError(response, "Failed to delete scene."));
+  try {
+    const response = await fetch(`/api/scenes/${encodeURIComponent(slug)}`, {
+      method: "DELETE",
+    });
+    if (!response.ok) {
+      throw await createClientApiError(response, {
+        context: "scenes-load",
+        fallbackMessage: "删除场景失败，请稍后再试",
+      });
+    }
+  } catch (error) {
+    throw toSceneError(error, "删除场景失败，请稍后再试");
   }
 }
 
@@ -144,17 +173,24 @@ const toVariantLesson = (variant: ParsedScene, index: number): Lesson => {
 };
 
 export async function getSceneVariantsFromApi(sceneSlug: string) {
-  const response = await fetch(`/api/scenes/${encodeURIComponent(sceneSlug)}/variants`, {
-    method: "GET",
-  });
-  if (!response.ok) {
-    throw new Error(await extractError(response, "Failed to load variants."));
+  try {
+    const response = await fetch(`/api/scenes/${encodeURIComponent(sceneSlug)}/variants`, {
+      method: "GET",
+    });
+    if (!response.ok) {
+      throw await createClientApiError(response, {
+        context: "scenes-load",
+        fallbackMessage: "加载变体失败，请稍后再试",
+      });
+    }
+    const data = (await response.json()) as {
+      variants?: ParsedScene[];
+    };
+    const variants = data.variants ?? [];
+    return variants.map((variant, index) => toVariantLesson(variant, index));
+  } catch (error) {
+    throw toSceneError(error, "加载变体失败，请稍后再试");
   }
-  const data = (await response.json()) as {
-    variants?: ParsedScene[];
-  };
-  const variants = data.variants ?? [];
-  return variants.map((variant, index) => toVariantLesson(variant, index));
 }
 
 export async function generateSceneVariantsFromApi(params: {
@@ -163,23 +199,30 @@ export async function generateSceneVariantsFromApi(params: {
   retainChunkRatio?: number;
   theme?: string;
 }) {
-  const response = await fetch(`/api/scenes/${encodeURIComponent(params.sceneSlug)}/variants`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      variantCount: params.variantCount,
-      retainChunkRatio: params.retainChunkRatio,
-      theme: params.theme,
-    }),
-  });
-  if (!response.ok) {
-    throw new Error(await extractError(response, "Failed to generate variants."));
+  try {
+    const response = await fetch(`/api/scenes/${encodeURIComponent(params.sceneSlug)}/variants`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        variantCount: params.variantCount,
+        retainChunkRatio: params.retainChunkRatio,
+        theme: params.theme,
+      }),
+    });
+    if (!response.ok) {
+      throw await createClientApiError(response, {
+        context: "scenes-load",
+        fallbackMessage: "生成变体失败，请稍后再试",
+      });
+    }
+    const data = (await response.json()) as { variants?: ParsedScene[] };
+    const variants = data.variants ?? [];
+    return variants.map((variant, index) => toVariantLesson(variant, index));
+  } catch (error) {
+    throw toSceneError(error, "生成变体失败，请稍后再试");
   }
-  const data = (await response.json()) as { variants?: ParsedScene[] };
-  const variants = data.variants ?? [];
-  return variants.map((variant, index) => toVariantLesson(variant, index));
 }
 
 export async function generatePersonalizedSceneFromApi(payload: {
@@ -190,34 +233,43 @@ export async function generatePersonalizedSceneFromApi(payload: {
   sentenceCount?: number;
   reuseKnownChunks?: boolean;
 }) {
-  const response = await fetch("/api/scenes/generate", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload),
-  });
-  if (!response.ok) {
-    throw new Error(await extractError(response, "Failed to generate scene."));
-  }
-  const data = (await response.json()) as {
-    scene?: Lesson;
-    personalization?: {
-      relatedChunkVariantsUsed?: Array<{
-        text: string;
-        differenceLabel: string;
-        knownChunkText?: string | null;
-      }>;
-      relatedChunkVariantsMatched?: Array<{
-        text: string;
-        differenceLabel: string;
-        knownChunkText?: string | null;
-      }>;
+  try {
+    const response = await fetch("/api/scenes/generate", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      throw await createClientApiError(response, {
+        context: "scenes-load",
+        fallbackMessage: "生成场景失败，请稍后再试",
+      });
+    }
+    const data = (await response.json()) as {
+      scene?: Lesson;
+      personalization?: {
+        relatedChunkVariantsUsed?: Array<{
+          text: string;
+          differenceLabel: string;
+          knownChunkText?: string | null;
+        }>;
+        relatedChunkVariantsMatched?: Array<{
+          text: string;
+          differenceLabel: string;
+          knownChunkText?: string | null;
+        }>;
+      };
     };
-  };
-  if (!data.scene) throw new Error("Invalid generated scene response.");
-  return {
-    scene: data.scene,
-    personalization: data.personalization,
-  };
+    if (!data.scene) {
+      throw new Error("Invalid generated scene response.");
+    }
+    return {
+      scene: data.scene,
+      personalization: data.personalization,
+    };
+  } catch (error) {
+    throw toSceneError(error, "生成场景失败，请稍后再试");
+  }
 }

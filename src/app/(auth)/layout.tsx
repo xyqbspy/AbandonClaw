@@ -5,7 +5,7 @@ import { getCurrentUser } from "@/lib/server/auth";
 export default async function AuthLayout({ children }: { children: ReactNode }) {
   const user = await getCurrentUser();
   if (user) {
-    redirect("/scenes");
+    redirect("/today");
   }
 
   return (

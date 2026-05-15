@@ -1,3 +1,7 @@
+import {
+  createClientApiError,
+  normalizeClientError,
+} from "@/lib/client/api-error";
 import { invalidateAfterReviewMutation } from "@/lib/utils/cache-actions";
 
 export type ReviewResult = "again" | "hard" | "good";
@@ -71,28 +75,26 @@ export interface ReviewSummaryResponse {
   targetCoverageMissCountToday: number;
 }
 
-const toApiError = async (response: Response, fallback: string) => {
-  try {
-    const body = (await response.json()) as { error?: string };
-    if (typeof body.error === "string" && body.error.trim()) {
-      return new Error(body.error);
-    }
-  } catch {
-    // Ignore parse failure.
-  }
-  return new Error(fallback);
-};
-
 export async function getDueReviewItemsFromApi(limit = 20) {
-  const response = await fetch(`/api/review/due?limit=${limit}`, { method: "GET" });
-  if (!response.ok) {
-    throw await toApiError(response, "加载待复习列表失败。");
+  try {
+    const response = await fetch(`/api/review/due?limit=${limit}`, { method: "GET" });
+    if (!response.ok) {
+      throw await createClientApiError(response, {
+        context: "review-load",
+        fallbackMessage: "加载待复习列表失败，请稍后再试",
+      });
+    }
+    return (await response.json()) as {
+      rows: DueReviewItemResponse[];
+      total: number;
+      scenePracticeRows: DueScenePracticeReviewItemResponse[];
+    };
+  } catch (error) {
+    throw normalizeClientError(error, {
+      context: "review-load",
+      fallbackMessage: "加载待复习列表失败，请稍后再试",
+    });
   }
-  return (await response.json()) as {
-    rows: DueReviewItemResponse[];
-    total: number;
-    scenePracticeRows: DueScenePracticeReviewItemResponse[];
-  };
 }
 
 export async function submitPhraseReviewFromApi(payload: {
@@ -107,26 +109,46 @@ export async function submitPhraseReviewFromApi(payload: {
   fullOutputCoverage?: ReviewFullOutputCoverage;
   fullOutputText?: string;
 }) {
-  const response = await fetch("/api/review/submit", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  if (!response.ok) {
-    throw await toApiError(response, "提交复习结果失败。");
+  try {
+    const response = await fetch("/api/review/submit", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      throw await createClientApiError(response, {
+        context: "review-submit",
+        fallbackMessage: "提交复习结果失败，请稍后再试",
+      });
+    }
+    const data = (await response.json()) as {
+      item: DueReviewItemResponse;
+      summary: ReviewSummaryResponse;
+    };
+    invalidateAfterReviewMutation();
+    return data;
+  } catch (error) {
+    throw normalizeClientError(error, {
+      context: "review-submit",
+      fallbackMessage: "提交复习结果失败，请稍后再试",
+    });
   }
-  const data = (await response.json()) as {
-    item: DueReviewItemResponse;
-    summary: ReviewSummaryResponse;
-  };
-  invalidateAfterReviewMutation();
-  return data;
 }
 
 export async function getReviewSummaryFromApi() {
-  const response = await fetch("/api/review/summary", { method: "GET" });
-  if (!response.ok) {
-    throw await toApiError(response, "加载复习统计失败。");
+  try {
+    const response = await fetch("/api/review/summary", { method: "GET" });
+    if (!response.ok) {
+      throw await createClientApiError(response, {
+        context: "review-load",
+        fallbackMessage: "加载复习统计失败，请稍后再试",
+      });
+    }
+    return (await response.json()) as ReviewSummaryResponse;
+  } catch (error) {
+    throw normalizeClientError(error, {
+      context: "review-load",
+      fallbackMessage: "加载复习统计失败，请稍后再试",
+    });
   }
-  return (await response.json()) as ReviewSummaryResponse;
 }

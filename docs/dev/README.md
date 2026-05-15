@@ -54,6 +54,28 @@ pnpm run text:check-mojibake
 git diff --check
 ```
 
+## 测试账号与 P0 smoke
+
+```bash
+pnpm run seed:test-users
+pnpm run reset:test-user -- --email=<test-email>
+pnpm run smoke:p0-auth-loop -- --base-url=http://127.0.0.1:3000
+pnpm run test:scripts
+```
+
+- `seed:test-users` 需要：
+  - `ALLOW_TEST_USER_SEED=true`
+  - `SUPABASE_SERVICE_ROLE_KEY`
+  - `TEST_NORMAL_EMAIL`
+  - `TEST_RESTRICTED_EMAIL`
+  - `TEST_ADMIN_EMAIL`
+  - `TEST_USER_PASSWORD`
+- `reset:test-user` 需要：
+  - `ALLOW_TEST_USER_RESET=true`
+  - 上述测试账号 email 白名单，或 `TEST_USER_ALLOWED_DOMAIN`
+- `smoke:p0-auth-loop` 会先 reset `TEST_NORMAL_EMAIL`，再用正式 Supabase 登录 session 跑 `/today -> scene -> save phrase -> review -> complete scene -> today` 的 API 级闭环。
+- `TEST_ADMIN_EMAIL` 还需要同时出现在 `ADMIN_EMAILS`，否则账号虽然会被 seed，但仍不能访问 `/admin`。
+
 ## 深读触发
 
 只有出现以下情况时，才继续深读维护手册或专项文档：
