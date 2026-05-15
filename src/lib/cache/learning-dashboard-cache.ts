@@ -18,7 +18,8 @@ export type LearningDashboardCacheRecord = {
 const CACHE_KEY: LearningDashboardCacheRecord["key"] = "learning-dashboard:me";
 const CACHE_SCHEMA_VERSION: LearningDashboardCacheRecord["schemaVersion"] =
   "learning-dashboard-cache-v1";
-const LEARNING_DASHBOARD_TTL_MS = 5 * 60 * 1000;
+// 24 小时：SWR 模式下命中即立即可见，背后仍会刷新覆盖；这里的目的是「一天内回到首页不出现 loading 闪烁」，不是数据新鲜度。
+const LEARNING_DASHBOARD_TTL_MS = 24 * 60 * 60 * 1000;
 
 let memoryRecord: LearningDashboardCacheRecord | null = null;
 

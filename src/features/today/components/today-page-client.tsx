@@ -18,9 +18,9 @@ import { TodayRecommendedScenesSection } from "@/features/today/components/today
 import { TodayReviewSummaryCard } from "@/features/today/components/today-review-summary-card";
 import { TodaySavedExpressionsSection } from "@/features/today/components/today-saved-expressions-section";
 import { TodayWelcomeCard } from "@/features/today/components/today-welcome-card";
-import { getLearningDashboardCache, setLearningDashboardCache } from "@/lib/cache/learning-dashboard-cache";
-import { getPhraseListCache, setPhraseListCache } from "@/lib/cache/phrase-list-cache";
-import { getSceneListCache, setSceneListCache } from "@/lib/cache/scene-list-cache";
+import { clearLearningDashboardCache, getLearningDashboardCache, setLearningDashboardCache } from "@/lib/cache/learning-dashboard-cache";
+import { clearAllPhraseListCache, getPhraseListCache, setPhraseListCache } from "@/lib/cache/phrase-list-cache";
+import { clearSceneListCache, getSceneListCache, setSceneListCache } from "@/lib/cache/scene-list-cache";
 import { recordClientEvent } from "@/lib/utils/client-events";
 import { getLearningDashboardFromApi, LearningDashboardResponse } from "@/lib/utils/learning-api";
 import { getMyPhrasesFromApi, UserPhraseItemResponse } from "@/lib/utils/phrases-api";
@@ -227,6 +227,24 @@ export function TodayPageClient({ displayName }: { displayName: string }) {
       void refreshData({ preferCache: true });
     }, 0);
     return () => window.clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    const handlePullRefresh = (event: Event) => {
+      const customEvent = event as CustomEvent<{ pathname?: string; handled?: boolean }>;
+      const path = (customEvent.detail?.pathname ?? "").split("?")[0];
+      if (path !== "/today") return;
+      if (customEvent.detail) customEvent.detail.handled = true;
+      void Promise.all([
+        clearLearningDashboardCache(),
+        clearAllPhraseListCache(),
+        clearSceneListCache(),
+      ]).then(() => refreshData({ preferCache: false }));
+    };
+    window.addEventListener("app:pull-refresh", handlePullRefresh as EventListener);
+    return () => {
+      window.removeEventListener("app:pull-refresh", handlePullRefresh as EventListener);
+    };
   }, []);
 
   useEffect(() => {

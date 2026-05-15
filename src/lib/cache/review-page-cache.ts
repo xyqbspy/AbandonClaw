@@ -22,7 +22,9 @@ export type ReviewPageCacheRecord = {
 };
 
 const CACHE_SCHEMA_VERSION: ReviewPageCacheRecord["schemaVersion"] = "review-page-cache-v1";
-const REVIEW_PAGE_TTL_MS = 3 * 60 * 1000;
+// 24 小时：SWR 模式下命中即立即可见，背后仍会刷新覆盖；目标是「一天内回到 review 页面不出现 loading 闪烁」。
+// 写入操作会主动 invalidate（见 cache-actions），因此过期时长可以放长。
+const REVIEW_PAGE_TTL_MS = 24 * 60 * 60 * 1000;
 const nowMs = () => Date.now();
 const CACHE_KEY_PREFIX = "review-page:v1:";
 

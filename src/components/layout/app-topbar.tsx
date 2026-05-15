@@ -5,6 +5,7 @@ import { Bell, ChevronDown, LogOut, Menu } from "lucide-react";
 import { toast } from "sonner";
 import { resolveTopbarBreadcrumb, type TopbarBreadcrumbItem } from "@/components/layout/app-topbar-breadcrumb";
 import { MobileNav } from "@/components/layout/mobile-nav";
+import { clearAllClientCache } from "@/lib/utils/cache-actions";
 
 type AppTopbarProps = {
   userDisplay: {
@@ -26,6 +27,8 @@ export function AppTopbar({ userDisplay }: AppTopbarProps) {
         const body = (await response.json()) as { error?: string };
         throw new Error(body.error ?? "退出登录失败。");
       }
+      // 切账号 / 登出时清所有客户端缓存，避免下个账号读到上个账号的 dashboard / scene / phrase / review 数据
+      await clearAllClientCache();
       router.push("/login");
       router.refresh();
     } catch (error) {

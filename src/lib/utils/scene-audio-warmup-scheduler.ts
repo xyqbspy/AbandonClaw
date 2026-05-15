@@ -56,6 +56,20 @@ const sceneAudioWarmupTasks = new Map<string, InternalSceneAudioWarmupTask>();
 let activeTaskCount = 0;
 let sequence = 0;
 const maxConcurrentWarmupTasks = 2;
+// 防止 task map 在长时间运行（多 scene 切换）后无限增长。命中上限时清理已结束的旧任务。
+const MAX_WARMUP_TASKS = 200;
+const WARMUP_TASKS_PRUNE_TARGET = 120;
+
+const pruneFinishedWarmupTasks = () => {
+  if (sceneAudioWarmupTasks.size <= MAX_WARMUP_TASKS) return;
+  const finished = Array.from(sceneAudioWarmupTasks.entries())
+    .filter(([, task]) => task.status === "loaded" || task.status === "failed" || task.status === "skipped")
+    .sort((a, b) => a[1].sequence - b[1].sequence);
+  const toRemove = sceneAudioWarmupTasks.size - WARMUP_TASKS_PRUNE_TARGET;
+  for (let i = 0; i < toRemove && i < finished.length; i += 1) {
+    sceneAudioWarmupTasks.delete(finished[i][0]);
+  }
+};
 
 const cloneTask = (task: InternalSceneAudioWarmupTask): SceneAudioWarmupTask => ({
   key: task.key,
@@ -121,6 +135,7 @@ const pumpSceneAudioWarmupQueue = () => {
       })
       .finally(() => {
         activeTaskCount = Math.max(0, activeTaskCount - 1);
+        pruneFinishedWarmupTasks();
         pumpSceneAudioWarmupQueue();
       });
   }
