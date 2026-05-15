@@ -100,6 +100,31 @@ export function assertProfileCanWrite(profile: Pick<ProfileRow, "access_status">
   }
 }
 
+const isStaleRefreshTokenError = (message: string) => {
+  const lower = message.toLowerCase();
+  return (
+    lower.includes("refresh token not found") ||
+    lower.includes("refresh_token_not_found") ||
+    lower.includes("invalid refresh token") ||
+    lower.includes("session_not_found") ||
+    lower.includes("session not found")
+  );
+};
+
+const clearStaleSupabaseSession = async (
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  message: string,
+) => {
+  console.warn("[auth] clearing stale supabase session", { message });
+  try {
+    await supabase.auth.signOut({ scope: "local" });
+  } catch (signOutError) {
+    console.warn("[auth] failed to clear stale supabase session", {
+      error: signOutError instanceof Error ? signOutError.message : String(signOutError),
+    });
+  }
+};
+
 export async function getCurrentSession(): Promise<Session | null> {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await withAuthRetry<{ session: Session | null }>(
@@ -107,6 +132,10 @@ export async function getCurrentSession(): Promise<Session | null> {
     () => supabase.auth.getSession() as Promise<{ data: { session: Session | null }; error: unknown }>,
   );
   if (error) {
+    if (isStaleRefreshTokenError(error.message)) {
+      await clearStaleSupabaseSession(supabase, error.message);
+      return null;
+    }
     if (isMissingSessionError(error.message)) return null;
     if (isTransientAuthNetworkError(error.message)) {
       console.warn("[auth] transient timeout in getCurrentSession, fallback to null", {
@@ -126,6 +155,10 @@ export async function getCurrentUser(): Promise<User | null> {
     () => supabase.auth.getUser() as Promise<{ data: { user: User | null }; error: unknown }>,
   );
   if (error) {
+    if (isStaleRefreshTokenError(error.message)) {
+      await clearStaleSupabaseSession(supabase, error.message);
+      return null;
+    }
     if (isMissingSessionError(error.message)) return null;
     if (isTransientAuthNetworkError(error.message)) {
       console.warn("[auth] transient timeout in getCurrentUser, trying session fallback", {
