@@ -20,6 +20,66 @@
 
 这 5 条违反任意一条，就可能让单任务多花 2-5 倍 token。**这 5 条与 AGENTS.md 同级，违反需要在最终答复里明确说明原因**。
 
+### 1.0 自治边界：默认动手，只在硬边界处确认
+
+**默认行为：动手做，不问。** 完成后用一句话汇报结果（改了什么 + 验证结果 + 是否要继续）。
+
+✓ **默认自治范围**（不需要 AskUserQuestion 确认，直接做）：
+
+| 类别 | 范围 |
+|---|---|
+| 代码编辑 | `Edit` / `Write` 现有文件 / 新增 hook / 新增测试 / 新增 page-private style / 内部 refactor |
+| 测试运行 | 任何 `pnpm run test:*` / `node --import tsx --test ...` / lint / tsc / mojibake |
+| 文档维护 | 更新 dev-log / audit / ui-style-audit / system-design / 在已知文档加 entry |
+| Git 局部 | 本地 commit / git add / git mv / git stash / git restore --staged（不 push） |
+| OpenSpec 例行 | spec validate / show / list / 写 proposal/tasks 草案给用户审 |
+| Bash 只读 | grep / find / ls / cat / git status/log/diff / awk / sed -n |
+| 任务拆分内的子步骤 | 已批准的 OpenSpec change 里 tasks.md 列的子任务、用户已确认的多步收口的中间步骤 |
+| 修复明显 bug | lint error / type error / 已知测试断言写错的修复 |
+
+✗ **必须 AskUserQuestion 或简短确认的硬边界**：
+
+| 类别 | 示例 | 为什么 |
+|---|---|---|
+| **新建 OpenSpec change** | 第一次写 proposal / 决定要不要走 Spec-Driven | 范围决定后续多轮 commit，要先对齐 |
+| **改 stable spec** | 修改 `openspec/specs/*/spec.md` 的 Requirement | 跨页面契约，影响多模块 |
+| **架构性新抽象** | 新建 `src/components/shared/*` / 新 design token / 新公共 hook | 跨 feature 复用，方向错代价大 |
+| **跨主链路改动** | auth / payment / 学习状态写回 / scene 完成判定 / review 回写 | 业务核心，必须先理解 |
+| **不可逆/破坏性** | `git push --force` / `git reset --hard` / `rm -rf` / 删除整个 feature 目录 / drop table / 撤销已 push commit | 无法 ctrl-z |
+| **真正多向选择** | 用户明确给了 2-3 个等价方案让选 / 任务范围不清楚 / 用户没说想要哪个 | 没默认值 |
+| **用户可感知行为变化** | 改 UI 文案 / 删功能 / 改默认值 / 改 API 响应结构 | 影响用户，要审核 |
+| **新外部依赖** | `pnpm add` 任何新包 / 接入新第三方服务 | 引入维护负担 |
+| **完成态 OpenSpec commit** | Spec-Driven change 走完 implement 后的 archive | 锁定 spec 变更 |
+
+### 1.0.1 不确定时怎么办
+
+如果某个操作介于"自治"和"硬边界"之间：
+
+1. 先看是否能"做完后好回滚"：能 → 做；不能 → 问
+2. 看代价是否大：commit 容易 revert → 做；改了 10 个文件结构 → 问
+3. 看是否新方向：第一次走这条路 → 问；之前已经走过类似的 → 做
+4. 看用户是否给过明确意图：用户说"继续"/"做下去"/"可以" → 视为对当前推进节奏的授权 → 做
+5. 看是否破坏 git history：本地 commit / 新 commit → 做；amend 已 push / force push → 问
+
+### 1.0.2 一旦做了，必须明示
+
+自治行为做完后**汇报结构**：
+- 改了什么（commit hash + 文件数 + 关键变化）
+- 验证结果（N/N 测试 / lint 0 / tsc 0 / mojibake 通过）
+- 是否要继续下一步（建议下一步或停在这里）
+
+不要伪装成"等用户确认"，也不要 silent 做完不说。
+
+### 1.0.3 反模式：过度 AskUserQuestion
+
+避免下面这些问法，它们大多在浪费 token + 用户耐心：
+
+- ✗ "我要做 X 还是 Y？" 但 X 和 Y 其实差别很小 → 选默认 X 做完汇报
+- ✗ "我要先做 X 然后 Y 吗？" 已经在节奏里 → 直接做
+- ✗ "我要不要也顺手改 Z？" 顺手改且不超范围 → 直接改
+- ✗ "改完了，可以提交吗？" 用户已经说过"继续做" → 直接 commit
+- ✗ 4 选项凑数 → 删到真有差别的 2 项，或不问
+
 ### 1.1 用专用工具，不要用 Bash 重做
 
 | ✗ 浪费 | ✓ 推荐 | 节省 |
@@ -355,6 +415,8 @@ Bash "pnpm run test 2>&1 | tail -20"
 | Read 2000 行大文件 | offset+limit 局部 |
 | 改一行跑全套 test | 改完批量跑相关 test |
 | 4 个 AskUserQuestion 选项 | 真正有差别的 2-3 个 |
+| 自治范围内反复 AskUserQuestion 求确认 | 直接做完汇报（见 §1.0） |
+| "改完了，可以提交吗？" | 用户已说继续 → 直接 commit |
 | TaskCreate 3 个 1 步任务 | 直接做 |
 | Write 修改已有文件 | Edit |
 | "我将先 X 然后 Y" 前言 | 直接做 |
