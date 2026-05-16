@@ -1,5 +1,48 @@
 # Dev Log
 
+### [2026-05-16] chunks/page.tsx 第二轮拆分（decompose-chunks-page-r2 落地）
+- 类型：Spec-Driven（OpenSpec change `decompose-chunks-page-r2`）
+- 状态：实施 + 测试 + 验证完成，已提交（commit `3301dc5`），等待 archive
+
+#### 背景
+按 `docs/system-design/architecture-audit-2026-05-16.md` §2.3 / §2.11，`src/app/(app)/chunks/page.tsx` 共 2368 行（仓库最大文件），已被 `feature-component-decomposition` spec Requirement "重入口第二轮拆分必须继续保持页面级动作与分支语义稳定" 明确点名。第一轮已抽出 11 个 hook + 4 个 view + 6 个 logic 文件，但主 `ChunksPage` 函数仍 1505 行 hooks/handlers/memos + 524 行 JSX；chunks 也是 today/scene/review 中唯一没有 `*-page-styles.ts` 的页族。
+
+#### OpenSpec change
+- `openspec/changes/decompose-chunks-page-r2/` 含 proposal + tasks + spec delta（feature-component-decomposition ADDED 1 个 Requirement + 2 个 Scenario，仅声明 r2 边界，不改既有 Requirement）。
+- spec validate --strict 通过。
+
+#### 本次落地
+按 tasks 顺序：
+
+- §1 chunks-page-styles.ts：抽 page.tsx 顶层 3 个 const + view-mode/content-filter/review-filter pill group + library tab 共 11 个 className 常量。page.tsx 通过 import alias `CHUNKS_APPLE_BUTTON_CLASSNAME as appleButtonClassName` 等保持下游 prop 名兼容。
+- §2 use-quick-add-related.ts：抽 4 state + 1 effect + 2 memo + 3 handler。`open` state 仍由 page 持有（因为 `closeFocusDetail` callback L995 在 hook 依赖的 `focusDetailViewModel` L1245 之前定义，hook 不能提前），其余内聚到 hook。7 个单测覆盖空白 / 重复校验 / 完整 save chain / save 失败 / copyTarget 成功失败 / handleOpenChange reset。
+- §3 use-builtin-phrases-actions.ts：抽 `handleSaveBuiltinPhrase` + `savingPhraseId` + setBuiltinPhrases 标记 isSaved 副作用。4 测试覆盖成功 / 失败 / 无 sourceScene fallback manual / savingPhraseId 状态切换。
+- §4 use-detail-audio-actions.ts：抽 `handleRegenerateCurrentDetailAudio` + `regeneratingDetailAudio` + 去重 + savedItem.exampleSentences fallback activeAssistItem.examples。5 测试。
+- §5 chunks-page-hero.tsx：抽 sticky top header（hero icon + title + 副标题 + search + library tab + add CTA）。DOM 输出字节级保持兼容，page.interaction.test selector 不变。
+
+#### 验证
+- 99/99 chunks 全套测试通过：39 unit（chunks-page-load-logic / chunks-page-logic / chunks-page-notify / chunks-focus-detail-{logic,messages,notify,presenters} / chunks-save-contract / chunks-page-focus-detail-sync）+ 60 interaction/hook（含新增 3 个 hook 的 16 测试 + page.interaction + chunks-list-view + chunks-page-sheets + chunks-quick-add-related-sheet）
+- `pnpm run lint`：0 errors / 2 warnings（pre-existing `smoke-p0-auth-loop-lib.ts` `MemoryCookie` 和 `lesson-reader.tsx` `onBackToList` 不在本轮范围）
+- `npx tsc --noEmit`：本轮 chunks 内 5 个新文件 0 新增错误（修了 3 个 type import 错位：`PhraseReviewStatus` 在 `phrases-api` 不在 `learning-flow`，`FocusDetailViewModel` 类型未 export 用 `ReturnType<typeof buildFocusDetailViewModel>` 替代，detail-audio `example` 参数显式标 `{ en?: string | null }` 避免 implicit any）
+- `pnpm run text:check-mojibake`：通过
+- `pnpm run spec:validate --strict`：通过
+
+#### 量化
+- chunks/page.tsx: **2368 → 2125 行**（-243 行，-10.3%）
+- 新增 5 个文件 577 行（其中 250 行 hook 单测）
+- 减幅低于 proposal 预期的 25-30%；§1 styles 收口反而增加少量 import/template literal 代码量，§2 quickAddRelated 净减 ~100 行，§3/§4 各减 ~60 行，§5 hero 减 ~62 行（page 中加了 8 行 JSX 调用）
+
+#### 文档同步
+- `docs/system-design/ui-style-audit.md` 追加 §21 chunks 二轮拆分 entry
+- `docs/system-design/architecture-audit-2026-05-16.md` §2.3 / §2.11 标注已落地
+- 本 dev-log entry
+- openspec change 走完 archive 流程后会移到 `openspec/changes/archive/2026-05-16-decompose-chunks-page-r2/`
+
+#### 剩余风险 / 不收项
+- 第三轮对象：`chunks-list-view.tsx`（868 行）+ `chunks-page-sheets.tsx`（449 行）。本轮建好的 chunks-page-styles 入口和"hook 承载单一动作 + 视图 section 字节兼容"的拆分模式可直接复用。
+- `scene-detail-page.tsx`（1326 行）拆分仍未启动，按 architecture-audit §2.4 留待独立 change。
+- chunks/page.tsx 仍有 2125 行，剩余主要是 JSX 装配（~520 行）+ 9 个 useCallback handler + 大量 useMemo 派生 state。继续拆分难点：handler 之间相互依赖、useMemo 依赖项跨文件传递成本高。spec 已允许多轮迭代，不强求单 change 降到目标值。
+
 ### [2026-05-16] TTS warmup P0/P1：observability + cancel + Redis signed URL + cooldown ladder + 推荐 scene 预热
 - 类型：Cleanup + 工程加固（同源 OpenSpec change `harden-tts-warmup-p0p1`，未走 archive）
 - 状态：代码已落地并提交（commit `0edf0e7`），50/50 测试全绿

@@ -150,6 +150,8 @@ export function PageHeader({
 
 ### 2.3 P0：chunks/page.tsx 2368 行单一 default function
 
+> **状态**：2026-05-16 已部分落地（commit `3301dc5`，OpenSpec change `decompose-chunks-page-r2`）。chunks/page.tsx 2368 → 2125 行（-243，-10.3%）。抽出 3 个动作 hook（quick-add-related / builtin-phrases-actions / detail-audio-actions）+ 1 个 view section（chunks-page-hero）。本轮目标不是一次降到 800 行而是验证拆分模式，第三轮对象转向 chunks-list-view.tsx（868 行）+ chunks-page-sheets.tsx（449 行）。详细见 dev-log [2026-05-16] 与 ui-style-audit §21。
+
 **现状**：
 
 `src/app/(app)/chunks/page.tsx` 共 2368 行，唯一的页面级 export 是 `export default function ChunksPage()`。文件内 17 个其它顶层 const 都是配置/常量。
@@ -325,6 +327,8 @@ src/features/chunks/
 - 与 2.9 一起做：补文档 + 改位置。
 
 ### 2.11 P2：chunks 是最大文件却没 chunks-page-styles.ts
+
+> **状态**：2026-05-16 已落地（commit `3301dc5`，作为 decompose-chunks-page-r2 §1 前置）。chunks-page-styles.ts 新建，收口 page.tsx 顶层 3 个 const + view-mode/content-filter/review-filter pill group + library tab 共 11 个常量。chunks 页族现在与 today / scene / review 对齐，都有自己的 *-page-styles.ts 入口。
 
 **现状**：today / scene / review 三个页族都有 `*-page-styles.ts` 文件收口私有 class 常量。chunks/page.tsx 2368 行，**没有对应 styles 入口**。
 

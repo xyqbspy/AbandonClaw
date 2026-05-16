@@ -410,3 +410,45 @@
   - 修复原文件中的乱码与字符串断裂，恢复为可编译状态。
   - 将题目切换区收为文件内 `ScenePracticeQuestionNavigator`，保留上一题/下一题与当前题号逻辑。
   - 将提示块、答案操作区、尝试统计和答案展示分别收为文件内私有展示块，保留提交、重置、显示答案与反馈文案逻辑。
+
+## 21. Chunks 工作台第二轮拆分（chunks/page.tsx）
+
+本轮 OpenSpec change：`decompose-chunks-page-r2`。
+
+已完成：
+
+- `src/app/(app)/chunks/chunks-page-styles.ts`
+  - 新建 chunks 页族私有样式入口（其它页族 today / scene / review 已有，chunks 第一轮没建）。
+  - 收口 page.tsx 顶层原 `appleButtonClassName` / `appleButtonStrongClassName` / `chunksButtonClassName` 三个常量，对外通过 import alias 引入，避免 chunks-list-view / chunks-page-sheets / chunks-focus-detail-presenters 等下游 prop 名字段被影响。
+  - 收口 view-mode / content-filter / review-filter 三处 pill group 重复的 base + active + inactive className，以及 library tab 切换的 base + active text + inactive text + 底部 underline。
+- `src/app/(app)/chunks/chunks-page-hero.tsx`
+  - 抽 sticky top header（hero icon + title + 副标题 + 搜索框 + library tab 切换 + 新增 add CTA）。
+  - DOM 输出字节级保持兼容：相同的 `<header>` / `<div>` 嵌套、`className`、`aria-label`、`placeholder`，page.interaction.test 不变。
+- `src/app/(app)/chunks/use-quick-add-related.ts`
+  - 抽 quickAdd 4 state（text / relationType / saving / inputRef）+ 1 useEffect（open 时 120ms 后聚焦）+ 2 useMemo（validationMessage / libraryHint）+ 3 handler（save / copyTarget / handleOpenChange）。
+  - `open` state 仍由 page 持有，因为早期 `closeFocusDetail` callback（L995 区域）和 `onOpenManualAddRelated` callback 都需要直接调 `setQuickAddRelatedOpen`，不能等 hook（hook 依赖 focusDetailViewModel 必须在 L1245 之后调）。
+- `src/app/(app)/chunks/use-builtin-phrases-actions.ts`
+  - 抽 `handleSaveBuiltinPhrase` + `savingPhraseId`，承载 builtin phrase 保存 + setBuiltinPhrases 标记 isSaved + 重新拉表的副作用链路。
+- `src/app/(app)/chunks/use-detail-audio-actions.ts`
+  - 抽 `handleRegenerateCurrentDetailAudio` + `regeneratingDetailAudio`，承载详情音频重生成（去重 + savedItem.exampleSentences fallback 到 activeAssistItem.examples + setFocusDetailActionsOpen + 成功/失败 notify）。
+
+3 个 hook 各带专属单测（共 16 测试），覆盖成功路径、失败路径、loading 状态进出、关键 handler 引用稳定性。
+
+明确不动：
+
+- `chunks-list-view.tsx`（868 行）/ `chunks-page-sheets.tsx`（449 行）继续保留 scene-local 私有展示语义，第三轮再处理。
+- 既有 11 个 hook（`use-chunks-route-state` / `use-expression-cluster-actions` / `use-focus-assist` / `use-generated-similar-sheet` / `use-chunks-list-data` / `use-manual-expression-composer` / `use-manual-sentence-composer` / `use-saved-relations` / `use-focus-detail-controller` / `use-chunks-page-actions` / `use-builtin-phrases-data`）的 props 签名全部不动。
+- 任何 handler 业务语义（toast / cache 失效 / 复习入口 / loadPhrases 调用 / setState 顺序）保持与原 page.tsx 100% 一致。
+- spec 层（`chunks-data-contract` / `chunks-workbench-user-path` / `feature-component-decomposition`）Requirement 不改；本 change 在 spec delta 中以 ADDED 形式补一份 r2 边界 scenario，不动既有 Requirement。
+
+量化结果：
+
+- chunks/page.tsx 2368 → 2125 行（-243 行，-10.3%）
+- 新增 5 个文件共 577 行（含 250 行 hook 单测）
+- chunks 全套 99/99 测试通过（39 unit + 60 interaction/hook）
+- lint 0 errors / 2 warnings（pre-existing 不在 chunks 范围）
+- tsc 本轮触动文件 0 新增错误
+- mojibake 通过
+- spec validate --strict 通过
+
+第三轮预期对象：`chunks-list-view.tsx`（868 行）+ `chunks-page-sheets.tsx`（449 行）。本轮建好的 chunks-page-styles 入口和拆分模式（hook 承载单一动作 + 视图 section 字节兼容）可直接复用。
