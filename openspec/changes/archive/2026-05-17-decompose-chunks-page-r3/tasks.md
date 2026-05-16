@@ -3,7 +3,7 @@
 按依赖序执行；每完成一项立即跑 page.interaction.test.tsx 验证。
 
 ## Status
-in_progress
+done
 
 ## 1. 抽 use-expression-map.ts
 
@@ -83,9 +83,9 @@ proposal §4 原描述"focus detail 区 JSX 装配（焦点 expression header + 
 
 ## 6. 完成态收尾（用户审核通过后）
 
-- [ ] 6.1 commit 实施改动（feat: prefix）
-- [ ] 6.2 更新 `docs/dev/dev-log.md` 追加 entry：背景 / 协作说明 / 落地 / 验证 / 量化 / LoC 实际结果 + 偏差原因分析
-- [ ] 6.3 更新 `docs/system-design/architecture-audit-2026-05-16.md` §2.3 追加 r3 状态行（LoC 量化数据）
-- [ ] 6.4 `openspec archive decompose-chunks-page-r3` 完成归档
-- [ ] 6.5 spec sync：把 r3 delta 合并到 `openspec/specs/feature-component-decomposition/spec.md`（如适用）
-- [ ] 6.6 `pnpm run maintenance:check`：通过
+- [x] 6.1 commit 实施改动（commit `f8e1d4c`, feat: prefix）
+- [x] 6.2 更新 `docs/dev/dev-log.md` 追加 entry：背景 / 协作说明 / 落地 / 验证 / 量化 / LoC 实际结果 + 偏差原因分析
+- [x] 6.3 更新 `docs/system-design/architecture-audit-2026-05-16.md` §2.3 追加 r3 状态行（LoC 量化数据）
+- [x] 6.4 `openspec archive decompose-chunks-page-r3` 完成归档
+- [x] 6.5 spec sync：把 r3 delta 合并到 `openspec/specs/feature-component-decomposition/spec.md`（与 r2 同模式）
+- [x] 6.6 `pnpm run maintenance:check`：通过

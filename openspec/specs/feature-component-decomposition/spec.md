@@ -86,6 +86,32 @@
 - **AND** 抽出的 hero section MUST 在 DOM 输出上保持字节级兼容（相同的 `<header>` / `className` / `aria-label` / `placeholder`）
 - **AND** 3 个新 hook MUST 各自带专属单测，验证 loading / 成功 / 失败路径以及关键 handler 引用稳定性
 
+### Requirement: chunks/page.tsx 第三轮拆分必须按"3 hook + 1 view section + 已有 hook 协作边界"执行
+系统 MUST 在对 `chunks/page.tsx` 进行第三轮拆分时，按以下边界推进：抽 `use-expression-map.ts`（map 浮层 6 state + close/resetError helpers）、抽 `use-sentence-expression-save.ts`（句子维度表达保存）、抽 `use-focus-relation-tab.ts`（focus detail 关系 tab UI 控制）、抽 `chunks-page-focus-mode-section.tsx`（focus mode 视图装配 = ClusterFocusList wrapper）；不得借本轮顺手改变既有 14 个 hook 的 props 签名、不得动 `chunks-list-view.tsx` / `chunks-page-sheets.tsx` 内部、不得改变 `useFocusDetailController` 现有职责边界、不得改变 spec 层业务语义。
+
+#### Scenario: 推进 chunks/page.tsx 三轮拆分时的范围边界
+- **GIVEN** 维护者准备推进 `chunks/page.tsx` 第三轮拆分
+- **WHEN** 决定本轮拆分对象时
+- **THEN** 维护者 MUST 把拆分范围限定为：抽 3 个 hook（`use-expression-map.ts` / `use-sentence-expression-save.ts` / `use-focus-relation-tab.ts`）+ 抽 1 个 view section（`chunks-page-focus-mode-section.tsx`）
+- **AND** MUST NOT 动 `chunks-list-view.tsx` 与 `chunks-page-sheets.tsx` 的内部实现
+- **AND** MUST NOT 改变既有 14 个 hook（`use-chunks-route-state` / `use-expression-cluster-actions` / `use-focus-assist` / `use-generated-similar-sheet` / `use-chunks-list-data` / `use-manual-expression-composer` / `use-manual-sentence-composer` / `use-saved-relations` / `use-focus-detail-controller` / `use-chunks-page-actions` / `use-builtin-phrases-data` / `use-builtin-phrases-actions` / `use-quick-add-related` / `use-detail-audio-actions`）的 props 签名
+- **AND** MUST NOT 让新 `use-focus-relation-tab` 承担 focus detail 数据计算（`focusViewModel` / 关系数据等仍由 `useFocusDetailController` 提供，新 hook 只承载 tab/expand/confirm-action 等 UI 状态）
+- **AND** MUST NOT 改变 `chunks-data-contract` / `chunks-workbench-user-path` / `feature-component-decomposition` 三份 spec 的 Requirement
+
+#### Scenario: chunks 三轮拆分后的入口级回归
+- **WHEN** 维护者完成本轮拆分（3 hook + focus mode section）
+- **THEN** `page.interaction.test.tsx` MUST 继续通过，不得依靠重写测试或弱化断言来达成
+- **AND** `chunks-list-view.interaction.test.tsx` / `chunks-page-sheets.interaction.test.tsx` / `chunks-quick-add-related-sheet.test.tsx` MUST 继续通过
+- **AND** 抽出的 `chunks-page-focus-mode-section.tsx` MUST 在 DOM 输出上保持字节级兼容（相同的外层 `<div className="space-y-4">`、`ClusterFocusList` 的 labels / appleSurfaceClassName / handler props）
+- **AND** 3 个新 hook MUST 各自带专属单测，验证 loading / 成功 / 失败路径以及关键 handler 引用稳定性
+
+#### Scenario: chunks 三轮拆分的 LoC 实际结果与 r4 策略指导
+- **GIVEN** 维护者完成 r3 拆分后准备评估 r4 策略
+- **WHEN** 维护者观察 r3 实际 LoC 减幅（chunks/page.tsx 2125 → 2102 = -23 行）
+- **THEN** 维护者 MUST 认识到"抽 state + 简单 handler"的减幅与"装配回调 / 解构 / props 透传"的开销近似抵消，page.tsx 几乎不瘦身
+- **AND** r4 范围 SHOULD 优先针对**高 props-cost 子树**（`chunks-list-view.tsx` 装配 wrapper，page.tsx 当前 ~87 行 props 列表）和**大块 useEffect orchestration**（整体抽成 hook 后 page.tsx 只剩 hook 调用），而非继续抽 state + 小 handler 组合
+- **AND** r4 启动前 SHOULD 先评估目标抽离对象的"装配开销 / 抽走开销"比值，确保有显著减幅
+
 ### Requirement: scene-detail-page.tsx 第二轮拆分必须保持主学习链路语义稳定
 
 系统 MUST 在对 `scene-detail-page.tsx` 进行第二轮拆分时，把拆分范围限定为 scene detail 同目录的内部 hook、logic 或 view section，优先收口 practice run lifecycle、practice/variant prewarm、variant run lifecycle 和 view switch 装配；不得借拆分改变 scene 阅读、音频、表达保存、practice、variants、expression map、session 恢复、learning sync 或 scene 完成判定语义。
