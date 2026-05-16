@@ -1,5 +1,50 @@
 # Dev Log
 
+### [2026-05-16] scene-detail-page.tsx 第二轮拆分（decompose-scene-detail-page-r2 落地）
+- 类型：Spec-Driven（OpenSpec change `decompose-scene-detail-page-r2`）
+- 状态：实施 + 测试 + 验证完成，已提交（commit `c2ee1d2`），等待 archive
+
+#### 背景
+按 `docs/system-design/architecture-audit-2026-05-16.md` §2.4，`scene-detail-page.tsx` 1326 行是仓库次大文件（仅次于已二轮拆分前的 chunks/page.tsx）。已被 `feature-component-decomposition` spec Requirement "重入口第二轮拆分必须继续保持页面级动作与分支语义稳定" 点名。第一轮已拆出 `use-scene-detail-data` / `-actions` / `-playback` / `-route-state` / `use-scene-learning-sync` / `scene-detail-page-logic` / `scene-detail-controller` 等模块，但主页面仍集中承担 practice run / prewarm / variant run / view switch 4 块职责。
+
+#### OpenSpec change
+- `openspec/changes/decompose-scene-detail-page-r2/`（含 proposal + tasks + spec delta），spec validate --strict 通过。
+
+#### 协作说明
+proposal、tasks、spec delta 和实施代码（4 个新文件 + scene-detail-page.tsx 修改）由 codex 完成。本次会话接手做验证 + 修复 2 个测试 setup bug + 标 tasks [x] + 文档同步 + commit + archive。
+
+#### 本次落地（按 tasks 顺序）
+- §2 抽 `use-scene-practice-run-lifecycle.ts` (278 行)：handlePracticeRunStart / Attempt / ModeComplete / Complete + practiceRunStartDedup + setPracticeSnapshot 回写 + learning state + milestone 触发，保持 run 去重窗口、attempt 统计、mode complete summary、scene practice milestone 和缓存快照语义不变
+- §3 抽 `use-scene-generation-prewarm.ts` (167 行)：practice prewarm failure counter / blocked state / retry error / reset / register + practice idle prewarm effect + variant idle prewarm effect，保持三次失败阻断、中文错误提示、手动重试解除阻断、idle action key 和 cleanup 不变
+- §4 抽 `use-scene-variant-run-lifecycle.ts` (106 行)：variant run cache/API 同步 + hydrateVariantSetFromRun + 自动 activeVariantId + generated set 后自动 start run
+- §5 抽 `scene-detail-view-switch.tsx` (296 行)：practice / variants / expression-map / variant-study / base 5 个 viewMode 分支装配 + SelectionDetailSheet 一次装配，DOM/aria/data-testid 字节级保持兼容
+
+#### 验证
+- 86/86 测试通过：page 级回归 35/35（page.test + page.regression）+ 新 hook 6/6 + scene detail logic 15/15 + scene detail 既有 hook 30/30
+- `pnpm run lint`：0 errors / 2 pre-existing warnings（lesson-reader.tsx onBackToList、smoke-p0-auth-loop-lib.ts MemoryCookie，不在本轮范围）
+- `npx tsc --noEmit`：本轮触动文件 0 新增错误（修了 1 个 prewarm 测试的 initialProps 类型收窄问题）
+- `pnpm run text:check-mojibake`：通过
+- `pnpm run spec:validate --strict`：通过
+
+#### 修复的 2 个测试 setup bug
+- `use-scene-generation-prewarm.test.tsx` L78：5 个 callback (handlePracticeToolClick / handleGeneratePractice / handleRegeneratePractice / prewarmPractice / prewarmVariants) 原内联在 renderHook 入参里，每次 rerender 都创建新引用导致 hook 内 useCallback deps 变化，"rerender 后 handlePracticeToolAction reference-equal" 断言永远失败。提到外面用 const 稳定引用后通过。
+- `use-scene-practice-run-lifecycle.test.tsx` L268：断言 `snapshot.summary.completedModeCount === 1` 写错。hook 实现 start 路径用 `current?.summary ??` 保留原 summary 不动（只 mode complete 路径才递增 completedModeCount）。改为期望 0 + 注释说明边界。
+
+#### 量化
+- scene-detail-page.tsx: **1326 → 849 行**（-477 行，-36%）
+- 新增 5 个文件（4 hook/section + tasks delta）共 1956 行（含 737 行 hook 单测）
+
+#### 文档同步
+- `docs/system-design/architecture-audit-2026-05-16.md` §2.4 标注已落地
+- 本 dev-log entry
+- openspec change archive 后自动同步到 `openspec/specs/feature-component-decomposition/spec.md`
+
+#### 剩余风险 / 不收项
+- chunks 第三轮（chunks-list-view.tsx 868 行 + chunks-page-sheets.tsx 449 行）仍未启动，按 architecture-audit §3 留待独立 change。
+- scene-detail-page.tsx 仍 849 行，剩余主要是 JSX 装配 + handler 拼装 + useMemo 派生 state。模式建立后第三轮可继续抽 navigation / progress entry composer，但收益递减。
+- view-switch 第一轮使用粗 props（10+ 个），未来如果 props 数量继续涨可评估改 context。
+- 与 chunks-r2 同样的现象：减幅低于"一次降到 500 行"的乐观预期，但建立了拆分模式 + page 级回归保护，第三轮迭代成本会显著降低。
+
 ### [2026-05-16] chunks/page.tsx 第二轮拆分（decompose-chunks-page-r2 落地）
 - 类型：Spec-Driven（OpenSpec change `decompose-chunks-page-r2`）
 - 状态：实施 + 测试 + 验证完成，已提交（commit `3301dc5`），等待 archive

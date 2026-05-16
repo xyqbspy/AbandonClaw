@@ -182,6 +182,8 @@ export function PageHeader({
 
 ### 2.4 P0：scene-detail-page.tsx 1326 行同 chunks/page.tsx
 
+> **状态**：2026-05-16 已落地（commit `c2ee1d2`，OpenSpec change `decompose-scene-detail-page-r2`）。scene-detail-page.tsx 1326 → 849 行（-477，-36%）。抽出 3 个 hook（practice-run-lifecycle / generation-prewarm / variant-run-lifecycle）+ 1 个 view section（scene-detail-view-switch）。86/86 测试通过（page 回归 35 + 既有 hook 30 + 新 hook 6 + logic 15）。详细见 dev-log [2026-05-16] scene-detail-page-r2 entry。
+
 **现状**：`src/app/(app)/scene/[slug]/scene-detail-page.tsx` 1326 行，唯一 default export `SceneDetailClientPage`。同目录已经拆出 `use-scene-detail-actions.ts` 677 / `use-scene-detail-data.tsx` / `use-scene-detail-playback.ts` 364 / `use-scene-detail-route-state.ts` / `use-scene-learning-sync.ts` / `scene-detail-controller` 等多个 hook。
 
 **违反规则**：与 2.3 相同。
