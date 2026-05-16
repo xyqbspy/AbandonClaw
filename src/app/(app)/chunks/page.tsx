@@ -2,15 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowRight, BookMarked, Compass, Feather, PlusCircle, Search } from "lucide-react";
+import { ArrowRight, Compass, Feather } from "lucide-react";
 import { clearAllPhraseListCache } from "@/lib/cache/phrase-list-cache";
 import { prefetchSceneDetail } from "@/lib/cache/scene-prefetch";
 import { useTtsPlaybackController } from "@/hooks/use-tts-playback-controller";
 import { normalizePhraseText } from "@/lib/shared/phrases";
-import { buildChunkAudioKey } from "@/lib/shared/tts";
-import {
-  regenerateChunkAudioBatch,
-} from "@/lib/utils/tts-api";
 import { scheduleChunkAudioWarmup } from "@/lib/utils/resource-actions";
 import { ExpressionMapResponse } from "@/lib/types/expression-map";
 import {
@@ -21,7 +17,6 @@ import {
   UserPhraseItemResponse,
 } from "@/lib/utils/phrases-api";
 import { startReviewSession } from "@/lib/utils/review-session";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { LoadingState } from "@/components/shared/action-loading";
 import { ExampleSentenceCards } from "@/components/shared/example-sentence-cards";
@@ -43,13 +38,10 @@ import {
   APPLE_BANNER_DANGER,
   APPLE_BANNER_INFO,
   APPLE_BADGE_SUCCESS,
-  APPLE_BUTTON_BASE,
-  APPLE_BUTTON_STRONG,
   APPLE_INPUT_PANEL,
   APPLE_LIST_ITEM,
   APPLE_META_TEXT,
   APPLE_PANEL,
-  APPLE_BUTTON_TEXT_SM,
 } from "@/lib/ui/apple-style";
 import {
   buildSavedFocusDetailState,
@@ -64,7 +56,6 @@ import {
   resolveClusterFilterExpressionLabel,
   resolveFocusExpressionId,
 } from "./chunks-page-logic";
-import { buildQuickAddRelatedPayload } from "./chunks-save-contract";
 import { ChunksPageSheets } from "./chunks-page-sheets";
 import { useChunksRouteState } from "./use-chunks-route-state";
 import { useExpressionClusterActions } from "./use-expression-cluster-actions";
@@ -77,21 +68,16 @@ import { useSavedRelations } from "./use-saved-relations";
 import { useFocusDetailController } from "./use-focus-detail-controller";
 import { ChunksListView } from "./chunks-list-view";
 import { useChunksPageActions } from "./use-chunks-page-actions";
+import { useBuiltinPhrasesActions } from "./use-builtin-phrases-actions";
 import { useBuiltinPhrasesData } from "./use-builtin-phrases-data";
+import { useDetailAudioActions } from "./use-detail-audio-actions";
+import { useQuickAddRelated } from "./use-quick-add-related";
 import { BuiltinPhrasesSection } from "./builtin-phrases-section";
+import { ChunksPageHero } from "./chunks-page-hero";
 
 import { buildChunksFocusDetailLabels } from "./chunks-focus-detail-messages";
 import {
   notifyChunksFocusDetailCandidateSaved,
-  notifyChunksFocusDetailCopyTargetFailed,
-  notifyChunksFocusDetailCopyTargetSuccess,
-  notifyChunksFocusDetailMissingExpression,
-  notifyChunksFocusDetailNoSourceSentence,
-  notifyChunksFocusDetailQuickAddFailed,
-  notifyChunksFocusDetailQuickAddSucceeded,
-  notifyChunksFocusDetailQuickAddValidation,
-  notifyChunksFocusDetailRegenerateAudioFailed,
-  notifyChunksFocusDetailRegenerateAudioSuccess,
   notifyChunksFocusDetailRetryEnrichmentFailed,
   notifyChunksFocusDetailRetryEnrichmentSuccess,
 } from "./chunks-focus-detail-notify";
@@ -100,6 +86,16 @@ import {
   buildChunksFocusDetailSheetPresentation,
 } from "./chunks-focus-detail-presenters";
 import { chunksPageMessages as zh } from "./chunks-page-messages";
+import {
+  CHUNKS_APPLE_BUTTON_CLASSNAME as appleButtonClassName,
+  CHUNKS_APPLE_BUTTON_STRONG_CLASSNAME as appleButtonStrongClassName,
+  CHUNKS_PILL_BUTTON_ACTIVE_CLASSNAME,
+  CHUNKS_PILL_BUTTON_BASE_CLASSNAME,
+  CHUNKS_PILL_BUTTON_BASE_COMPACT_CLASSNAME,
+  CHUNKS_PILL_BUTTON_INACTIVE_CLASSNAME,
+  CHUNKS_PILL_GROUP_CONTAINER_CLASSNAME,
+  CHUNKS_PRIMARY_BUTTON_CLASSNAME as chunksButtonClassName,
+} from "./chunks-page-styles";
 import {
   notifyChunksActionMessage,
   notifyChunksActionSucceeded,
@@ -167,10 +163,6 @@ const SIMILAR_LABEL_FALLBACK = [
   zh.diffSpecific,
   zh.diffRelated,
 ];
-const appleButtonClassName = `${APPLE_BUTTON_BASE} ${APPLE_BUTTON_TEXT_SM}`;
-const appleButtonStrongClassName = `${APPLE_BUTTON_STRONG} ${APPLE_BUTTON_TEXT_SM}`;
-const chunksButtonClassName =
-  "cursor-pointer rounded-xl bg-white px-4 py-2 text-[10px] font-black text-slate-500 shadow-sm transition-all hover:bg-slate-50 hover:text-blue-600";
 const normalizeSimilarLabel = (label: string | null | undefined) => {
   const trimmed = (label ?? "").trim();
   if (!trimmed) return zh.diffRelated;
@@ -355,7 +347,6 @@ export default function ChunksPage() {
   });
   const [libraryTab, setLibraryTab] = useState<"mine" | "builtin">("mine");
   const [builtinFilter, setBuiltinFilter] = useState<BuiltinPhraseFilterKey>("all");
-  const [savingBuiltinPhraseId, setSavingBuiltinPhraseId] = useState<string | null>(null);
   const [expressionViewMode, setExpressionViewMode] = useState<"list" | "focus">("focus");
   const hasResolvedInitialLibraryTabRef = useRef(false);
 
@@ -398,11 +389,6 @@ export default function ChunksPage() {
   const [selectedMoveIntoClusterMap, setSelectedMoveIntoClusterMap] = useState<Record<string, boolean>>({});
   const [focusDetailActionsOpen, setFocusDetailActionsOpen] = useState(false);
   const [quickAddRelatedOpen, setQuickAddRelatedOpen] = useState(false);
-  const [quickAddRelatedText, setQuickAddRelatedText] = useState("");
-  const [quickAddRelatedType, setQuickAddRelatedType] = useState<"similar" | "contrast">("similar");
-  const [savingQuickAddRelated, setSavingQuickAddRelated] = useState(false);
-  const quickAddRelatedInputRef = useRef<HTMLInputElement | null>(null);
-  const [regeneratingDetailAudio, setRegeneratingDetailAudio] = useState(false);
 
   useEffect(
     () => () => {
@@ -410,18 +396,6 @@ export default function ChunksPage() {
     },
     [stop],
   );
-
-  useEffect(() => {
-    if (!quickAddRelatedOpen) return;
-
-    const timer = window.setTimeout(() => {
-      quickAddRelatedInputRef.current?.focus();
-    }, 120);
-
-    return () => {
-      window.clearTimeout(timer);
-    };
-  }, [quickAddRelatedOpen]);
 
   const { loading, phrases, setPhrases, total, loadPhrases } = useChunksListData({
     query,
@@ -1335,144 +1309,38 @@ export default function ChunksPage() {
     resetManualExpressionComposer();
   };
 
-  const resetQuickAddRelatedForm = () => {
-    setQuickAddRelatedText("");
-    setQuickAddRelatedType("similar");
-  };
-
-  const quickAddRelatedValidationMessage = useMemo(() => {
-    const text = quickAddRelatedText.trim();
-    if (!text || !focusExpression) return null;
-
-    const normalizedText = normalizePhraseText(text);
-    const normalizedFocusText = normalizePhraseText(focusExpression.text);
-    if (normalizedText === normalizedFocusText) {
-      return zh.quickAddDuplicateCurrent;
-    }
-
-    const duplicateExists =
-      quickAddRelatedType === "similar"
-        ? focusDetailViewModel.similarRows.some(
-            (row) => normalizePhraseText(row.text) === normalizedText,
-          )
-        : focusDetailViewModel.contrastRows.some(
-            (row) => normalizePhraseText(row.text) === normalizedText,
-          );
-
-    if (!duplicateExists) return null;
-    return quickAddRelatedType === "similar"
-      ? zh.quickAddDuplicateSimilar
-      : zh.quickAddDuplicateContrast;
-  }, [
-    focusDetailViewModel.contrastRows,
-    focusDetailViewModel.similarRows,
+  const quickAddRelated = useQuickAddRelated({
+    open: quickAddRelatedOpen,
+    onOpenChange: setQuickAddRelatedOpen,
     focusExpression,
-    quickAddRelatedText,
-    quickAddRelatedType,
-  ]);
+    focusDetail,
+    focusDetailViewModel,
+    phraseByNormalized,
+    loadPhrases,
+    invalidateSavedRelations,
+    setFocusRelationTab,
+    setFocusDetailTab,
+    setFocusDetailActionsOpen,
+    query,
+    reviewFilter,
+    contentFilter,
+    expressionClusterFilterId,
+  });
 
-  const quickAddRelatedLibraryHint = useMemo(() => {
-    const text = quickAddRelatedText.trim();
-    if (!text || !focusExpression || quickAddRelatedValidationMessage) return null;
+  const builtinPhrasesActions = useBuiltinPhrasesActions({
+    setBuiltinPhrases,
+    loadPhrases,
+    query,
+    reviewFilter,
+    contentFilter,
+    expressionClusterFilterId,
+  });
 
-    const existingItem = phraseByNormalized.get(normalizePhraseText(text));
-    if (!existingItem || existingItem.learningItemType !== "expression") return null;
-    return zh.quickAddExistingLibraryHint;
-  }, [focusExpression, phraseByNormalized, quickAddRelatedText, quickAddRelatedValidationMessage]);
-
-  const handleSaveQuickAddRelated = async () => {
-    if (!focusExpression || !focusDetail?.savedItem) return;
-
-    const text = quickAddRelatedText.trim();
-    if (!text) {
-      notifyChunksFocusDetailMissingExpression();
-      return;
-    }
-    if (savingQuickAddRelated) return;
-    if (quickAddRelatedValidationMessage) {
-      notifyChunksFocusDetailQuickAddValidation(quickAddRelatedValidationMessage);
-      return;
-    }
-
-    setSavingQuickAddRelated(true);
-    try {
-      const response = await savePhraseFromApi(
-        buildQuickAddRelatedPayload({
-          focusExpression,
-          text,
-          kind: quickAddRelatedType,
-        }),
-      );
-      await enrichSimilarExpressionFromApi({
-        userPhraseId: response.userPhrase.id,
-        baseExpression: focusExpression.text,
-      });
-      await loadPhrases(query, reviewFilter, contentFilter, expressionClusterFilterId, {
-        preferCache: false,
-      });
-      invalidateSavedRelations([focusExpression.userPhraseId, response.userPhrase.id]);
-      setFocusRelationTab(quickAddRelatedType);
-      setFocusDetailTab(quickAddRelatedType);
-      setFocusDetailActionsOpen(false);
-      setQuickAddRelatedOpen(false);
-      resetQuickAddRelatedForm();
-      notifyChunksFocusDetailQuickAddSucceeded(
-        quickAddRelatedType === "similar"
-          ? zh.quickAddSuccessSimilar
-          : zh.quickAddSuccessContrast,
-      );
-    } catch (error) {
-      notifyChunksFocusDetailQuickAddFailed(error instanceof Error ? error.message : null);
-    } finally {
-      setSavingQuickAddRelated(false);
-    }
-  };
-
-  const handleCopyQuickAddTarget = async () => {
-    const text = focusExpression?.text?.trim() ?? "";
-    if (!text) return;
-
-    try {
-      await navigator.clipboard.writeText(text);
-      notifyChunksFocusDetailCopyTargetSuccess();
-    } catch {
-      notifyChunksFocusDetailCopyTargetFailed();
-    }
-  };
-
-  const handleRegenerateCurrentDetailAudio = async () => {
-    if (!focusDetail || regeneratingDetailAudio) return;
-
-    const candidateTexts = [
-      focusDetailViewModel.detailSpeakText,
-      ...(focusDetail.savedItem?.exampleSentences ?? focusDetailViewModel.activeAssistItem?.examples ?? [])
-        .map((example) => example.en?.trim() ?? ""),
-    ]
-      .map((text) => text.trim())
-      .filter(Boolean);
-    const uniqueTexts = Array.from(new Set(candidateTexts));
-
-    if (uniqueTexts.length === 0) {
-      notifyChunksFocusDetailNoSourceSentence();
-      return;
-    }
-
-    setRegeneratingDetailAudio(true);
-    try {
-      await regenerateChunkAudioBatch(
-        uniqueTexts.map((text) => ({
-          chunkText: text,
-          chunkKey: buildChunkAudioKey(text),
-        })),
-      );
-      setFocusDetailActionsOpen(false);
-      notifyChunksFocusDetailRegenerateAudioSuccess();
-    } catch (error) {
-      notifyChunksFocusDetailRegenerateAudioFailed(error instanceof Error ? error.message : null);
-    } finally {
-      setRegeneratingDetailAudio(false);
-    }
-  };
+  const detailAudioActions = useDetailAudioActions({
+    focusDetail,
+    focusDetailViewModel,
+    setFocusDetailActionsOpen,
+  });
 
   const handleSaveManualExpression = async (mode: "save" | "save_and_review") => {
     const text = manualText.trim();
@@ -1598,8 +1466,8 @@ export default function ChunksPage() {
     focusAssistData,
     savingFocusCandidateKeys,
     focusAssistLoading,
-    savingQuickAddRelated,
-    regeneratingDetailAudio,
+    savingQuickAddRelated: quickAddRelated.saving,
+    regeneratingDetailAudio: detailAudioActions.regenerating,
     retryingEnrichmentIds,
     movingIntoCluster,
     ensuringMoveTargetCluster,
@@ -1665,7 +1533,7 @@ export default function ChunksPage() {
       setQuickAddRelatedOpen(true);
     },
     onRegenerateAudio: () => {
-      void handleRegenerateCurrentDetailAudio();
+      void detailAudioActions.regenerate();
     },
     onRetryEnrichment: () => {
       if (!focusDetail?.savedItem) return;
@@ -1787,128 +1655,22 @@ export default function ChunksPage() {
     onSubmit: () => void handleMoveSelectedIntoCurrentCluster(),
   };
 
-  const handleSaveBuiltinPhrase = useCallback(
-    async (phrase: {
-      id: string;
-      text: string;
-      translation: string | null;
-      usageNote: string | null;
-      level: string | null;
-      category: string | null;
-      tags: string[];
-      sourceScene: { slug: string; title: string } | null;
-    }) => {
-      setSavingBuiltinPhraseId(phrase.id);
-      try {
-        await savePhraseFromApi({
-          text: phrase.text,
-          translation: phrase.translation ?? undefined,
-          usageNote: phrase.usageNote ?? undefined,
-          difficulty: phrase.level ?? undefined,
-          tags: Array.from(
-            new Set([
-              ...phrase.tags,
-              "builtin",
-              "core_phrase",
-              ...(phrase.category ? [phrase.category] : []),
-            ]),
-          ),
-          sourceSceneSlug: phrase.sourceScene?.slug ?? undefined,
-          sourceType: phrase.sourceScene?.slug ? "scene" : "manual",
-          sourceChunkText: phrase.text,
-        });
-
-        setBuiltinPhrases((current) =>
-          current.map((item) => (item.id === phrase.id ? { ...item, isSaved: true } : item)),
-        );
-        notifyChunksActionSucceeded("已加入“我的表达”，并进入后续复习。");
-        await loadPhrases(query, reviewFilter, contentFilter, expressionClusterFilterId, {
-          preferCache: false,
-        });
-      } catch (error) {
-        notifyChunksLoadFailed(error instanceof Error ? error.message : "保存必备表达失败。");
-      } finally {
-        setSavingBuiltinPhraseId(null);
-      }
-    },
-    [
-      contentFilter,
-      expressionClusterFilterId,
-      loadPhrases,
-      query,
-      reviewFilter,
-      setBuiltinPhrases,
-    ],
-  );
-
   return (
     <div className="min-h-screen bg-[#f8fafc] font-sans">
-      <header className="sticky top-0 z-50 border-b border-slate-100 bg-white/80 backdrop-blur-xl">
-        <div className="mx-auto max-w-[760px] px-3 pt-3 pb-4 sm:pt-4 lg:px-5">
-          <div className="mb-6 flex items-center gap-3">
-            <div className="flex size-10 items-center justify-center rounded-xl bg-blue-600 text-white shadow-lg shadow-blue-100">
-              <BookMarked className="size-5" aria-hidden="true" />
-            </div>
-            <div className="min-w-0">
-              <h1 className="font-sans text-lg font-black text-slate-900">{zh.heroTitle}</h1>
-              <p className="text-[10px] font-bold text-slate-400">
-                {libraryTab === "builtin"
-                  ? zh.builtinHeroSubtitle
-                  : `${zh.heroSubtitle} · ${summary}`}
-              </p>
-            </div>
-          </div>
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-slate-300" />
-            <Input
-              className="h-12 rounded-2xl border-0 bg-slate-50 py-3 pl-11 pr-4 text-sm text-slate-700 shadow-none outline-none transition-all placeholder:text-slate-300 focus:bg-white focus-visible:ring-2 focus-visible:ring-blue-500/20"
-              placeholder={`${zh.searchPlaceholder}...`}
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-            />
-          </div>
-          <div className="mt-6 flex items-center gap-8 px-2">
-            {[
-              { key: "mine" as const, label: zh.tabMine },
-              { key: "builtin" as const, label: zh.tabBuiltin },
-            ].map((tab) => {
-              const active = libraryTab === tab.key;
-              return (
-                <button
-                  key={tab.key}
-                  type="button"
-                  className={`relative whitespace-nowrap text-[13px] font-black transition ${
-                    active ? "text-blue-600" : "text-slate-400 hover:text-slate-600"
-                  }`}
-                  onClick={() => setLibraryTab(tab.key)}
-                >
-                  {tab.label}
-                  {active ? (
-                    <span className="absolute left-1/2 top-full mt-2 block h-[3px] w-4 -translate-x-1/2 rounded-full bg-blue-600" />
-                  ) : null}
-                </button>
-              );
-            })}
-            <div className="flex-1" />
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              className="h-8 cursor-pointer gap-1 rounded-xl px-2 text-[11px] font-bold text-blue-600 hover:bg-blue-50 hover:text-blue-700"
-              onClick={() => setAddSheetOpen(true)}
-            >
-              <PlusCircle className="size-3.5" aria-hidden="true" />
-              {zh.addLearningContent}
-            </Button>
-          </div>
-        </div>
-      </header>
+      <ChunksPageHero
+        libraryTab={libraryTab}
+        onLibraryTabChange={setLibraryTab}
+        query={query}
+        onQueryChange={setQuery}
+        summary={summary}
+        onOpenAddSheet={() => setAddSheetOpen(true)}
+      />
 
       <main className="mx-auto max-w-[760px] space-y-6 px-3 pb-32 pt-3 sm:pt-4 lg:px-5">
 
       {libraryTab === "mine" ? (
         <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex gap-1 rounded-xl bg-slate-100 p-1">
+        <div className={CHUNKS_PILL_GROUP_CONTAINER_CLASSNAME}>
           {[
             { value: "focus" as const, label: zh.viewModeFocus },
             { value: "list" as const, label: zh.viewModeList },
@@ -1918,10 +1680,10 @@ export default function ChunksPage() {
               <button
                 key={option.value}
                 type="button"
-                className={`cursor-pointer rounded-lg px-5 py-2 text-xs font-bold transition-all ${
+                className={`${CHUNKS_PILL_BUTTON_BASE_CLASSNAME} ${
                   active
-                    ? "bg-white text-blue-600 shadow-sm"
-                    : "text-slate-400 hover:text-slate-600"
+                    ? CHUNKS_PILL_BUTTON_ACTIVE_CLASSNAME
+                    : CHUNKS_PILL_BUTTON_INACTIVE_CLASSNAME
                 }`}
                 onClick={() => {
                   if (option.value === "focus") {
@@ -1940,7 +1702,7 @@ export default function ChunksPage() {
       ) : null}
 
       {libraryTab === "mine" && expressionViewMode === "list" ? (
-        <div className="flex gap-1 rounded-xl bg-slate-100 p-1">
+        <div className={CHUNKS_PILL_GROUP_CONTAINER_CLASSNAME}>
           {[
             { value: "expression" as const, label: zh.contentTabExpression },
             { value: "sentence" as const, label: zh.contentTabSentence },
@@ -1950,10 +1712,10 @@ export default function ChunksPage() {
               <button
                 key={option.value}
                 type="button"
-                className={`cursor-pointer rounded-lg px-5 py-2 text-xs font-bold transition-all ${
+                className={`${CHUNKS_PILL_BUTTON_BASE_CLASSNAME} ${
                   active
-                    ? "bg-white text-blue-600 shadow-sm"
-                    : "text-slate-400 hover:text-slate-600"
+                    ? CHUNKS_PILL_BUTTON_ACTIVE_CLASSNAME
+                    : CHUNKS_PILL_BUTTON_INACTIVE_CLASSNAME
                 }`}
                 onClick={() => {
                   setContentFilter(option.value);
@@ -1968,7 +1730,7 @@ export default function ChunksPage() {
       ) : null}
 
       {libraryTab === "mine" && !(contentFilter === "expression" && expressionViewMode === "focus") ? (
-        <div className="flex flex-wrap gap-1 rounded-xl bg-slate-100 p-1">
+        <div className={`${CHUNKS_PILL_GROUP_CONTAINER_CLASSNAME} flex-wrap`}>
           {[
             { key: "all", label: zh.tabs.all },
             { key: "saved", label: zh.tabs.saved },
@@ -1978,10 +1740,10 @@ export default function ChunksPage() {
             <button
               key={tab.key}
               type="button"
-              className={`cursor-pointer rounded-lg px-4 py-2 text-xs font-bold transition-all ${
+              className={`${CHUNKS_PILL_BUTTON_BASE_COMPACT_CLASSNAME} ${
                 reviewFilter === tab.key
-                  ? "bg-white text-blue-600 shadow-sm"
-                  : "text-slate-400 hover:text-slate-600"
+                  ? CHUNKS_PILL_BUTTON_ACTIVE_CLASSNAME
+                  : CHUNKS_PILL_BUTTON_INACTIVE_CLASSNAME
               }`}
               onClick={() => setReviewFilter(tab.key as PhraseReviewStatus | "all")}
             >
@@ -2013,8 +1775,8 @@ export default function ChunksPage() {
           phrases={filteredBuiltinPhrases}
           activeFilter={builtinFilter}
           onFilterChange={setBuiltinFilter}
-          onSave={handleSaveBuiltinPhrase}
-          savingPhraseId={savingBuiltinPhraseId}
+          onSave={builtinPhrasesActions.save}
+          savingPhraseId={builtinPhrasesActions.savingPhraseId}
           error={builtinLoadError}
         />
       ) : null}
@@ -2263,13 +2025,13 @@ export default function ChunksPage() {
         }}
         quickAdd={{
           open: quickAddRelatedOpen,
-          saving: savingQuickAddRelated,
-          text: quickAddRelatedText,
-          relationType: quickAddRelatedType,
+          saving: quickAddRelated.saving,
+          text: quickAddRelated.text,
+          relationType: quickAddRelated.relationType,
           targetText: focusExpression?.text ?? "",
-          inputRef: quickAddRelatedInputRef,
-          validationMessage: quickAddRelatedValidationMessage,
-          libraryHint: quickAddRelatedLibraryHint,
+          inputRef: quickAddRelated.inputRef,
+          validationMessage: quickAddRelated.validationMessage,
+          libraryHint: quickAddRelated.libraryHint,
           labels: {
             title: zh.quickAddRelatedTitle,
             description: zh.quickAddRelatedDesc,
@@ -2289,16 +2051,11 @@ export default function ChunksPage() {
           appleBannerDangerClassName: APPLE_BANNER_DANGER,
           appleBannerInfoClassName: APPLE_BANNER_INFO,
           appleListItemClassName: APPLE_LIST_ITEM,
-          onOpenChange: (open) => {
-            setQuickAddRelatedOpen(open);
-            if (!open && !savingQuickAddRelated) {
-              resetQuickAddRelatedForm();
-            }
-          },
-          onCopyTarget: () => void handleCopyQuickAddTarget(),
-          onTextChange: setQuickAddRelatedText,
-          onRelationTypeChange: setQuickAddRelatedType,
-          onSubmit: () => void handleSaveQuickAddRelated(),
+          onOpenChange: quickAddRelated.handleOpenChange,
+          onCopyTarget: () => void quickAddRelated.copyTarget(),
+          onTextChange: quickAddRelated.setText,
+          onRelationTypeChange: quickAddRelated.setRelationType,
+          onSubmit: () => void quickAddRelated.save(),
         }}
         generatedSimilar={{
           open: similarSheetOpen,
