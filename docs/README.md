@@ -43,6 +43,7 @@
 | 灾备与数据恢复 | `docs/dev/disaster-recovery.md` |
 | 平台层防护与事故响应（Nginx / 腾讯云 WAF / Cloudflare） | `docs/dev/incident-response-runbook.md` |
 | 文档与 OpenSpec 关联性 / 冲突 audit、部署平台对应翻译表 | `docs/dev/docs-audit-2026-05-15.md` |
+| 页面组件化、样式抽离、token 双轨等架构落差盘点 | `docs/system-design/architecture-audit-2026-05-16.md` |
 | OpenSpec、CHANGELOG、dev-log、收尾 | `openspec/specs/project-maintenance/spec.md`、`docs/dev/README.md` |
 
 ## 稳定规范到实现锚点
