@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireCurrentProfile } from "@/lib/server/auth";
 import { toApiErrorResponse } from "@/lib/server/api-error";
 import { NotFoundError } from "@/lib/server/errors";
+import { logApiError } from "@/lib/server/logger";
 import { getSceneRecordBySlug } from "@/lib/server/scene/service";
 import {
   generateSceneVariants,
@@ -122,6 +123,7 @@ export async function POST(
       { status: 200 },
     );
   } catch (error) {
+    logApiError("api/scenes/[slug]/variants", error, { request });
     return toApiErrorResponse(error, "Failed to generate variants.", { request });
   }
 }

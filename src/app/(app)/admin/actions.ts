@@ -19,6 +19,7 @@ import {
   updateSceneVisibility,
 } from "@/lib/server/admin/service";
 import { NotFoundError, ValidationError } from "@/lib/server/errors";
+import { logApiError } from "@/lib/server/logger";
 import { runSeedScenesSync } from "@/lib/server/scene/service";
 import {
   parseBooleanFromForm,
@@ -467,9 +468,8 @@ export async function enrichAdminPhraseAction(formData: FormData) {
   try {
     await enrichAdminUserPhraseById(userPhraseId);
   } catch (error) {
-    console.warn("[admin][phrases] enrich failed", {
-      userPhraseId,
-      error: error instanceof Error ? error.message : "unknown",
+    logApiError("admin/actions/enrichAdminPhraseAction", error, {
+      details: { userPhraseId },
     });
     notice = ADMIN_NOTICE.phraseEnrichFailed;
     tone = "danger";
@@ -498,9 +498,8 @@ export async function enrichAdminPhrasesBatchAction(formData: FormData) {
   try {
     await enrichAdminUserPhrasesByIds(userPhraseIds);
   } catch (error) {
-    console.warn("[admin][phrases] batch enrich failed", {
-      total: userPhraseIds.length,
-      error: error instanceof Error ? error.message : "unknown",
+    logApiError("admin/actions/enrichAdminPhrasesBatchAction", error, {
+      details: { total: userPhraseIds.length },
     });
     notice = ADMIN_NOTICE.batchEnrichFailed;
     tone = "danger";

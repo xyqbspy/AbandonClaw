@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { assertProfileCanGenerate, requireVerifiedCurrentProfile } from "@/lib/server/auth";
 import { toApiErrorResponse } from "@/lib/server/api-error";
-import { ValidationError } from "@/lib/server/errors";
+import { SceneParseError, ValidationError } from "@/lib/server/errors";
 import { callGlmChatCompletion } from "@/lib/server/glm-client";
 import { markHighCostUsage, reserveHighCostUsage } from "@/lib/server/high-cost-usage";
+import { logApiError } from "@/lib/server/logger";
 import { enforceHighCostRateLimit } from "@/lib/server/rate-limit";
 import { assertAllowedOrigin } from "@/lib/server/request-guard";
 import {
@@ -34,7 +35,7 @@ const parseWithDiagnostics = (rawText: string) => {
   } catch {
     const jsonCandidate = extractJsonCandidate(rawText);
     if (!jsonCandidate) {
-      throw new Error("Model output is not valid JSON.");
+      throw new SceneParseError("Model output is not valid JSON.");
     }
     return JSON.parse(jsonCandidate) as unknown;
   }
@@ -143,6 +144,7 @@ export async function POST(request: Request) {
       { status: 200 },
     );
   } catch (error) {
+    logApiError("api/phrases/similar/generate", error, { request });
     return toApiErrorResponse(error, "Similar expression generate failed.", { request });
   }
 }

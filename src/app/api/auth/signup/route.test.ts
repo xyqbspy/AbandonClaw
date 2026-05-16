@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test, { afterEach } from "node:test";
 import { RateLimitError, ValidationError } from "@/lib/server/errors";
 import { clearRateLimitStore, enforceRegistrationIpRateLimit } from "@/lib/server/rate-limit";
-import { handleSignupPost } from "./route";
+import { handleSignupGet, handleSignupPost } from "./route";
 
 const originalRegistrationIpLimitMaxAttempts = process.env.REGISTRATION_IP_LIMIT_MAX_ATTEMPTS;
 const originalRegistrationIpLimitWindowSeconds = process.env.REGISTRATION_IP_LIMIT_WINDOW_SECONDS;
@@ -271,4 +271,39 @@ test("signup handler 缺失验证码时不会创建账号", async () => {
 
   assert.equal(response.status, 400);
   assert.equal(registerCalled, false);
+});
+
+test("signup GET handler 返回当前注册模式与来源", async () => {
+  const response = await handleSignupGet(
+    new Request("http://localhost/api/auth/signup", { method: "GET" }),
+    {
+      getEffectiveRegistrationMode: async () => ({
+        mode: "invite_only",
+        source: "runtime",
+        updatedBy: null,
+        updatedAt: null,
+      }),
+    },
+  );
+
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.mode, "invite_only");
+  assert.equal(body.source, "runtime");
+});
+
+test("signup GET handler 在解析注册模式失败时返回带 requestId 的 500", async () => {
+  const response = await handleSignupGet(
+    new Request("http://localhost/api/auth/signup", { method: "GET" }),
+    {
+      getEffectiveRegistrationMode: async () => {
+        throw new Error("supabase down");
+      },
+    },
+  );
+
+  assert.equal(response.status, 500);
+  const body = await response.json();
+  assert.equal(body.code, "INTERNAL_ERROR");
+  assert.equal(typeof body.requestId, "string");
 });

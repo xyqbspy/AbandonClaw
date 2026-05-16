@@ -64,3 +64,16 @@ test("scene mutate handler 会返回模型解析后的 variants", async () => {
     variants: [sampleScene],
   });
 });
+
+test("scene mutate handler 在模型输出 JSON 结构非法时返回 422 SCENE_PARSE_ERROR", async () => {
+  const response = await handleSceneMutatePost(createJsonRequest({ scene: sampleScene }), {
+    requireCurrentProfile: async () => ({ user: { id: "user-1" }, profile: {} } as never),
+    callGlmChatCompletion: async () =>
+      JSON.stringify({ version: "v1", variants: [] }),
+  });
+
+  assert.equal(response.status, 422);
+  const body = await response.json();
+  assert.equal(body.code, "SCENE_PARSE_ERROR");
+  assert.equal(typeof body.requestId, "string");
+});

@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { toApiErrorResponse } from "@/lib/server/api-error";
 import { requireCurrentProfile } from "@/lib/server/auth";
-import { ValidationError } from "@/lib/server/errors";
+import { SceneParseError, ValidationError } from "@/lib/server/errors";
 import { callGlmChatCompletion } from "@/lib/server/glm-client";
+import { logApiError } from "@/lib/server/logger";
 import {
   buildSceneMutateUserPrompt,
   SCENE_MUTATE_SYSTEM_PROMPT,
@@ -131,11 +132,12 @@ export async function handleSceneMutatePost(
     );
 
     if (!isValidSceneMutateResponse(parsed)) {
-      throw new Error("Model output JSON does not match SceneMutateResponse basic structure.");
+      throw new SceneParseError("Model output JSON does not match SceneMutateResponse basic structure.");
     }
 
     return NextResponse.json(parsed, { status: 200 });
   } catch (error) {
+    logApiError("api/scene/mutate", error, { request });
     return toApiErrorResponse(error, "Scene mutate failed.", { request });
   }
 }

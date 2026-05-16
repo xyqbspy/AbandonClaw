@@ -60,6 +60,8 @@ test("CSP report 拒绝非法 JSON payload", async () => {
   assert.equal(response.status, 400);
   const body = await response.json();
   assert.equal(body.error, "Invalid JSON payload.");
+  assert.equal(body.code, "VALIDATION_ERROR");
+  assert.equal(typeof body.requestId, "string");
 });
 
 test("CSP report 拒绝缺少 csp-report 字段的 payload", async () => {
@@ -67,6 +69,8 @@ test("CSP report 拒绝缺少 csp-report 字段的 payload", async () => {
   assert.equal(response.status, 400);
   const body = await response.json();
   assert.equal(body.error, "Invalid CSP report payload.");
+  assert.equal(body.code, "VALIDATION_ERROR");
+  assert.equal(typeof body.requestId, "string");
 });
 
 test("CSP report 命中限流时返回 429", async () => {

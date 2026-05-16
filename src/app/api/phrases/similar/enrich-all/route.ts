@@ -6,6 +6,7 @@ import {
 } from "@/lib/server/auth";
 import { toApiErrorResponse } from "@/lib/server/api-error";
 import { ValidationError } from "@/lib/server/errors";
+import { logApiError } from "@/lib/server/logger";
 import { enrichAiExpressionLearningInfo } from "@/lib/server/phrases/service";
 import { parseJsonBody, parseOptionalTrimmedString } from "@/lib/server/validation";
 
@@ -55,6 +56,11 @@ export async function POST(request: Request) {
         });
         results.push({ userPhraseId: result.userPhraseId, status: "done" });
       } catch (error) {
+        logApiError("api/phrases/similar/enrich-all", error, {
+          request,
+          userId: user.id,
+          details: { userPhraseId },
+        });
         results.push({
           userPhraseId,
           status: "failed",
@@ -64,6 +70,7 @@ export async function POST(request: Request) {
     }
     return NextResponse.json({ items: results }, { status: 200 });
   } catch (error) {
+    logApiError("api/phrases/similar/enrich-all", error, { request });
     return toApiErrorResponse(error, "Failed to enrich similar expressions in batch.", { request });
   }
 }

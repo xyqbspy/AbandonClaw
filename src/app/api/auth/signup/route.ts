@@ -39,20 +39,32 @@ const signupRouteDependencies: SignupRouteDependencies = {
   registerWithEmailPassword,
 };
 
-export async function GET() {
-  const registrationMode = await getEffectiveRegistrationMode();
-  return NextResponse.json(
-    {
-      mode: registrationMode.mode,
-      source: registrationMode.source,
-    },
-    {
-      status: 200,
-      headers: {
-        "Cache-Control": "no-store",
+export async function handleSignupGet(
+  request: Request,
+  dependencies: Pick<SignupRouteDependencies, "getEffectiveRegistrationMode"> = signupRouteDependencies,
+) {
+  try {
+    const registrationMode = await dependencies.getEffectiveRegistrationMode();
+    return NextResponse.json(
+      {
+        mode: registrationMode.mode,
+        source: registrationMode.source,
       },
-    },
-  );
+      {
+        status: 200,
+        headers: {
+          "Cache-Control": "no-store",
+        },
+      },
+    );
+  } catch (error) {
+    logApiError("api/auth/signup", error, { request });
+    return toApiErrorResponse(error, "Failed to load registration mode.", { request });
+  }
+}
+
+export async function GET(request: Request) {
+  return handleSignupGet(request);
 }
 
 export async function handleSignupPost(

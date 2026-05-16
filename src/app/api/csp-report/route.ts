@@ -1,6 +1,7 @@
 import * as Sentry from "@sentry/nextjs";
 import { NextResponse } from "next/server";
 import { toApiErrorResponse } from "@/lib/server/api-error";
+import { ValidationError } from "@/lib/server/errors";
 import { enforceRateLimit, getClientIp } from "@/lib/server/rate-limit";
 
 const CSP_REPORT_RATE_LIMIT = 30;
@@ -53,12 +54,12 @@ export async function POST(request: Request) {
     try {
       raw = await request.json();
     } catch {
-      return NextResponse.json({ error: "Invalid JSON payload." }, { status: 400 });
+      throw new ValidationError("Invalid JSON payload.");
     }
 
     const violation = extractViolation(raw);
     if (!violation) {
-      return NextResponse.json({ error: "Invalid CSP report payload." }, { status: 400 });
+      throw new ValidationError("Invalid CSP report payload.");
     }
 
     Sentry.withScope((scope) => {

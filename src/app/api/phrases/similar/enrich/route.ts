@@ -6,6 +6,7 @@ import {
 } from "@/lib/server/auth";
 import { toApiErrorResponse } from "@/lib/server/api-error";
 import { ValidationError } from "@/lib/server/errors";
+import { logApiError } from "@/lib/server/logger";
 import { enrichAiExpressionLearningInfo } from "@/lib/server/phrases/service";
 import { parseJsonBody, parseOptionalTrimmedString } from "@/lib/server/validation";
 
@@ -36,6 +37,7 @@ export async function POST(request: Request) {
     });
     return NextResponse.json(result, { status: 200 });
   } catch (error) {
+    logApiError("api/phrases/similar/enrich", error, { request });
     return toApiErrorResponse(error, "Failed to enrich similar expression.", { request });
   }
 }

@@ -3,6 +3,7 @@ import { assertProfileCanGenerate, requireCurrentProfile } from "@/lib/server/au
 import { toApiErrorResponse } from "@/lib/server/api-error";
 import { ValidationError } from "@/lib/server/errors";
 import { callGlmChatCompletion } from "@/lib/server/glm-client";
+import { logApiError } from "@/lib/server/logger";
 import { extractJsonCandidate } from "@/lib/server/scene-json";
 import {
   MANUAL_EXPRESSION_ASSIST_SYSTEM_PROMPT,
@@ -211,6 +212,7 @@ export async function POST(request: Request) {
       { status: 200 },
     );
   } catch (error) {
+    logApiError("api/phrases/manual-assist", error, { request });
     return toApiErrorResponse(error, "Manual phrase assist failed.", { request });
   }
 }

@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { toApiErrorResponse } from "@/lib/server/api-error";
 import { requireCurrentProfile } from "@/lib/server/auth";
-import { isAppError, ValidationError } from "@/lib/server/errors";
+import { ValidationError } from "@/lib/server/errors";
+import { logApiError } from "@/lib/server/logger";
 import { parseJsonBody } from "@/lib/server/validation";
 import { ParseSceneRequest } from "@/lib/types/scene-parser";
 import { parseImportedSceneWithCache } from "@/lib/server/scene/import";
@@ -21,13 +22,13 @@ const isValidPayload = (
 interface SceneParseHandlerDependencies {
   requireCurrentProfile: typeof requireCurrentProfile;
   parseImportedSceneWithCache: typeof parseImportedSceneWithCache;
-  logError: typeof console.error;
+  logApiError: typeof logApiError;
 }
 
 const defaultDependencies: SceneParseHandlerDependencies = {
   requireCurrentProfile,
   parseImportedSceneWithCache,
-  logError: console.error,
+  logApiError,
 };
 
 export async function handleSceneParsePost(
@@ -58,12 +59,7 @@ export async function handleSceneParsePost(
       { status: 200 },
     );
   } catch (error) {
-    if (error instanceof Error) {
-      dependencies.logError("[api/scene/parse] failed", {
-        message: error.message,
-        ...(isAppError(error) ? { code: error.code, details: error.details ?? null } : {}),
-      });
-    }
+    dependencies.logApiError("api/scene/parse", error, { request });
     return toApiErrorResponse(error, "Scene parse failed.", { request });
   }
 }

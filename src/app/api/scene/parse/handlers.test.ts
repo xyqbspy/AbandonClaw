@@ -11,7 +11,7 @@ const createJsonRequest = (body: unknown) =>
   });
 
 test("scene parse handler 在解析失败时返回 422 和结构化错误", async () => {
-  const logs: unknown[] = [];
+  const logs: Array<[string, unknown, Record<string, unknown>?]> = [];
   const response = await handleSceneParsePost(
     createJsonRequest({
       rawText: "This is a long enough source text for parsing.",
@@ -25,8 +25,8 @@ test("scene parse handler 在解析失败时返回 422 和结构化错误", asyn
           parseError: "Extracted JSON candidate is still invalid JSON.",
         });
       },
-      logError: (...args) => {
-        logs.push(args);
+      logApiError: (module, error, context) => {
+        logs.push([module, error, context]);
       },
     },
   );
@@ -41,6 +41,8 @@ test("scene parse handler 在解析失败时返回 422 和结构化错误", asyn
   });
   assert.equal(typeof body.requestId, "string");
   assert.equal(logs.length, 1);
+  assert.equal(logs[0][0], "api/scene/parse");
+  assert.ok(logs[0][1] instanceof SceneParseError);
 });
 
 test("scene parse handler 会透传 force=true 给解析服务", async () => {
@@ -78,7 +80,7 @@ test("scene parse handler 会透传 force=true 给解析服务", async () => {
           },
         };
       },
-      logError: () => {},
+      logApiError: () => {},
     },
   );
 
@@ -98,7 +100,7 @@ test("scene parse handler 会拒绝未登录请求", async () => {
     parseImportedSceneWithCache: async () => {
       throw new Error("should not be called");
     },
-    logError: () => {},
+    logApiError: () => {},
   });
 
   assert.equal(response.status, 401);

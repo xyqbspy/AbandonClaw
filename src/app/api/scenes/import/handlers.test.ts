@@ -38,7 +38,7 @@ const createLesson = (slug: string, title: string): Lesson => ({
 
 test("scene import handler 在解析失败时返回 422 并带 requestId", async () => {
   clearRateLimitStore();
-  const logs: unknown[] = [];
+  const logs: Array<[string, unknown, Record<string, unknown>?]> = [];
   const response = await handleSceneImportPost(
     createJsonRequest({
       sourceText: "This is a long enough source text for importing.",
@@ -53,8 +53,8 @@ test("scene import handler 在解析失败时返回 422 并带 requestId", async
       createImportedScene: async () => {
         throw new Error("should not reach createImportedScene");
       },
-      logError: (...args) => {
-        logs.push(args);
+      logApiError: (module, error, context) => {
+        logs.push([module, error, context]);
       },
     },
   );
@@ -67,6 +67,8 @@ test("scene import handler 在解析失败时返回 422 并带 requestId", async
   });
   assert.equal(typeof body.requestId, "string");
   assert.equal(logs.length, 1);
+  assert.equal(logs[0][0], "api/scenes/import");
+  assert.ok(logs[0][1] instanceof SceneParseError);
 });
 
 test("scene import handler 会裁剪 title/theme 并把 userId 传给服务层", async () => {
@@ -114,7 +116,7 @@ test("scene import handler 会裁剪 title/theme 并把 userId 传给服务层",
         createReceived = params;
         return createLesson("scene-1", "Scene 1");
       },
-      logError: () => {},
+      logApiError: () => {},
     },
   );
 

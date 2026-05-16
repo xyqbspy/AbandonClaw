@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { assertProfileCanGenerate, requireVerifiedCurrentProfile } from "@/lib/server/auth";
 import { toApiErrorResponse } from "@/lib/server/api-error";
 import { markHighCostUsage, reserveHighCostUsage } from "@/lib/server/high-cost-usage";
+import { logApiError } from "@/lib/server/logger";
 import { enforceHighCostRateLimit } from "@/lib/server/rate-limit";
 import { assertAllowedOrigin } from "@/lib/server/request-guard";
 import {
@@ -46,6 +47,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json(response, { status: 200 });
   } catch (error) {
+    logApiError("api/expression-map/generate", error, { request });
     return toApiErrorResponse(error, "Failed to generate expression map.", { request });
   }
 }

@@ -1,5 +1,54 @@
 # Dev Log
 
+### [2026-05-17] API 错误响应一致性收口（harden-api-error-response-consistency 实施）
+- 类型：Spec-Driven（OpenSpec change `harden-api-error-response-consistency`）
+- 状态：实施 + 测试 + 验证完成，等待 commit + archive
+
+#### 背景
+`docs/dev/api-error-response-audit-2026-05-16.md` 对照 `api-operational-guardrails` spec 盘点了 58 个 API route + admin server actions 的错误响应一致性，识别出 3 处 P0（响应契约破坏）+ 10 处 P1（高成本路径可观测性缺失），共 13 处落差。本轮按 audit §3 批次 A 一次性收口。
+
+#### OpenSpec change
+- `openspec/changes/harden-api-error-response-consistency/`（proposal + tasks + spec delta），`pnpm exec openspec validate --strict` 通过。
+- spec delta：ADD "高成本接口必须通过 logApiError 注入 module 关联"；MODIFIED "未知服务端异常必须被错误追踪系统捕获"（补 SceneParseError / AuthError 包装约束 + 受控失败类型映射表）。
+
+#### 本轮落地（按 audit 编号）
+**P0**
+- §2.1 `auth/signup` GET 加 try/catch，POST/GET 都通过 `signupRouteDependencies` DI 注入 `getEffectiveRegistrationMode`
+- §2.2 `csp-report` 两处早期返回改 `throw new ValidationError(...)`，统一走外层 catch
+- §2.3 `auth/logout` 包装从 `Error` → `AuthError`，POST 改 `handleLogoutPost` 支持单测注入 Supabase factory
+
+**P1**
+- §2.4 (a)–(g) 7 处高成本路径补 `logApiError(module, error, { request })`：scene/parse、scenes/import、scenes/[slug]/variants POST、phrases/manual-assist、expression-map/generate、phrases/similar/generate、phrases/similar/enrich
+- §2.4 (a)/(b) DI 字段 `logError` 重命名为 `logApiError`，移除间接 console.error 层
+- §2.4 (f) `similar/generate` plain `Error("Model output is not valid JSON.")` 改 `SceneParseError`
+- §2.5 `phrases/similar/enrich-all` 内层 catch 与外层 catch 都加 `logApiError`，response shape 不变
+- §2.6 `scene/mutate` plain `Error` 改 `SceneParseError`；外层 catch 加 `logApiError`
+- §2.7 `admin/actions.ts` 两个 enrich action 把 `console.warn` 升级 `logApiError("admin/actions/<name>", ...)`
+
+#### 验证
+- 新增 / 修改测试 22/22 通过：auth/signup（5 既有 + 2 新增 GET）/ auth/logout（2 新增）/ csp-report（5 既有 + 2 强化 code 断言）/ scene/mutate（2 既有 + 1 新增模型输出非法）/ scene/parse handlers（3 既有，DI 字段更名）/ scenes/import handlers（2 既有，DI 字段更名）
+- `pnpm run test:unit`：473 tests，472 pass，**1 pre-existing fail**（`scene practice set GET`，与本轮无关，已确认 stash 回退到 main 也复现；该测试 mock 的 `requireCurrentProfile` 返回 `{ user }` 缺 `profile`，被 route GET 路径的 `assertProfileCanWrite(profile)` 拦截，属于历史 mock 漂移，不在本 change 范围）
+- `pnpm run lint`：0 errors / 2 pre-existing warnings（与本轮无关）
+- `pnpm run text:check-mojibake`：通过
+- `pnpm exec openspec validate harden-api-error-response-consistency --strict`：通过
+- `pnpm run maintenance:check`：只报本 change tasks 标识为 in_progress（实施期正常）+ 2 个预先存在的 active change，无新增失败
+
+#### 用户可感知变化
+- `auth/logout` Supabase signOut 失败响应：500 INTERNAL_ERROR → 401 AUTH_UNAUTHORIZED + `requestId`（前端注销失败时拿到更准确的语义，但前端只关心 ok / 非 ok，行为兼容）
+- `csp-report` 早期返回 status=400：plain `{error}` → `{error, code, requestId, details:null}`（浏览器 CSP report 不读 body，无可感知影响）
+- 其它 P0/P1 修复对成功路径无影响
+
+#### 本轮明确不收项
+- §2.8 admin server actions 错误返回三种模式混用：需单独 change `define-server-action-error-contract`
+- §2.9 lint / maintenance 防回归规则：等本轮稳定后再评估
+
+#### 文件清单
+- 修改 11 个 route / handlers：src/app/api/{auth/signup,auth/logout,csp-report,scene/parse/handlers,scenes/import/handlers,scenes/[slug]/variants,phrases/manual-assist,phrases/similar/{generate,enrich,enrich-all},expression-map/generate,scene/mutate}/route(s|.ts)
+- 修改 1 个 server actions 文件：src/app/(app)/admin/actions.ts
+- 修改 / 新增 6 个测试文件：scene/parse + scenes/import + scene/mutate + csp-report + auth/signup + 新建 auth/logout/route.test.ts
+- 新增 3 份 OpenSpec change 文件 + 1 份 audit 文档 + 更新 docs/dev/README.md 入口
+- 与 `docs/dev/api-error-response-audit-2026-05-16.md` §2.1–§2.7 状态标注同步
+
 ### [2026-05-16] scene-detail-page.tsx 第二轮拆分（decompose-scene-detail-page-r2 落地）
 - 类型：Spec-Driven（OpenSpec change `decompose-scene-detail-page-r2`）
 - 状态：实施 + 测试 + 验证完成，已提交（commit `c2ee1d2`），等待 archive

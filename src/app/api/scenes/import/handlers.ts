@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { toApiErrorResponse } from "@/lib/server/api-error";
-import { isAppError } from "@/lib/server/errors";
+import { logApiError } from "@/lib/server/logger";
 import { enforceRateLimit } from "@/lib/server/rate-limit";
 import { assertAllowedOrigin } from "@/lib/server/request-guard";
 import {
@@ -18,14 +18,14 @@ interface SceneImportHandlerDependencies {
   requireCurrentProfile: typeof requireCurrentProfile;
   parseImportedSceneWithCache: typeof parseImportedSceneWithCache;
   createImportedScene: typeof createImportedScene;
-  logError: typeof console.error;
+  logApiError: typeof logApiError;
 }
 
 const defaultDependencies: SceneImportHandlerDependencies = {
   requireCurrentProfile,
   parseImportedSceneWithCache,
   createImportedScene,
-  logError: console.error,
+  logApiError,
 };
 
 export async function handleSceneImportPost(
@@ -72,12 +72,7 @@ export async function handleSceneImportPost(
       { status: 200 },
     );
   } catch (error) {
-    if (error instanceof Error) {
-      dependencies.logError("[api/scenes/import] failed", {
-        message: error.message,
-        ...(isAppError(error) ? { code: error.code, details: error.details ?? null } : {}),
-      });
-    }
+    dependencies.logApiError("api/scenes/import", error, { request });
     return toApiErrorResponse(error, "Failed to import scene.", { request });
   }
 }
