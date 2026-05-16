@@ -1,5 +1,44 @@
 # Dev Log
 
+### [2026-05-16] TTS warmup P0/P1：observability + cancel + Redis signed URL + cooldown ladder + 推荐 scene 预热
+- 类型：Cleanup + 工程加固（同源 OpenSpec change `harden-tts-warmup-p0p1`，未走 archive）
+- 状态：代码已落地并提交（commit `0edf0e7`），50/50 测试全绿
+
+#### 背景
+上轮 04dba5a 落地了"一天内不重复请求 + warmup 内存防护"。剩余的 TTS 预热架构问题：
+1. 用户从 scene A 切到 scene B，A 排队和在飞的 warmup 不会被打断，浪费带宽
+2. sentence/chunk 失败后下次入队直接 reset 重跑，没有节流，疑难内容反复打 msedge-tts
+3. 服务端 signed URL 缓存是进程内 Map，PM2 cluster 模式下每个 worker 各自一份，命中率被打折
+4. Today 只 warm continueLearning 的 scene，3 个推荐 scene 点进去前都得现场加载
+5. idle scheduler 因为页面 hidden / 滚动 / 弱网静默跳过，生产没法回答 warmup 实际命中率
+
+#### OpenSpec change
+- `openspec/changes/harden-tts-warmup-p0p1/`（proposal + tasks；specs/ 为空，本次未提 spec delta，按"工程加固"定位不走完整 Spec-Driven archive 流程）
+
+#### 本次落地
+- §1 Observability：`scene-audio-warmup-scheduler` 任务转折（loaded/failed/skipped）发 `warmup_task_finished`（附 status/kind/sceneSlug/priority/source/durationMs）；promote / reset / cancel 路径发 `warmup_task_promoted` / `warmup_task_reset` / `warmup_task_cancelled`；`scheduleSceneIdleAudioWarmup.shouldPauseRound` 命中 page-hidden/save-data-or-2g/playback-loading/interaction-recent 时发 `warmup_idle_round_skipped`。
+- §2 Cross-scene cancel：`cancelWarmupsBySceneSlug(slug)`，queued → skipped，loading → `AbortController.abort()`；维护 `taskAbortControllers: Map<key, AbortController>`，进入 loading 时创建、终态清理；`requestTtsUrl` / `ensureSentenceAudio` / `ensureChunkAudio` / `ensureSceneFullAudio` 接 optional `AbortSignal`；`use-scene-detail-playback` cleanup 时调 cancel。
+- §3 推荐 scene 背景预热：`today-page-client` 在 sceneList 加载完后，复用 `src/lib/cache/scene-prefetch.ts` 的 `scheduleScenePrefetch`，对前 2 个推荐 scene（排除 continueSlug）发起 background warm；saveData/2g 自带跳过，scheduler 内部 200/120 自动 prune，不需要 today 一侧额外清理。
+- §4 Redis signed URL：新建 `src/lib/server/tts/signed-url-cache.ts`，Upstash 优先 + 内存 Map fallback；`UPSTASH_REDIS_REST_URL` 缺失时退化保持本地零配置；`service.ts` 把原 in-memory `signedUrlCache` 替换为 helper 调用，`pendingSignedUrlRequests` 仍保留为进程内短时去重。
+- §5 sentence/chunk failure cooldown 泛化：`audioRetryFailureRecords` Map + ladder `[0, 5s, 60s, 300s, 1800s]`（1=立即可重试、2=5s、3=60s、4=300s、5+=1800s 上限）；命中 throw + `tts_request_cooling_down` 事件，成功（含 cache 命中）清零；scene_full 走自己的 45s `sceneFullFailureCooldowns` 独立路径不进入泛化。
+- §5.7 bug fix（测试发现）：原 `getAudioRetryCooldown` 在 cooldown 过期时把 record 整条 delete，下一次 `markAudioRetryFailure` previous=null、ladder 永远停在 1 次失败。改为保留 failureCount，按 `lastFailedAt` 静默 30min 后才视为新一轮（与 ladder 上限 1800s 对齐）。
+
+#### 验证
+- 单测 50/50 通过：`scene-audio-warmup-scheduler.test.ts` (14) + `tts-api.test.ts` (16) + `tts-api.scene-loop.test.ts` (2) + `tts-warmup-registry.test.ts` (7) + `today-page-client.test.tsx` (6) + 新建 `signed-url-cache.test.ts` (5)
+- `pnpm run lint`：无新增 warning（仅 2 个旧 warning 不在改动文件内）
+- `npx tsc --noEmit`：本次触动文件无新增错误（其它 pre-existing test 错误未动）
+- `pnpm run text:check-mojibake`：通过
+
+#### 文档同步（本轮）
+- `docs/system-design/audio-tts-pipeline.md`：§4.1 改"signed URL 缓存是进程内 Map"→ Upstash Redis + 内存 fallback；新增 §5.4 sentence/chunk 失败 cooldown ladder；新增 §7.8 跨 scene cancel；新增 §7.9 today 推荐 scene 背景预热；新增 §15.4 scheduler lifecycle 事件清单（`warmup_task_*` / `warmup_idle_round_skipped` / `tts_request_cooling_down`）
+- `CHANGELOG.md`：2026-05-16 加 2 条用户可感知（推荐 scene 点开零等待 + 切场景自动打断后台预热）
+
+#### 剩余风险 / 不收项
+- OpenSpec change `harden-tts-warmup-p0p1` 当前 specs/ 为空、未走 archive。本次按"工程加固 + 后台收口"定位，不改用户契约（产品语义沿用现有 spec：弱网跳过 / scene full 45s 冷却 / warmup observability），如果后续要严格走 Spec-Driven 完成态再补 delta 并归档。
+- `audioRetryFailureRecords` 是进程内 Map，没有上限或 LRU 裁剪。当前单用户单会话 cache key 量级（每 scene 几十 sentence + chunk）下不构成问题；如果某天 key 量级跨 100k，再考虑加裁剪。
+- Upstash Redis 失败时退化到 fallback Map，但 fallback Map 不跨 worker 共享。线上 Upstash 长时间不可用时，PM2 多 worker 命中率会回到改造前。helper 已加 `console.warn`，可以从 PM2 log 看到。
+- 跨 scene cancel 触发点目前只在 `use-scene-detail-playback` cleanup。如果未来有别的页面级离开 scene 入口（例如全局路由 hook），需要补一次调用，否则旧任务还是会跑完。
+
 ### [2026-05-15] 文档 audit：腾讯云部署修正 + 命名/引用收口
 - 类型：Cleanup / 文档修正
 - 状态：已完成

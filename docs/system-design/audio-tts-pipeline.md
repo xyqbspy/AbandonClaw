@@ -95,7 +95,7 @@
 
 - 运行时真正依赖的是 Supabase Storage，不是本地 `public/audio`
 - 本地文件写入更像兼容兜底或本地开发副产物
-- 服务端签名 URL 缓存是进程内 `Map`，TTL 约 59 分钟
+- 服务端签名 URL 缓存优先走 Upstash Redis（`UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN`），TTL 约 59 分钟；Redis 未配置或调用失败时退化到进程内 `Map`，本地开发零配置可用。改造原因：PM2 cluster 模式下每个 worker 各自维护一份 Map 会把同一 `storagePath` 的命中率稀释；改成 Redis 共享后任意 worker 命中即所有 worker 受益。helper 在 `src/lib/server/tts/signed-url-cache.ts`。
 
 ### 4.2 本地 `public/audio` 产物边界
 
@@ -229,6 +229,22 @@ chunk 音频重生成前也会主动清：
 - 每次新音频成功持久化到浏览器 Cache Storage 后，都会检查条目数与总大小是否超限
 - 若超限，系统会按最旧条目优先裁剪
 - 裁剪失败只记日志，不阻塞当前音频请求、预取或播放
+
+### 5.4 sentence / chunk 失败 cooldown ladder
+
+`requestTtsUrl()` 在 sentence / chunk 路径上维护通用失败 cooldown，避免持续失败的内容反复打 msedge-tts：
+
+- 状态结构 `audioRetryFailureRecords: Map<cacheKey, { failureCount, lastFailedAt, cooldownMs, expiresAt }>`
+- 失败次数 → cooldown ladder：
+  - 1 次：0ms（立即可重试）
+  - 2 次：5s
+  - 3 次：60s
+  - 4 次：300s（5min）
+  - 5+ 次：1800s（30min，上限）
+- cooldown 命中时直接 `throw`，不发 `/api/tts`，并记录 `tts_request_cooling_down` 事件
+- 成功（包括命中浏览器持久缓存或内存 URL 缓存）即调 `clearAudioRetryFailure()` 把 failureCount 清零
+- record 的 cooldown 过期后保留 failureCount，只有 `lastFailedAt` 静默 30min 后才视为新一轮（重新从 1 次失败起算）。这条规则是 ladder 能稳定升级的关键：若每次 cooldown 过期就丢 record，第 2 次失败永远会被当成第 1 次重新计数。
+- 注意：`scene_full` 走自己的 `sceneFullFailureCooldowns`（固定 45s + 失败 reason 分类），不进入这条泛化路径。
 
 ## 6. 客户端播放链路
 
@@ -406,6 +422,31 @@ chunk 音频重生成前也会主动清：
 - `today continue learning`
 
 这些 lesson 级轻量预热现在会按统一 key 去重，不再因为入口不同就各自重复热一次。
+
+### 7.8 跨 scene cancel
+
+`src/lib/utils/scene-audio-warmup-scheduler.ts` 现在提供 `cancelWarmupsBySceneSlug(sceneSlug)`：
+
+- queued 任务直接标 `skipped`，永远不会进入 loading
+- loading 任务调用对应 `AbortController.abort()`，底层 `fetch` 收到 `AbortError` 后不写 cache、不 preload、也不计入失败 cooldown
+- scheduler 维护 `taskAbortControllers: Map<key, AbortController>`，task 进入 loading 时创建 controller，进入终态后清理
+
+`requestTtsUrl()` 接受 optional `signal: AbortSignal`，沿调用栈透传到 `ensureSentenceAudio` / `ensureChunkAudio` / `ensureSceneFullAudio`。
+
+触发点：
+
+- `src/app/(app)/scene/[slug]/use-scene-detail-playback.ts` 的 cleanup（用户离开 scene）会调 `cancelWarmupsBySceneSlug(currentSlug)`，避免旧 scene 的排队和在飞 fetch 继续占用用户带宽。
+
+observability：每次 cancel 会记录 `warmup_task_cancelled`，payload 含 `previousStatus`（`queued` 或 `loading`）、`kind`、`priority`、`source`。
+
+### 7.9 today 推荐 scene 背景预热
+
+`src/features/today/components/today-page-client.tsx` 在 `sceneList` 加载完成后，对前 N 个推荐 scene（默认 N=2，排除 `continueLearning.sceneSlug`）调用 `scheduleScenePrefetch(slugs, { currentSlug })`：
+
+- 复用 `src/lib/cache/scene-prefetch.ts`，自带 idle callback 触发、`saveData / slow-2g / 2g` 跳过、scene cache 命中检查、`scheduleLessonAudioWarmup` 自动调用
+- 不需要在 today 一侧额外清理；scheduler 内部已有 200/120 自动 prune
+
+效果：用户从 today 点开推荐 scene 时，第 1 句通常已 warm，首次播放零等待。
 
 ## 8. 当前链路的实际优点
 
@@ -691,6 +732,19 @@ block 音频继续复用 sentence TTS 通道，但事件中仍保持：
 - 样本少时 gain 可能为负，这是调度诊断信号，不是自动失败条件。
 - 老事件没有 `wasWarmed` 时按 cold 处理。
 - registry 是内存态，刷新页面后 registry 会重置；事件记录仍按 `client-events` 的本地存储保留。
+
+### 15.4 Scheduler lifecycle 事件
+
+除了上面的"资源就绪与播放命中"事件外，`scene-audio-warmup-scheduler` 与 idle warmup 还会发出 scheduler 自身的诊断事件，用来回看预热任务实际有没有在调度链路上跑通：
+
+- `warmup_task_finished`：单个 warmup task 进入终态，payload `status ∈ {loaded, failed, skipped}` + `kind` + `sceneSlug` + `priority` + `source` + `durationMs`（`startedAt` 到完成的耗时，单位 ms）
+- `warmup_task_promoted`：已存在的 task 被更高优先级重新入队，payload `previousPriority` → `nextPriority`
+- `warmup_task_reset`：曾失败 / 跳过的 task 被重新入队，payload `previousStatus` + `priority` + `source`
+- `warmup_task_cancelled`：被 `cancelWarmupsBySceneSlug` 打断，payload `previousStatus`（`queued` 或 `loading`）
+- `warmup_idle_round_skipped`：`scheduleSceneIdleAudioWarmup` 因 `page-hidden` / `save-data-or-2g` / `playback-loading` / `interaction-recent` 跳过当前轮次，payload `reason` + `completedRounds` + `nextIndex`
+- `tts_request_cooling_down`：sentence / chunk 在 cooldown ladder 命中时直接 throw 而没发 fetch，payload `kind` + `cacheKey` + `failureCount` + `cooldownMs` + `remainingMs`
+
+这组事件不进入 §15.3 的预热收益 summary（那是基于播放事件），但同样落 `client-events` 本地存储，可以在 `/admin/observability` 的原始事件列表里直接查到，用于回答"预热到底有没有真的跑、是不是被取消、是不是因为弱网跳过、是不是命中失败 cooldown"等问题。
 
 ## 16. scenes 循环复习播放
 
