@@ -42,7 +42,7 @@ export default async function ProgressPage() {
   const studyHours = Math.max(0, Math.round((overview.recentStudyMinutes / 60) * 10) / 10);
 
   return (
-    <main className="mx-auto max-w-6xl space-y-8 px-6 py-6 sm:py-8 lg:px-10">
+    <main className="mx-auto max-w-6xl space-y-6 px-3 py-6 sm:space-y-8 sm:py-8 lg:px-5">
       <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-3xl font-black tracking-tight text-slate-900">你的学习节奏</h1>
@@ -64,8 +64,8 @@ export default async function ProgressPage() {
         </div>
       </header>
 
-      <section className="grid grid-cols-1 gap-6 md:grid-cols-4">
-        <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
+      <section className="grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-4">
+        <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm sm:p-6">
           <p className="text-xs font-bold text-slate-400 uppercase">连续学习</p>
           <div className="mt-2 flex items-baseline gap-2">
             <span className="text-3xl font-black text-blue-600">{overview.streakDays}</span>
@@ -80,7 +80,7 @@ export default async function ProgressPage() {
             ))}
           </div>
         </div>
-        <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
+        <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm sm:p-6">
           <p className="text-xs font-bold text-slate-400 uppercase">表达资产 / 已收藏表达</p>
           <div className="mt-2 flex items-baseline gap-2">
             <span className="text-3xl font-black text-slate-800">{overview.savedPhraseCount}</span>
@@ -88,7 +88,7 @@ export default async function ProgressPage() {
           </div>
           <p className="mt-4 text-[10px] leading-tight text-slate-400">来自场景学习与复习沉淀的表达资产。</p>
         </div>
-        <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
+        <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm sm:p-6">
           <p className="text-xs font-bold text-slate-400 uppercase">累计时长</p>
           <div className="mt-2 flex items-baseline gap-2">
             <span className="text-3xl font-black text-slate-800">{overview.recentStudyMinutes}</span>
@@ -96,7 +96,7 @@ export default async function ProgressPage() {
           </div>
           <p className="mt-4 text-[10px] leading-tight text-slate-400">最近 7 天约 {studyHours} 小时的有效输入。</p>
         </div>
-        <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
+        <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm sm:p-6">
           <p className="text-xs font-bold text-slate-400 uppercase">复习正确率</p>
           <div className="mt-2 flex items-baseline gap-2">
             <span className="text-3xl font-black text-emerald-500">{reviewAccuracyLabel}</span>
@@ -105,8 +105,8 @@ export default async function ProgressPage() {
         </div>
       </section>
 
-      <section className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm sm:p-8">
-        <h2 className="mb-6 flex items-center gap-2 text-sm font-bold text-slate-800">
+      <section className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm sm:p-6">
+        <h2 className="mb-4 flex items-center gap-2 text-sm font-bold text-slate-800 sm:mb-6">
           <CalendarDays className="size-4 text-blue-500" aria-hidden="true" />
           学习热力图
         </h2>
@@ -129,13 +129,13 @@ export default async function ProgressPage() {
         </div>
       </section>
 
-      <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
-        <section className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm sm:p-8">
-          <h2 className="mb-6 flex items-center gap-2 text-sm font-bold text-slate-800">
+      <div className="grid grid-cols-1 gap-4 sm:gap-8 md:grid-cols-2">
+        <section className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm sm:p-6">
+          <h2 className="mb-4 flex items-center gap-2 text-sm font-bold text-slate-800 sm:mb-6">
             <TrendingUp className="size-4 text-blue-500" aria-hidden="true" />
             最近 7 天学习趋势
           </h2>
-          <div className="flex h-64 items-end justify-between gap-3 rounded-xl border border-dashed border-slate-300 bg-gradient-to-b from-slate-100 to-white p-5">
+          <div className="flex h-64 items-end justify-between gap-3 rounded-xl border border-dashed border-slate-300 bg-gradient-to-b from-slate-100 to-white p-3 sm:p-5">
             {trendBars.map((height, index) => (
               <div key={trendLabels[index]} className="flex h-full flex-1 flex-col justify-end gap-2">
                 <div
@@ -149,8 +149,8 @@ export default async function ProgressPage() {
           <p className="mt-4 text-xs text-slate-400">先用近 7 天学习时长趋势占位，后续可接入更细的每日学习事件。</p>
         </section>
 
-        <section className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm sm:p-8">
-          <h2 className="mb-6 text-sm font-bold text-slate-800">成长足迹</h2>
+        <section className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm sm:p-6">
+          <h2 className="mb-4 text-sm font-bold text-slate-800 sm:mb-6">成长足迹</h2>
           <div className="space-y-6">
             <TimelineItem
               title={`完成场景：${overview.completedScenesCount} 个`}

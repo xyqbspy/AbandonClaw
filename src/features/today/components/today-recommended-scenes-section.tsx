@@ -71,11 +71,11 @@ export function TodayRecommendedScenesSection({
       </div>
 
       {loading && !nextScene ? (
-        <div className="rounded-[1.5rem] border border-slate-200 bg-white p-5">
+        <div className="rounded-[1.5rem] border border-slate-200 bg-white p-4 sm:p-5">
           <LoadingState text={loadingText} className="py-0" />
         </div>
       ) : !nextScene ? (
-        <div className="rounded-[1.5rem] border border-dashed border-slate-200 bg-slate-900/5 p-5 font-sans text-[15px] text-slate-500">
+        <div className="rounded-[1.5rem] border border-dashed border-slate-200 bg-slate-900/5 p-4 font-sans text-[15px] text-slate-500 sm:p-5">
           {emptyText}
         </div>
       ) : (

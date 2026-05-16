@@ -10,7 +10,7 @@ export function TodayReviewSummaryCard({
   return (
     <button
       type="button"
-      className="flex w-full items-center justify-between rounded-[1.5rem] border border-slate-100 bg-white px-5 py-5 text-left shadow-[0_4px_14px_rgba(15,23,42,0.04)] transition active:scale-[0.99]"
+      className="flex w-full items-center justify-between rounded-[1.5rem] border border-slate-100 bg-white px-4 py-4 text-left shadow-[0_4px_14px_rgba(15,23,42,0.04)] transition active:scale-[0.99] sm:px-5 sm:py-5"
       onClick={onClick}
     >
       <div className="flex items-center gap-4">

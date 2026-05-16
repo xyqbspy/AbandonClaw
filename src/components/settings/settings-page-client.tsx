@@ -18,7 +18,7 @@ type SettingsDraft = {
   voiceSpeed: UserVoiceSpeed;
 };
 
-const CARD_CLASS = "rounded-3xl bg-white p-8 shadow-sm shadow-slate-200/70";
+const CARD_CLASS = "rounded-3xl bg-white p-5 shadow-sm shadow-slate-200/70 sm:p-8";
 const FIELD_CLASS = "space-y-2";
 const LABEL_CLASS = "ml-1 block text-xs font-bold text-slate-500";
 const INPUT_CLASS =
@@ -69,13 +69,13 @@ export function SettingsPageClient({ canAccessAdmin, userDisplay }: SettingsPage
   }, [draft, initialDraft]);
 
   return (
-    <main className="mx-auto max-w-4xl space-y-8 px-6 py-6 sm:py-8 lg:px-10">
+    <main className="mx-auto max-w-4xl space-y-6 px-3 py-6 sm:space-y-8 sm:py-8 lg:px-5">
       <header>
         <h1 className="text-3xl font-black tracking-tight text-slate-900">账号与学习偏好</h1>
         <p className="mt-2 text-sm text-slate-500">管理个人信息、学习节奏和发音相关设置。</p>
       </header>
 
-      <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:gap-8 md:grid-cols-2">
         <section className={CARD_CLASS}>
           <div className="mb-6 flex items-center gap-3">
             <div className={cn(ICON_CLASS, "bg-blue-50 text-blue-600")}>
@@ -173,7 +173,7 @@ export function SettingsPageClient({ canAccessAdmin, userDisplay }: SettingsPage
       </div>
 
       {canAccessAdmin ? (
-        <section className="flex flex-col items-center justify-between gap-6 rounded-[2rem] bg-slate-900 p-8 text-white shadow-xl shadow-slate-200 md:flex-row">
+        <section className="flex flex-col items-center justify-between gap-6 rounded-[2rem] bg-slate-900 p-5 text-white shadow-xl shadow-slate-200 sm:p-8 md:flex-row">
           <div className="flex items-center gap-5">
             <div className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-white/10 text-blue-400">
               <ShieldCheck className="size-7" aria-hidden="true" />
@@ -187,7 +187,7 @@ export function SettingsPageClient({ canAccessAdmin, userDisplay }: SettingsPage
           </div>
           <Link
             href="/admin"
-            className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-blue-600 px-8 py-3 text-sm font-bold text-white transition-all hover:scale-105 hover:bg-blue-500 active:scale-95"
+            className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-bold text-white transition-all hover:scale-105 hover:bg-blue-500 active:scale-95 sm:px-8"
           >
             进入管理后台
             <ArrowRight className="size-3" aria-hidden="true" />
@@ -198,7 +198,7 @@ export function SettingsPageClient({ canAccessAdmin, userDisplay }: SettingsPage
       <div className="flex justify-start pt-4">
         <button
           type="button"
-          className="inline-flex cursor-pointer items-center gap-3 rounded-2xl bg-blue-600 px-10 py-4 text-sm font-black text-white shadow-lg shadow-blue-200 transition-all hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex cursor-pointer items-center gap-3 rounded-2xl bg-blue-600 px-6 py-4 text-sm font-black text-white shadow-lg shadow-blue-200 transition-all hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 sm:px-10"
           disabled={!isDirty}
           onClick={() => {
             if (typeof window !== "undefined") {

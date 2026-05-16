@@ -45,7 +45,7 @@ export function TodayContinueCard({
   const chips = metaItems?.filter((item) => item !== durationLabel) ?? [];
 
   return (
-    <section className="relative overflow-hidden rounded-[2rem] bg-white p-6 shadow-[0_20px_25px_-5px_rgba(59,130,246,0.10),0_8px_10px_-6px_rgba(59,130,246,0.04)] sm:rounded-[2.5rem] sm:p-8">
+    <section className="relative overflow-hidden rounded-[2rem] bg-white p-5 shadow-[0_20px_25px_-5px_rgba(59,130,246,0.10),0_8px_10px_-6px_rgba(59,130,246,0.04)] sm:rounded-[2.5rem] sm:p-6">
       <div className="pointer-events-none absolute -right-10 -top-10 size-40 rounded-full bg-blue-50/80 blur-3xl" />
 
       <div className="relative z-10">
