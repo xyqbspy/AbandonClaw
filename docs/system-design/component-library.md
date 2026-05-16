@@ -23,7 +23,21 @@
 
 - design tokens：颜色、圆角、阴影、字体、间距等底层变量，放在全局 CSS 或底层样式入口，不携带业务语义。
 - shared UI semantics：跨页面稳定复用的 UI 语义，例如 `EmptyState`、`DetailInfoBlock`、音频动作按钮、admin 操作按钮；这类能力才适合进入 `src/components/shared`、`src/components/audio` 或 `src/components/admin`。
-- feature-private styles：只服务单个页面族或 feature 的组合样式，例如 `today-page-styles.ts`、`review-page-styles.ts`、`scene-page-styles.ts`；它们用于减少漂移和 JSX 噪音，但仍是私有实现细节。
+- feature-private styles：只服务单个页面族或 feature 的组合样式，例如 `today-page-styles.ts`、`review-page-styles.ts`、`scene-page-styles.ts`、`chunks-page-styles.ts`；它们用于减少漂移和 JSX 噪音，但仍是私有实现细节。命名约定是 `*-page-styles.ts`；少数文件因为承载的不是页面布局而是某种**视觉主题**（如 `src/features/lesson/styles/dialogue-theme.ts` 表达对话气泡 A/B 主题），可保留 `*-theme.ts` 命名，不强行统一为 page-styles。
+
+### design tokens 双轨分工（CSS var vs TS const）
+
+当前 design tokens 分两套并存且**职责互补，不相互替代**：
+
+- `--mobile-*` CSS 变量（`src/styles/mobile-adaptive.css` + `rhythm.css`）：覆盖**间距 / 字号 / 控件尺寸**等密度变量，移动端响应式适配的底层。新增页面间距、字号、按钮高度优先使用，详细列表与使用约定见 [mobile-adaptive-tokens.md](/d:/WorkCode/AbandonClaw/docs/system-design/mobile-adaptive-tokens.md)。
+- `APPLE_*` TS 常量（`src/lib/ui/apple-style.ts` + `admin-style.ts`）：覆盖**表面 / 边框 / 阴影 / banner / badge / button-style / panel** 等视觉语义常量。跨组件视觉元素优先使用。
+
+实际约定：
+- 间距 / 字号 / 控件尺寸：`var(--mobile-*)`
+- 表面色 / 边框 / 阴影 / 圆角 / banner / badge / panel：`APPLE_*`
+- 不混用：spacing 不要硬编码 `p-4`、表面色不要硬编码 `bg-white shadow-sm`
+- 新页面同时引用两套是正常的，组合后形成 feature-private styles 常量
+- 如果未来引入第三套（例如 dark mode / theme variant），必须先确认与现有两套的边界，并补本节说明
 
 判断规则：
 
@@ -169,7 +183,7 @@
 | 空态展示 | `EmptyState` 已用于 chunks，admin 有 `AdminEmptyState` 子域变体 | 保持 `EmptyState` 与 admin 子域分离 | 已是 shared，但不强行统一 admin |
 | 详情信息块 | `DetailInfoBlock` / `DetailStageBlock` 已被 chunks 与 lesson 使用 | 继续作为详情/浮层信息块基元 | 已是 shared |
 | 统计卡片 | `StatCard` 已存在，但不同页面统计密度和语义仍不完全一致 | 新增跨页面统计区时优先评估复用 | 候选，不主动迁移旧页面 |
-| 页面标题区 | `PageHeader` 已存在，适合工作台/管理页标题 | 新增页面优先复用，再按页面角色微调 | 候选，不替代学习流程主任务标题 |
+| 页面标题区 | `AdminPageHeader` (`components/admin/`) 服务 9 个 admin 页面 | admin 子域统一复用 | 已是 admin 专用组件；非 admin 页面不复用，按页面角色单独设计 |
 
 继续观察：
 
@@ -179,6 +193,7 @@
 | status / info pill | Today、Review、Scene、Chunks 都有 pill，但 tone、尺寸、交互差异较多 | 优先使用 `Badge` 或私有 styles，不直接抽全局 pill |
 | step index / progress dot | Today task index、Scene training step、Review stage step 都类似 | 语义分别是任务序号、训练步骤、复习阶段，不宜只因外观相似合并 |
 | fixed footer action | Review footer、detail sheet footer、scene floating action 都有底部动作 | 动作层级和容器上下文不同，先遵守各自 stable spec |
+| (app) page root shell | today/scenes/review/chunks/scene/progress/settings 全部手写 `px-3 lg:px-5 min-h-screen bg-[#f8fafc] ...` | 2026-05-16 跨页 padding 收口能直接改 5 处证明分散写并未阻塞维护；重复成本较低，等再发生一次跨页 root 调整后评估抽 `AppPageContent` |
 
 明确不抽：
 

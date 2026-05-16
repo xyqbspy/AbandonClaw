@@ -296,6 +296,8 @@ src/features/chunks/
 
 ### 2.9 P2：双轨 design token（`--mobile-*` CSS var + `APPLE_*` TS const）缺分工说明
 
+> **状态**：2026-05-16 已落地（与批次 B 同一 commit）。`component-library.md` §1.1 之后新增 "design tokens 双轨分工" 段，明确 `--mobile-*` 管间距/字号/控件尺寸、`APPLE_*` 管表面/边框/阴影/banner/badge/button-style，二者职责互补不替代，并指明引入第三套必须先确认与现有两套边界。
+
 **现状**：
 
 - `src/styles/mobile-adaptive.css`（117 行）+ `src/styles/rhythm.css`（6 行）：定义 `--mobile-space-*`、`--mobile-font-*`、`--mobile-control-*` 等 CSS 变量。407 处 `var(--mobile-*)` 引用。
@@ -320,6 +322,8 @@ src/features/chunks/
 - 同时把 `src/styles/mobile-adaptive-guidelines.md` 迁到 `docs/system-design/mobile-adaptive-tokens.md`（见 2.10）。
 
 ### 2.10 P2：src/styles/mobile-adaptive-guidelines.md 位置错位
+
+> **状态**：2026-05-16 已落地（与批次 B 同一 commit）。文件迁到 `docs/system-design/mobile-adaptive-tokens.md`，`docs/README.md` 高频入口表加入引用，`component-library.md` §1.1 双轨段链回该文档作为 `--mobile-*` token 使用约定的权威来源。
 
 **现状**：85 行的样式使用约定文档藏在 `src/styles/` 源码目录里。
 
@@ -361,6 +365,8 @@ src/features/chunks/
 
 ### 2.12 P2：lesson/styles/dialogue-theme.ts 命名口径不一致
 
+> **状态**：2026-05-16 已落地（与批次 B 同一 commit）。`component-library.md` §1.1 "feature-private styles" 段补一行说明：默认命名 `*-page-styles.ts`，少数承载视觉主题（如 dialogue 气泡 A/B 主题）的文件可保留 `*-theme.ts`，不强行统一。
+
 **现状**：
 
 ```
@@ -387,6 +393,8 @@ src/features/lesson/styles/dialogue-theme.ts   ← 命名异常
 - 不强求统一命名（dialogue 确实是 theme 不是 layout styles）。
 
 ### 2.13 P3：(app) 页面 root 缺共享 page-shell 组件
+
+> **状态**：2026-05-16 已落地（与批次 B 同一 commit）。`component-library.md` §3.1 候选池 "继续观察" 表追加 `(app) page root shell` 候选项，记录暂不抽的理由（重复成本较低，本次 padding 收口直接改 5 处可控）。组件本身不动，留作后续跨页 root 联动需求触发时再评估。
 
 **现状**：今天的 padding 收口暴露了一点—— `src/app/(app)/` 下所有页面 root 都手写 `min-h-screen bg-[#f8fafc] px-3 lg:px-5 ...`，重复 5+ 处。已有的 `src/components/layout/page-shell.tsx` 只承担 sidebar + min-h，不带 padding 与 max-width。
 
