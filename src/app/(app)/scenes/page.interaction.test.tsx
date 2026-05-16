@@ -165,7 +165,7 @@ const mockedModules = {
       message: () => undefined,
     },
   },
-  "@/components/scenes/generate-scene-sheet": {
+  "./generate-scene-sheet": {
     GenerateSceneSheet: ({
       open,
       onGenerated,

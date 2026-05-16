@@ -7,7 +7,7 @@ import {
   AdminDetailGrid,
   AdminDetailItem,
   AdminDetailSection,
-} from "@/components/shared/admin-detail-section";
+} from "@/components/admin/admin-detail-section";
 
 test("AdminDetailSection 会渲染标题、字段和代码块", () => {
   const html = renderToStaticMarkup(

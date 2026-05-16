@@ -284,7 +284,7 @@ const mockedModules = {
       activeAssistItem: null,
     }),
   },
-  "@/features/chunks/expression-clusters/ui-logic": {
+  "@/features/chunks/components/expression-clusters-ui-logic": {
     getFocusMainExpressionRows: () => [],
     resolveFocusMainExpressionId: () => "",
     toggleMoveIntoClusterCandidateSelection: (current: Record<string, boolean>) => current,

@@ -33,7 +33,7 @@ import {
   resolveFocusMainExpressionId,
   toggleMoveIntoClusterCandidateSelection,
   toggleMoveIntoClusterGroupSelection,
-} from "@/features/chunks/expression-clusters/ui-logic";
+} from "@/features/chunks/components/expression-clusters-ui-logic";
 import {
   APPLE_BANNER_DANGER,
   APPLE_BANNER_INFO,

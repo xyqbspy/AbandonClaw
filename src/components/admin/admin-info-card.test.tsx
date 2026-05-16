@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { AdminInfoCard, AdminInfoList, AdminNoticeCard } from "@/components/shared/admin-info-card";
+import { AdminInfoCard, AdminInfoList, AdminNoticeCard } from "@/components/admin/admin-info-card";
 
 test("AdminInfoCard 和 AdminInfoList 会渲染标题与信息项", () => {
   const html = renderToStaticMarkup(

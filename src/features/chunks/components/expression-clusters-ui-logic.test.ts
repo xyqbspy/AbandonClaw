@@ -6,7 +6,7 @@ import {
   resolveFocusMainExpressionId,
   toggleMoveIntoClusterCandidateSelection,
   toggleMoveIntoClusterGroupSelection,
-} from "./ui-logic";
+} from "./expression-clusters-ui-logic";
 import { MoveIntoClusterCandidate, MoveIntoClusterGroup } from "@/features/chunks/components/types";
 
 const createRow = (overrides: Partial<{

@@ -8,7 +8,7 @@ import {
   readAdminStringParam,
 } from "@/app/(app)/admin/admin-page-state";
 import { SceneSentenceEditorSheet } from "@/components/admin/scene-sentence-editor-sheet";
-import { AdminNoticeCard } from "@/components/shared/admin-info-card";
+import { AdminNoticeCard } from "@/components/admin/admin-info-card";
 import {
   AdminEmptyState,
   AdminList,
@@ -20,10 +20,10 @@ import {
   AdminListMeta,
   AdminListTitle,
   AdminPagination,
-} from "@/components/shared/admin-list-shell";
+} from "@/components/admin/admin-list-shell";
 import { AdminConfirmActionButton } from "@/components/admin/admin-action-button";
 import { FilterBar, FilterBarForm, FilterBarMeta } from "@/components/shared/filter-bar";
-import { PageHeader } from "@/components/shared/page-header";
+import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -157,7 +157,7 @@ export default async function AdminScenesPage({
 
   return (
     <div className="space-y-4">
-      <PageHeader variant="admin" eyebrow={LABELS.eyebrow} title={LABELS.title} description={LABELS.description} />
+      <AdminPageHeader eyebrow={LABELS.eyebrow} title={LABELS.title} description={LABELS.description} />
 
       {notice ? <AdminNoticeCard tone={notice.tone}>{notice.notice}</AdminNoticeCard> : null}
 

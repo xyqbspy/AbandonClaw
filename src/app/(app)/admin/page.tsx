@@ -17,7 +17,7 @@ import {
 } from "@/app/(app)/admin/actions";
 import { readAdminNotice } from "@/app/(app)/admin/admin-page-state";
 import { AdminSubmitButton } from "@/components/admin/admin-action-button";
-import { AdminNoticeCard } from "@/components/shared/admin-info-card";
+import { AdminNoticeCard } from "@/components/admin/admin-info-card";
 import { requireAdmin } from "@/lib/server/auth";
 import { getAdminHighCostCapabilityControls, getAdminOverviewStats } from "@/lib/server/admin/service";
 import { cn } from "@/lib/utils";

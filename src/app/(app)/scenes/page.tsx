@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { GenerateSceneSheet } from "@/components/scenes/generate-scene-sheet";
+import { GenerateSceneSheet } from "./generate-scene-sheet";
 import { LoadingState } from "@/components/shared/action-loading";
 import { Button } from "@/components/ui/button";
 import {

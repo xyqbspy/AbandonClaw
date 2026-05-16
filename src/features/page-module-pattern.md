@@ -140,7 +140,7 @@
 - `focus-detail-selectors.ts`
 - `focus-detail-labels.ts`
 - `expression-map-selectors.ts`
-- `expression-clusters/ui-logic.ts`
+- `expression-clusters-ui-logic.ts`
 
 ### `scene/[slug]`
 

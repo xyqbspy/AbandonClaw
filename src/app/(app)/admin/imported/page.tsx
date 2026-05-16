@@ -11,9 +11,9 @@ import {
   AdminListMeta,
   AdminListTitle,
   AdminPagination,
-} from "@/components/shared/admin-list-shell";
+} from "@/components/admin/admin-list-shell";
 import { FilterBar, FilterBarForm } from "@/components/shared/filter-bar";
-import { PageHeader } from "@/components/shared/page-header";
+import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -58,8 +58,7 @@ export default async function AdminImportedScenesPage({
 
   return (
     <div className="space-y-4">
-      <PageHeader
-        variant="admin"
+      <AdminPageHeader
         eyebrow={LABELS.eyebrow}
         title={LABELS.title}
         description={LABELS.description}

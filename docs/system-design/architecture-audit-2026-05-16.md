@@ -86,6 +86,8 @@
 
 ### 2.1 P0：components/shared/ 误放 4 个 admin-* 组件
 
+> **状态**：2026-05-16 已落地（与本批次同一 commit）。4 个 admin-* 文件已迁到 `src/components/admin/`，import 路径在 8 个 admin 页面 + 2 个组件互引 + 2 个测试中全部更新。`shared/admin-*.test.tsx` 也一并迁到 `components/admin/`。
+
 **现状**：
 
 ```
@@ -116,6 +118,8 @@ src/components/shared/admin-list-shell.tsx
 - 估算 1 个 commit，跑 admin 相关测试（admin actions / admin invites / admin users 等）+ tsc --noEmit。
 
 ### 2.2 P0：page-header.tsx 通过 `variant="admin"` 强行揉合两个语义
+
+> **状态**：2026-05-16 已落地（与 §2.1 同一 commit）。`shared/page-header.tsx` 整体迁到 `components/admin/admin-page-header.tsx`，移除 `variant` prop，固定 admin 视觉。原 export 名 `PageHeader` 改 `AdminPageHeader`，9 个 admin 页面调用同步更新（删除 `variant="admin"` 入参）。
 
 **现状**：
 
@@ -188,6 +192,8 @@ export function PageHeader({
 
 ### 2.5 P1：components/settings/settings-page-client.tsx 位置违反分层
 
+> **状态**：2026-05-16 已落地（与本批次同一 commit）。文件迁到 `src/app/(app)/settings/settings-page-client.tsx`，import 改为相对路径，`src/components/settings/` 空目录已删。
+
 **现状**：
 
 ```
@@ -215,6 +221,8 @@ src/components/settings/settings-page-client.tsx  (216 行)
 
 ### 2.6 P1：components/scenes/（复数）vs features/scene/（单数）命名冲突
 
+> **状态**：2026-05-16 已落地（与 §2.5 同一 commit）。`generate-scene-sheet.tsx` + `.test.tsx` 迁到 `src/app/(app)/scenes/`（scenes 列表页同目录），`src/components/scenes/` 空目录已删，scenes 测试 mock 路径同步更新为 `./generate-scene-sheet`。
+
 **现状**：
 
 - `src/components/scenes/generate-scene-sheet.tsx`（单文件，只被 `app/(app)/scenes/page.tsx` 用）
@@ -239,6 +247,8 @@ src/components/settings/settings-page-client.tsx  (216 行)
 
 ### 2.7 P1：空 feature 目录 features/auth/、features/marketing/
 
+> **状态**：2026-05-16 已落地（与 §2.5 同一 commit）。两个空目录已 `rmdir` 删除。
+
 **现状**：两个目录存在但空（既无 `components/` 也无 `*.ts`）。
 
 **违反规则**：
@@ -256,6 +266,8 @@ src/components/settings/settings-page-client.tsx  (216 行)
 - 如果未来 auth 真正需要 feature 化（例如登录后引导流程），届时再建。
 
 ### 2.8 P1：features/chunks/expression-clusters/ 与 components/ 同级
+
+> **状态**：2026-05-16 已落地（与 §2.5 同一 commit）。`expression-clusters/ui-logic.ts` + `.test.ts` 迁到 `features/chunks/components/expression-clusters-ui-logic.ts`（对齐其它 feature `components/+styles/` 命名约定），chunks/page.tsx + chunks/page.interaction.test.tsx + src/features/page-module-pattern.md 三处引用同步更新。`expression-clusters/` 子目录已删。
 
 **现状**：
 

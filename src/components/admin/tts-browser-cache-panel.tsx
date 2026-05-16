@@ -7,7 +7,7 @@ import {
   AdminActionBar,
   AdminActionBarActions,
   AdminActionBarHint,
-} from "@/components/shared/admin-action-bar";
+} from "@/components/admin/admin-action-bar";
 import { AdminActionButton } from "@/components/admin/admin-action-button";
 import {
   AdminEmptyState,
@@ -19,7 +19,7 @@ import {
   AdminListItem,
   AdminListMeta,
   AdminListTitle,
-} from "@/components/shared/admin-list-shell";
+} from "@/components/admin/admin-list-shell";
 import { confirmAction } from "@/components/shared/confirm-action";
 import { StatCard } from "@/components/shared/stat-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";

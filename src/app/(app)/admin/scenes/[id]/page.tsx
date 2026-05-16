@@ -9,8 +9,8 @@ import {
   AdminDetailGrid,
   AdminDetailItem,
   AdminDetailSection,
-} from "@/components/shared/admin-detail-section";
-import { AdminNoticeCard } from "@/components/shared/admin-info-card";
+} from "@/components/admin/admin-detail-section";
+import { AdminNoticeCard } from "@/components/admin/admin-info-card";
 import {
   AdminList,
   AdminListBadges,
@@ -19,8 +19,8 @@ import {
   AdminListItem,
   AdminListMeta,
   AdminListTitle,
-} from "@/components/shared/admin-list-shell";
-import { PageHeader } from "@/components/shared/page-header";
+} from "@/components/admin/admin-list-shell";
+import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { Badge } from "@/components/ui/badge";
 import { getAdminSceneDetail } from "@/lib/server/admin/service";
 import { formatAdminDateTime } from "@/lib/ui/admin-format";
@@ -69,8 +69,7 @@ export default async function AdminSceneDetailPage({
 
   return (
     <div className="space-y-4">
-      <PageHeader
-        variant="admin"
+      <AdminPageHeader
         eyebrow={LABELS.eyebrow}
         title={scene.title}
         description={`ID: ${scene.id}`}

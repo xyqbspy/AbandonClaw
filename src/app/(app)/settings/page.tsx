@@ -1,4 +1,4 @@
-import { SettingsPageClient } from "@/components/settings/settings-page-client";
+import { SettingsPageClient } from "./settings-page-client";
 import { getCurrentUser, isAdminUser } from "@/lib/server/auth";
 
 export default async function SettingsPage() {
