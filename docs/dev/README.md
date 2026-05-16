@@ -17,6 +17,7 @@
 
 - `AGENTS.md`：强制红线和任务分流。
 - `docs/README.md`：定位该读哪类业务文档。
+- `docs/dev/ai-token-efficiency-playbook.md`：AI 智能体 token 节省强制约束与高 ROI 做法（每次新会话或新任务第一时间读完）。
 - `openspec/specs/project-maintenance/spec.md`：长期稳定维护契约。
 - `project-maintenance-playbook.md`：日常执行清单和深读说明。
 - `change-intake-template.md`：接需求阶段的最小问题分析骨架。
@@ -24,6 +25,8 @@
 
 ## 当前目录
 
+- [ai-token-efficiency-playbook.md](/d:/WorkCode/AbandonClaw/docs/dev/ai-token-efficiency-playbook.md)
+  - **AI 智能体必读**。每次新会话或拿到新任务第一时间读完。汇总读文件 / 工具调用 / 编辑 / 输出 / 验证 / subagent 等环节的高 ROI token 节省做法，违反 §1 强制约束需要在最终答复说明原因。
 - [project-maintenance-playbook.md](/d:/WorkCode/AbandonClaw/docs/dev/project-maintenance-playbook.md)
   - 日常维护手册；Fast Track 不需要默认通读全文。
 - [change-intake-template.md](/d:/WorkCode/AbandonClaw/docs/dev/change-intake-template.md)

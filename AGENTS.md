@@ -6,6 +6,8 @@
 
 本文件只保留强约束和任务分流。详细执行清单在 `docs/dev/README.md`、`docs/dev/project-maintenance-playbook.md` 和 `openspec/specs/project-maintenance/spec.md`。
 
+**Token 效率手册**：每次新会话或拿到新任务时，**第一时间读完** `docs/dev/ai-token-efficiency-playbook.md`。该文件汇总了"读文件 / 工具调用 / 编辑 / 输出 / 验证 / 任务追踪 / subagent"等环节的高 ROI 节省做法。违反其中"§1 强制约束"5 条任意一条需要在最终答复里说明原因。读不读这份文档，往往是同一任务用 30k vs 100k token 的差别。
+
 ## 1. 修改前必须做
 
 在开始修改前，按顺序完成：
@@ -17,6 +19,7 @@
 5. 输出问题分析与最小方案。
 6. 再修改代码或文档。
 7. 必要时同步测试与文档。
+8. **Token 效率约束**：执行任何工具调用前确认遵守 `docs/dev/ai-token-efficiency-playbook.md` §1 的 5 条强制约束（用专用工具不用 Bash 重做、并行无依赖调用、任务分流定方向、不复述用户已知内容、不写 emoji/装饰）。
 
 禁止直接从局部代码猜业务语义；涉及主链路、状态流、回写、恢复、Scene 完成判定时必须先理解完整链路。
 
