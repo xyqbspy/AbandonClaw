@@ -2,6 +2,12 @@
 
 只记录用户可感知变化。开发过程、验证结果和维护收尾记录放在 `docs/dev/dev-log.md`。
 
+## 2026-05-17
+
+### 错误响应一致性收口
+- 注销时 Supabase signOut 失败的响应状态从 500 (`INTERNAL_ERROR`) 改为 401 (`AUTH_UNAUTHORIZED`)，前端能更准确识别 "session 已失效需要重新登录" 的语义；响应仍包含 `requestId` 便于联系维护者排查。
+- CSP 违规上报端点 (`/api/csp-report`) 在 payload 异常时返回的 400 错误体现在包含 `code` 与 `requestId`，与项目其它 API 错误格式对齐（浏览器不读取该响应体，无实际行为变化，仅为接口契约统一）。
+
 ## 2026-05-16
 
 ### TTS 预热体验收口

@@ -1,7 +1,7 @@
 # 任务清单：收口 API 错误响应一致性落差
 
 ## Status
-in_progress
+done
 
 ## 实施
 
@@ -52,4 +52,4 @@ in_progress
 
 - [x] 更新 `docs/dev/api-error-response-audit-2026-05-16.md` §2.1–§2.7 标注 "本 change 已落地"。
 - [x] 更新 `docs/dev/dev-log.md` 追加本轮收口项 / 明确不收项 / 验证结果。
-- [ ] 本次完成态收尾若直接进入 `main` 且存在用户可感知变化（例如 `auth/logout` 状态码 500→401），再更新正式 `CHANGELOG.md`。
+- [x] 本次完成态收尾若直接进入 `main` 且存在用户可感知变化（例如 `auth/logout` 状态码 500→401），再更新正式 `CHANGELOG.md`。
