@@ -8,12 +8,10 @@ import { prefetchSceneDetail } from "@/lib/cache/scene-prefetch";
 import { useTtsPlaybackController } from "@/hooks/use-tts-playback-controller";
 import { normalizePhraseText } from "@/lib/shared/phrases";
 import { scheduleChunkAudioWarmup } from "@/lib/utils/resource-actions";
-import { ExpressionMapResponse } from "@/lib/types/expression-map";
 import {
   enrichSimilarExpressionFromApi,
   ManualExpressionAssistResponse,
   PhraseReviewStatus,
-  savePhraseFromApi,
   UserPhraseItemResponse,
 } from "@/lib/utils/phrases-api";
 import { startReviewSession } from "@/lib/utils/review-session";
@@ -21,7 +19,6 @@ import { Button } from "@/components/ui/button";
 import { LoadingState } from "@/components/shared/action-loading";
 import { ExampleSentenceCards } from "@/components/shared/example-sentence-cards";
 import { buildExpressionMapViewModel } from "@/features/chunks/components/expression-map-selectors";
-import { ClusterFocusList } from "@/features/chunks/components/cluster-focus-list";
 import { buildFocusDetailViewModel } from "@/features/chunks/components/focus-detail-selectors";
 import type { FocusDetailRelatedItem } from "@/features/chunks/components/focus-detail-selectors";
 import {
@@ -71,8 +68,12 @@ import { useChunksPageActions } from "./use-chunks-page-actions";
 import { useBuiltinPhrasesActions } from "./use-builtin-phrases-actions";
 import { useBuiltinPhrasesData } from "./use-builtin-phrases-data";
 import { useDetailAudioActions } from "./use-detail-audio-actions";
+import { useExpressionMap } from "./use-expression-map";
+import { useFocusRelationTab } from "./use-focus-relation-tab";
 import { useQuickAddRelated } from "./use-quick-add-related";
+import { useSentenceExpressionSave } from "./use-sentence-expression-save";
 import { BuiltinPhrasesSection } from "./builtin-phrases-section";
+import { ChunksPageFocusModeSection } from "./chunks-page-focus-mode-section";
 import { ChunksPageHero } from "./chunks-page-hero";
 
 import { buildChunksFocusDetailLabels } from "./chunks-focus-detail-messages";
@@ -305,11 +306,6 @@ type FocusDetailState = {
   assistItem: ManualExpressionAssistResponse["inputItem"] | null;
 };
 
-type FocusDetailConfirmAction =
-  | "set-cluster-main"
-  | "set-standalone-main"
-  | "delete-expression";
-
 const extractExpressionsFromSentenceItem = (item: UserPhraseItemResponse) => {
   const raw = (item.sourceChunkText ?? "").trim();
   if (!raw) return [] as string[];
@@ -351,16 +347,25 @@ export default function ChunksPage() {
   const hasResolvedInitialLibraryTabRef = useRef(false);
 
   // 地图与列表展示
-  const [mapOpen, setMapOpen] = useState(false);
-  const [mapLoading, setMapLoading] = useState(false);
-  const [mapError, setMapError] = useState<string | null>(null);
-  const [mapData, setMapData] = useState<ExpressionMapResponse | null>(null);
-  const [mapSourceExpression, setMapSourceExpression] = useState<UserPhraseItemResponse | null>(
-    null,
-  );
+  const expressionMap = useExpressionMap();
+  const {
+    open: mapOpen,
+    loading: mapLoading,
+    error: mapError,
+    data: mapData,
+    sourceExpression: mapSourceExpression,
+    openingForId: mapOpeningForId,
+  } = expressionMap.state;
+  const {
+    setOpen: setMapOpen,
+    setLoading: setMapLoading,
+    setError: setMapError,
+    setData: setMapData,
+    setSourceExpression: setMapSourceExpression,
+    setOpeningForId: setMapOpeningForId,
+  } = expressionMap.setters;
   const [activeClusterId, setActiveClusterId] = useState<string | null>(null);
   const [addingCluster, setAddingCluster] = useState(false);
-  const [mapOpeningForId, setMapOpeningForId] = useState<string | null>(null);
   const [openingSourceSceneSlug, setOpeningSourceSceneSlug] = useState<string | null>(null);
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
   const [expandedCardIds, setExpandedCardIds] = useState<Record<string, boolean>>({});
@@ -372,22 +377,31 @@ export default function ChunksPage() {
   const [manualSentence, setManualSentence] = useState("");
   const [savingManual, setSavingManual] = useState(false);
   const [savingManualMode, setSavingManualMode] = useState<"save" | "save_and_review" | null>(null);
-  const [savingSentenceExpressionKey, setSavingSentenceExpressionKey] = useState<string | null>(
-    null,
-  );
-  const [savedSentenceExpressionKeys, setSavedSentenceExpressionKeys] = useState<
-    Record<string, boolean>
-  >({});
+  const {
+    savingSentenceExpressionKey,
+    savedSentenceExpressionKeys,
+    saveExpressionFromSentence,
+  } = useSentenceExpressionSave({
+    notifySaved: notifyChunksSentenceExpressionSaved,
+    notifyFailed: notifyChunksLoadFailed,
+  });
   const [retryingEnrichmentIds, setRetryingEnrichmentIds] = useState<Record<string, boolean>>({});
   // Focus 主表达与详情
   const [focusExpressionId, setFocusExpressionId] = useState<string>("");
-  const [focusRelationTab, setFocusRelationTab] = useState<"similar" | "contrast">("similar");
-  const [expandedFocusMainId, setExpandedFocusMainId] = useState<string | null>(null);
-  const [focusRelationActiveText, setFocusRelationActiveText] = useState("");
-  const [detailConfirmAction, setDetailConfirmAction] = useState<FocusDetailConfirmAction | null>(null);
+  const {
+    focusRelationTab,
+    setFocusRelationTab,
+    expandedFocusMainId,
+    setExpandedFocusMainId,
+    focusRelationActiveText,
+    setFocusRelationActiveText,
+    detailConfirmAction,
+    setDetailConfirmAction,
+    focusDetailActionsOpen,
+    setFocusDetailActionsOpen,
+  } = useFocusRelationTab();
   const [expandedMoveIntoClusterGroups, setExpandedMoveIntoClusterGroups] = useState<Record<string, boolean>>({});
   const [selectedMoveIntoClusterMap, setSelectedMoveIntoClusterMap] = useState<Record<string, boolean>>({});
-  const [focusDetailActionsOpen, setFocusDetailActionsOpen] = useState(false);
   const [quickAddRelatedOpen, setQuickAddRelatedOpen] = useState(false);
 
   useEffect(
@@ -756,14 +770,14 @@ export default function ChunksPage() {
       setFocusDetailActionsOpen(false);
       return openFocusDetailBase(params);
     },
-    [openFocusDetailBase],
+    [openFocusDetailBase, setFocusDetailActionsOpen],
   );
   const openFocusSiblingDetail = useCallback(
     (direction: -1 | 1) => {
       setFocusDetailActionsOpen(false);
       openFocusSiblingDetailBase(direction);
     },
-    [openFocusSiblingDetailBase],
+    [openFocusSiblingDetailBase, setFocusDetailActionsOpen],
   );
 
   const {
@@ -833,7 +847,7 @@ export default function ChunksPage() {
   useEffect(() => {
     resetFocusAssist();
     setFocusRelationTab("similar");
-  }, [focusExpressionId, resetFocusAssist]);
+  }, [focusExpressionId, resetFocusAssist, setFocusRelationTab]);
 
   useEffect(() => {
     const sourceItems = focusRelationTab === "contrast" ? focusContrastItems : focusSimilarItems;
@@ -851,7 +865,13 @@ export default function ChunksPage() {
     if (!exists) {
       setFocusRelationActiveText(sourceItems[0].text);
     }
-  }, [focusContrastItems, focusRelationActiveText, focusRelationTab, focusSimilarItems]);
+  }, [
+    focusContrastItems,
+    focusRelationActiveText,
+    focusRelationTab,
+    focusSimilarItems,
+    setFocusRelationActiveText,
+  ]);
 
   const startReviewFromCard = (item: UserPhraseItemResponse) => {
     if (item.learningItemType === "sentence") {
@@ -893,30 +913,6 @@ export default function ChunksPage() {
       kind: "current",
       chainMode: "reset",
     });
-  };
-
-  const saveExpressionFromSentence = async (item: UserPhraseItemResponse, expression: string) => {
-    const normalized = normalizePhraseText(expression);
-    if (!normalized) return;
-    const key = `${item.userPhraseId}:${normalized}`;
-    if (savingSentenceExpressionKey === key) return;
-    setSavingSentenceExpressionKey(key);
-    try {
-      await savePhraseFromApi({
-        text: expression,
-        learningItemType: "expression",
-        sourceType: "manual",
-        sourceSentenceText: item.text,
-        sourceChunkText: expression,
-        translation: item.translation ?? undefined,
-      });
-      setSavedSentenceExpressionKeys((prev) => ({ ...prev, [key]: true }));
-      notifyChunksSentenceExpressionSaved();
-    } catch (error) {
-      notifyChunksLoadFailed(error instanceof Error ? error.message : null);
-    } finally {
-      setSavingSentenceExpressionKey(null);
-    }
   };
 
   // 表达簇动作
@@ -1827,60 +1823,47 @@ export default function ChunksPage() {
             </p>
           </section>
         ) : contentFilter === "expression" && expressionViewMode === "focus" && focusExpression ? (
-        <div className="space-y-4">
-          <ClusterFocusList
-            ready={focusRelationsBootstrapDone}
-            rows={focusMainExpressionRows}
-            currentFocusExpressionId={focusExpression.userPhraseId}
-            expandedFocusMainId={expandedFocusMainId}
-            clusterMembersByClusterId={clusterMembersByClusterId}
-            savedRelationRowsBySourceId={savedRelationRowsBySourceId}
-            currentFocusSimilarItems={focusSimilarItems}
-            labels={{
-              loading: zh.detailLoading,
-              title: zh.focusModeTitle,
-              expand: zh.focusExpand,
-              collapse: zh.focusCollapse,
-              noTranslation: zh.noTranslation,
-              similarTab: zh.focusTabSimilar,
-              openCurrentDetail: zh.openCurrentDetail,
-            }}
-            appleSurfaceClassName="rounded-2xl border-0 bg-white shadow-sm ring-0"
-            onToggleMain={switchFocusMainExpression}
-            onToggleExpanded={(userPhraseId) =>
-              setExpandedFocusMainId((current) => (current === userPhraseId ? null : userPhraseId))
-            }
-            onOpenMainDetail={(row) => {
-              switchFocusMainExpression(row.userPhraseId);
-              void openFocusDetail({
-                text: row.text,
-                kind: "current",
-                chainMode: "reset",
-              });
-            }}
-            onOpenMainSimilarTab={(row) => {
-              switchFocusMainExpression(row.userPhraseId);
-              void openFocusDetail({
-                text: row.text,
-                kind: "current",
-                initialTab: "similar",
-                chainMode: "reset",
-              });
-            }}
-            onOpenPreviewItem={(row, item) => {
-              switchFocusMainExpression(row.userPhraseId);
-              setFocusRelationTab("similar");
-              setFocusRelationActiveText(item.text);
-              void openFocusDetail({
-                text: item.text,
-                differenceLabel: item.differenceLabel,
-                kind: item.kind,
-                chainMode: "reset",
-              });
-            }}
-          />
-
-        </div>
+        <ChunksPageFocusModeSection
+          ready={focusRelationsBootstrapDone}
+          rows={focusMainExpressionRows}
+          currentFocusExpressionId={focusExpression.userPhraseId}
+          expandedFocusMainId={expandedFocusMainId}
+          clusterMembersByClusterId={clusterMembersByClusterId}
+          savedRelationRowsBySourceId={savedRelationRowsBySourceId}
+          currentFocusSimilarItems={focusSimilarItems}
+          onSwitchMain={switchFocusMainExpression}
+          onToggleExpandedMain={(userPhraseId) =>
+            setExpandedFocusMainId((current) => (current === userPhraseId ? null : userPhraseId))
+          }
+          onOpenMainDetail={(row) => {
+            switchFocusMainExpression(row.userPhraseId);
+            void openFocusDetail({
+              text: row.text,
+              kind: "current",
+              chainMode: "reset",
+            });
+          }}
+          onOpenMainSimilarTab={(row) => {
+            switchFocusMainExpression(row.userPhraseId);
+            void openFocusDetail({
+              text: row.text,
+              kind: "current",
+              initialTab: "similar",
+              chainMode: "reset",
+            });
+          }}
+          onOpenPreviewItem={(row, item) => {
+            switchFocusMainExpression(row.userPhraseId);
+            setFocusRelationTab("similar");
+            setFocusRelationActiveText(item.text);
+            void openFocusDetail({
+              text: item.text,
+              differenceLabel: item.differenceLabel,
+              kind: item.kind,
+              chainMode: "reset",
+            });
+          }}
+        />
       ) : (
         <section className="space-y-4">
           <ChunksListView

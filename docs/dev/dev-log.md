@@ -1,5 +1,58 @@
 # Dev Log
 
+### [2026-05-17] chunks/page.tsx 第三轮拆分（decompose-chunks-page-r3 落地）
+- 类型：Spec-Driven（OpenSpec change `decompose-chunks-page-r3`）
+- 状态：实施 + 测试 + 验证完成，等待 commit + archive
+
+#### 背景
+chunks/page.tsx 经 r2 拆分（commit `3301dc5`）从 2368 → 2125 行后仍是仓库 LoC 最大前端文件。架构师视角评估（2026-05-17 会话）指出这是前端最大债，启动 r3 继续推进。
+
+#### OpenSpec change
+- `openspec/changes/decompose-chunks-page-r3/`（proposal + tasks + spec delta），`pnpm exec openspec validate --strict` 通过。
+- spec delta：ADD Requirement "chunks/page.tsx 第三轮拆分必须按 3 hook + 1 view section + 已有 hook 协作边界执行" + 3 个 scenario。
+
+#### 本轮落地（按 tasks 顺序）
+- §1 抽 `use-expression-map.ts` (59 行)：6 state + setters + close / resetError helpers。采用 state + setters 模型保持与既有 `useChunksPageActions` 6 个 setter props 兼容。
+- §2 抽 `use-sentence-expression-save.ts` (66 行)：2 state + saveExpressionFromSentence handler，DI 支持注入 savePhrase。
+- §3 抽 `use-focus-relation-tab.ts` (50 行)：5 state + 5 setter 透传，page.tsx 既有 useEffect / 子 hook 调用全部不动 props 签名；同时把 `FocusDetailConfirmAction` 类型 export 到 hook，page.tsx 不再直接定义。
+- §4 抽 `chunks-page-focus-mode-section.tsx` (82 行)：ClusterFocusList wrapper，labels 闭包 + appleSurfaceClassName 常量化，page.tsx 调用从 55 行装配 → 42 行 props 透传。
+
+#### §4 与 proposal 的方向调整
+proposal §4 原描述抽 "focus detail 区"（焦点 expression header + similar/contrast tab + relation 列表 + actions menu + confirm dialog）。实际调研发现这套 UI 全部在 `chunks-page-sheets.tsx` 内通过 `FocusDetailSheet` 渲染，page.tsx 主体不直接渲染。为保持 r3 的"1 个 view section"承诺，调整为抽 **focus mode 视图装配**（ClusterFocusList wrapper），承载 page.tsx return 体中 focus 模式 JSX 块。组件作用相同（物理隔离），只是承载对象调整。详细见 tasks.md §4.6。
+
+#### 验证
+- chunks 全套 114/114 测试通过（9 个 logic / 14 个 hook / 4 个 interaction / 3 个 sheet / 84 个 hook 单测）
+- `pnpm run lint`：0 errors / 2 pre-existing warnings（lesson-reader.tsx onBackToList、smoke-p0-auth-loop-lib.ts MemoryCookie，与本轮无关）
+- `npx tsc --noEmit`：错误均为预先存在（today-primary-recommendation.test.ts、service.user-phrase-flow.test.ts），git stash 到 main 同样复现，与本轮无关
+- `pnpm run text:check-mojibake`：通过
+- `pnpm exec openspec validate decompose-chunks-page-r3 --strict`：通过
+
+#### 量化与 LoC 偏差分析（重要发现）
+**chunks/page.tsx: 2125 → 2102 行（-23, -1.1%）**，**远低于 proposal §预期收益（1500-1600）的预测**。
+
+| 抽离对象 | 移走代码 | page.tsx 新增装配 | 净减 |
+| --- | --- | --- | --- |
+| use-expression-map | ~10 行 | ~20 行解构 | **+10** |
+| use-sentence-expression-save | ~26 行 | ~8 行解构 | -18 |
+| use-focus-relation-tab | ~10 行 | ~13 行解构 | +3 |
+| chunks-page-focus-mode-section | ~55 行 JSX | ~42 行 props 透传 | -13 |
+| 删除 ExpressionMapResponse / savePhraseFromApi import | -2 | - | -2 |
+| 加 6 行 hook import | - | +6 | +6 |
+| 修 4 个 react-hooks/exhaustive-deps warning | - | +4 | +4 |
+
+**关键发现**：抽 state + 简单 handler 时"装配回调 / 解构 / props 透传"开销与抽走代码量接近，page.tsx 几乎不瘦身。
+
+**对 r4 策略的指导**：r4 应优先抽**高 props-cost 子树**（如 chunks-list-view 装配 wrapper，page.tsx 当前 ~87 行 props 列表）和**大块 useEffect orchestration**（整体抽成 hook 后 page.tsx 只剩 hook 调用），而不是继续抽 state + 小 handler 组合。
+
+#### 协作说明
+proposal、tasks、spec delta 和实施代码（4 个新文件 + 3 个测试文件 + page.tsx 修改）由本会话完成。
+
+#### 本轮明确不收项
+- chunks-list-view.tsx 868 行 → 留 r4
+- chunks-page-sheets.tsx 449 行 → 留 r4
+- mine tab 顶部 4 个 pill group filter（view mode / content filter / review filter / cluster banner）→ 留 r4
+- 任何业务语义 / 缓存 / API / 复习入口变更
+
 ### [2026-05-17] API 错误响应一致性收口（harden-api-error-response-consistency 实施）
 - 类型：Spec-Driven（OpenSpec change `harden-api-error-response-consistency`）
 - 状态：实施 + 测试 + 验证完成，等待 commit + archive

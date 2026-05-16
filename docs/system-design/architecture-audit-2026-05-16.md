@@ -154,7 +154,9 @@ export function PageHeader({
 
 ### 2.3 P0：chunks/page.tsx 2368 行单一 default function
 
-> **状态**：2026-05-16 已部分落地（commit `3301dc5`，OpenSpec change `decompose-chunks-page-r2`）。chunks/page.tsx 2368 → 2125 行（-243，-10.3%）。抽出 3 个动作 hook（quick-add-related / builtin-phrases-actions / detail-audio-actions）+ 1 个 view section（chunks-page-hero）。本轮目标不是一次降到 800 行而是验证拆分模式，第三轮对象转向 chunks-list-view.tsx（868 行）+ chunks-page-sheets.tsx（449 行）。详细见 dev-log [2026-05-16] 与 ui-style-audit §21。
+> **状态**：2026-05-16 r2 部分落地（commit `3301dc5`，OpenSpec change `decompose-chunks-page-r2`）：chunks/page.tsx 2368 → 2125 行（-243，-10.3%），抽 3 hook（quick-add-related / builtin-phrases-actions / detail-audio-actions）+ 1 view section（chunks-page-hero）。
+>
+> **2026-05-17 r3 落地**（OpenSpec change `decompose-chunks-page-r3`）：chunks/page.tsx 2125 → 2102 行（-23，-1.1%）。抽 3 hook（use-expression-map / use-sentence-expression-save / use-focus-relation-tab）+ 1 view section（chunks-page-focus-mode-section）。**LoC 减幅远低于 proposal 预期（1500-1600）**，关键发现：抽 state + 简单 handler 时"装配回调 / 解构 / props 透传"的开销与抽走的代码量接近，page.tsx 几乎不瘦身。这对 r4 策略至关重要 — r4 应优先抽 chunks-list-view 装配 wrapper（page.tsx ~87 行 props 列表）等高 props-cost 子树，而不是继续抽小 hook。详细见 dev-log [2026-05-17]。
 
 **现状**：
 
