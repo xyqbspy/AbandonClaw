@@ -2,19 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { formatLoadingText, LoadingContent } from "@/components/shared/action-loading";
 import {
   getSceneLearningProgressCache,
   getSceneLearningProgressCacheSnapshotSync,
   getScenePracticeSnapshotCache,
-  getSceneVariantRunCache,
   setSceneLearningProgressCache,
   setScenePracticeSnapshotCache,
-  setSceneVariantRunCache,
 } from "@/lib/cache/scene-runtime-cache";
 import { SelectionDetailSheet } from "@/features/lesson/components/selection-detail-sheet";
-import { SceneExpressionMapView } from "@/features/scene/components/scene-expression-map-view";
-import { ScenePracticeView } from "@/features/scene/components/scene-practice-view";
 import { SceneDetailSkeleton } from "@/features/scene/components/scene-detail-skeleton";
 import {
   SCENE_ACTION_BUTTON_LG_CLASSNAME,
@@ -24,33 +19,19 @@ import {
   SCENE_PAGE_RAISED_SECTION_CLASSNAME,
   SCENE_PAGE_SHEET_PADDING_CLASSNAME,
 } from "@/features/scene/components/scene-page-styles";
-import { SceneVariantsView } from "@/features/scene/components/scene-variants-view";
-import { sceneViewLabels } from "@/features/scene/components/scene-view-labels";
 import { normalizePhraseText } from "@/lib/shared/phrases";
 import { Lesson } from "@/lib/types";
-import type { PracticeAssessmentLevel, PracticeMode } from "@/lib/types/learning-flow";
 import { recordClientEvent } from "@/lib/utils/client-events";
 import { savePhraseFromApi } from "@/lib/utils/phrases-api";
-import { hydrateVariantSetFromRun, savePracticeSet } from "@/lib/utils/scene-learning-flow-storage";
+import { savePracticeSet } from "@/lib/utils/scene-learning-flow-storage";
 import {
-  completeScenePracticeRunFromApi,
   getScenePracticeSetFromApi,
   getScenePracticeSnapshotFromApi,
-  getSceneVariantRunSnapshotFromApi,
-  markScenePracticeModeCompleteFromApi,
   recordSceneTrainingEventFromApi,
-  recordScenePracticeAttemptFromApi,
   ScenePracticeSnapshotResponse,
   SceneLearningProgressResponse,
-  SceneVariantRunResponse,
-  saveScenePracticeSetFromApi,
-  startScenePracticeRunFromApi,
-  startSceneVariantRunFromApi,
 } from "@/lib/utils/learning-api";
-import { cancelScheduledIdleAction, scheduleIdleAction } from "@/lib/utils/resource-actions";
 import { useSceneDetailActions } from "./use-scene-detail-actions";
-import { SceneBaseView } from "./scene-base-view";
-import { toVariantStatusLabel, toVariantTitle } from "./scene-detail-logic";
 import { sceneDetailMessages } from "./scene-detail-messages";
 import {
   notifySceneContinueStep,
@@ -74,27 +55,17 @@ import { SceneTrainingNextStepStrip } from "./scene-training-next-step-strip";
 import { useSceneDetailData } from "./use-scene-detail-data";
 import { useSceneDetailPlayback } from "./use-scene-detail-playback";
 import { useSceneDetailRouteState } from "./use-scene-detail-route-state";
+import { useSceneGenerationPrewarm } from "./use-scene-generation-prewarm";
+import {
+  resetScenePracticeRunStartDedupForTests,
+  useScenePracticeRunLifecycle,
+} from "./use-scene-practice-run-lifecycle";
+import { useSceneVariantRunLifecycle } from "./use-scene-variant-run-lifecycle";
 import { useSceneLearningSync } from "./use-scene-learning-sync";
-import { SceneVariantStudyView } from "./scene-variant-study-view";
+import { SceneDetailViewSwitch } from "./scene-detail-view-switch";
 
 const appleButtonSmClassName = SCENE_ACTION_BUTTON_SM_CLASSNAME;
-const appleButtonLgClassName = SCENE_ACTION_BUTTON_LG_CLASSNAME;
-const appleDangerButtonSmClassName = SCENE_DANGER_ACTION_BUTTON_SM_CLASSNAME;
-const PRACTICE_PREWARM_FAILURE_LIMIT = 3;
-const PRACTICE_PREWARM_FAILURE_WINDOW_MS = 60_000;
-const PRACTICE_RUN_START_DEDUP_MS = 30_000;
-
-const practiceRunStartDedup = new Map<
-  string,
-  {
-    completedAt: number | null;
-    promise: Promise<unknown> | null;
-  }
->();
-
-export const resetScenePracticeRunStartDedupForTests = () => {
-  practiceRunStartDedup.clear();
-};
+export { resetScenePracticeRunStartDedupForTests };
 
 type SavePhrasePayload = {
   text: string;
@@ -105,26 +76,6 @@ type SavePhrasePayload = {
   sourceSentenceText?: string;
   sourceChunkText?: string;
 };
-type PracticeRunStartPayload = {
-  practiceSetId: string;
-  mode: PracticeMode;
-  sourceType: "original" | "variant";
-  sourceVariantId?: string | null;
-};
-type PracticeAttemptPayload = PracticeRunStartPayload & {
-  exerciseId: string;
-  sentenceId?: string | null;
-  userAnswer: string;
-  assessmentLevel: PracticeAssessmentLevel;
-  isCorrect: boolean;
-  metadata?: Record<string, unknown>;
-};
-type PracticeModeCompletePayload = {
-  practiceSetId: string;
-  mode: PracticeMode;
-  nextMode?: PracticeMode;
-};
-
 export default function SceneDetailClientPage({
   initialLesson = null,
 }: {
@@ -138,10 +89,6 @@ export default function SceneDetailClientPage({
   const sessionDoneRef = useRef(false);
   const focusExpressionPromptShownRef = useRef(false);
   const sceneResumeToastShownRef = useRef(false);
-  const practicePrewarmFailureRef = useRef<{ count: number; firstFailureAt: number | null }>({
-    count: 0,
-    firstFailureAt: null,
-  });
   const initialTrainingStateSnapshot = getSceneLearningProgressCacheSnapshotSync(sceneSlug);
   const initialTrainingState =
     initialTrainingStateSnapshot.found && initialTrainingStateSnapshot.record
@@ -176,8 +123,6 @@ export default function SceneDetailClientPage({
   );
   const [practiceSnapshot, setPracticeSnapshot] = useState<ScenePracticeSnapshotResponse | null>(null);
   const [viewResetVersion, setViewResetVersion] = useState(0);
-  const [practicePrewarmBlocked, setPracticePrewarmBlocked] = useState(false);
-  const [practiceRetryError, setPracticeRetryError] = useState<string | null>(null);
 
   const {
     baseLesson,
@@ -348,6 +293,25 @@ export default function SceneDetailClientPage({
   });
 
   const {
+    practiceRetryError,
+    resetPracticePrewarmFailures,
+    handlePracticeToolAction,
+    handleGeneratePracticeManually,
+    handleRegeneratePracticeManually,
+  } = useSceneGenerationPrewarm({
+    baseLesson,
+    currentStep: trainingState?.session?.currentStep ?? null,
+    generatedState,
+    practiceLoading,
+    variantsLoading,
+    handlePracticeToolClick,
+    handleGeneratePractice,
+    handleRegeneratePractice,
+    prewarmPractice,
+    prewarmVariants,
+  });
+
+  const {
     playbackState,
     effectiveSpeakingText,
     variantChunkModalOpen,
@@ -379,15 +343,10 @@ export default function SceneDetailClientPage({
       sessionDoneRef.current = false;
       focusExpressionPromptShownRef.current = false;
       sceneResumeToastShownRef.current = false;
-      practicePrewarmFailureRef.current = {
-        count: 0,
-        firstFailureAt: null,
-      };
-      setPracticePrewarmBlocked(false);
-      setPracticeRetryError(null);
+      resetPracticePrewarmFailures();
       setViewResetVersion((current) => current + 1);
     };
-  }, [resetChunkDetailState, resetRouteScopedState]);
+  }, [resetChunkDetailState, resetPracticePrewarmFailures, resetRouteScopedState]);
 
   useEffect(() => {
     if (!baseLesson || !latestPracticeSetId) {
@@ -573,244 +532,31 @@ export default function SceneDetailClientPage({
     notifySceneLoadError(loadErrorMessage);
   }, [loadErrorMessage]);
 
-  const resetPracticePrewarmFailures = useCallback(() => {
-    practicePrewarmFailureRef.current = {
-      count: 0,
-      firstFailureAt: null,
-    };
-    setPracticePrewarmBlocked(false);
-    setPracticeRetryError(null);
-  }, []);
-
-  const registerPracticePrewarmFailure = useCallback(() => {
-    const now = Date.now();
-    const current = practicePrewarmFailureRef.current;
-    const withinWindow =
-      current.firstFailureAt !== null &&
-      now - current.firstFailureAt <= PRACTICE_PREWARM_FAILURE_WINDOW_MS;
-    const nextCount = withinWindow ? current.count + 1 : 1;
-    practicePrewarmFailureRef.current = {
-      count: nextCount,
-      firstFailureAt: withinWindow ? current.firstFailureAt : now,
-    };
-
-    if (nextCount >= PRACTICE_PREWARM_FAILURE_LIMIT) {
-      setPracticePrewarmBlocked(true);
-      setPracticeRetryError("练习题生成多次失败，请稍后手动重试。");
-    }
-  }, []);
-
-  const handlePracticeToolAction = useCallback(() => {
-    resetPracticePrewarmFailures();
-    handlePracticeToolClick();
-  }, [handlePracticeToolClick, resetPracticePrewarmFailures]);
-
-  const handleGeneratePracticeManually = useCallback(
-    (lesson: Lesson) => {
-      resetPracticePrewarmFailures();
-      return handleGeneratePractice(lesson);
-    },
-    [handleGeneratePractice, resetPracticePrewarmFailures],
-  );
-
-  const handleRegeneratePracticeManually = useCallback(() => {
-    resetPracticePrewarmFailures();
-    return handleRegeneratePractice();
-  }, [handleRegeneratePractice, resetPracticePrewarmFailures]);
-
-  const handlePracticeRunStart = useCallback(
-    (payload: PracticeRunStartPayload) => {
-      if (!baseLesson) return;
-      const runKey = [
-        baseLesson.slug,
-        payload.practiceSetId,
-        payload.mode,
-        payload.sourceType,
-        payload.sourceVariantId ?? "",
-      ].join(":");
-      const currentDedup = practiceRunStartDedup.get(runKey);
-      const now = Date.now();
-      if (currentDedup?.promise) return;
-      if (
-        currentDedup?.completedAt &&
-        now - currentDedup.completedAt < PRACTICE_RUN_START_DEDUP_MS
-      ) {
-        return;
-      }
-
-      const matchingPracticeSet =
-        latestPracticeSet?.id === payload.practiceSetId ? latestPracticeSet : null;
-      const runPromise = (matchingPracticeSet
-        ? saveScenePracticeSetFromApi(baseLesson.slug, {
-            practiceSet: matchingPracticeSet,
-            replaceExisting: false,
-          }).then(() => undefined)
-        : Promise.resolve()
-      )
-        .then(() => startScenePracticeRunFromApi(baseLesson.slug, payload))
-        .then((result) => {
-          if (
-            (trainingState?.session?.practicedSentenceCount ?? 0) < 1 &&
-            (result.learningState?.session?.practicedSentenceCount ?? 0) >= 1
-          ) {
-            notifySceneMilestone("practice_sentence", baseLesson.title);
-          }
-          if (result.learningState) {
-            handleLearningStateChange(result.learningState);
-          }
-          setPracticeSnapshot((current) => {
-            const next = {
-              run: result.run,
-              latestAttempt: current?.latestAttempt ?? null,
-              summary: current?.summary ?? {
-                completedModeCount: result.run.completedModes.length,
-                totalAttemptCount: 0,
-                correctAttemptCount: 0,
-                latestAssessmentLevel: null,
-              },
-            };
-            void setScenePracticeSnapshotCache(baseLesson.slug, payload.practiceSetId, next).catch(() => {
-              // Ignore cache failures.
-            });
-            return next;
-          });
-        })
-        .then(() => {
-          practiceRunStartDedup.set(runKey, {
-            completedAt: Date.now(),
-            promise: null,
-          });
-        })
-        .catch(() => {
-          practiceRunStartDedup.delete(runKey);
-          // Non-blocking.
-        });
-
-      practiceRunStartDedup.set(runKey, {
-        completedAt: null,
-        promise: runPromise,
-      });
-    },
-    [
-      baseLesson,
-      handleLearningStateChange,
-      latestPracticeSet,
-      trainingState?.session?.practicedSentenceCount,
-    ],
-  );
-
-  const handlePracticeComplete = useCallback(() => {
-    if (!baseLesson) return;
-    const shouldNotifyMilestone = !sceneRawCompletedMap.scene_practice;
-    if (!latestPracticeSet) {
-      if (shouldNotifyMilestone) {
-        notifySceneMilestone("scene_practice", baseLesson.title);
-      }
-      handleMarkPracticeComplete();
-      return;
-    }
-    void completeScenePracticeRunFromApi(baseLesson.slug, {
-      practiceSetId: latestPracticeSet.id,
-    })
-      .then((result) => {
-        setPracticeSnapshot((current) => {
-          const next =
-            current
-              ? {
-                  ...current,
-                  run: result.run,
-                }
-              : {
-                  run: result.run,
-                  latestAttempt: null,
-                  summary: {
-                    completedModeCount: result.run.completedModes.length,
-                    totalAttemptCount: 0,
-                    correctAttemptCount: 0,
-                    latestAssessmentLevel: null,
-                  },
-                };
-          void setScenePracticeSnapshotCache(baseLesson.slug, latestPracticeSet.id, next).catch(() => {
-            // Ignore cache failures.
-          });
-          return next;
-        });
-      })
-      .catch(() => {
-        // Non-blocking.
-      });
-    if (shouldNotifyMilestone) {
-      notifySceneMilestone("scene_practice", baseLesson.title);
-    }
-    handleMarkPracticeComplete();
-  }, [
+  const {
+    handlePracticeRunStart,
+    handlePracticeComplete,
+    handlePracticeAttempt,
+    handlePracticeModeComplete,
+  } = useScenePracticeRunLifecycle({
     baseLesson,
-    handleMarkPracticeComplete,
     latestPracticeSet,
-    sceneRawCompletedMap.scene_practice,
-  ]);
+    practicedSentenceCount: trainingState?.session?.practicedSentenceCount ?? 0,
+    scenePracticeCompleted: sceneRawCompletedMap.scene_practice,
+    setPracticeSnapshot,
+    handleLearningStateChange,
+    handleMarkPracticeComplete,
+  });
 
-  const handlePracticeAttempt = useCallback(
-    (payload: PracticeAttemptPayload) => {
-      if (!baseLesson || !payload.practiceSetId) return;
-      void recordScenePracticeAttemptFromApi(baseLesson.slug, payload)
-        .then((result) => {
-          if (result.learningState) {
-            handleLearningStateChange(result.learningState);
-          }
-          setPracticeSnapshot((current) => {
-            const next = {
-              run: result.run,
-              latestAttempt: result.attempt,
-              summary: {
-                completedModeCount: current?.summary.completedModeCount ?? result.run.completedModes.length,
-                totalAttemptCount: (current?.summary.totalAttemptCount ?? 0) + 1,
-                correctAttemptCount:
-                  (current?.summary.correctAttemptCount ?? 0) + (result.attempt.isCorrect ? 1 : 0),
-                latestAssessmentLevel: result.attempt.assessmentLevel,
-              },
-            };
-            void setScenePracticeSnapshotCache(baseLesson.slug, payload.practiceSetId, next).catch(() => {
-              // Ignore cache failures.
-            });
-            return next;
-          });
-        })
-        .catch(() => {
-          // Non-blocking.
-        });
-    },
-    [baseLesson, handleLearningStateChange],
-  );
-
-  const handlePracticeModeComplete = useCallback(
-    (payload: PracticeModeCompletePayload) => {
-      if (!baseLesson) return;
-      void markScenePracticeModeCompleteFromApi(baseLesson.slug, payload)
-        .then((result) => {
-          setPracticeSnapshot((current) => {
-            const next = {
-              run: result.run,
-              latestAttempt: current?.latestAttempt ?? null,
-              summary: {
-                completedModeCount: result.run.completedModes.length,
-                totalAttemptCount: current?.summary.totalAttemptCount ?? 0,
-                correctAttemptCount: current?.summary.correctAttemptCount ?? 0,
-                latestAssessmentLevel: current?.summary.latestAssessmentLevel ?? null,
-              },
-            };
-            void setScenePracticeSnapshotCache(baseLesson.slug, payload.practiceSetId, next).catch(() => {
-              // Ignore cache failures.
-            });
-            return next;
-          });
-        })
-        .catch(() => {
-          // Non-blocking.
-        });
-    },
-    [baseLesson],
-  );
+  useSceneVariantRunLifecycle({
+    baseLesson,
+    viewMode,
+    latestVariantSetId,
+    latestVariantSetStatus,
+    activeVariantId,
+    searchParams,
+    setActiveVariantId,
+    refreshGeneratedState,
+  });
 
   const handleBackToSceneView = useCallback(() => {
     setViewModeWithRoute("scene");
@@ -952,145 +698,6 @@ export default function SceneDetailClientPage({
     practiceLoading,
   ]);
 
-  useEffect(() => {
-    const currentStep = trainingState?.session?.currentStep;
-    const scheduleKey = baseLesson
-      ? `scene-practice-prewarm:${baseLesson.id}:${currentStep ?? "none"}`
-      : "";
-    if (
-      !baseLesson ||
-      (currentStep !== "practice_sentence" && currentStep !== "scene_practice") ||
-      generatedState.practiceStatus !== "idle" ||
-      practiceLoading ||
-      practicePrewarmBlocked
-    ) {
-      if (scheduleKey) {
-        cancelScheduledIdleAction(scheduleKey);
-      }
-      return;
-    }
-    scheduleIdleAction(scheduleKey, () => {
-      void prewarmPractice(baseLesson).then((result) => {
-        if (result) {
-          resetPracticePrewarmFailures();
-          return;
-        }
-        registerPracticePrewarmFailure();
-      });
-    });
-    return () => {
-      cancelScheduledIdleAction(scheduleKey);
-    };
-  }, [
-    baseLesson,
-    generatedState.practiceStatus,
-    practicePrewarmBlocked,
-    practiceLoading,
-    prewarmPractice,
-    registerPracticePrewarmFailure,
-    resetPracticePrewarmFailures,
-    trainingState?.session?.currentStep,
-  ]);
-
-  useEffect(() => {
-    const currentStep = trainingState?.session?.currentStep;
-    const scheduleKey = baseLesson
-      ? `scene-variant-prewarm:${baseLesson.id}:${currentStep ?? "none"}`
-      : "";
-    if (
-      !baseLesson ||
-      (currentStep !== "scene_practice" && currentStep !== "done") ||
-      generatedState.variantStatus !== "idle" ||
-      variantsLoading
-    ) {
-      if (scheduleKey) {
-        cancelScheduledIdleAction(scheduleKey);
-      }
-      return;
-    }
-    scheduleIdleAction(scheduleKey, () => {
-      void prewarmVariants();
-    });
-    return () => {
-      cancelScheduledIdleAction(scheduleKey);
-    };
-  }, [
-    baseLesson,
-    generatedState.variantStatus,
-    prewarmVariants,
-    trainingState?.session?.currentStep,
-    variantsLoading,
-  ]);
-
-  useEffect(() => {
-    if (!baseLesson || !latestVariantSetId) return;
-    let cancelled = false;
-
-    void (async () => {
-      const applyVariantRun = (result: SceneVariantRunResponse) => {
-        if (!result.run) return;
-        hydrateVariantSetFromRun(baseLesson.id, latestVariantSetId, result.run);
-        refreshGeneratedState(baseLesson.id);
-        if (!activeVariantId && !searchParams.get("variant") && result.run.activeVariantId) {
-          setActiveVariantId(result.run.activeVariantId);
-        }
-      };
-
-      const cache = await getSceneVariantRunCache(baseLesson.slug, latestVariantSetId);
-      if (!cancelled && cache.found && cache.record && !cache.isExpired) {
-        applyVariantRun(cache.record.data.snapshot);
-        return;
-      }
-
-      try {
-        const result = await getSceneVariantRunSnapshotFromApi(baseLesson.slug, {
-          variantSetId: latestVariantSetId,
-        });
-        if (cancelled) return;
-        applyVariantRun(result);
-        void setSceneVariantRunCache(baseLesson.slug, latestVariantSetId, result).catch(() => {
-          // Ignore cache failures.
-        });
-      } catch {
-        // Non-blocking.
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    activeVariantId,
-    baseLesson,
-    latestVariantSetId,
-    refreshGeneratedState,
-    searchParams,
-    setActiveVariantId,
-  ]);
-
-  useEffect(() => {
-    if (
-      !baseLesson ||
-      viewMode !== "variants" ||
-      !latestVariantSetId ||
-      latestVariantSetStatus !== "generated"
-    ) {
-      return;
-    }
-
-    void startSceneVariantRunFromApi(baseLesson.slug, {
-      variantSetId: latestVariantSetId,
-    })
-      .then((result) => {
-        void setSceneVariantRunCache(baseLesson.slug, latestVariantSetId, result).catch(() => {
-          // Ignore cache failures.
-        });
-      })
-      .catch(() => {
-        // Non-blocking.
-      });
-  }, [baseLesson, latestVariantSetId, latestVariantSetStatus, viewMode]);
-
   if (sceneLoading) {
     return <SceneDetailSkeleton />;
   }
@@ -1175,143 +782,59 @@ export default function SceneDetailClientPage({
     />
   );
 
-  if (viewMode === "practice") {
-    return (
-      <ScenePracticeView
-        practiceSet={latestPracticeSet}
-        practiceSnapshot={practiceSnapshot}
-        showAnswerMap={showAnswerMap}
-        appleButtonSmClassName={appleButtonSmClassName}
-        appleDangerButtonSmClassName={appleDangerButtonSmClassName}
-        labels={{
-          ...sceneViewLabels.practice,
-          complete: "完成本轮练习",
-        }}
-        regenerating={practiceLoading}
-        onBack={handleBackToSceneView}
-        onDelete={handleDeletePracticeSet}
-        onRegenerate={handleRegeneratePracticeFromView}
-        onComplete={handlePracticeComplete}
-        completing={sceneCompleting}
-        onSentenceCompleted={handleSentenceCompleted}
-        onPracticeRunStart={handlePracticeRunStart}
-        onPracticeAttempt={handlePracticeAttempt}
-        onPracticeModeComplete={handlePracticeModeComplete}
-        onReviewScene={handleBackToSceneView}
-        onRepeatPractice={handleRepeatPractice}
-        onOpenVariants={handleOpenVariantsView}
-        onToggleAnswer={handleTogglePracticeAnswer}
-      />
-    );
-  }
-
-  if (viewMode === "variants") {
-    return (
-      <SceneVariantsView
-        baseLesson={baseLesson}
-        variantSet={latestVariantSet}
-        expressionMapLoading={expressionMapLoading}
-        appleButtonSmClassName={appleButtonSmClassName}
-        appleDangerButtonSmClassName={appleDangerButtonSmClassName}
-        labels={sceneViewLabels.variants}
-        onBack={handleBackToSceneView}
-        onComplete={handleMarkVariantSetComplete}
-        completing={sceneCompleting}
-        onRepeatVariants={handleRepeatVariants}
-        onDeleteSet={handleDeleteVariantSet}
-        onOpenExpressionMap={handleOpenExpressionMapView}
-        onOpenChunk={handleOpenVariantChunk}
-        onOpenVariant={handleOpenVariant}
-        onDeleteVariant={handleDeleteVariantItem}
-        toVariantTitle={toVariantTitle}
-        toVariantStatusLabel={toVariantStatusLabel}
-        chunkDetailSheet={chunkDetailSheet}
-      />
-    );
-  }
-
-  if (viewMode === "expression-map") {
-    return (
-      <SceneExpressionMapView
-        clusters={expressionMap?.clusters ?? []}
-        error={expressionMapError}
-        appleButtonSmClassName={appleButtonSmClassName}
-        labels={sceneViewLabels.expressionMap}
-        onBack={handleOpenVariantsView}
-        onOpenExpressionDetail={handleOpenExpressionDetail}
-        chunkDetailSheet={chunkDetailSheet}
-      />
-    );
-  }
-
-  if (viewMode === "variant-study" && activeVariantLesson) {
-    const variantStudyHeaderTools = (
-      <button
-        type="button"
-        className={`${appleButtonLgClassName} px-3 py-1.5 disabled:opacity-60`}
-        disabled={!canGeneratePractice}
-        onClick={() => void handleGeneratePracticeManually(activeVariantLesson)}
-      >
-        <LoadingContent
-          loading={practiceLoading}
-          loadingText={formatLoadingText("场景练习准备中...", "中...")}
-        >
-          基于此变体生成练习
-        </LoadingContent>
-      </button>
-    );
-    const variantStudyAuxiliaryTools = (
-      <button
-        type="button"
-        className={`${SCENE_DANGER_ACTION_BUTTON_SM_CLASSNAME} px-3 py-1.5`}
-        onClick={() => handleDeleteVariantItem(activeVariantItem?.id ?? activeVariantLesson.id)}
-      >
-        删除变体
-      </button>
-    );
-
-    return (
-      <SceneVariantStudyView
-        lesson={activeVariantLesson}
-        topRightTool={
-          <button
-            type="button"
-            className={`${appleButtonLgClassName} px-3 py-1.5`}
-            onClick={handleOpenVariantsView}
-          >
-            返回
-          </button>
-        }
-        headerTools={variantStudyHeaderTools}
-        auxiliaryTools={variantStudyAuxiliaryTools}
-        savedPhraseTexts={Array.from(savedPhraseTextSet)}
-        onSavePhrase={savePhraseForScene}
-        onReviewPhrase={savePhraseForScene}
-        onBlockPlayback={handleBlockPlaybackWarmup}
-        onSentencePlayback={handleSentencePlaybackWarmup}
-      />
-    );
-  }
-
   return (
-    <SceneBaseView
-      lesson={baseLesson}
-      practiceError={practiceRetryError ?? practiceError}
+    <SceneDetailViewSwitch
+      viewMode={viewMode}
+      baseLesson={baseLesson}
+      activeVariantItem={activeVariantItem}
+      activeVariantLesson={activeVariantLesson}
+      latestPracticeSet={latestPracticeSet}
+      latestVariantSet={latestVariantSet}
+      practiceSnapshot={practiceSnapshot}
+      showAnswerMap={showAnswerMap}
+      expressionMap={expressionMap}
+      expressionMapError={expressionMapError}
+      expressionMapLoading={expressionMapLoading}
+      practiceRetryError={practiceRetryError}
+      practiceError={practiceError}
       variantsError={variantsError}
-      trainingNextStep={trainingNextStep}
-      headerTools={null}
-      headerTitle={baseLesson.subtitle?.trim() || baseLesson.sections[0]?.summary?.trim() || baseLesson.title}
-      onBackToList={() => router.push("/scenes")}
-      interactionMode="training"
+      practiceLoading={practiceLoading}
+      sceneCompleting={sceneCompleting}
+      canGeneratePractice={canGeneratePractice}
       savedPhraseTexts={Array.from(savedPhraseTextSet)}
+      appleButtonSmClassName={appleButtonSmClassName}
+      appleButtonLgClassName={SCENE_ACTION_BUTTON_LG_CLASSNAME}
+      appleDangerButtonSmClassName={SCENE_DANGER_ACTION_BUTTON_SM_CLASSNAME}
+      trainingNextStep={trainingNextStep}
+      chunkDetailSheet={chunkDetailSheet}
+      onBackToList={() => router.push("/scenes")}
+      onBackToSceneView={handleBackToSceneView}
+      onOpenVariantsView={handleOpenVariantsView}
+      onRegeneratePracticeFromView={handleRegeneratePracticeFromView}
+      onOpenExpressionMapView={handleOpenExpressionMapView}
+      onDeletePracticeSet={handleDeletePracticeSet}
+      onPracticeComplete={handlePracticeComplete}
+      onSentenceCompleted={handleSentenceCompleted}
+      onPracticeRunStart={handlePracticeRunStart}
+      onPracticeAttempt={handlePracticeAttempt}
+      onPracticeModeComplete={handlePracticeModeComplete}
+      onRepeatPractice={handleRepeatPractice}
+      onTogglePracticeAnswer={handleTogglePracticeAnswer}
+      onMarkVariantSetComplete={handleMarkVariantSetComplete}
+      onRepeatVariants={handleRepeatVariants}
+      onDeleteVariantSet={handleDeleteVariantSet}
+      onOpenVariantChunk={handleOpenVariantChunk}
+      onOpenVariant={handleOpenVariant}
+      onDeleteVariantItem={handleDeleteVariantItem}
+      onOpenExpressionDetail={handleOpenExpressionDetail}
+      onGeneratePracticeManually={handleGeneratePracticeManually}
       onSavePhrase={savePhraseForScene}
       onReviewPhrase={savePhraseForScene}
-      onSceneLoopPlayback={handleSceneFullPlay}
+      onSceneFullPlay={handleSceneFullPlay}
       onBlockPlayback={handleBlockPlaybackWarmup}
       onSentencePlayback={handleSentencePlaybackWarmup}
       onChunkEncounter={handleBaseChunkEncounter}
       onSentencePracticeComplete={handleSentenceCompleted}
-      chunkDetailSheet={chunkDetailSheet}
     />
   );
 }
