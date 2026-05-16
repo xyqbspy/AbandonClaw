@@ -12,6 +12,11 @@ import {
   uploadTtsAudioToStorage,
 } from "@/lib/server/tts/repo";
 import {
+  clearCachedSignedUrl as sharedClearCachedSignedUrl,
+  getCachedSignedUrl as sharedGetCachedSignedUrl,
+  setCachedSignedUrl as sharedSetCachedSignedUrl,
+} from "@/lib/server/tts/signed-url-cache";
+import {
   buildChunkAudioKey,
   buildSceneFullAudioKey,
   buildSentenceAudioKey,
@@ -44,18 +49,12 @@ type SceneFullSegment = {
   speaker?: string;
 };
 
-type SignedUrlCacheEntry = {
-  url: string;
-  expiresAt: number;
-};
-
 type TtsResponseSource = "storage-hit" | "fresh-upload" | "inline-fallback";
 
 const voiceJenny = "en-US-JennyNeural";
 const voiceGuy = "en-US-GuyNeural";
 const signedUrlTtlSeconds = 60 * 60;
 const signedUrlCacheTtlMs = Math.max(60, signedUrlTtlSeconds - 60) * 1000;
-const signedUrlCache = new Map<string, SignedUrlCacheEntry>();
 const pendingSignedUrlRequests = new Map<string, Promise<string>>();
 const REGENERATE_CONCURRENCY = 3;
 
@@ -158,26 +157,15 @@ const canFallbackToInlineAudio = (error: unknown) => {
 
 const toInlineAudioUrl = (buffer: Buffer) => `data:audio/mpeg;base64,${buffer.toString("base64")}`;
 
-const getCachedSignedUrl = (storagePath: string) => {
-  const cached = signedUrlCache.get(storagePath);
-  if (!cached) return null;
-  if (cached.expiresAt <= Date.now()) {
-    signedUrlCache.delete(storagePath);
-    return null;
-  }
-  return cached.url;
-};
+const getCachedSignedUrl = (storagePath: string) => sharedGetCachedSignedUrl(storagePath);
 
-const cacheSignedUrl = (storagePath: string, url: string) => {
-  signedUrlCache.set(storagePath, {
-    url,
-    expiresAt: Date.now() + signedUrlCacheTtlMs,
-  });
+const cacheSignedUrl = async (storagePath: string, url: string) => {
+  await sharedSetCachedSignedUrl(storagePath, url, signedUrlCacheTtlMs);
   return url;
 };
 
 const getStorageSignedUrlIfExists = async (storagePath: string) => {
-  const cached = getCachedSignedUrl(storagePath);
+  const cached = await getCachedSignedUrl(storagePath);
   if (cached) return cached;
 
   const signedUrl = await getTtsStorageSignedUrlIfExists(storagePath);
@@ -189,8 +177,8 @@ const uploadAudioToStorage = async (storagePath: string, buffer: Buffer) => {
   return cacheSignedUrl(storagePath, url);
 };
 
-const clearSignedUrlCache = (storagePath: string) => {
-  signedUrlCache.delete(storagePath);
+const clearSignedUrlCache = async (storagePath: string) => {
+  await sharedClearCachedSignedUrl(storagePath);
   pendingSignedUrlRequests.delete(storagePath);
 };
 
@@ -491,7 +479,7 @@ export async function regenerateChunkTtsAudioBatch(
     });
 
     try {
-      clearSignedUrlCache(target.storagePath);
+      await clearSignedUrlCache(target.storagePath);
       await resolvedDependencies.removeLocalFile(target.absolutePath).catch(() => {
         // Non-blocking local cleanup.
       });

@@ -5,6 +5,7 @@ import {
   ensureSentenceAudio,
   getSceneFullAudioCooldown,
 } from "@/lib/utils/tts-api";
+import { recordClientEvent } from "@/lib/utils/client-events";
 import { markAudioWarmed, type WarmupSource } from "@/lib/utils/tts-warmup-registry";
 
 export type SceneAudioWarmupTaskKind = "sentence" | "scene_full";
@@ -41,6 +42,7 @@ type InternalSceneAudioWarmupTask = SceneAudioWarmupTaskPayload & {
   source: SceneAudioWarmupTaskSource;
   sequence: number;
   errorMessage?: string;
+  startedAt?: number;
 };
 
 export type SceneAudioWarmupTask = Omit<InternalSceneAudioWarmupTask, "sequence">;
@@ -53,6 +55,7 @@ const priorityRank: Record<SceneAudioWarmupTaskPriority, number> = {
 };
 
 const sceneAudioWarmupTasks = new Map<string, InternalSceneAudioWarmupTask>();
+const taskAbortControllers = new Map<string, AbortController>();
 let activeTaskCount = 0;
 let sequence = 0;
 const maxConcurrentWarmupTasks = 2;
@@ -94,15 +97,32 @@ const shouldPromotePriority = (
   next: SceneAudioWarmupTaskPriority,
 ) => priorityRank[next] < priorityRank[current];
 
-const runTask = async (task: InternalSceneAudioWarmupTask) => {
+const runTask = async (task: InternalSceneAudioWarmupTask, signal: AbortSignal) => {
   if (task.kind === "sentence") {
-    await ensureSentenceAudio(task.payload);
+    await ensureSentenceAudio({ ...task.payload, signal });
     return "loaded" as const;
   }
   const cooldown = getSceneFullAudioCooldown(task.payload);
   if (cooldown) return "skipped" as const;
-  await ensureSceneFullAudio(task.payload);
+  await ensureSceneFullAudio({ ...task.payload, signal });
   return "loaded" as const;
+};
+
+const getTaskSceneSlug = (task: InternalSceneAudioWarmupTask) => task.payload.sceneSlug;
+
+const recordWarmupTaskFinishedEvent = (
+  task: InternalSceneAudioWarmupTask,
+  status: SceneAudioWarmupTaskStatus,
+) => {
+  recordClientEvent("warmup_task_finished", {
+    sceneSlug: getTaskSceneSlug(task),
+    kind: task.kind,
+    priority: task.priority,
+    source: task.source,
+    status,
+    durationMs: task.startedAt ? Date.now() - task.startedAt : null,
+    ...(task.errorMessage ? { errorMessage: task.errorMessage } : {}),
+  });
 };
 
 const getNextQueuedTask = () =>
@@ -122,18 +142,26 @@ const pumpSceneAudioWarmupQueue = () => {
     activeTaskCount += 1;
     task.status = "loading";
     task.errorMessage = undefined;
+    task.startedAt = Date.now();
+    const controller = new AbortController();
+    taskAbortControllers.set(task.key, controller);
 
-    void runTask(task)
+    void runTask(task, controller.signal)
       .then((status) => {
+        if (controller.signal.aborted) return;
         task.status = status;
         task.errorMessage =
           status === "skipped" ? "Scene full warmup skipped during cooldown." : undefined;
+        recordWarmupTaskFinishedEvent(task, status);
       })
       .catch((error: unknown) => {
+        if (controller.signal.aborted) return;
         task.status = "failed";
         task.errorMessage = error instanceof Error ? error.message : "Scene audio warmup failed.";
+        recordWarmupTaskFinishedEvent(task, "failed");
       })
       .finally(() => {
+        taskAbortControllers.delete(task.key);
         activeTaskCount = Math.max(0, activeTaskCount - 1);
         pruneFinishedWarmupTasks();
         pumpSceneAudioWarmupQueue();
@@ -158,14 +186,30 @@ const enqueueSceneAudioWarmupTask = (
 
   if (existing) {
     if (shouldPromotePriority(existing.priority, priority)) {
+      const previousPriority = existing.priority;
       existing.priority = priority;
       existing.source = source;
+      recordClientEvent("warmup_task_promoted", {
+        sceneSlug: getTaskSceneSlug(existing),
+        kind: existing.kind,
+        previousPriority,
+        nextPriority: priority,
+        source,
+      });
     }
     if (existing.status === "failed" || existing.status === "skipped") {
+      const previousStatus = existing.status;
       existing.status = "queued";
       existing.errorMessage = undefined;
       existing.sequence = sequence;
       sequence += 1;
+      recordClientEvent("warmup_task_reset", {
+        sceneSlug: getTaskSceneSlug(existing),
+        kind: existing.kind,
+        previousStatus,
+        priority: existing.priority,
+        source: existing.source,
+      });
       pumpSceneAudioWarmupQueue();
     }
     return key;
@@ -223,12 +267,59 @@ export const promoteSceneAudioWarmupTask = (
   return true;
 };
 
+export const cancelWarmupsBySceneSlug = (sceneSlug: string) => {
+  const target = sceneSlug.trim();
+  if (!target) return 0;
+  let cancelled = 0;
+  for (const [key, task] of sceneAudioWarmupTasks) {
+    if (task.payload.sceneSlug !== target) continue;
+    if (task.status === "queued") {
+      task.status = "skipped";
+      task.errorMessage = "Cancelled because scene navigated away.";
+      recordClientEvent("warmup_task_cancelled", {
+        sceneSlug: target,
+        kind: task.kind,
+        previousStatus: "queued",
+        priority: task.priority,
+        source: task.source,
+      });
+      cancelled += 1;
+      continue;
+    }
+    if (task.status === "loading") {
+      const controller = taskAbortControllers.get(key);
+      if (controller) {
+        controller.abort();
+      }
+      task.status = "skipped";
+      task.errorMessage = "Cancelled because scene navigated away.";
+      recordClientEvent("warmup_task_cancelled", {
+        sceneSlug: target,
+        kind: task.kind,
+        previousStatus: "loading",
+        priority: task.priority,
+        source: task.source,
+      });
+      cancelled += 1;
+    }
+  }
+  if (cancelled > 0) {
+    pruneFinishedWarmupTasks();
+    pumpSceneAudioWarmupQueue();
+  }
+  return cancelled;
+};
+
 export const listSceneAudioWarmupTasks = () =>
   Array.from(sceneAudioWarmupTasks.values())
     .sort((left, right) => left.sequence - right.sequence)
     .map(cloneTask);
 
 export const resetSceneAudioWarmupSchedulerForTests = () => {
+  for (const controller of taskAbortControllers.values()) {
+    controller.abort();
+  }
+  taskAbortControllers.clear();
   sceneAudioWarmupTasks.clear();
   activeTaskCount = 0;
   sequence = 0;

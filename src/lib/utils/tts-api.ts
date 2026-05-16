@@ -143,6 +143,66 @@ const sceneFullFailureCooldowns = new Map<
   }
 >();
 
+// 通用 sentence/chunk 失败 cooldown：连续失败按指数回退，避免持续失败的内容反复打 msedge-tts
+type AudioRetryFailureRecord = {
+  failureCount: number;
+  lastFailedAt: number;
+  cooldownMs: number;
+  expiresAt: number;
+};
+const audioRetryFailureRecords = new Map<string, AudioRetryFailureRecord>();
+const audioRetryCooldownLadderMs = [0, 5_000, 60_000, 300_000, 1_800_000];
+// record 静默 30min 后视为新一轮，重新从 1 次失败起算（与 ladder 顶端 1800s 对齐）
+const audioRetryRecordIdleResetMs = 30 * 60 * 1000;
+
+const getAudioRetryCooldownMs = (failureCount: number) => {
+  if (failureCount <= 0) return 0;
+  const lastIndex = audioRetryCooldownLadderMs.length - 1;
+  const idx = Math.min(failureCount - 1, lastIndex);
+  return audioRetryCooldownLadderMs[idx] ?? 0;
+};
+
+const isAudioRetryRecordStale = (record: AudioRetryFailureRecord, now: number) =>
+  now - record.lastFailedAt > audioRetryRecordIdleResetMs;
+
+const getAudioRetryCooldown = (cacheKey: string, now = Date.now()) => {
+  const record = audioRetryFailureRecords.get(cacheKey);
+  if (!record) return null;
+  if (isAudioRetryRecordStale(record, now)) {
+    // 静默太久，丢弃旧 record，下一次失败重新从 1 次起算
+    audioRetryFailureRecords.delete(cacheKey);
+    return null;
+  }
+  if (record.expiresAt <= now) {
+    // cooldown 已过，可立即重试，但保留 failureCount 用于 ladder 升级
+    return null;
+  }
+  return {
+    failureCount: record.failureCount,
+    lastFailedAt: record.lastFailedAt,
+    cooldownMs: record.cooldownMs,
+    remainingMs: record.expiresAt - now,
+  };
+};
+
+const markAudioRetryFailure = (cacheKey: string, now = Date.now()) => {
+  const previous = audioRetryFailureRecords.get(cacheKey);
+  const previousFailureCount =
+    previous && !isAudioRetryRecordStale(previous, now) ? previous.failureCount : 0;
+  const failureCount = previousFailureCount + 1;
+  const cooldownMs = getAudioRetryCooldownMs(failureCount);
+  audioRetryFailureRecords.set(cacheKey, {
+    failureCount,
+    lastFailedAt: now,
+    cooldownMs,
+    expiresAt: now + cooldownMs,
+  });
+};
+
+const clearAudioRetryFailure = (cacheKey: string) => {
+  audioRetryFailureRecords.delete(cacheKey);
+};
+
 class TtsClientError extends Error {
   failureReason: SceneFullFailureReason;
   details: Record<string, unknown>;
@@ -714,23 +774,50 @@ const requestTtsUrl = async (
   cacheKey: string,
   payload: TtsRequestPayload,
   fallbackError: string,
+  options?: { signal?: AbortSignal },
 ) => {
   const persistentUrl = await readPersistentAudioUrl(cacheKey);
   if (persistentUrl) {
     cacheTtsUrl(cacheKey, persistentUrl);
     preloadAudioUrl(persistentUrl);
+    clearAudioRetryFailure(cacheKey);
     return persistentUrl;
   }
 
   const cachedUrl = getCachedTtsUrl(cacheKey);
   if (cachedUrl) {
     preloadAudioUrl(cachedUrl);
+    clearAudioRetryFailure(cacheKey);
     return cachedUrl;
   }
 
   const pending = pendingTtsUrlRequests.get(cacheKey);
   if (pending) {
     return pending;
+  }
+
+  // sentence/chunk 失败 cooldown：scene_full 走自己的失败 reason 路径，不重复
+  if (payload.kind !== "scene_full") {
+    const cooldown = getAudioRetryCooldown(cacheKey);
+    if (cooldown && cooldown.remainingMs > 0) {
+      recordClientEvent("tts_request_cooling_down", {
+        cacheKey,
+        kind: payload.kind,
+        failureCount: cooldown.failureCount,
+        cooldownMs: cooldown.cooldownMs,
+        remainingMs: cooldown.remainingMs,
+      });
+      throw new TtsClientError(
+        "音频暂时不可用，已自动稍后重试。",
+        "unknown",
+        {
+          cacheKey,
+          failureCount: cooldown.failureCount,
+          cooldownMs: cooldown.cooldownMs,
+          remainingMs: cooldown.remainingMs,
+        },
+      );
+    }
   }
 
   const task = (async () => {
@@ -740,6 +827,7 @@ const requestTtsUrl = async (
         "Content-Type": "application/json",
       },
       body: JSON.stringify(payload),
+      signal: options?.signal,
     });
     if (!response.ok) {
       throw await extractTtsClientError(response, fallbackError);
@@ -748,8 +836,12 @@ const requestTtsUrl = async (
     if (!data.url) {
       throw new Error("Invalid tts audio response.");
     }
+    if (options?.signal?.aborted) {
+      throw new DOMException("Aborted", "AbortError");
+    }
     const url = cacheTtsUrl(cacheKey, data.url);
     preloadAudioUrl(url);
+    clearAudioRetryFailure(cacheKey);
     void persistAudioToBrowserCache(cacheKey, data.url)
       .then(async (persistentUrl) => {
         if (!persistentUrl) return;
@@ -765,9 +857,20 @@ const requestTtsUrl = async (
         // Non-blocking persistence.
       });
     return url;
-  })().finally(() => {
-    pendingTtsUrlRequests.delete(cacheKey);
-  });
+  })()
+    .catch((error: unknown) => {
+      if (
+        payload.kind !== "scene_full" &&
+        !(error instanceof DOMException && error.name === "AbortError") &&
+        !options?.signal?.aborted
+      ) {
+        markAudioRetryFailure(cacheKey);
+      }
+      throw error;
+    })
+    .finally(() => {
+      pendingTtsUrlRequests.delete(cacheKey);
+    });
 
   pendingTtsUrlRequests.set(cacheKey, task);
   return task;
@@ -874,6 +977,7 @@ export async function ensureSentenceAudio(params: {
   text: string;
   speaker?: string;
   mode?: "normal" | "slow";
+  signal?: AbortSignal;
 }) {
   const mode = params.mode ?? "normal";
   return requestTtsUrl(
@@ -887,12 +991,14 @@ export async function ensureSentenceAudio(params: {
       mode,
     } satisfies SentenceTtsPayload,
     "Failed to generate sentence audio.",
+    { signal: params.signal },
   );
 }
 
 export async function ensureChunkAudio(params: {
   chunkText: string;
   chunkKey?: string;
+  signal?: AbortSignal;
 }) {
   const key = params.chunkKey ?? buildChunkAudioKey(params.chunkText);
   return requestTtsUrl(
@@ -903,6 +1009,7 @@ export async function ensureChunkAudio(params: {
       text: params.chunkText,
     } satisfies ChunkTtsPayload,
     "Failed to generate chunk audio.",
+    { signal: params.signal },
   );
 }
 
@@ -910,6 +1017,7 @@ export async function ensureSceneFullAudio(params: {
   sceneSlug: string;
   sceneType?: "dialogue" | "monologue";
   segments: Array<{ text: string; speaker?: string }>;
+  signal?: AbortSignal;
 }) {
   const sceneType = params.sceneType ?? "monologue";
   return requestTtsUrl(
@@ -921,6 +1029,7 @@ export async function ensureSceneFullAudio(params: {
       segments: params.segments,
     } satisfies SceneFullTtsPayload,
     "Failed to generate full scene audio.",
+    { signal: params.signal },
   );
 }
 
@@ -1414,6 +1523,7 @@ export const __resetTtsTestState = async (options?: { preservePersistentCache?: 
   ttsUrlCache.clear();
   pendingTtsUrlRequests.clear();
   sceneFullFailureCooldowns.clear();
+  audioRetryFailureRecords.clear();
   sceneFullFailureCooldownMs = defaultSceneFullFailureCooldownMs;
   __resetTtsWarmupRegistryForTests();
   preloadedAudioUrls.clear();
@@ -1436,3 +1546,6 @@ export const __setTtsCacheLimitsForTests = (overrides: Partial<TtsCacheLimits>) 
 export const __setSceneFullFailureCooldownMsForTests = (cooldownMs: number) => {
   sceneFullFailureCooldownMs = Math.max(0, cooldownMs);
 };
+
+export const __getAudioRetryFailureRecordForTests = (cacheKey: string) =>
+  audioRetryFailureRecords.get(cacheKey) ?? null;

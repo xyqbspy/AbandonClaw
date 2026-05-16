@@ -11,6 +11,7 @@ import {
   getSentenceSpeakText,
   promoteLessonPlaybackAudioWarmups,
 } from "@/lib/utils/audio-warmup";
+import { cancelWarmupsBySceneSlug } from "@/lib/utils/scene-audio-warmup-scheduler";
 import {
   SCENE_IDLE_WARMUP_BATCH_SIZE,
   cancelSceneIdleAudioWarmup,
@@ -138,6 +139,8 @@ export function useSceneDetailPlayback({
     return () => {
       window.clearTimeout(timer);
       cancelSceneIdleAudioWarmup(idleWarmupKey);
+      // 离开 scene 时打断已排队/在飞的 warmup 任务，节省用户带宽
+      cancelWarmupsBySceneSlug(warmupLesson.slug);
     };
   }, [activeVariantLesson, baseLesson, viewMode]);
 

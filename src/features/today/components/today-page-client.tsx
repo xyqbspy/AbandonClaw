@@ -26,6 +26,7 @@ import { getLearningDashboardFromApi, LearningDashboardResponse } from "@/lib/ut
 import { getMyPhrasesFromApi, UserPhraseItemResponse } from "@/lib/utils/phrases-api";
 import { startReviewSession } from "@/lib/utils/review-session";
 import { warmupContinueLearningScene } from "@/lib/utils/scene-resource-actions";
+import { scheduleScenePrefetch } from "@/lib/cache/scene-prefetch";
 import { getScenesFromApi, SceneListItemResponse } from "@/lib/utils/scenes-api";
 
 const EMPTY_DASHBOARD: LearningDashboardResponse = {
@@ -404,6 +405,19 @@ export function TodayPageClient({ displayName }: { displayName: string }) {
       currentStep: todayLearningSnapshot.effectiveCurrentStep,
     });
   }, [continueLearning, todayLearningSnapshot.effectiveCurrentStep]);
+
+  useEffect(() => {
+    if (recommendedScenes.length === 0) return;
+    // 推荐 scene 背景预热：复用 scenes 页面的预取队列，最多 2 个，
+    // 排除当前 continueLearning 避免重复 warm。saveData/2g 自动跳过。
+    const continueSlug = continueLearning?.sceneSlug;
+    const candidateSlugs = recommendedScenes
+      .map((scene) => scene.slug)
+      .filter((slug) => slug && slug !== continueSlug)
+      .slice(0, 2);
+    if (candidateSlugs.length === 0) return;
+    scheduleScenePrefetch(candidateSlugs, { currentSlug: continueSlug });
+  }, [continueLearning?.sceneSlug, recommendedScenes]);
 
   return (
     <div className="min-h-screen bg-[#f8fafc] font-['-apple-system','BlinkMacSystemFont','Segoe_UI',sans-serif]">

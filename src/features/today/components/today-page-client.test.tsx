@@ -4,11 +4,16 @@ import test, { afterEach } from "node:test";
 import React from "react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import type { LearningDashboardResponse } from "@/lib/utils/learning-api";
+import type { SceneListItemResponse } from "@/lib/utils/scenes-api";
 
 const localRequire = createRequire(import.meta.url);
 const nodeModule = localRequire("node:module") as typeof import("node:module");
 
 const routerPushCalls: string[] = [];
+const scheduleScenePrefetchCalls: Array<{
+  slugs: string[];
+  options: Record<string, unknown> | undefined;
+}> = [];
 const recentPhraseRows = [
   {
     userPhraseId: "phrase-1",
@@ -108,7 +113,7 @@ let mockGetMyPhrasesFromApi = async () => ({
   page: 1,
   limit: 3,
 });
-let mockGetScenesFromApi = async () => [];
+let mockGetScenesFromApi: () => Promise<SceneListItemResponse[]> = async () => [];
 
 const mockedModules = {
   "next/link": {
@@ -157,6 +162,11 @@ const mockedModules = {
   "@/lib/utils/scene-resource-actions": {
     warmupContinueLearningScene: () => undefined,
   },
+  "@/lib/cache/scene-prefetch": {
+    scheduleScenePrefetch: (slugs: string[], options?: Record<string, unknown>) => {
+      scheduleScenePrefetchCalls.push({ slugs: [...slugs], options });
+    },
+  },
   "@/lib/utils/scenes-api": {
     getScenesFromApi: () => mockGetScenesFromApi(),
   },
@@ -190,6 +200,7 @@ function getTodayPageClient() {
 afterEach(() => {
   cleanup();
   routerPushCalls.length = 0;
+  scheduleScenePrefetchCalls.length = 0;
   TodayPageClientModule = null;
   mockGetLearningDashboardCache = async () => defaultDashboardCacheResult;
   mockGetPhraseListCache = async () => defaultPhraseCacheResult;
@@ -307,3 +318,93 @@ test("TodayPageClient keeps continue learning as the primary card for existing l
     assert.deepEqual(routerPushCalls, ["/scene/coffee-chat"]);
   });
 });
+
+const makeSceneListItem = (slug: string, overrides: Record<string, unknown> = {}) => ({
+  id: slug,
+  slug,
+  title: slug,
+  subtitle: "subtitle",
+  difficulty: "Beginner",
+  estimatedMinutes: 5,
+  sentenceCount: 4,
+  sceneType: "dialogue" as const,
+  sourceType: "builtin" as const,
+  createdAt: "2026-05-01T00:00:00.000Z",
+  variantLinks: [],
+  learningStatus: "not_started" as const,
+  progressPercent: 0,
+  lastViewedAt: null,
+  ...overrides,
+});
+
+test("TodayPageClient 在 sceneList 加载完成后对前 2 个推荐 scene 触发 scheduleScenePrefetch", async () => {
+  // dashboard.continueLearning 为 null 时，sceneList[0] 会被 buildFallbackContinueLearning
+  // 当作隐式 continueLearning，因而该 slug 会被从 prefetch 列表排除
+  mockGetScenesFromApi = async () => [
+    makeSceneListItem("scene-rec-a"),
+    makeSceneListItem("scene-rec-b"),
+    makeSceneListItem("scene-rec-c"),
+  ];
+
+  const TodayPageClient = getTodayPageClient();
+  render(<TodayPageClient displayName="xyqbspy" />);
+
+  await waitFor(() => {
+    assert.ok(scheduleScenePrefetchCalls.length > 0, "应触发 scheduleScenePrefetch");
+  });
+
+  const lastCall = scheduleScenePrefetchCalls[scheduleScenePrefetchCalls.length - 1];
+  assert.deepEqual(lastCall.slugs, ["scene-rec-b", "scene-rec-c"]);
+  assert.equal(lastCall.options?.currentSlug, "scene-rec-a");
+});
+
+test("TodayPageClient 排除与 continueLearning 相同的 slug 后再选前 2 个", async () => {
+  mockGetLearningDashboardFromApi = async () => ({
+    ...createDashboardResponse(),
+    continueLearning: {
+      sceneSlug: "scene-rec-a",
+      title: "A",
+      subtitle: null,
+      progressPercent: 30,
+      masteryStage: "focus",
+      masteryPercent: 30,
+      currentStep: "practice_sentence",
+      lastViewedAt: "2026-05-14T10:00:00.000Z",
+      lastSentenceIndex: 1,
+      estimatedMinutes: 6,
+      savedPhraseCount: 1,
+      completedSentenceCount: 1,
+    },
+  });
+  mockGetScenesFromApi = async () => [
+    makeSceneListItem("scene-rec-a"),
+    makeSceneListItem("scene-rec-b"),
+    makeSceneListItem("scene-rec-c"),
+  ];
+
+  const TodayPageClient = getTodayPageClient();
+  render(<TodayPageClient displayName="xyqbspy" />);
+
+  await waitFor(() => {
+    assert.ok(scheduleScenePrefetchCalls.length > 0);
+  });
+  const lastCall = scheduleScenePrefetchCalls[scheduleScenePrefetchCalls.length - 1];
+  assert.deepEqual(lastCall.slugs, ["scene-rec-b", "scene-rec-c"]);
+  assert.equal(lastCall.options?.currentSlug, "scene-rec-a");
+});
+
+test("TodayPageClient 在 sceneList 为空时不触发 scheduleScenePrefetch", async () => {
+  mockGetScenesFromApi = async () => [];
+
+  const TodayPageClient = getTodayPageClient();
+  render(<TodayPageClient displayName="xyqbspy" />);
+
+  await waitFor(() => {
+    screen.getByText("表达库");
+  });
+
+  // 等一帧确保 useEffect 已跑
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(scheduleScenePrefetchCalls.length, 0);
+});
+

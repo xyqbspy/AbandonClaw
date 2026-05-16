@@ -6,12 +6,15 @@ import {
   listClientEventRecords,
 } from "./client-events";
 import {
+  __getAudioRetryFailureRecordForTests,
   __resetTtsTestState,
   __setTtsCacheLimitsForTests,
   clearBrowserTtsCacheEntries,
   buildChunkTtsCacheKey,
+  buildSceneFullTtsCacheKey,
   buildSentenceTtsCacheKey,
   ensureChunkAudio,
+  ensureSceneFullAudio,
   ensureSentenceAudio,
   getBrowserTtsCacheSummary,
   getTtsPlaybackState,
@@ -784,3 +787,155 @@ test("playChunkAudio applies the stored user voice speed", async () => {
 
   assert.deepEqual(playbackRates, [1.2]);
 });
+
+test("ensureSentenceAudio 连续失败按 ladder 升级 cooldown，命中冷却时直接 throw 不发 fetch", async () => {
+  globalThis.window = {
+    localStorage: createLocalStorageMock(),
+    dispatchEvent: () => true,
+  } as unknown as Window & typeof globalThis;
+  globalThis.Audio = class {
+    preload = "auto";
+    src = "";
+    load() {}
+  } as typeof Audio;
+
+  let fetchCount = 0;
+  globalThis.fetch = (async () => {
+    fetchCount += 1;
+    return new Response(
+      JSON.stringify({ error: "synthesizer crashed", code: "TTS_PROVIDER_ERROR" }),
+      { status: 500, headers: { "Content-Type": "application/json" } },
+    );
+  }) as typeof fetch;
+
+  const payload = {
+    sceneSlug: "scene-cooldown",
+    sentenceId: "s-1",
+    text: "First sentence please.",
+    speaker: "A",
+    mode: "normal" as const,
+  };
+  const cacheKey = buildSentenceTtsCacheKey(payload);
+
+  // 第 1 次失败：失败计数 1，cooldownMs=0，立即可 retry
+  await assert.rejects(() => ensureSentenceAudio(payload));
+  let record = __getAudioRetryFailureRecordForTests(cacheKey);
+  assert.equal(record?.failureCount, 1);
+  assert.equal(record?.cooldownMs, 0);
+  assert.equal(fetchCount, 1);
+
+  // 第 2 次失败：失败计数 2，cooldownMs 升到 5_000
+  await assert.rejects(() => ensureSentenceAudio(payload));
+  record = __getAudioRetryFailureRecordForTests(cacheKey);
+  assert.equal(record?.failureCount, 2);
+  assert.equal(record?.cooldownMs, 5_000);
+  assert.equal(fetchCount, 2);
+
+  // 第 3 次：仍在 cooldown 期内，应直接 throw 不发 fetch
+  await assert.rejects(() => ensureSentenceAudio(payload), (error) => {
+    const detail = (error as Error & { details?: Record<string, unknown> }).details;
+    assert.ok(detail);
+    assert.equal(detail?.failureCount, 2);
+    assert.equal(detail?.cooldownMs, 5_000);
+    return true;
+  });
+  assert.equal(fetchCount, 2, "cooldown 命中时不应发起新 fetch");
+
+  // 命中 cooldown 时应记录 tts_request_cooling_down 事件
+  const coolingDown = listClientEventRecords().find(
+    (record) => record.name === "tts_request_cooling_down",
+  );
+  assert.ok(coolingDown, "expected tts_request_cooling_down event");
+  assert.equal(coolingDown?.payload.kind, "sentence");
+  assert.equal(coolingDown?.payload.failureCount, 2);
+  assert.equal(coolingDown?.payload.cooldownMs, 5_000);
+});
+
+test("ensureChunkAudio 成功后 cooldown 立即清零，再失败时按 1 次失败起算", async () => {
+  globalThis.window = {
+    localStorage: createLocalStorageMock(),
+    dispatchEvent: () => true,
+  } as unknown as Window & typeof globalThis;
+  globalThis.Audio = class {
+    preload = "auto";
+    src = "";
+    load() {}
+  } as typeof Audio;
+
+  let nextResponseShouldFail = true;
+  globalThis.fetch = (async () => {
+    if (nextResponseShouldFail) {
+      return new Response(JSON.stringify({ error: "transient" }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    return new Response(JSON.stringify({ url: "https://cdn.test/chunk-recovered.mp3" }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }) as typeof fetch;
+
+  const cacheKey = buildChunkTtsCacheKey({
+    chunkText: "recover me",
+    chunkKey: "recover-me",
+  });
+
+  // 第 1 次失败：record 出现，failureCount=1
+  await assert.rejects(() =>
+    ensureChunkAudio({ chunkText: "recover me", chunkKey: "recover-me" }),
+  );
+  assert.equal(__getAudioRetryFailureRecordForTests(cacheKey)?.failureCount, 1);
+
+  // 切换为成功响应：成功后 record 应被清除
+  nextResponseShouldFail = false;
+  await ensureChunkAudio({ chunkText: "recover me", chunkKey: "recover-me" });
+  assert.equal(
+    __getAudioRetryFailureRecordForTests(cacheKey),
+    null,
+    "成功后 record 应被 clearAudioRetryFailure 删除",
+  );
+
+  // 命中内存 cache 后再请求也不会触发 fetch；为了测试新失败的 record 重置，
+  // 重置 cache 状态后再次让 fetch 失败
+  await __resetTtsTestState({ preservePersistentCache: false });
+  nextResponseShouldFail = true;
+  await assert.rejects(() =>
+    ensureChunkAudio({ chunkText: "recover me", chunkKey: "recover-me" }),
+  );
+  // 重置后第 1 次失败的 failureCount 仍是 1（不是承接之前的 2/3）
+  assert.equal(__getAudioRetryFailureRecordForTests(cacheKey)?.failureCount, 1);
+});
+
+test("ensureSceneFullAudio 失败时不进入泛化 audioRetry cooldown（走自己的 sceneFullFailureCooldowns）", async () => {
+  globalThis.window = {
+    localStorage: createLocalStorageMock(),
+    dispatchEvent: () => true,
+  } as unknown as Window & typeof globalThis;
+  globalThis.Audio = class {
+    preload = "auto";
+    src = "";
+    load() {}
+  } as typeof Audio;
+
+  globalThis.fetch = (async () =>
+    new Response(JSON.stringify({ error: "scene full failed" }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    })) as typeof fetch;
+
+  const params = {
+    sceneSlug: "scene-isolated",
+    sceneType: "monologue" as const,
+    segments: [{ text: "Only segment." }],
+  };
+  const cacheKey = buildSceneFullTtsCacheKey(params);
+
+  await assert.rejects(() => ensureSceneFullAudio(params));
+  assert.equal(
+    __getAudioRetryFailureRecordForTests(cacheKey),
+    null,
+    "scene_full 失败不应写入 audioRetryFailureRecords",
+  );
+});
+

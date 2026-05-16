@@ -5,6 +5,7 @@ import {
   warmupChunkTextsAudio,
   warmupLessonAudio,
 } from "@/lib/utils/audio-warmup";
+import { recordClientEvent } from "@/lib/utils/client-events";
 import { getTtsPlaybackState } from "@/lib/utils/tts-api";
 
 type IdleHandle = number;
@@ -254,17 +255,26 @@ export const scheduleSceneIdleAudioWarmup = (
     sceneIdleWarmupHandles.delete(key);
   };
 
-  const shouldPauseRound = () =>
-    isPageHidden() ||
-    shouldAvoidHeavyAudioWarmup() ||
-    hasImmediatePlaybackDemand() ||
-    hasRecentSceneIdleInteraction(interactionQuietWindowMs);
+  const shouldPauseRound = () => {
+    if (isPageHidden()) return "page-hidden" as const;
+    if (shouldAvoidHeavyAudioWarmup()) return "save-data-or-2g" as const;
+    if (hasImmediatePlaybackDemand()) return "playback-loading" as const;
+    if (hasRecentSceneIdleInteraction(interactionQuietWindowMs)) return "interaction-recent" as const;
+    return null;
+  };
 
   const scheduleRound = (delayMs: number) => {
     const run = () => {
       if (!sceneIdleWarmupHandles.has(key)) return;
 
-      if (shouldPauseRound()) {
+      const skipReason = shouldPauseRound();
+      if (skipReason) {
+        recordClientEvent("warmup_idle_round_skipped", {
+          sceneSlug: lesson.slug,
+          reason: skipReason,
+          completedRounds,
+          nextIndex,
+        });
         scheduleRound(intervalMs);
         return;
       }
