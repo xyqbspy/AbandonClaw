@@ -1301,7 +1301,6 @@ export default function SceneDetailClientPage({
       trainingNextStep={trainingNextStep}
       headerTools={null}
       headerTitle={baseLesson.subtitle?.trim() || baseLesson.sections[0]?.summary?.trim() || baseLesson.title}
-      onBackToList={() => router.push("/scenes")}
       interactionMode="training"
       savedPhraseTexts={Array.from(savedPhraseTextSet)}
       onSavePhrase={savePhraseForScene}

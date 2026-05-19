@@ -63,7 +63,6 @@ export function LessonReader({
   lesson,
   headerTools,
   headerTitle,
-  onBackToList,
   trainingTopPanel,
   topRightTool,
   minimalHeader = false,
@@ -79,7 +78,6 @@ export function LessonReader({
   lesson: Lesson;
   headerTools?: ReactNode;
   headerTitle?: string;
-  onBackToList?: () => void;
   trainingTopPanel?: (controls: LessonReaderSceneLoopControls) => ReactNode;
   topRightTool?: ReactNode;
   minimalHeader?: boolean;
