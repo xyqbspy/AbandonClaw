@@ -36,7 +36,8 @@ test("scene practice set GET 会透传 userId 与 slug 并返回 latest set", as
   const response = await handleScenePracticeSetGet(
     { params: Promise.resolve({ slug: "scene-1" }) },
     {
-      requireCurrentProfile: async () => ({ user: { id: "user-1" } } as never),
+      requireCurrentProfile: async () =>
+        ({ user: { id: "user-1" }, profile: { access_status: "active" } } as never),
       getLatestScenePracticeSet: async (userId, slug) => {
         received = { userId, slug };
         return { practiceSet } as never;
