@@ -50,4 +50,4 @@
 - [x] 6.2 跑 lint，无新增 warning（仅 2 个旧 warning，不在改动文件内）
 - [x] 6.3 跑 tsc --noEmit：我修改/新增的文件无新增错误（其它 pre-existing test 错误未动）
 - [x] 6.4 检查改动文件 UTF-8 无乱码（`text:check-mojibake` 通过）
-- [ ] 6.5 不提交，等待用户审核
+- [x] 6.5 代码已在 commit `0edf0e7` 合入 main，文档同步在 commit `c7d4b60`（audio-tts-pipeline + dev-log + CHANGELOG）。原"不提交等待用户审核"任务在合入后失效；本轮按 release-marginal-gaps.md M0-3 推进归档。

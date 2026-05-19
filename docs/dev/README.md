@@ -39,6 +39,9 @@
   - 服务端上线前检查、运行护栏和真实 HTTP baseline。
 - [release-readiness-assessment.md](/d:/WorkCode/AbandonClaw/docs/dev/release-readiness-assessment.md)
   - 上线准备评估与缺口跟踪：业务防护层之外、平台运维层缺口的统一入口。每个缺口包含背景、原因、方案、效果、验收。
+- [release-marginal-gaps.md](/d:/WorkCode/AbandonClaw/docs/dev/release-marginal-gaps.md)
+  - 上线边际问题跟踪：主流程跑通、P0 闭环之后剩下的二阶问题。按 M0（今天就做）/ M1（本周）/ M2（触发再做）+ 盲点 四档，每项含等级、为什么、怎么做、解决了什么、验收。
+- [`deploy/`](/d:/WorkCode/AbandonClaw/deploy/) — 部署配置模板（Nginx 反向代理 + 限流），对应 `release-marginal-gaps.md` M1-2。部署时直接套用，避免现场拼配置。
 - [disaster-recovery.md](/d:/WorkCode/AbandonClaw/docs/dev/disaster-recovery.md)
   - 灾备与数据恢复手册：备份策略、RPO/RTO、恢复操作步骤、自建 pg_dump 兜底、季度演练 checklist。
 - [incident-response-runbook.md](/d:/WorkCode/AbandonClaw/docs/dev/incident-response-runbook.md)

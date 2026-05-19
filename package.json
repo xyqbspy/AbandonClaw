@@ -18,6 +18,7 @@
     "test:all": "pnpm run test:unit && pnpm run test:interaction",
     "text:check-mojibake": "node --import tsx scripts/check-mojibake.ts",
     "maintenance:check": "node --import tsx scripts/check-maintenance-guardrails.ts",
+    "usage:snapshot": "node --import tsx scripts/high-cost-usage-snapshot.ts",
     "phrases:infer-relations": "npx tsx scripts/infer-missing-phrase-relations.ts",
     "phrases:backfill-relation-families": "npx tsx scripts/backfill-phrase-relation-families.ts",
     "phrases:enrich-missing": "npx tsx scripts/enrich-missing-phrases.ts",
