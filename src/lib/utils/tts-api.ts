@@ -108,6 +108,10 @@ export type BrowserTtsCacheEntry = {
   cachedAt: number | null;
 };
 
+type BrowserTtsCacheRecord = BrowserTtsCacheEntry & {
+  writeOrder: number | null;
+};
+
 let currentAudio: HTMLAudioElement | null = null;
 let playbackAudio: HTMLAudioElement | null = null;
 let playbackGeneration = 0;
@@ -134,6 +138,7 @@ const defaultTtsCacheLimits: TtsCacheLimits = {
 };
 let ttsCacheLimits: TtsCacheLimits = { ...defaultTtsCacheLimits };
 let sceneFullFailureCooldownMs = defaultSceneFullFailureCooldownMs;
+let browserTtsCacheWriteOrderSeq = 0;
 const sceneFullFailureCooldowns = new Map<
   string,
   {
@@ -475,6 +480,11 @@ const canUseBrowserAudioCache = () =>
 const buildBrowserAudioCacheRequest = (cacheKey: string) =>
   new Request(`https://local.tts.cache/${encodeURIComponent(cacheKey)}`);
 
+const nextBrowserTtsCacheWriteOrder = () => {
+  browserTtsCacheWriteOrderSeq += 1;
+  return browserTtsCacheWriteOrderSeq;
+};
+
 const getBrowserAudioCache = async () => {
   if (!canUseBrowserAudioCache()) return null;
   return caches.open(browserTtsCacheName);
@@ -536,7 +546,11 @@ const readPersistentAudioUrl = async (cacheKey: string) => {
   return objectUrl;
 };
 
-const persistAudioToBrowserCache = async (cacheKey: string, sourceUrl: string) => {
+const persistAudioToBrowserCache = async (
+  cacheKey: string,
+  sourceUrl: string,
+  writeOrder = nextBrowserTtsCacheWriteOrder(),
+) => {
   if (!canUseBrowserAudioCache()) return null;
 
   const cache = await getBrowserAudioCache();
@@ -563,6 +577,7 @@ const persistAudioToBrowserCache = async (cacheKey: string, sourceUrl: string) =
       headers: {
         "Content-Type": blob.type || "audio/mpeg",
         "X-TTS-Cached-At": String(Date.now()),
+        "X-TTS-Write-Order": String(writeOrder),
       },
     }),
   );
@@ -571,7 +586,7 @@ const persistAudioToBrowserCache = async (cacheKey: string, sourceUrl: string) =
   return objectUrl;
 };
 
-export const listBrowserTtsCacheEntries = async (): Promise<BrowserTtsCacheEntry[]> => {
+const readBrowserTtsCacheRecords = async (): Promise<BrowserTtsCacheRecord[]> => {
   const cache = await getBrowserAudioCache();
   if (!cache || typeof cache.keys !== "function") return [];
 
@@ -591,20 +606,29 @@ export const listBrowserTtsCacheEntries = async (): Promise<BrowserTtsCacheEntry
         size: blob.size,
         contentType: response.headers.get("Content-Type"),
         cachedAt: Number(response.headers.get("X-TTS-Cached-At") || "") || null,
-      } satisfies BrowserTtsCacheEntry;
+        writeOrder: Number(response.headers.get("X-TTS-Write-Order") || "") || null,
+      } satisfies BrowserTtsCacheRecord;
     }),
   );
 
   return entries
-    .filter((entry): entry is BrowserTtsCacheEntry => Boolean(entry))
+    .filter((entry): entry is BrowserTtsCacheRecord => Boolean(entry));
+};
+
+export const listBrowserTtsCacheEntries = async (): Promise<BrowserTtsCacheEntry[]> => {
+  const entries = await readBrowserTtsCacheRecords();
+  return entries
     .sort((a, b) => b.size - a.size || a.cacheKey.localeCompare(b.cacheKey));
 };
 
-const pruneBrowserTtsCacheIfNeeded = async (protectedCacheKeys: string[]) => {
+const getBrowserTtsCacheEvictionOrderValue = (entry: BrowserTtsCacheRecord) =>
+  entry.writeOrder ?? entry.cachedAt ?? 0;
+
+const pruneBrowserTtsCacheIfNeeded = async () => {
   const cache = await getBrowserAudioCache();
   if (!cache) return;
 
-  const entries = await listBrowserTtsCacheEntries();
+  const entries = await readBrowserTtsCacheRecords();
   let entryCount = entries.length;
   let totalBytes = entries.reduce((sum, entry) => sum + entry.size, 0);
   if (
@@ -614,10 +638,12 @@ const pruneBrowserTtsCacheIfNeeded = async (protectedCacheKeys: string[]) => {
     return;
   }
 
-  const protectedKeys = new Set(protectedCacheKeys);
   const toDelete: string[] = [];
   const oldestFirst = [...entries].sort(
-    (a, b) => (a.cachedAt ?? 0) - (b.cachedAt ?? 0) || a.cacheKey.localeCompare(b.cacheKey),
+    (a, b) =>
+      getBrowserTtsCacheEvictionOrderValue(a) - getBrowserTtsCacheEvictionOrderValue(b) ||
+      (a.cachedAt ?? 0) - (b.cachedAt ?? 0) ||
+      a.cacheKey.localeCompare(b.cacheKey),
   );
 
   for (const entry of oldestFirst) {
@@ -627,7 +653,6 @@ const pruneBrowserTtsCacheIfNeeded = async (protectedCacheKeys: string[]) => {
     ) {
       break;
     }
-    if (protectedKeys.has(entry.cacheKey)) continue;
     toDelete.push(entry.cacheKey);
     entryCount -= 1;
     totalBytes -= entry.size;
@@ -847,7 +872,7 @@ const requestTtsUrl = async (
         if (!persistentUrl) return;
         cacheTtsUrl(cacheKey, persistentUrl);
         preloadAudioUrl(persistentUrl);
-        await pruneBrowserTtsCacheIfNeeded([cacheKey]);
+        await pruneBrowserTtsCacheIfNeeded();
       })
       .catch((error) => {
         console.warn("[tts-cache] browser cache persistence/prune skipped", {
@@ -1520,6 +1545,7 @@ export const ensureChunkTtsFromApi = ensureChunkAudio;
 export const __resetTtsTestState = async (options?: { preservePersistentCache?: boolean }) => {
   stopTtsPlayback();
   ttsCacheLimits = { ...defaultTtsCacheLimits };
+  browserTtsCacheWriteOrderSeq = 0;
   ttsUrlCache.clear();
   pendingTtsUrlRequests.clear();
   sceneFullFailureCooldowns.clear();
