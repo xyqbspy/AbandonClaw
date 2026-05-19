@@ -505,6 +505,10 @@ ROI 分析：Sentry 免费版（5k errors/month）已经覆盖小规模真实用
 - [ ] 腾讯云 DDoS 基础防护开启（CVM 自带）。
 - [ ] （可选）Cloudflare 已前置并配置 Bot Fight Mode。
 - [ ] 异常流量告警可触达 oncall。
+- [ ] 域名 ICP 备案完成（公开开放前必备，腾讯云域名）。
+- [ ] 演练一次"单账号刷接口"处置流程（用测试账号，对照 `incident-response-runbook.md` §4.1）。
+- [ ] 演练一次"全站异常紧急关闭"流程（在 staging，对照 `incident-response-runbook.md` §4.3）。
+- [ ] `incident-response-runbook.md` §5 巡检清单已指派执行人与频率。
 - [x] 事故响应剧本已写入 `docs/dev/incident-response-runbook.md`。
 - [x] dev-log 记录 WAF 启用时间与配置摘要。
 
