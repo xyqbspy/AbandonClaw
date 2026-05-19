@@ -4,6 +4,7 @@ import { toApiErrorResponse } from "@/lib/server/api-error";
 import { savePhraseForUser } from "@/lib/server/phrases/service";
 import { trackChunksForUser } from "@/lib/server/chunks/service";
 import { assertAllowedOrigin } from "@/lib/server/request-guard";
+import { logServerEvent } from "@/lib/server/logger";
 import {
   normalizeSavePhraseBatchPayload,
   parseSavePhraseBatchRequest,
@@ -48,7 +49,12 @@ export async function POST(request: Request) {
                 interactionType: "favorite",
               });
             } catch (trackError) {
-              console.warn("[user-chunks] batch favorite tracking failed", trackError);
+              logServerEvent("warn", "[user-chunks] batch favorite tracking failed", {
+                request,
+                error: trackError,
+                module: "api/phrases/save-all",
+                userId: user.id,
+              });
             }
           }
           nextResults.push({

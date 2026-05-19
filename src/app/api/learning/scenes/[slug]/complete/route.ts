@@ -3,6 +3,7 @@ import { assertProfileCanWrite, requireCurrentProfile } from "@/lib/server/auth"
 import { toApiErrorResponse } from "@/lib/server/api-error";
 import { assertAllowedOrigin } from "@/lib/server/request-guard";
 import { completeSceneLearning } from "@/lib/server/learning/service";
+import { logServerEvent } from "@/lib/server/logger";
 import {
   buildDeterministicIdempotencyKey,
   getRequestIdempotencyKey,
@@ -50,7 +51,12 @@ export async function POST(
           interactionType: "encounter",
         });
       } catch (trackError) {
-        console.warn("[user-chunks] complete-scene tracking failed", trackError);
+        logServerEvent("warn", "[user-chunks] complete-scene tracking failed", {
+          request,
+          error: trackError,
+          module: "api/learning/scenes/complete",
+          userId: user.id,
+        });
       }
     }
 
