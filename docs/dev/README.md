@@ -36,28 +36,26 @@
 - [testing-policy.md](/d:/WorkCode/AbandonClaw/docs/dev/testing-policy.md)
   - 测试策略、最小验证和回归边界。
 - [backend-release-readiness-checklist.md](/d:/WorkCode/AbandonClaw/docs/dev/backend-release-readiness-checklist.md)
-  - 服务端上线前检查、运行护栏和真实 HTTP baseline。
+  - **唯一的上线执行清单**。服务端上线前检查、运行护栏、public registration 验证和真实 HTTP baseline 已统一收口到这里。
 - [release-readiness-assessment.md](/d:/WorkCode/AbandonClaw/docs/dev/release-readiness-assessment.md)
-  - 上线准备评估与缺口跟踪：业务防护层之外、平台运维层缺口的统一入口。每个缺口包含背景、原因、方案、效果、验收。
-- [release-marginal-gaps.md](/d:/WorkCode/AbandonClaw/docs/dev/release-marginal-gaps.md)
-  - 上线边际问题跟踪：主流程跑通、P0 闭环之后剩下的二阶问题。按 M0（今天就做）/ M1（本周）/ M2（触发再做）+ 盲点 四档，每项含等级、为什么、怎么做、解决了什么、验收。
-- [`deploy/`](/d:/WorkCode/AbandonClaw/deploy/) — 部署配置模板（Nginx 反向代理 + 限流），对应 `release-marginal-gaps.md` M1-2。部署时直接套用，避免现场拼配置。
+  - **唯一的上线策略入口**。上线准备评估、public registration 放行边界、平台运维缺口和 release 边际项已并入这里。
+- [`deploy/`](/d:/WorkCode/AbandonClaw/deploy/) — 部署配置模板（Nginx 反向代理 + 限流），对应 `release-readiness-assessment.md` 的 Nginx / 平台层防护收口项。部署时直接套用，避免现场拼配置。
 - [disaster-recovery.md](/d:/WorkCode/AbandonClaw/docs/dev/disaster-recovery.md)
   - 灾备与数据恢复手册：备份策略、RPO/RTO、恢复操作步骤、自建 pg_dump 兜底、季度演练 checklist。
 - [incident-response-runbook.md](/d:/WorkCode/AbandonClaw/docs/dev/incident-response-runbook.md)
   - 平台层防护与事故响应手册：Nginx / 腾讯云 WAF / Cloudflare 推荐配置、异常流量识别、4 类事故响应剧本、日常巡检节奏。
 - [docs-audit-2026-05-15.md](/d:/WorkCode/AbandonClaw/docs/dev/docs-audit-2026-05-15.md)
   - 文档与 OpenSpec 关联性 / 冲突 audit：腾讯云 vs Vercel 部署平台对应翻译表、路径死链、命名错位、需求覆盖缺口的处置结论。
-- [public-registration-http-baseline-runbook.md](/d:/WorkCode/AbandonClaw/docs/dev/public-registration-http-baseline-runbook.md)
-  - 公网开放注册相关 baseline 的准备、执行、blocked 判断和结果留证手册。
-- [public-registration-feature-verification-guide.md](/d:/WorkCode/AbandonClaw/docs/dev/public-registration-feature-verification-guide.md)
-  - 公网开放注册前各项防护能力的验证方法、通过标准和失败排查入口。
-- [public-registration-readiness-plan.md](/d:/WorkCode/AbandonClaw/docs/dev/public-registration-readiness-plan.md)
-  - 公网开放注册、滥用防护、学习数据可信化和运营处置的优先级执行计划。
 - [server-data-boundary-audit.md](/d:/WorkCode/AbandonClaw/docs/dev/server-data-boundary-audit.md)
   - 用户态数据边界、RLS、SQL 映射和服务端白名单审计。
 - [dev-log.md](/d:/WorkCode/AbandonClaw/docs/dev/dev-log.md)
   - 开发过程记录；不是正式 CHANGELOG。
+
+## 已并入
+
+- `release-marginal-gaps.md` 的 M0 / M1 / M2 与盲点：并入 `release-readiness-assessment.md`
+- `public-registration-readiness-plan.md`：并入 `release-readiness-assessment.md`
+- `public-registration-http-baseline-runbook.md` 与 `public-registration-feature-verification-guide.md`：并入 `backend-release-readiness-checklist.md`
 
 ## 常用命令
 

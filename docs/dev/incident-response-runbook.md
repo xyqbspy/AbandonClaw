@@ -19,7 +19,7 @@
 - **限流**：Upstash Redis（应用层 user/IP 维度）+ in-memory fallback。
 - **错误追踪**：Sentry。
 
-> 备用 / 历史环境：项目曾经使用过 Vercel（`*.vercel.app` 域名），相关说明见 `docs/dev/public-registration-http-baseline-runbook.md`。当前公网生产部署以腾讯云为主。
+> 备用 / 历史环境：项目曾经使用过 Vercel（`*.vercel.app` 域名）。当前公网生产部署以腾讯云为主；真实 HTTP baseline 的现行执行口径以 `docs/dev/backend-release-readiness-checklist.md` 为准。
 
 **当前裸点**：
 
@@ -295,7 +295,7 @@ proxy_buffering off;
 
 - 不替代腾讯云 / Cloudflare 平台层 DDoS 防护：只在他们之上做配置。
 - 不引入第三方 WAF（如 Sucuri / Imperva）：成本与目标不匹配，等公开开放规模真正起来再评估。
-- 不引入设备指纹 / 用户行为模型：见 `public-registration-readiness-plan.md` P2.2 全局风控。
+- 不引入设备指纹 / 用户行为模型：当前仍放在 `release-readiness-assessment.md` 的触发式收口里，等公开开放或增长阶段再评估。
 - 不替代腾讯云 ICP 备案 / 内容安全合规：法律侧由用户负责。
 
 ## 7. 待用户首次执行
@@ -316,6 +316,6 @@ proxy_buffering off;
 
 - `docs/dev/release-readiness-assessment.md` P2-3
 - `docs/dev/disaster-recovery.md`
-- `docs/dev/public-registration-readiness-plan.md` 第 9 节攻击发生时最小处置流程
+- `docs/dev/backend-release-readiness-checklist.md`
 - `docs/dev/docs-audit-2026-05-15.md` 部署平台对应翻译表
 - `openspec/specs/api-operational-guardrails/spec.md`
