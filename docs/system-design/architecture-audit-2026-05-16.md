@@ -157,6 +157,8 @@ export function PageHeader({
 > **状态**：2026-05-16 r2 部分落地（commit `3301dc5`，OpenSpec change `decompose-chunks-page-r2`）：chunks/page.tsx 2368 → 2125 行（-243，-10.3%），抽 3 hook（quick-add-related / builtin-phrases-actions / detail-audio-actions）+ 1 view section（chunks-page-hero）。
 >
 > **2026-05-17 r3 落地**（OpenSpec change `decompose-chunks-page-r3`）：chunks/page.tsx 2125 → 2102 行（-23，-1.1%）。抽 3 hook（use-expression-map / use-sentence-expression-save / use-focus-relation-tab）+ 1 view section（chunks-page-focus-mode-section）。**LoC 减幅远低于 proposal 预期（1500-1600）**，关键发现：抽 state + 简单 handler 时"装配回调 / 解构 / props 透传"的开销与抽走的代码量接近，page.tsx 几乎不瘦身。这对 r4 策略至关重要 — r4 应优先抽 chunks-list-view 装配 wrapper（page.tsx ~87 行 props 列表）等高 props-cost 子树，而不是继续抽小 hook。详细见 dev-log [2026-05-17]。
+>
+> **2026-05-17 r4 落地**（OpenSpec change `decompose-chunks-page-r4`，commit `43db0cd`）：chunks/page.tsx 2108 → 2041 行（**-67, -3.2%**），抽 1 个高 props-cost view wrapper section（`chunks-page-list-section.tsx` 176 行：ChunksListView 完整装配 + 41 字段 labels 闭包 + 18 handler props + reviewStatusLabel 常量 + extractExpressionsFromSentenceItem helper）。**r3 §5.9 给出的"高 props-cost 子树优先"策略验证成立**：r4 减幅约为 r3（-23 行）的 3 倍。chunks 全套 114/114 测试通过，DOM 字节级保持兼容。r5 候选：`<FocusDetailSheet>` 装配等其它 50+ 行 props 列表的子组件调用。详细见 dev-log [2026-05-17] decompose-chunks-page-r4。
 
 **现状**：
 

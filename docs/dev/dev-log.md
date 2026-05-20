@@ -1,5 +1,66 @@
 # Dev Log
 
+### [2026-05-17] chunks/page.tsx 第四轮拆分（decompose-chunks-page-r4 落地）
+- 类型：Spec-Driven（OpenSpec change `decompose-chunks-page-r4`）
+- 状态：实施 + 测试 + 验证 + meta 三件套同步 + archive 完成
+
+#### 背景
+chunks/page.tsx 经 r3 拆分（commit `f8e1d4c`）从 2125 → 2102 行后仍是前端最大文件。r3 §5.9 给出关键发现："抽 state + 简单 handler 时'装配回调 / 解构 / props 透传'开销与抽走代码量近似抵消，page.tsx 几乎不瘦身"，并指明 r4 策略应转向"高 props-cost 子树"。本轮 r4 按此指导推进。
+
+#### OpenSpec change
+- `openspec/changes/decompose-chunks-page-r4/`（proposal + tasks + spec delta），`pnpm exec openspec validate --strict` 通过。
+- spec delta：ADD Requirement "chunks/page.tsx 第四轮拆分必须按 1 个高 props-cost view wrapper section 边界执行" + 3 个 scenario（范围边界 / 入口级回归 / LoC 实际结果与 r5 策略指导）。
+
+#### 本轮落地
+- §1 抽 `chunks-page-list-section.tsx` (176 行)：ChunksListView 装配 wrapper，承载 41 字段 labels 闭包 + 18 handler props + 6 个分组 props（data / expansion / status / audio / presenters / actions），并把 page.tsx 顶部 `reviewStatusLabel` 常量 + `extractExpressionsFromSentenceItem` helper 一并迁入。DOM 字节级保持兼容。
+- §2 配套：`chunks-list-view.tsx` 把 `ChunksListViewLabels` / `ChunksListViewProps` 改为 `export type`；`chunks-page-focus-mode-section.tsx` 删除内联孤儿 type（与 ClusterFocusList 期望形状已不一致），改用 `@/features/chunks/components/types` 统一定义；`use-sentence-expression-save.test.tsx` 小幅 lint cleanup（`resolveSave` 默认 noop 替代 null 判空）。
+
+#### 验证
+- chunks 全套 114/114 测试通过（3 page interaction + 1 list-view + 2 sheets + 64 hook + 39 pure logic + 5 use-sentence-expression-save）
+- `pnpm run lint`：0 errors / 0 warnings（r3 的 2 个 pre-existing warning 已在另一台机器 commit `3f0428d` 清理）
+- `npx tsc --noEmit`：本轮触动文件 0 新增错误（pre-existing 错误不修）
+- `pnpm run text:check-mojibake`：通过
+- `pnpm exec openspec validate decompose-chunks-page-r4 --strict`：通过
+
+#### 量化与策略验证（验证 r3 §5.9 策略有效）
+**chunks/page.tsx: 2108 → 2041 行（-67, -3.2%）**，明显高于 r3 的 -23 (-1.1%)。
+
+| 移走对象 | 移走代码量（page.tsx） | page.tsx 新增装配 | 净减 |
+| --- | --- | --- | --- |
+| ChunksListView 装配代码（41 labels + 18 handler + 多组 props） | ~95 行 hand-roll | 1 个组件调用 + 6 个分组 props 拼装 (~52 行) | -43 |
+| `reviewStatusLabel` 常量 | 6 行 | - | -6 |
+| `extractExpressionsFromSentenceItem` helper | 17 行 | - | -17 |
+| `import { ChunksListView }` | 1 行 | - | -1 |
+| `import CHUNKS_PRIMARY_BUTTON_CLASSNAME` | 1 行 | - | -1 |
+| 加 `import ChunksPageListSection` | - | +1 | +1 |
+
+**总计净减 -67 行**。r3 策略验证成立：抽高 props-cost 子树 + 一并迁走强耦合常量 / helper 在 page.tsx 瘦身上效率约为 r3 ("state + 小 handler 组合") 的 3 倍。
+
+**对 r5 策略指导**：候选包括 `<FocusDetailSheet>` 装配（chunks-page-sheets 内）、其它 50+ 行 props 列表的子组件调用。r5 启动前应先量化候选对象的 props 行数 + 关联常量 / helper 行数之和，确保有显著减幅。
+
+#### meta 三件套同步（project-maintenance spec line 117 硬约束）
+本轮属于 spec line 117 列举的"架构能力"变化（多轮拆分策略验证 + 新 spec ADDED Requirement），必须同轮检查 meta 三件套。在 commit `90baf71`（"docs: 补全 meta 三件套 a146d12 之后的新工程能力"）中一次性收口含 r4 在内的过去 2 周新工程能力：
+
+- `product-overview.md`：未新增"r4 拆分"小节（拆分是技术能力变化，不直接改变用户可感知能力），但 §5.8 / §5.9 / §5.10 已覆盖 a146d12 之后的用户可感知变化（API 错误响应一致 / TTS 预热 / 会话健壮性）
+- `technical-overview.md` §4.4 "代码组织治理与多轮拆分"覆盖 chunks r2/r3/r4 + scene-detail r2 完整 LoC 表
+- `interview-project-deep-dive.md` §14.14 "page.tsx 多轮拆分：工程能力的可量化案例"完整展开 r2/r3/r4 量化反馈案例
+
+#### 流程修复（本轮顺序违规的反思）
+本轮顺序倒置（r4 commit 在前 / meta sync 在后）违反 project-maintenance spec line 135 "Spec-Driven 完成态提交前必须先完成收尾"。**根因**：r3 tasks.md §6 收尾清单本身就没列 meta 三件套（隐性漏洞），r4 直接照抄 r3 模板继承了漏洞。本轮通过 4 步联合修复防复发：
+
+1. 修 r4 tasks.md §5 收尾清单加 meta 三件套检查项（archive 后成为 r5 模板）
+2. 补 r3 archive 的 tasks.md patch（标注隐性漏洞源头与本轮修复轨迹）
+3. 强化 `scripts/check-maintenance-guardrails.ts`：涉及主链路文件时警告 `docs/meta/*` 是否同步
+4. AI feedback memory：主链路 OpenSpec change 优先读 project-maintenance spec 两条硬约束
+
+#### 协作说明
+proposal / tasks / spec delta / 实施代码（1 个新文件 + 4 个修改文件）由本会话完成。
+
+#### 本轮明确不收项
+- chunks-list-view.tsx 868 行 → 留 r5
+- chunks-page-sheets.tsx 449 行 → 留 r5
+- 任何业务语义 / 缓存 / API / 复习入口变更
+
 ### [2026-05-17] chunks/page.tsx 第三轮拆分（decompose-chunks-page-r3 落地）
 - 类型：Spec-Driven（OpenSpec change `decompose-chunks-page-r3`）
 - 状态：实施 + 测试 + 验证完成，等待 commit + archive
