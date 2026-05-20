@@ -89,3 +89,15 @@ proposal §4 原描述"focus detail 区 JSX 装配（焦点 expression header + 
 - [x] 6.4 `openspec archive decompose-chunks-page-r3` 完成归档
 - [x] 6.5 spec sync：把 r3 delta 合并到 `openspec/specs/feature-component-decomposition/spec.md`（与 r2 同模式）
 - [x] 6.6 `pnpm run maintenance:check`：通过
+
+### 6.7（2026-05-20 后补 patch）meta 三件套检查项
+
+本节是 r4 收尾期间识别 r3 隐性漏洞后的追加补丁，目的是把"漏掉 meta 三件套检查"这件事在 r3 archive 留痕，避免 r5 / r6 继续抄 r3 旧模板（§6.1–§6.6）继承漏洞。**archive 不修内容**是 OpenSpec workflow 原则，但本补丁只追加 §6.7 不修改既有 §6.1–§6.6，且属于流程修复留痕性质，不改变 r3 实际拆分结果。
+
+- 漏掉的检查项：`docs/meta/product-overview.md` / `docs/meta/technical-overview.md` / `docs/meta/interview-project-deep-dive.md` 三件套是否需要按 `openspec/specs/project-maintenance/spec.md` line 117 "较大改动必须同步产品与技术总览" 同轮更新
+- r3 当时的应做但未做：r3 是"架构能力"变化（feature-component-decomposition spec 新增 1 个 Requirement + 3 个 scenario），应当同轮检查 meta 三件套，但 §6 收尾清单未列此项
+- r3 期间的实际状态：commit `a146d12`（2026-05-19, 在 r3 commit `f8e1d4c`/`4278e23` 之后）已经把 meta 三件套补到 P0-P2 治理 + 北极星量化的状态，但**未覆盖 r3 + r4 的多轮拆分案例**
+- 本漏洞造成的实际后果：r4 收尾时继续照抄 r3 §6 模板，再次漏检 meta 三件套，导致 r4 commit `43db0cd` 违反 spec line 135（先提交实现代码再补文档）。详见 r4 archive tasks.md §5.7 流程修复段
+- 后续防复发：r4 archive tasks.md §5（含 §5.4 meta 三件套检查 + §5.7 流程修复）替代 r3 §6 作为下一轮拆分（r5 / r6）的收尾模板
+
+如果 r5 / r6 维护者读到这里：**请参考 `openspec/changes/archive/2026-05-20-decompose-chunks-page-r4/tasks.md` §5 而非 r3 的 §6 作为收尾模板**。
