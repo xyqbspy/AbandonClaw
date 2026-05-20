@@ -6,12 +6,10 @@
 
 它不替代：
 
-- `backend-release-readiness-checklist.md`：上线前逐项勾选清单。
-- `public-registration-readiness-plan.md`：阶段判断、优先级和风险盘点。
-- `public-registration-http-baseline-runbook.md`：真实 HTTP baseline 执行手册。
+- `backend-release-readiness-checklist.md`：上线前逐项勾选与真实环境执行清单。
 - `dev-log.md`：每次改动与上线的过程记录。
 
-本文档覆盖业务防护层之外、平台运维层的缺口，是「平台底线」的统一入口。
+本文档现在是**唯一的上线策略入口**。原 `public-registration-readiness-plan.md` 的阶段判断、优先级和放行边界，以及原 `release-marginal-gaps.md` 的 M0 / M1 / M2 与盲点结论，均并入本文；详细执行步骤统一收口到 `backend-release-readiness-checklist.md`。
 
 ## 1. 整体结论
 
@@ -45,7 +43,20 @@
 | 运维 / CI | 4/10 | 有 dev-log、上线 checklist、PM2 配置；缺 CI 工作流、alerting、oncall |
 | 合规 / 法务 | 3/10 | 隐私政策、服务条款、Cookie 同意均未补 |
 
-## 3. 缺口清单与处置
+## 3. 放行模式与推荐边界
+
+本文档的放行判断只看两件事：当前入口暴露给谁，以及当前防护是否和暴露面匹配。
+
+| 模式 | 适用阶段 | 当前建议 | 额外要求 |
+| --- | --- | --- | --- |
+| `closed` | 内部开发 / 故障止血 | 默认安全值 | 无 |
+| `invite_only` | 10-50 个邀请用户 | 当前推荐 | 本文 P0 完成，且执行清单里的真实 HTTP 验证已留证 |
+| `open_guarded` | 半公开渠道 | 暂不建议 | P0 + P1 + P2 全部完成，WAF / 风控 / 运维值班入口齐备 |
+| `open` | 正式公开 | 当前不建议 | 需要完整运营、合规、风控与应急体系 |
+
+当前建议保持 `invite_only` 小范围放行，不把入口发到不可控公开渠道。若只做熟人内测，优先补齐本文 P0；若要发到公开群、社媒或其他不可控入口，先把 P1 / P2 补齐，再讨论放量。
+
+## 4. 缺口清单与处置
 
 ### P0 — 上线前必须完成
 
@@ -99,7 +110,7 @@
 
 **背景与原因**
 
-`backend-release-readiness-checklist.md` 与 `public-registration-readiness-plan.md` 都明确要求：上线前必须在目标环境跑完 16 个 baseline 场景，确认 `rateLimitBackend.kind=upstash`，并把结果留证到 `dev-log.md`。当前 dev-log 没有完整 baseline 摘要。
+`backend-release-readiness-checklist.md` 的「真实 HTTP 验证」已经把 baseline 场景、执行顺序、结果判读和留证要求统一收口。上线前仍必须在目标环境跑完 16 个 baseline 场景，确认 `rateLimitBackend.kind=upstash`，并把结果留证到 `dev-log.md`。当前 dev-log 没有完整 baseline 摘要。
 
 **为什么必须做**
 
@@ -108,7 +119,7 @@
 
 **怎么做**
 
-按 `public-registration-http-baseline-runbook.md` 第 4-7 节操作：
+按 `backend-release-readiness-checklist.md` 的「真实 HTTP 验证」章节操作：
 
 1. 复制配置：`Copy-Item scripts/load-samples/public-registration-http-baseline.sample.json tmp/public-registration-http-baseline.local.json`
 2. 替换真实 `baseUrl`、`origin`、`expectedRegistrationMode`、各类 cookie、`inviteCode`、`outputPath`。
@@ -142,13 +153,13 @@
 
 **完成时间**：待外部执行
 
-**完成摘要**：baseline runner 已确认可执行（`pnpm run load:public-registration-baseline --dry-run` 通过），sample 配置完整。实际跑通需要用户在浏览器登录目标环境拿到 verified/unverified/generation_limited/readonly/quota/admin/3 个 IP 限流账号 cookie，并在 `/admin/invites` 生成有效邀请码。按 `public-registration-http-baseline-runbook.md` 第 3-7 节执行。
+**完成摘要**：baseline runner 已确认可执行（`pnpm run load:public-registration-baseline --dry-run` 通过），sample 配置完整。实际跑通需要用户在浏览器登录目标环境拿到 verified/unverified/generation_limited/readonly/quota/admin/3 个 IP 限流账号 cookie，并在 `/admin/invites` 生成有效邀请码。按 `backend-release-readiness-checklist.md` 的「真实 HTTP 验证」章节执行。
 
 #### P0-3：邮箱 provider 配置确认
 
 **背景与原因**
 
-`baseline-runbook` 第 6 节明确：若执行 `signup-email-code-sent` 返回 `Email provider is not configured`，邀请注册成功链路就是上线阻断项。当前邮箱依赖 `RESEND_API_KEY`，需在目标环境确认。
+执行清单里的 `signup-email-code-sent` 场景已经明确：若返回 `Email provider is not configured`，邀请注册成功链路就是上线阻断项。当前邮箱依赖 `RESEND_API_KEY`，需在目标环境确认。
 
 **为什么必须做**
 
@@ -311,7 +322,7 @@ ROI 分析：Sentry 免费版（5k errors/month）已经覆盖小规模真实用
 
 **背景与原因**
 
-`public-registration-readiness-plan.md` 第 P2.4 节列了「数据库备份与恢复演练」，但当前没有实际演练，也没有明确的 RPO（数据丢失容忍）/ RTO（恢复时间目标）答案。Supabase 的 PITR（Point-in-Time Recovery）是付费功能，需要确认当前计划是否启用。
+当前公开开放准备虽然已经补了灾备文档，但还没有实际演练，也没有明确的 RPO（数据丢失容忍）/ RTO（恢复时间目标）答案。Supabase 的 PITR（Point-in-Time Recovery）是付费功能，需要确认当前计划是否启用。
 
 **为什么必须做**
 
@@ -414,7 +425,7 @@ ROI 分析：Sentry 免费版（5k errors/month）已经覆盖小规模真实用
 
 **背景与原因**
 
-`public-registration-readiness-plan.md` P2.1 明确写了：当前学习时长依赖前端 `studySecondsDelta` 上报，已经做了 60s 单次上限和 10s 间隔，是临时挡板。如果未来引入排行榜、付费会员、积分、公开等级，必须先做服务端 heartbeat。
+当前学习时长依赖前端 `studySecondsDelta` 上报，已经做了 60s 单次上限和 10s 间隔，是临时挡板。如果未来引入排行榜、付费会员、积分、公开等级，必须先做服务端 heartbeat。
 
 **为什么必须做**
 
@@ -459,7 +470,7 @@ ROI 分析：Sentry 免费版（5k errors/month）已经覆盖小规模真实用
 
 **背景与原因**
 
-`public-registration-readiness-plan.md` 第 10 节明确「不承诺抵御 DDoS，DDoS 需要平台、CDN 或 WAF 层处理」。当前主线部署在腾讯云 CVM + PM2，应用前端 Nginx 反向代理还未启用 rate limit / connection limit，腾讯云 WAF / DDoS 高防也未启用。一次低成本的脚本攻击就可能：
+当前阶段仍不承诺抵御 DDoS；DDoS 仍需要平台、CDN 或 WAF 层处理。当前主线部署在腾讯云 CVM + PM2，应用前端 Nginx 反向代理还未启用 rate limit / connection limit，腾讯云 WAF / DDoS 高防也未启用。一次低成本的脚本攻击就可能：
 
 - 打爆 GLM API 账单。
 - 触发限流后大量正常用户被误伤。
@@ -505,6 +516,10 @@ ROI 分析：Sentry 免费版（5k errors/month）已经覆盖小规模真实用
 - [ ] 腾讯云 DDoS 基础防护开启（CVM 自带）。
 - [ ] （可选）Cloudflare 已前置并配置 Bot Fight Mode。
 - [ ] 异常流量告警可触达 oncall。
+- [ ] 域名 ICP 备案完成（公开开放前必备，腾讯云域名）。
+- [ ] 演练一次"单账号刷接口"处置流程（用测试账号，对照 `incident-response-runbook.md` §4.1）。
+- [ ] 演练一次"全站异常紧急关闭"流程（在 staging，对照 `incident-response-runbook.md` §4.3）。
+- [ ] `incident-response-runbook.md` §5 巡检清单已指派执行人与频率。
 - [x] 事故响应剧本已写入 `docs/dev/incident-response-runbook.md`。
 - [x] dev-log 记录 WAF 启用时间与配置摘要。
 
@@ -568,13 +583,47 @@ ROI 分析：Sentry 免费版（5k errors/month）已经覆盖小规模真实用
 
 **完成摘要**：通过 OpenSpec change `add-compliance-pages` 落地。新增 `/privacy` 与 `/terms` 占位页面（marketing layout）、覆盖隐私政策 6 项与服务条款 7 项核心内容，全部标 `__待法律审阅__`，底部加显眼的免责说明。注册页加 consent checkbox，未勾选时按钮 disabled + 提交时双重 toast 拦截。signup 页 5 个测试全过；build 通过。change 已归档，stable spec `auth-api-boundaries` 新增「注册流程必须包含明示同意条款步骤」requirement + 2 scenario。**重要：占位条款不构成法律承诺，公开开放前必须由律师审阅替换内容并填写「联系方式」「数据存储区域」「适用法律 / 仲裁机构」等 `__待用户填写__` 字段。**
 
-## 4. 落地节奏建议
+## 5. 边际项与触发式收口
+
+这一节吸收原 `release-marginal-gaps.md` 的 M0 / M1 / M2 与盲点结论。原则只有一个：主链路已跑通后，优先补“已经写好但还没接上线”的项，其次补“出一次会放大成事故”的项，明确的过度工程则压到触发时再做。
+
+### M0：今天就做
+
+| 项 | 当前状态 | 仓库内已就位 | 还差什么 |
+| --- | --- | --- | --- |
+| Sentry DSN 接线 | 外部 blocked | `@sentry/nextjs`、`requestId` tag、5xx capture 已落地 | 生产 env 配 `NEXT_PUBLIC_SENTRY_DSN`、打一条测试事件、接告警 |
+| GitHub branch protection | 外部 blocked | `.github/workflows/ci.yml` 已在仓库 | GitHub 后台给 `main` 加 `CI / check` 必过 |
+| 恢复 `maintenance:check` 真拦截 | 部分 blocked | 只剩 `stabilize-auth-session-p0-smoke` 6.5 人工冒烟未归档 | 冒烟完成后归档 change，再去掉 `continue-on-error` |
+| boot 自检日志 | 代码已落地 | `[boot]` 日志、`boot-check.ts` 与测试已在仓库 | 部署后用 `pm2 logs` 确认首行输出 |
+
+### M1：本周排进
+
+| 项 | 风险 | 仓库内已就位 | 本周动作 |
+| --- | --- | --- | --- |
+| 灾备演练 1 次 | 手册没演练，出事时第一次操作就是真现场 | `disaster-recovery.md` 已成文 | 在 staging / 等价环境跑一次恢复，写回实际 RTO |
+| Nginx `limit_req` / `limit_conn` | 应用层限流挡不住网络层泛洪 | `deploy/` 模板已备料 | CVM 上套模板、`nginx -t`、reload、自测 429/503 |
+| 每日用量快照 | `todayHighCostUsage` 没主动出口 | `pnpm run usage:snapshot` 已有 | 接 PM2 cron 或 Sentry digest，至少产出 1 天快照 |
+| 紧急开关演练 | 第一次按按钮不该发生在事故里 | `/admin`、`/admin/users`、`/admin/invites` 都已具备 | 演练 `closed` / capability / `access_status` 切换并记录生效时长 |
+
+### M2：触发后再做
+
+| 项 | 触发条件 | 现在不做的原因 | 触发后动作 |
+| --- | --- | --- | --- |
+| CSP enforce | report-only 观察 1-2 周稳定 | 提前切 enforce 容易误伤正常资源 | `CSP_ENFORCE=true` + `pm2 reload` |
+| 腾讯云 WAF / Cloudflare / DDoS 高防 | 公开渠道发布、被扫或用户量明显上升 | 内测期先不为不存在的威胁付费 | 按 `incident-response-runbook.md` 第 2 节启用 |
+| 合规页律师审阅 / Cookie 同意 | ICP、应用商店、真实欧盟用户 | 当前只做占位与明示同意 | 律师替换条款，补真实联系人 / 区域 / 适用法 |
+| 服务端学习 session heartbeat | 引入排行榜 / 付费 / 积分 / 公开等级 | 当前 60s / 10s 挡板足够，小范围内测不值得重做数据链路 | 单独走 OpenSpec change `add-server-side-learning-session-heartbeat` |
+| chunks / scene-detail 二轮拆分 | 下次大改对应页面 | 纯维护债，不阻塞发布 | 在下一次相关 change 里顺手拆 |
+
+## 6. 落地节奏建议
 
 | 时间窗 | 动作 |
 | --- | --- |
+| 今天 / 30 分钟内 | 接 Sentry DSN、补 branch protection、确认 `maintenance:check` 解锁条件、看 `[boot]` 首行 |
 | 上线前 1 天 | P0-1（清理 secret + rotate） |
 | 上线前 1 天 | P0-2（baseline 跑通 + 留证） |
 | 上线前 1 天 | P0-3（邮箱 provider 验证） |
+| 本周 | 灾备演练、Nginx 限流、每日用量快照、紧急开关演练 |
 | 上线后 D+3 | P1-1（Sentry 接入） |
 | 上线后 D+7 | P1-2（CI 工作流） |
 | 上线后 D+7 | P1-3（备份恢复方案与演练） |
@@ -583,7 +632,7 @@ ROI 分析：Sentry 免费版（5k errors/month）已经覆盖小规模真实用
 | 公开开放前 | P2-4（合规声明） |
 | 引入榜单 / 付费 / 积分前 | P2-2（服务端 heartbeat） |
 
-## 5. 跟踪机制
+## 7. 跟踪机制
 
 每完成一项缺口：
 
@@ -592,12 +641,12 @@ ROI 分析：Sentry 免费版（5k errors/month）已经覆盖小规模真实用
 3. 如果对业务行为产生用户可感知变化（例如引入 Cookie 同意 banner），同步 `CHANGELOG.md`。
 4. 如果对应缺口涉及主链路变更（例如 P2-2 服务端 heartbeat），按 Spec-Driven 流程执行。
 
-## 6. 相关文档
+## 8. 相关文档
 
 - `docs/dev/backend-release-readiness-checklist.md`
-- `docs/dev/public-registration-readiness-plan.md`
-- `docs/dev/public-registration-http-baseline-runbook.md`
-- `docs/dev/public-registration-feature-verification-guide.md`
+- `docs/dev/disaster-recovery.md`
+- `docs/dev/incident-response-runbook.md`
+- `deploy/README.md`
 - `docs/dev/server-data-boundary-audit.md`
 - `docs/dev/dev-log.md`
 - `openspec/specs/api-operational-guardrails/spec.md`

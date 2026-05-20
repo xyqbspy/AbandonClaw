@@ -38,7 +38,7 @@
 | 音频 / TTS / 预热 / 缓存 | `docs/system-design/audio-tts-pipeline.md`、`openspec/specs/audio-playback-orchestration/spec.md`、`openspec/specs/audio-action-button-consistency/spec.md` |
 | 认证、用户态数据、RLS、后端边界 | `openspec/specs/auth-api-boundaries/spec.md`、`docs/domain-rules/auth-api-boundaries.md` |
 | API 失败保护、运行护栏 | `openspec/specs/api-operational-guardrails/spec.md`、`docs/dev/backend-release-readiness-checklist.md` |
-| 公网开放注册、滥用防护、成本额度 | `docs/dev/public-registration-readiness-plan.md` |
+| 公网开放注册、滥用防护、成本额度 | `docs/dev/release-readiness-assessment.md`、`docs/dev/backend-release-readiness-checklist.md` |
 | 上线准备评估与缺口跟踪 | `docs/dev/release-readiness-assessment.md` |
 | 灾备与数据恢复 | `docs/dev/disaster-recovery.md` |
 | 平台层防护与事故响应（Nginx / 腾讯云 WAF / Cloudflare） | `docs/dev/incident-response-runbook.md` |

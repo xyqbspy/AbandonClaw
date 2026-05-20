@@ -12,8 +12,6 @@ import {
 } from "./test-users-lib";
 import { createSupabaseTestUserAccess } from "./test-users-supabase";
 
-type MemoryCookie = { name: string; value: string };
-
 type SceneChunkSnapshot = {
   text: string;
   translation: string | null;

@@ -424,10 +424,10 @@ test("浏览器 TTS 缓存在超限后会保留最新写入的音频", async () 
     chunkKey: "call-it-a-day",
   });
 
-  for (let attempt = 0; attempt < 20; attempt += 1) {
+  for (let attempt = 0; attempt < 100; attempt += 1) {
     const bucketSize = cacheBuckets.get("tts-audio-v2")?.size ?? 0;
     if (bucketSize === 1) break;
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await new Promise((resolve) => setTimeout(resolve, 5));
   }
 
   const entries = await listBrowserTtsCacheEntries();

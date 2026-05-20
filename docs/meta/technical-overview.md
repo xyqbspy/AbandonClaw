@@ -79,8 +79,10 @@
 - `@testing-library/user-event`
 - `ESLint`
 - `OpenSpec`
+- `GitHub Actions` CI workflow（lint / mojibake / unit + scripts test / openspec validate / maintenance:check）
+- `Sentry`（`@sentry/nextjs`，requestId 自动注入 + 5xx 自动 capture + CSP violation 上报）
 
-项目没有上很重的测试平台，而是走“单元测试 + 交互测试 + 定向回归”的轻量方案，比较适合当前阶段快速迭代。
+项目没有上很重的测试平台，而是走“单元测试 + 交互测试 + 定向回归”的轻量方案，比较适合当前阶段快速迭代。CI 工作流已经在 PR 和 push 到 main 时跑全套护栏。
 
 ## 4. 架构组织方式
 
@@ -285,15 +287,21 @@
 
 这套方案已经自建注册验证码的最小闭环，但仍复用 Supabase Auth 作为账号体系和邮件链接确认兼容入口；本轮不做邮件投递监控、模板系统或复杂风控。
 
-## 6.8 统一错误追踪
+## 6.8 可观测性收口
 
-接口层已经补了：
+接口层与运行时已经形成多入口可观测性：
 
-- `requestId`
-- 统一错误响应
-- 基础结构化日志
+- `requestId`：每个请求生成稳定 ID，贯穿 middleware、route、service 与错误响应
+- 统一错误响应：`code / details / requestId` 结构稳定，前端可解析
+- 基础结构化日志：`logServerEvent` / `logApiError` 自动注入 requestId + module + userId
+- `Sentry`：`@sentry/nextjs` 在生产环境捕获 5xx 错误，自动附带 requestId tag，DSN 缺失时 SDK 退化为 no-op 不报错
+- `[boot]` 启动自检：`instrumentation.ts` 在 Node runtime 启动时打印 10 个关键 env 的就绪状态（sentry / upstash / resend / email / origin / IP 限流 / daily quota / registration mode / CSP mode），不打印 secret 值，运维侧一眼可见是否漂移
+- CSP violation 上报：`Content-Security-Policy-Report-Only` 已上，违规通过 `/api/csp-report` 收集并送 Sentry，观察期稳定后通过 `CSP_ENFORCE=true` env 一键切正式 enforce
+- `/admin/observability`：本地浏览器回看最近业务事件与失败摘要
+- `/admin/status`：实时观察 rateLimitBackend / todayHighCostUsage 等运行时状态
+- `pnpm run usage:snapshot`：独立脚本入口，输出当日高成本能力用量快照（汇总 + 明细 + JSON 三段），可被 PM2 cron 调度采集
 
-这样在排查问题时，已经可以把 middleware、route、service 串起来，而不是只看零散 `console.error`。
+这样在排查问题时，已经可以把 middleware、route、service 串起来，而不是只看零散 `console.error`，并且生产环境出 5xx 时分钟级触发告警。
 
 ## 7. 稳定性与安全治理
 
@@ -310,8 +318,16 @@
 - 账号状态降级：`disabled`、`generation_limited`、`readonly`
 - 用户态表逐步切换到 `createSupabaseServerClient`
 - 数据库侧已有主要用户态表的 RLS / policy 配套
+- 错误聚合与告警:`@sentry/nextjs` 在生产捕获 5xx,自动注入 requestId tag
+- 安全策略层:除最小安全头基线外,已上 `Content-Security-Policy-Report-Only` + `/api/csp-report` 收集 + 通过 `CSP_ENFORCE=true` env 一键切 enforce
+- 启动期 env 自检:`instrumentation.ts` 启动时打印 `[boot]` 行,关键 env 漂移分钟级可见
+- CI 工作流:GitHub Actions 在 PR 与 push 到 main 时跑 lint / mojibake / unit + scripts test / openspec validate / maintenance:check
+- 合规占位:`/privacy` / `/terms` 占位页面 + 注册同意条款 checkbox
+- 部署配置模板:`deploy/nginx.example.conf` + `proxy_common` + `deploy/README.md`,Nginx 反向代理 + 限流模板直接 cp 即用
+- 灾备文档:`docs/dev/disaster-recovery.md` 备份策略 / RPO / RTO / 单表恢复步骤
+- 事故响应剧本:`docs/dev/incident-response-runbook.md` 4 类事故剧本 + Nginx / WAF / Cloudflare 启用顺序
 
-可以理解为：项目已经从“纯业务功能阶段”进入了“基础治理已落地”的阶段，但还没有走到完整平台化。
+可以理解为:项目已经从“纯业务功能阶段”进入了“基础治理已落地”的阶段,可观测性、安全策略、CI、灾备与事故响应都已经形成最小可执行入口,但仍未走到完整平台化。
 
 ## 8. 典型技术方案
 
@@ -376,6 +392,12 @@
 - `统一错误追踪`：requestId + logger + 统一错误结构
 - `Origin 防护`：受保护写接口最小攻击防护
 - `RLS 承接`：用户态表逐步回到数据库最小权限模型
+- `错误聚合`：`@sentry/nextjs` 自动 capture 5xx + requestId tag
+- `启动自检`：`instrumentation.ts` 启动期打印 `[boot]` 行,关键 env 漂移可见
+- `CSP report-only`:`Content-Security-Policy-Report-Only` + `/api/csp-report` 收集 violation 送 Sentry,通过 `CSP_ENFORCE=true` env 一键切 enforce
+- `CI 工作流`:GitHub Actions 在 PR / push main 跑全套护栏(lint / mojibake / unit + scripts test / openspec validate / maintenance:check)
+- `用量快照脚本`:`pnpm run usage:snapshot` 输出当日高成本能力用量,可被 cron 调度
+- `部署模板`:`deploy/nginx.example.conf` + `proxy_common` + 启用步骤文档,生产部署直接 cp 即用
 
 ## 10. 当前边界与未做项
 
@@ -386,8 +408,10 @@
 - 未看到完整熔断体系
 - 未看到 PWA / Service Worker 级离线架构
 - 未看到全面的字段级加解密
-- 已补齐最小安全头基线，但 CSP、报告机制、跨源隔离与环境化安全策略仍未平台化
-- 公开注册已具备小范围试放的准入和处置基线，但完整 WAF、设备指纹、邮件投递监控、增长分析和运营审计后台仍未平台化
+- 安全头与 CSP 已经覆盖 report-only 与基础策略,但 CSP 仍处于观察期(尚未切 enforce);更高阶的跨源隔离、平台级 CSP 治理与全面环境化安全策略仍未平台化
+- 公开注册已具备小范围试放的准入和处置基线,但完整 WAF、设备指纹、邮件投递监控、增长分析和运营审计后台仍未平台化
+- 错误聚合 / 启动自检已就位,但全量 APM、跨设备业务事件聚合、retention 类用户结果指标尚未平台化
+- 部署模板与灾备 / 事故剧本已成文,但实际生产环境的 Nginx 限流启用、灾备演练、WAF 接入仍依赖外部执行
 
 也就是说，这个项目的技术路线更偏“实用型全栈产品工程”，而不是“大而全的平台工程模板”。
 
@@ -398,6 +422,10 @@
 - 准备面试、简历表达或项目深挖追问时，继续看 `docs/meta/interview-project-deep-dive.md`
 - 想深入音频链路时，继续看 `docs/system-design/audio-tts-pipeline.md`
 - 想深入工程维护方式时，继续看 `docs/dev/project-maintenance-playbook.md`
+- 想看上线策略与放行边界时，看 `docs/dev/release-readiness-assessment.md`
+- 想看上线前执行清单与真实 HTTP baseline 时，看 `docs/dev/backend-release-readiness-checklist.md`
+- 部署 Nginx 反向代理 + 限流模板时，看 `deploy/README.md`
+- 想看灾备 / 事故响应剧本时，看 `docs/dev/disaster-recovery.md` 与 `docs/dev/incident-response-runbook.md`
 
 ## 12. 与其他文档的关系
 
@@ -411,3 +439,9 @@
   - 讲维护入口、模块边界与日常改动策略
 - `docs/system-design/audio-tts-pipeline.md`
   - 讲音频生成、缓存、预热、播放的实现细节
+- `docs/dev/release-readiness-assessment.md`
+  - 上线策略、放行边界与平台运维缺口跟踪
+- `docs/dev/backend-release-readiness-checklist.md`
+  - 上线前执行清单与真实 HTTP baseline
+- `deploy/README.md`
+  - Nginx 反向代理 + 限流配置启用步骤

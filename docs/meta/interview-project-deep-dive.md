@@ -208,10 +208,14 @@
 - 幂等去重：保护关键写接口和重复点击。
 - Origin 校验：保护受保护写接口。
 - RLS 承接：用户态数据逐步回到数据库最小权限模型。
+- **错误聚合到 Sentry**:`@sentry/nextjs` 在生产捕获 5xx,自动附带 requestId tag,事故响应从"等用户截图"降到分钟级。
+- **CSP 安全策略**:`Content-Security-Policy-Report-Only` 已上,违规通过 `/api/csp-report` 收集并送 Sentry,通过 `CSP_ENFORCE=true` env 一键切正式 enforce。
+- **启动期 env 自检**:`instrumentation.ts` 服务启动时打印 `[boot]` 行,覆盖 sentry / upstash / resend / email / origin / IP 限流 / daily quota / registration mode / CSP mode 10 个关键就绪状态,不打印 secret 值,部署后看一眼日志就能判断 env 是否漂移。
+- **CI 工作流**:GitHub Actions 在 PR / push 到 main 时跑全套护栏(lint / mojibake / unit + scripts test / openspec validate / maintenance:check)。
 
-这里可以讲成“从功能可用走向可治理”：
+这里可以讲成"从功能可用走向可治理":
 
-> 早期项目最重要的是闭环跑通；到现在已经开始补限流、幂等、追踪、权限边界和公开注册准入这些工程化能力，让高成本 AI 接口、用户态数据访问和小范围开放都更可控。
+> 早期项目最重要的是闭环跑通;到现在已经开始补限流、幂等、追踪、权限边界、错误聚合、CSP、启动自检和 CI 护栏这些工程化能力,让高成本 AI 接口、用户态数据访问、小范围开放和事故响应都更可控。
 
 ## 11. 技术亮点七：AI 能力不是孤立 demo
 
@@ -351,6 +355,12 @@ review pack 需要的是后台播放稳定性，不是音频编辑能力。segme
 - `src/lib/server/api-error.ts`
 - `src/lib/server/request-context.ts`
 - `src/lib/server/request-guard.ts`
+- `src/lib/server/logger.ts`（`logServerEvent` / `logApiError`，自动注入 requestId + module + userId）
+- `src/lib/server/boot-check.ts` + `instrumentation.ts`(启动期 `[boot]` 自检 10 个关键 env 就绪状态)
+- `src/lib/server/csp.ts` + `next.config.ts`(CSP directives 抽 helper,`CSP_ENFORCE=true` env 切 enforce)
+- `sentry.server.config.ts` + `sentry.client.config.ts` + `sentry.edge.config.ts`(5xx 自动 capture + requestId tag)
+- `.github/workflows/ci.yml`(PR / push main 跑 lint / mojibake / unit + scripts test / openspec validate / maintenance:check)
+- `deploy/nginx.example.conf` + `deploy/proxy_common.example.conf`(Nginx 反向代理 + 限流模板,直接 cp 即用)
 
 容易被继续追问的点：
 
@@ -447,11 +457,11 @@ review pack 需要的是后台播放稳定性，不是音频编辑能力。segme
 
 优先级可以这样排：
 
-1. 强化观测链路：把当前本地 client-events 中最关键的失败摘要升级为更正式的服务端事件或日志采样。
+1. 强化观测链路：当前本地 client-events + Sentry 5xx 聚合已经够内测;下一步是把它升级到 retention 类用户结果指标(7/14/30 天表达回忆率 / 主动使用率),用真实数据回答"北极星是否在达成"。
 2. 细化 TTS 指标：区分 block / scene full 的 warm hit、cold hit、fallback rate，用数据判断预热是否值得。
 3. 收紧 API 契约：把高频 route 的输入输出 schema 和错误结构继续稳定下来，为 OpenAPI 平台化做准备。
 4. 完善权限边界：继续把用户态访问收回 `createSupabaseServerClient + RLS`。
-5. 优化 review 调度：在已有信号上增强熟悉度、输出信心和完整输出的权重。
+5. Today 推荐引入"用户表达资产"维度:目前推荐主要看 starter path 和 continue learning,引入"基于已保存表达推荐相关场景"能直接强化北极星的"迁移"维度,这是当前最大短板。
 
 不要优先说：
 
@@ -678,6 +688,54 @@ review pack 需要的是后台播放稳定性，不是音频编辑能力。segme
 面试时可以强调：
 
 > 测试策略和架构拆分是配套的。逻辑拆到 service / shared 后，才能用轻量 Node test 覆盖核心语义；交互测试只覆盖真正需要 DOM 的路径。
+
+### 14.12 Review 调度怎么消费 5 类正式信号
+
+这是项目里一条比较深的链路,**面试时被追问"review 不只是对错怎么实现的"** 可以直接展开:
+
+回答结构：
+
+1. UI 收集端:`review-page-stage-panel.tsx` 按阶段收集 `recognitionState` / `outputConfidence` / `fullOutputStatus` / `variantRewriteStatus` / `fullOutputCoverage` 5 类正式信号。
+2. 数据库落库:`phrase_review_logs` 表保留每次 review 完整事件 + `again / hard / good` 主反馈。
+3. 排序消费:`resolveReviewSchedulingFocus` 把 5 类信号映射成 `low_output_confidence / missing_target_coverage / missing_full_output / missing_variant_rewrite / recognition_only` 5 级 focus,`getReviewSchedulingUrgencyRank` 决定 due 列表的优先级。
+4. 节奏消费:`resolveNextReviewAt` 在保留 again / hard / good 主方向的前提下,根据 5 类信号细调下一次复习时间(从 12h 到 10d)。
+5. 解释回流:`schedulingFocus` 字段透传到 UI,`getReviewSchedulingReason()` 把它映射成稳定文案("仍需输出训练" / "尚未覆盖目标表达" 等),用户能看到"为什么这条优先出现"。
+6. 历史兼容:所有 null 值走保守中性解释,新字段按新增记录逐步生效,不要求历史回填。
+
+可以这样答：
+
+> Review 不是简单 SM-2 间隔重复。我们已经把"用户识别 / 主动回忆 / 变体迁移 / 完整输出"4 类阶段信号正式入库,并且让排序和节奏都按这些信号细调。比如完整输出未覆盖目标表达的条目,即使用户提交 good,下次也不会被安排到很远;提交 again 但同时未完成迁移训练的,会进一步收紧到 12 小时。这让 review 不止"判断对错",而是基于"在哪个训练深度卡住"的细粒度调度。
+
+可展开实现：
+
+- 信号定义 spec:`openspec/specs/review-practice-signals/spec.md`
+- 调度 spec:`openspec/specs/review-scheduling-signals/spec.md`
+- 服务端:`src/lib/server/review/service.ts`(`resolveReviewSchedulingFocus` / `getReviewSchedulingUrgencyRank` / `resolveNextReviewAt`)
+- 前端解释:`src/app/(app)/review/review-page-selectors.ts`(`getReviewSchedulingReason`)
+- 测试:`service.logic.test.ts` 覆盖 5 类 focus × 3 类 result 的细调路径
+
+被继续追问时:
+
+- 为什么不直接覆盖 again / hard / good:这 3 个是用户最直接反馈,新信号是补充维度;保留主方向兼容前端 UI 和历史数据。
+- 为什么新信号有 null 兼容:历史 review 没有这些字段,强制回填会伪造结果;保守中性解释比假数据更安全。
+- 当前最大缺口:有信号 + 有消费 + 有 UI 解释,但没有 retention 量化(7/14/30 天表达回忆率)来验证"这套调度真的让用户记住更多"。
+
+### 14.13 可观测性的多个入口
+
+被问"出事故了怎么定位"时可以按入口讲,不要只答 Sentry:
+
+| 入口 | 用于 | 时效 |
+| --- | --- | --- |
+| `Sentry` | 生产 5xx 自动聚合 + requestId tag + breadcrumb | 分钟级告警 |
+| `[boot]` 日志 | 启动期 env 漂移检测(10 个字段) | 部署后第一时间 |
+| `/admin/status` | 实时观察 rateLimitBackend / todayHighCostUsage / quota | 即时 |
+| `/admin/observability` | 本地浏览器回看最近业务事件(today continue / review submit / 场景完成 / 音频失败 / 替代 CTA) | 会话内 |
+| `pnpm run usage:snapshot` | 当日高成本能力用量(3 段汇总 + 明细 + JSON) | 可被 PM2 cron 定时采集 |
+| `requestId` 贯穿 | 把 middleware → route → service → 错误响应 → Sentry 串成同一线索 | 任意时刻 |
+
+可以这样答：
+
+> 我没把可观测性当成"上 Sentry 就够了",而是按事故类型分入口。生产 5xx 走 Sentry 告警;部署后看 `[boot]` 日志确认 env 没漂;实时排查走 `/admin/status` 和 `/admin/observability`;成本异常用 `usage:snapshot` 看当日用量趋势;用户报某个 requestId 时,Sentry / PM2 / route 日志能用同一个 ID 串起来。
 
 ## 15. 分模块深挖准备卡
 
@@ -1000,6 +1058,7 @@ review pack 需要的是后台播放稳定性，不是音频编辑能力。segme
 - 设计并落地服务端主导的学习状态闭环，支持学习进度回写、session 恢复、Review 信号沉淀和 Progress 聚合。
 - 实现 TTS 音频生成、Storage 持久化、浏览器 Cache Storage 缓存、空闲预热、review pack 循环播放与播放兜底，降低重复请求、二次播放延迟和后台切歌失败概率。
 - 建设接口治理基线，包括 `requestId` 追踪、统一错误响应、服务端注册准入、邮箱验证码与邮箱验证闭环、高成本接口限流和 quota、关键写接口幂等、Origin 校验与用户态数据权限边界收紧。
+- 建设可观测性与上线治理:接入 `@sentry/nextjs` 自动捕获 5xx 并注入 requestId tag,启动期 `[boot]` 自检 10 个关键 env 就绪状态,落地 `Content-Security-Policy-Report-Only` + `/api/csp-report` 收集,搭建 GitHub Actions CI 工作流跑全套护栏,产出灾备 / 事故响应剧本和可直接 cp 启用的 Nginx 反向代理 + 限流模板。
 
 ### 19.2 优化点表达
 
@@ -1007,14 +1066,16 @@ review pack 需要的是后台播放稳定性，不是音频编辑能力。segme
 - 通过音频 URL 缓存、浏览器持久缓存、`blob:` URL 复用和同日稳定 review pack，减少 TTS 重复生成、远端请求和后台播放切歌依赖。
 - 通过共享限流、注册 IP 频控、daily quota、管理员紧急开关、幂等去重和统一日志追踪，提升公开注册与高成本 AI 接口的稳定性与可排障性。
 - 通过用户态查询与写入逐步切换到 `createSupabaseServerClient + RLS`，提升后端最小权限边界与安全纵深。
+- 通过 Sentry 5xx 聚合 + `[boot]` 启动自检 + CSP report-only + GitHub Actions CI 工作流,把事故响应从"等用户截图"降到分钟级,把 env 漂移检测前置到部署后第一时间,把规范漂移检测前置到 PR 阶段。
+- 通过 Review 调度消费 5 类正式信号(`recognitionState` / `outputConfidence` / `fullOutputStatus` / `variantRewriteStatus` / `fullOutputCoverage`),让复习节奏按"在哪个训练深度卡住"细调,而不是只靠 again / hard / good 三档。
 
 ### 19.3 招聘平台短版
 
-负责基于 `Next.js 16 + React 19 + Supabase` 搭建英语学习全栈应用，围绕 `Today -> Scene -> Chunks -> Review -> Progress` 建立完整学习闭环。主导学习状态回写、表达资产沉淀、TTS 音频链路和后端接口治理，落地了场景预取、音频多层缓存、空闲预热、review pack 循环播放、服务端注册准入、邮箱验证码与邮箱验证闭环、接口限流、幂等去重、统一错误追踪和基于 `RLS` 的用户态数据权限边界收紧。
+负责基于 `Next.js 16 + React 19 + Supabase` 搭建英语学习全栈应用，围绕 `Today -> Scene -> Chunks -> Review -> Progress` 建立完整学习闭环。主导学习状态回写、表达资产沉淀、TTS 音频链路、Review 5 类正式信号调度和后端接口治理,落地场景预取、音频多层缓存、空闲预热、review pack 循环播放、服务端注册准入、邮箱验证码与邮箱验证闭环、接口限流、幂等去重、Sentry 5xx 聚合、`[boot]` 启动期 env 自检、CSP report-only、GitHub Actions CI 护栏、Nginx 反向代理 + 限流部署模板和基于 `RLS` 的用户态数据权限边界收紧。
 
 ### 19.4 口头自我介绍版
 
-我这个项目比较偏全栈产品工程，不只是做页面，而是把学习主链路、表达资产、AI 能力和后端治理一起做了。前端用的是 `Next.js 16 + React 19`，后端主要依赖 `Supabase`。我自己做得比较重的部分，一块是 TTS 音频链路和缓存预热，一块是学习状态闭环和接口治理，比如限流、幂等、requestId、RLS 权限边界这些。
+我这个项目比较偏全栈产品工程，不只是做页面，而是把学习主链路、表达资产、AI 能力、后端治理和可观测性一起做了。前端用的是 `Next.js 16 + React 19`，后端主要依赖 `Supabase`。我自己做得比较重的部分,一块是 TTS 音频链路和缓存预热,一块是学习状态闭环和 Review 多信号调度,一块是后端接口治理和上线可观测性,比如限流、幂等、requestId、RLS、Sentry 5xx 聚合、启动期 env 自检、CSP 安全策略和 CI 护栏这些。
 
 ## 20. 推荐背诵顺序
 

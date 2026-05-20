@@ -29,7 +29,6 @@ export function SceneBaseView({
   trainingNextStep,
   headerTools,
   headerTitle,
-  onBackToList,
   interactionMode = "default",
   savedPhraseTexts,
   onSavePhrase,
@@ -48,7 +47,6 @@ export function SceneBaseView({
   trainingNextStep?: (controls: LessonReaderSceneLoopControls) => ReactNode;
   headerTools: ReactNode;
   headerTitle?: string;
-  onBackToList?: () => void;
   interactionMode?: "default" | "training";
   savedPhraseTexts: string[];
   onSavePhrase: (payload: SavePhrasePayload) => Promise<{ created: boolean }>;
@@ -81,7 +79,6 @@ export function SceneBaseView({
           lesson={lesson}
           headerTools={headerTools}
           headerTitle={headerTitle}
-          onBackToList={onBackToList}
           trainingTopPanel={trainingNextStep}
           interactionMode={interactionMode}
           savedPhraseTexts={savedPhraseTexts}

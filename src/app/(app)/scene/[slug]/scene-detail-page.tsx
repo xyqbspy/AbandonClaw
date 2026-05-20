@@ -113,11 +113,11 @@ export default function SceneDetailClientPage({
     hydratedTrainingCache.sceneSlug === sceneSlug
       ? hydratedTrainingCache
       : {
-          sceneSlug,
-          isResolved: false,
-          isFresh: false,
-          state: null,
-        };
+        sceneSlug,
+        isResolved: false,
+        isFresh: false,
+        state: null,
+      };
   const [trainingState, setTrainingState] = useState<SceneLearningProgressResponse | null>(
     initialTrainingState,
   );
@@ -498,8 +498,8 @@ export default function SceneDetailClientPage({
     if (!variantChunkDetail?.text) return;
     const sentenceIndex = variantChunkSentence
       ? (baseLesson?.sections
-          .flatMap((section) => section.blocks.flatMap((block) => block.sentences))
-          .findIndex((sentence) => sentence.id === variantChunkSentence.id) ?? -1)
+        .flatMap((section) => section.blocks.flatMap((block) => block.sentences))
+        .findIndex((sentence) => sentence.id === variantChunkSentence.id) ?? -1)
       : -1;
 
     void savePhraseForScene({
@@ -622,11 +622,11 @@ export default function SceneDetailClientPage({
               ? isSentenceEntryStep
                 ? "进入句子练习"
                 : "继续整段练习"
-            : practiceLoading
-              ? "练习准备中..."
-              : isSentenceEntryStep
-                ? "生成并进入句子练习"
-                : "生成并完成整段练习",
+              : practiceLoading
+                ? "练习准备中..."
+                : isSentenceEntryStep
+                  ? "生成并进入句子练习"
+                  : "生成并完成整段练习",
         onClick: () => {
           if (practiceSetStatus === "completed") {
             handleRepeatPractice();
@@ -646,9 +646,9 @@ export default function SceneDetailClientPage({
             ? "再练变体训练"
             : variantSetStatus === "generated"
               ? "查看变体"
-            : variantsLoading
-              ? "变体准备中..."
-              : "打开变体训练",
+              : variantsLoading
+                ? "变体准备中..."
+                : "打开变体训练",
         onClick: () => {
           if (variantSetStatus === "completed") {
             handleRepeatVariants();

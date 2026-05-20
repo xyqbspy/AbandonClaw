@@ -24,6 +24,13 @@ Supabase 不同计划下的自动备份能力：
 
 **项目当前 Supabase 计划**：__待用户确认__（在 Supabase 后台 Project Settings → Billing 查看）
 
+> **重要**：如果当前是 **Free 计划**，PITR（Point-in-Time Recovery）不可用，本文档以下路径全部 N/A：
+> - §2.2 误改数据 中"用 PITR 回到误改前时点"
+> - §1.3 RPO 表中"启用 PITR 后可降到 <= 5 分钟"
+>
+> Free 计划下只能走 §3.1 后台快照恢复（最近一次自动备份，最多丢失 24 小时数据）。
+> 公开开放前强烈建议升 **Pro ($25/月)** 启用 PITR。在确认计划之前，不要按 PITR 步骤演练或承诺 RPO < 24 小时。
+
 ### 1.3 RPO / RTO 目标
 
 按当前小范围内测阶段定义：

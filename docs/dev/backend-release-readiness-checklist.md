@@ -1,5 +1,7 @@
 # 服务端治理上线前检查清单
 
+本文档现在是**唯一的上线执行清单**。原 `public-registration-http-baseline-runbook.md` 与 `public-registration-feature-verification-guide.md` 的执行项，已经并入本文的「真实 HTTP 验证」「P0-B 公网开放防护检查」与相关章节。
+
 ## 环境
 
 - [ ] `NEXT_PUBLIC_SUPABASE_URL` 已配置且与目标项目一致
@@ -51,9 +53,29 @@
 
 ## 真实 HTTP 验证
 
-执行前先看：
+执行方式直接以本节为准，不再依赖额外 runbook。
 
-- [public-registration-http-baseline-runbook.md](/d:/WorkCode/AbandonClaw/docs/dev/public-registration-http-baseline-runbook.md)
+推荐顺序：
+
+1. 复制 sample 配置：
+   ```bash
+   Copy-Item scripts/load-samples/public-registration-http-baseline.sample.json tmp/public-registration-http-baseline.local.json
+   ```
+2. 填入真实 `baseUrl`、`origin`、`expectedRegistrationMode`、`inviteCode`、各类 cookie 与 `outputPath`。
+3. 先跑 dry-run：
+   ```bash
+   pnpm run load:public-registration-baseline --dry-run --config-file=tmp/public-registration-http-baseline.local.json
+   ```
+4. 再跑全量：
+   ```bash
+   pnpm run load:public-registration-baseline --config-file=tmp/public-registration-http-baseline.local.json
+   ```
+5. 若只补跑单场景，追加 `--scenario=<name>`。
+6. 若 DNS 有问题但已确认目标入口 IP，可临时追加 `--resolve-ip=<ip>`，不要改系统 hosts。
+7. 结果判断规则：
+   - `passed`：场景按预期完成。
+   - `blocked`：缺少 cookie / 邀请码 / 账号状态 / 模式前提，不算通过。
+   - `failed`：目标环境真实行为不符预期，必须查 `requestId` 与服务端日志。
 
 以下项目未完成前，不应把注册入口发给真实公网用户：
 

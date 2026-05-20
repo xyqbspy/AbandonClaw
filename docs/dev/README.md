@@ -36,9 +36,10 @@
 - [testing-policy.md](/d:/WorkCode/AbandonClaw/docs/dev/testing-policy.md)
   - 测试策略、最小验证和回归边界。
 - [backend-release-readiness-checklist.md](/d:/WorkCode/AbandonClaw/docs/dev/backend-release-readiness-checklist.md)
-  - 服务端上线前检查、运行护栏和真实 HTTP baseline。
+  - **唯一的上线执行清单**。服务端上线前检查、运行护栏、public registration 验证和真实 HTTP baseline 已统一收口到这里。
 - [release-readiness-assessment.md](/d:/WorkCode/AbandonClaw/docs/dev/release-readiness-assessment.md)
-  - 上线准备评估与缺口跟踪：业务防护层之外、平台运维层缺口的统一入口。每个缺口包含背景、原因、方案、效果、验收。
+  - **唯一的上线策略入口**。上线准备评估、public registration 放行边界、平台运维缺口和 release 边际项已并入这里。
+- [`deploy/`](/d:/WorkCode/AbandonClaw/deploy/) — 部署配置模板（Nginx 反向代理 + 限流），对应 `release-readiness-assessment.md` 的 Nginx / 平台层防护收口项。部署时直接套用，避免现场拼配置。
 - [disaster-recovery.md](/d:/WorkCode/AbandonClaw/docs/dev/disaster-recovery.md)
   - 灾备与数据恢复手册：备份策略、RPO/RTO、恢复操作步骤、自建 pg_dump 兜底、季度演练 checklist。
 - [incident-response-runbook.md](/d:/WorkCode/AbandonClaw/docs/dev/incident-response-runbook.md)
@@ -57,6 +58,12 @@
   - 用户态数据边界、RLS、SQL 映射和服务端白名单审计。
 - [dev-log.md](/d:/WorkCode/AbandonClaw/docs/dev/dev-log.md)
   - 开发过程记录；不是正式 CHANGELOG。
+
+## 已并入
+
+- `release-marginal-gaps.md` 的 M0 / M1 / M2 与盲点：并入 `release-readiness-assessment.md`
+- `public-registration-readiness-plan.md`：并入 `release-readiness-assessment.md`
+- `public-registration-http-baseline-runbook.md` 与 `public-registration-feature-verification-guide.md`：并入 `backend-release-readiness-checklist.md`
 
 ## 常用命令
 
