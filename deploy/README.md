@@ -34,16 +34,24 @@ limit_conn_zone  $binary_remote_addr zone=conn_per_ip:10m;
 
 > 这一步必须放 `http {}`，不能放 `server {}`，否则 zone 无法被多 server 复用。
 
-**如果 `http {}` 里没有显式 `large_client_header_buffers`，也强烈建议同时加上：**
+**如果 `http {}` 里没有显式 buffer 配置，强烈建议同时加上以下两组：**
 
 ```nginx
+# 客户端 → nginx 请求头方向（大 cookie 的请求进得来）
 large_client_header_buffers 8 32k;
 client_header_buffer_size 16k;
+
+# nginx → 上游响应头方向（Supabase 一次写多个 Set-Cookie 的响应进得来）
+proxy_buffer_size       128k;
+proxy_buffers           8 256k;
+proxy_busy_buffers_size 256k;
 ```
 
-> Supabase 的 auth cookie 通常 4-8KB，多个 cookie 叠加后容易超过 nginx 默认 buffer (4 8k)。
-> 一旦超过，nginx 在请求头解析阶段就返回 502/400，**应用根本接不到请求**，用户会看到
-> "登录过的浏览器进不去，无痕能进" 的诡异现象。site 配置里也已经加了同样的两行作为兜底。
+> Supabase 的 auth cookie 通常 4-8KB，多个 cookie 叠加后容易超过 nginx 默认 buffer：
+> - 客户端请求方向超限 → `client sent too large header` → nginx 直接 400/502
+> - 上游响应方向超限 → `upstream sent too big header while reading response header from upstream` → nginx 直接 502
+>
+> 两种情况共同表现：**登录过的浏览器进不去，无痕模式能进**。Site 配置里已经加了同样的 buffer 作为兜底。
 
 ### 3. 部署 site 配置
 
@@ -107,24 +115,36 @@ curl -sIk https://your-domain.example.com/ | grep -iE "strict-transport-security
 
 ### 现象 A：登录过的浏览器 502，无痕模式正常
 
-**根因**：Supabase auth cookie 太大，超过 nginx 默认 `large_client_header_buffers`。
-nginx 在请求头解析阶段就拒绝，应用根本接不到请求 → 用户以为项目挂了。
+**根因**：Supabase auth cookie 太大，超过 nginx 默认 buffer。有两个方向，**生产环境曾真实出现过 A2 这一种**：
+
+- **A1（请求方向超限）**：客户端发上来的 Cookie 总长度过大，nginx `large_client_header_buffers` 不够，请求头解析阶段就拒绝。
+- **A2（响应方向超限，更常见）**：上游 Next.js 在 Supabase middleware 刷新 session 时一次写多个 Set-Cookie，响应头长度超过 nginx `proxy_buffer_size`，nginx 接住 upstream 响应时溢出。
+
+两种情况都让用户看到 502，且无痕模式都能进（因为没有 cookie 不触发任一路径）。
 
 **快速验证**：
 
 ```bash
-# 看 nginx error log，如果出现 "upstream sent too big header" / "client sent too large header"
-# 就是这个问题
-sudo tail -n 100 /var/log/nginx/error.log | grep -iE "header|buffer|too large"
+sudo tail -n 100 /var/log/nginx/error.log | grep -iE "header|buffer|too large|too big"
+
+# 看到这个 → A1：client sent too large header line while reading client request headers
+# 看到这个 → A2：upstream sent too big header while reading response header from upstream
 ```
 
-**热修**：
+**热修（两组 buffer 都加最稳）**：
 
 ```bash
 sudo vi /etc/nginx/nginx.conf
 # 在 http {} 段加（或调大现有值）:
+#
+#   # 请求方向 (A1)
 #   large_client_header_buffers 8 32k;
 #   client_header_buffer_size 16k;
+#
+#   # 响应方向 (A2，最常见)
+#   proxy_buffer_size       128k;
+#   proxy_buffers           8 256k;
+#   proxy_busy_buffers_size 256k;
 
 sudo nginx -t && sudo nginx -s reload
 ```
