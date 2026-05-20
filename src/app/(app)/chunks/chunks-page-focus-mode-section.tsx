@@ -1,23 +1,12 @@
 "use client";
 
 import { ClusterFocusList } from "@/features/chunks/components/cluster-focus-list";
+import type {
+  FocusPreviewItem,
+  SavedRelationRowsBySourceId,
+} from "@/features/chunks/components/types";
 import type { UserPhraseItemResponse } from "@/lib/utils/phrases-api";
 import { chunksPageMessages as zh } from "./chunks-page-messages";
-
-type FocusPreviewItem = {
-  text: string;
-  kind: "library-similar" | "suggested-similar" | "contrast";
-  differenceLabel?: string | null;
-};
-
-type SavedRelationRowsBySourceId = Map<
-  string,
-  Array<{
-    relationId: string;
-    text: string;
-    differenceLabel?: string | null;
-  }>
->;
 
 const FOCUS_MODE_SECTION_SURFACE_CLASSNAME =
   "rounded-2xl border-0 bg-white shadow-sm ring-0";

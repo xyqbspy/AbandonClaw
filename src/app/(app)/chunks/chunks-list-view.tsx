@@ -331,7 +331,7 @@ function ChunksManualSourceNote({
   );
 }
 
-type ChunksListViewLabels = {
+export type ChunksListViewLabels = {
   sentenceUnit: string;
   expressionUnit: string;
   learningInfoPending: string;
@@ -379,7 +379,7 @@ type ChunksListViewLabels = {
   learningInfoPendingHint: string;
 };
 
-type ChunksListViewProps = {
+export type ChunksListViewProps = {
   phrases: UserPhraseItemResponse[];
   clusterMembersByClusterId: Map<string, UserPhraseItemResponse[]>;
   expandedSimilarIds: Record<string, boolean>;

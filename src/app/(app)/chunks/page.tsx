@@ -63,7 +63,6 @@ import { useManualExpressionComposer } from "./use-manual-expression-composer";
 import { useManualSentenceComposer } from "./use-manual-sentence-composer";
 import { useSavedRelations } from "./use-saved-relations";
 import { useFocusDetailController } from "./use-focus-detail-controller";
-import { ChunksListView } from "./chunks-list-view";
 import { useChunksPageActions } from "./use-chunks-page-actions";
 import { useBuiltinPhrasesActions } from "./use-builtin-phrases-actions";
 import { useBuiltinPhrasesData } from "./use-builtin-phrases-data";
@@ -75,6 +74,7 @@ import { useSentenceExpressionSave } from "./use-sentence-expression-save";
 import { BuiltinPhrasesSection } from "./builtin-phrases-section";
 import { ChunksPageFocusModeSection } from "./chunks-page-focus-mode-section";
 import { ChunksPageHero } from "./chunks-page-hero";
+import { ChunksPageListSection } from "./chunks-page-list-section";
 
 import { buildChunksFocusDetailLabels } from "./chunks-focus-detail-messages";
 import {
@@ -95,7 +95,6 @@ import {
   CHUNKS_PILL_BUTTON_BASE_COMPACT_CLASSNAME,
   CHUNKS_PILL_BUTTON_INACTIVE_CLASSNAME,
   CHUNKS_PILL_GROUP_CONTAINER_CLASSNAME,
-  CHUNKS_PRIMARY_BUTTON_CLASSNAME as chunksButtonClassName,
 } from "./chunks-page-styles";
 import {
   notifyChunksActionMessage,
@@ -117,13 +116,6 @@ import {
   filterBuiltinPhrases,
   sortBuiltinPhrases,
 } from "@/features/chunks/builtin-phrases";
-
-const reviewStatusLabel: Record<PhraseReviewStatus, string> = {
-  saved: zh.tabs.saved,
-  reviewing: zh.tabs.reviewing,
-  mastered: zh.tabs.mastered,
-  archived: "\u5df2\u5f52\u6863",
-};
 
 const normalizePathname = (pathname?: string | null) => {
   if (typeof pathname !== "string") return "/";
@@ -304,23 +296,6 @@ type FocusDetailState = {
   kind: "current" | "library-similar" | "suggested-similar" | "contrast";
   savedItem: UserPhraseItemResponse | null;
   assistItem: ManualExpressionAssistResponse["inputItem"] | null;
-};
-
-const extractExpressionsFromSentenceItem = (item: UserPhraseItemResponse) => {
-  const raw = (item.sourceChunkText ?? "").trim();
-  if (!raw) return [] as string[];
-  const parts = raw
-    .split(/[|,/，；;]+/)
-    .map((entry) => entry.trim())
-    .filter((entry) => entry.length >= 2 && entry.length <= 80);
-  const unique = new Map<string, string>();
-  for (const entry of parts) {
-    const normalized = normalizePhraseText(entry);
-    if (/^sentence-[0-9a-f]{8}$/i.test(normalized)) continue;
-    if (!normalized || unique.has(normalized)) continue;
-    unique.set(normalized, entry);
-  }
-  return Array.from(unique.values()).slice(0, 6);
 };
 
 export default function ChunksPage() {
@@ -1865,94 +1840,52 @@ export default function ChunksPage() {
           }}
         />
       ) : (
-        <section className="space-y-4">
-          <ChunksListView
-          phrases={phrases}
-          clusterMembersByClusterId={clusterMembersByClusterId}
-          expandedSimilarIds={expandedSimilarIds}
-          expandedCardIds={expandedCardIds}
-          expandedIds={expandedIds}
-          savedSentenceExpressionKeys={savedSentenceExpressionKeys}
-          retryingEnrichmentIds={retryingEnrichmentIds}
-          reviewStatusLabel={reviewStatusLabel}
-            savingSentenceExpressionKey={savingSentenceExpressionKey}
-            generatingSimilarForId={generatingSimilarForId}
-            mapOpeningForId={mapOpeningForId}
-            openingSourceSceneSlug={openingSourceSceneSlug}
-            playingText={speakingText}
-          ttsPlaybackText={speakingText}
-          ttsLoadingText={loadingText}
-          appleButtonClassName={chunksButtonClassName}
-          appleSurfaceClassName="rounded-[2rem] border border-slate-50 bg-white shadow-sm ring-0"
-          labels={{
-            sentenceUnit: zh.sentenceUnit,
-            expressionUnit: zh.expressionUnit,
-            learningInfoPending: zh.learningInfoPending,
-            learningInfoFailed: zh.learningInfoFailed,
-            noTranslation: zh.noTranslation,
-            usageHint: zh.usageHint,
-            sentenceSource: zh.sentenceSource,
-            sentenceSourceFallback: zh.sentenceSourceFallback,
-            sentenceUnitHint: zh.sentenceUnitHint,
-            sentenceExpressions: zh.sentenceExpressions,
-            sentenceExpressionsHint: zh.sentenceExpressionsHint,
-            sentenceSavedExpression: zh.sentenceSavedExpression,
-            sentenceSaveExpression: zh.sentenceSaveExpression,
-            sentenceNoExpressions: zh.sentenceNoExpressions,
-            reviewStage: zh.reviewStage,
-            similarExpressions: zh.similarExpressions,
-            translationLabel: zh.translationLabel,
-            sourceSentence: zh.sourceSentence,
-            speakSentence: zh.speakSentence,
-            noSourceSentence: zh.noSourceSentence,
-            semanticFocusLabel: zh.semanticFocusLabel,
-            semanticFocusPending: zh.semanticFocusPending,
-            diffRelated: zh.diffRelated,
-            typicalScenarioLabel: zh.typicalScenarioLabel,
-            typicalScenarioPending: zh.typicalScenarioPending,
-            hideSimilar: zh.hideSimilar,
-            showSimilar: zh.showSimilar,
-            viewAllSimilar: zh.viewAllSimilar,
-            similarEmpty: zh.similarEmpty,
-            generatingSimilar: zh.generatingSimilar,
-            findMoreSimilar: zh.findMoreSimilar,
-            manualRecorded: zh.manualRecorded,
-            sourceNoteDisplay: zh.sourceNoteDisplay,
-            collapseDetail: zh.collapseDetail,
-            expandDetail: zh.expandDetail,
-            inThisSentence: zh.inThisSentence,
-            commonUsage: zh.commonUsage,
-            sentenceRecordExpression: zh.sentenceRecordExpression,
-            detailPrimaryAction: zh.detailPrimaryAction,
-            mapUnavailable: zh.mapUnavailable,
-            mapPending: zh.mapPending,
-            openMap: zh.openMap,
-            sourceScene: zh.sourceScene,
-            retryEnrichment: zh.retryEnrichment,
-            learningInfoPendingHint: zh.learningInfoPendingHint,
+        <ChunksPageListSection
+          data={{
+            phrases,
+            clusterMembersByClusterId,
           }}
-          toggleCardExpanded={toggleCardExpanded}
-          toggleSimilarExpanded={toggleSimilarExpanded}
-          toggleExpanded={toggleExpanded}
-          getUsageHint={getUsageHint}
-          getReviewActionHint={getReviewActionHint}
-          getPrimaryActionLabel={getPrimaryActionLabel}
-          buildDifferenceNote={buildDifferenceNote}
-          extractExpressionsFromSentenceItem={extractExpressionsFromSentenceItem}
-          renderExampleSentenceCards={renderExampleSentenceCards}
-          renderSentenceWithExpressionHighlight={renderSentenceWithExpressionHighlight}
-          handlePronounceSentence={handlePronounceSentence}
-          saveExpressionFromSentence={saveExpressionFromSentence}
-          openExpressionComposerFromSentence={openExpressionComposerFromSentence}
-          openExpressionDetail={openExpressionDetailFromCard}
-          startReviewFromCard={startReviewFromCard}
-          openExpressionMap={openExpressionMap}
-          openSourceScene={openSourceScene}
-          retryAiEnrichment={retryAiEnrichment}
-          applyClusterFilter={applyClusterFilter}
-          openGenerateSimilarSheet={openGenerateSimilarSheet}
+          expansion={{
+            expandedSimilarIds,
+            expandedCardIds,
+            expandedIds,
+            toggleCardExpanded,
+            toggleSimilarExpanded,
+            toggleExpanded,
+          }}
+          status={{
+            savedSentenceExpressionKeys,
+            retryingEnrichmentIds,
+            savingSentenceExpressionKey,
+            generatingSimilarForId,
+            mapOpeningForId,
+            openingSourceSceneSlug,
+          }}
+          audio={{
+            speakingText,
+            loadingText,
+            handlePronounceSentence,
+          }}
+          presenters={{
+            getUsageHint,
+            getReviewActionHint,
+            getPrimaryActionLabel,
+            buildDifferenceNote,
+            renderExampleSentenceCards,
+            renderSentenceWithExpressionHighlight,
+          }}
+          actions={{
+            saveExpressionFromSentence,
+            openExpressionComposerFromSentence,
+            openExpressionDetail: openExpressionDetailFromCard,
+            startReviewFromCard,
+            openExpressionMap,
+            openSourceScene,
+            retryAiEnrichment,
+            applyClusterFilter,
+            openGenerateSimilarSheet,
+          }}
         />
-        </section>
       )
       ) : null}
 

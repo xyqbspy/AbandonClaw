@@ -89,7 +89,7 @@ test("useSentenceExpressionSave 失败路径触发 notifyFailed 并清理 saving
 });
 
 test("useSentenceExpressionSave 同一 key 进行中再次调用直接 noop", async () => {
-  let resolveSave: (() => void) | null = null;
+  let resolveSave: () => void = () => {};
   const savePromise = new Promise<void>((resolve) => {
     resolveSave = resolve;
   });
@@ -118,7 +118,7 @@ test("useSentenceExpressionSave 同一 key 进行中再次调用直接 noop", as
   });
 
   assert.equal(saveCalls.length, 1);
-  resolveSave?.();
+  resolveSave();
   await waitFor(() => {
     assert.equal(result.current.savingSentenceExpressionKey, null);
   });
