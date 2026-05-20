@@ -4,6 +4,7 @@
 /node_modules
 /newApphtml
 /.pnp
+.claude
 .pnp.*
 .yarn/*
 !.yarn/patches
