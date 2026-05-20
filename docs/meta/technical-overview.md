@@ -130,6 +130,22 @@
 - 状态不是纯前端瞬时状态
 - 更适合后续继续做推荐、回写和审计
 
+### 4.4 代码组织治理与多轮拆分
+
+项目把"页面薄层化"做成了一条可量化、可迭代的工程治理路径,不是一次性 refactor。每一轮拆分都按 OpenSpec change 走 proposal → tasks → spec delta → 实施 → 量化反馈 → 归档,关键文件 LoC 与减幅都进 spec 留档,给下一轮策略提供数据依据:
+
+- `chunks/page.tsx`:**2368 行 → 2125 (r2, -243) → 2102 (r3, -23) → 2041 (r4, -67)**,共 4 轮拆分,每轮抽出 hook / view section / wrapper
+- `scene-detail-page.tsx`:**1326 行 → 849 (r2, -36%)**,抽出 practice run lifecycle / generation prewarm / variant run lifecycle / view switch 4 块职责
+- 量化反馈驱动策略迭代:r3 抽 4 个小 hook 只减 23 行,**关键发现**"装配回调 / 解构 / props 透传"开销与抽走代码量近似抵消;这一发现写进 r3 spec delta,r4 据此改抽**高 props-cost 子树**(ChunksListView wrapper),效率立刻提升 3 倍
+
+页面拆分以外的代码组织治理:
+
+- **组件分层规范化**(架构审计批次 A,commit `f96139c`):把 `src/features/*` 与 `src/components/shared` 边界重新对齐,消除跨 feature 直接 import
+- **OpenSpec spec `feature-component-decomposition`** 已经为 chunks/scene/review 三个重入口建立了"必须按轮迭代 + 字节级 DOM 兼容 + 入口级回归测试不弱化"的硬约束,新拆分必须遵守
+- **AI 协作自治边界**(`docs/dev/ai-token-efficiency-playbook.md` §1.0):明确 AI agent 在文档 / 代码 / spec 三层的自治边界,避免 AI 改动越界或为节省 token 跳过验证
+
+这些治理项的目标不是把 LoC 降到某个魔法数字,而是建立"页面薄 → 复杂度下沉到 hook / section / logic → 入口级测试保护 → 多轮迭代降低单次风险"的可维护节奏。
+
 ## 5. 前端实现方案
 
 ### 5.1 页面组织
@@ -300,8 +316,35 @@
 - `/admin/observability`：本地浏览器回看最近业务事件与失败摘要
 - `/admin/status`：实时观察 rateLimitBackend / todayHighCostUsage 等运行时状态
 - `pnpm run usage:snapshot`：独立脚本入口，输出当日高成本能力用量快照（汇总 + 明细 + JSON 三段），可被 PM2 cron 调度采集
+- TTS warmup 生命周期事件：`warmup_task_finished` / `warmup_task_promoted` / `warmup_task_reset` / `warmup_task_cancelled` / `warmup_idle_round_skipped` / `tts_request_cooling_down`，覆盖任务每一次状态转折和 idle scheduler 因 hidden / save-data-2g / playback-loading / interaction-recent 而 skip 的原因，能回答"预热到底有没有命中"
 
 这样在排查问题时，已经可以把 middleware、route、service 串起来，而不是只看零散 `console.error`，并且生产环境出 5xx 时分钟级触发告警。
+
+## 6.9 高成本资源失败回退与跨 worker 缓存共享
+
+TTS / AI 这类高成本资源已经在限流之外补了"失败回退阶梯 + 跨 worker 缓存共享"两层保护:
+
+- **跨场景 cancel**:用户从 scene A 切到 scene B 时,A 的排队任务会被 promoted 到 skipped,正在加载的任务通过 `AbortController.abort()` 中断;`requestTtsUrl` / `ensureSentenceAudio` / `ensureChunkAudio` / `ensureSceneFullAudio` 都接受 optional `AbortSignal`,避免后台空跑浪费带宽
+- **sentence / chunk 失败 cooldown ladder**:失败次数对应 `[0, 5s, 60s, 300s, 1800s]` 冷却时间,疑难内容不会反复打上游 TTS;静默 30 分钟后视为新一轮,失败计数才重置;scene full 仍走自己的 45 秒独立路径,不混进通用 ladder
+- **签名 URL 缓存跨 worker 共享**:`src/lib/server/tts/signed-url-cache.ts` 用 Upstash Redis 优先 + 内存 Map fallback,PM2 cluster 多 worker 部署时命中率不再被打折;Upstash 不可用时退化保持本地零配置;`pendingSignedUrlRequests` 仍保留为进程内短时去重
+- **Today 推荐场景背景预热**:`today-page-client` 在 sceneList 加载完后,复用 `scene-prefetch.ts` 的 `scheduleScenePrefetch` 对前 2 个推荐 scene 发起 background warm;saveData / 2g 网络下自动跳过
+
+这层设计的目标是:让"失败的高成本资源"既不重复打上游、也不阻塞后续请求,同时多 worker 部署不会让缓存收益缩水。
+
+## 6.10 API 错误响应契约统一
+
+最近一轮通过 `docs/dev/api-error-response-audit-2026-05-16.md` 对 58 个 API route + admin server actions 做了系统盘点,识别出 3 处 P0(响应契约破坏)+ 10 处 P1(高成本路径可观测性缺失),按 OpenSpec change `harden-api-error-response-consistency` 一次性收口:
+
+- 全量 API 错误响应统一 `code + details + requestId` 三件套,前端可稳定解析错误结构
+- `auth/logout` Supabase signOut 失败响应从 500 `INTERNAL_ERROR` 改 401 `AUTH_UNAUTHORIZED`,语义更准确(前端遇到这种错应该引导回登录,而不是上报后端故障)
+- `auth/signup` GET 加 try/catch 保护;两端都通过 DI 注入 `getEffectiveRegistrationMode`,可测试性提升
+- `csp-report` 早期返回(payload 异常)改 `throw new ValidationError(...)`,统一走外层 catch
+- `auth/logout` 内部异常包装从 plain `Error` → `AuthError`,POST 改 `handleLogoutPost` 支持单测注入 Supabase factory
+- 7 处高成本路径(scene/parse / scenes/import / scenes/[slug]/variants / phrases/manual-assist / expression-map/generate / phrases/similar/generate / phrases/similar/enrich)补 `logApiError(module, error, { request })` 注入 module 关联,事故后能按业务模块过滤,而不是只看一堆没有上下文的 5xx
+- `similar/generate` / `scene/mutate` 等几处 plain `Error("Model output is not valid JSON.")` 改 `SceneParseError`,符合"受控失败类型映射表"
+- spec delta ADD "高成本接口必须通过 logApiError 注入 module 关联";MODIFIED "未知服务端异常必须被错误追踪系统捕获"(补 `SceneParseError` / `AuthError` 包装约束 + 受控失败类型映射表)
+
+这层契约统一对成功路径无影响,但显著提升了前端错误处理逻辑稳定性 + 后端事故定位速度 + Sentry 事件分桶能力。
 
 ## 7. 稳定性与安全治理
 
@@ -326,6 +369,8 @@
 - 部署配置模板:`deploy/nginx.example.conf` + `proxy_common` + `deploy/README.md`,Nginx 反向代理 + 限流模板直接 cp 即用
 - 灾备文档:`docs/dev/disaster-recovery.md` 备份策略 / RPO / RTO / 单表恢复步骤
 - 事故响应剧本:`docs/dev/incident-response-runbook.md` 4 类事故剧本 + Nginx / WAF / Cloudflare 启用顺序
+- API 错误响应契约一致:全量 API 错误响应统一 `code + details + requestId`,高成本路径补 `logApiError(module, error, { request })` 注入 module 关联(spec `api-operational-guardrails`)
+- 生产稳定性诊断深度:线上 502 不是一次性 fix,而是分次定位到根因——Supabase 大 cookie 触发 Nginx 客户端请求头超限补 `large_client_header_buffers`、之后排查发现真正瓶颈在上游响应头方向补 `proxy_buffers` / `proxy_buffer_size`(`deploy/nginx.example.conf` + `deploy/proxy_common.example.conf`),诊断过程沉淀到 deploy 模板供二次复用
 
 可以理解为:项目已经从“纯业务功能阶段”进入了“基础治理已落地”的阶段,可观测性、安全策略、CI、灾备与事故响应都已经形成最小可执行入口,但仍未走到完整平台化。
 
@@ -348,6 +393,9 @@
 - 重复复用
 - 弱网容错
 - 后台预热
+- 跨场景自动 cancel：用户切场景时,旧场景 queued 任务会被 promoted 到 skipped,loading 任务通过 `AbortController.abort()` 中断,避免后台空跑
+- sentence / chunk 失败 cooldown ladder：失败次数对应 `[0, 5s, 60s, 300s, 1800s]` 阶梯,疑难内容不会反复打上游;scene full 走自己的 45 秒独立路径
+- 签名 URL 缓存跨 worker 共享：服务端用 Upstash Redis 优先 + 内存 fallback,PM2 cluster 多 worker 命中率不打折
 - scenes 循环复习后台播放：同日稳定 review pack 先把多个场景的 scene full segments 合并为一个 payload，再复用 scene full TTS 通道生成整体音频，播放开始后由单个 `<audio loop>` 持续承接
 
 ### 8.2 学习状态闭环
@@ -398,6 +446,10 @@
 - `CI 工作流`:GitHub Actions 在 PR / push main 跑全套护栏(lint / mojibake / unit + scripts test / openspec validate / maintenance:check)
 - `用量快照脚本`:`pnpm run usage:snapshot` 输出当日高成本能力用量,可被 cron 调度
 - `部署模板`:`deploy/nginx.example.conf` + `proxy_common` + 启用步骤文档,生产部署直接 cp 即用
+- `API 错误响应契约一致`:全量 API 错误响应统一 `code + details + requestId`,高成本路径自动按 module 进入 Sentry
+- `TTS 失败回退阶梯`:sentence / chunk 失败 `[0, 5s, 60s, 300s, 1800s]` 冷却 + 跨场景 cancel + Upstash Redis signed URL cache,避免反复打上游和 PM2 多 worker 命中率打折
+- `代码组织治理`:chunks / scene-detail 等重入口走多轮 OpenSpec change 拆分,每轮 LoC 与减幅入 spec 留档,数据驱动下一轮策略(r3 -23 行 → r4 -67 行验证"高 props-cost 子树"策略效率高 3 倍)
+- `AI 协作自治边界`:`docs/dev/ai-token-efficiency-playbook.md` 约束 AI agent 在文档 / 代码 / spec 三层的自治边界,避免改动越界或为节省 token 跳过验证
 
 ## 10. 当前边界与未做项
 
@@ -412,6 +464,7 @@
 - 公开注册已具备小范围试放的准入和处置基线,但完整 WAF、设备指纹、邮件投递监控、增长分析和运营审计后台仍未平台化
 - 错误聚合 / 启动自检已就位,但全量 APM、跨设备业务事件聚合、retention 类用户结果指标尚未平台化
 - 部署模板与灾备 / 事故剧本已成文,但实际生产环境的 Nginx 限流启用、灾备演练、WAF 接入仍依赖外部执行
+- 多轮页面拆分已建立可迭代模式且每轮量化,但 `chunks/page.tsx` 仍 2041 行 / `scene-detail-page.tsx` 仍 849 行,r5 及之后的"高 props-cost 子树"候选(`<FocusDetailSheet>` 装配等)仍待按 OpenSpec change 推进
 
 也就是说，这个项目的技术路线更偏“实用型全栈产品工程”，而不是“大而全的平台工程模板”。
 
@@ -426,6 +479,9 @@
 - 想看上线前执行清单与真实 HTTP baseline 时，看 `docs/dev/backend-release-readiness-checklist.md`
 - 部署 Nginx 反向代理 + 限流模板时，看 `deploy/README.md`
 - 想看灾备 / 事故响应剧本时，看 `docs/dev/disaster-recovery.md` 与 `docs/dev/incident-response-runbook.md`
+- 想看 API 错误响应一致性盘点结果时，看 `docs/dev/api-error-response-audit-2026-05-16.md`
+- 想看 AI 协作的 token 效率与自治边界约束时，看 `docs/dev/ai-token-efficiency-playbook.md`
+- 想看页面拆分多轮策略与量化反馈时，看 `openspec/specs/feature-component-decomposition/spec.md` 与归档的 `decompose-chunks-page-r2 / r3 / r4` 及 `decompose-scene-detail-page-r2`
 
 ## 12. 与其他文档的关系
 
@@ -445,3 +501,7 @@
   - 上线前执行清单与真实 HTTP baseline
 - `deploy/README.md`
   - Nginx 反向代理 + 限流配置启用步骤
+- `docs/dev/api-error-response-audit-2026-05-16.md`
+  - 58 个 API route + admin server actions 的错误响应一致性盘点(已按 OpenSpec change `harden-api-error-response-consistency` 收口 P0+P1)
+- `docs/dev/ai-token-efficiency-playbook.md`
+  - AI 协作的 token 效率手册 + AI agent 在文档 / 代码 / spec 三层的自治边界约束

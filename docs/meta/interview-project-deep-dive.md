@@ -212,6 +212,7 @@
 - **CSP 安全策略**:`Content-Security-Policy-Report-Only` 已上,违规通过 `/api/csp-report` 收集并送 Sentry,通过 `CSP_ENFORCE=true` env 一键切正式 enforce。
 - **启动期 env 自检**:`instrumentation.ts` 服务启动时打印 `[boot]` 行,覆盖 sentry / upstash / resend / email / origin / IP 限流 / daily quota / registration mode / CSP mode 10 个关键就绪状态,不打印 secret 值,部署后看一眼日志就能判断 env 是否漂移。
 - **CI 工作流**:GitHub Actions 在 PR / push 到 main 时跑全套护栏(lint / mojibake / unit + scripts test / openspec validate / maintenance:check)。
+- **API 错误响应契约一致性**:全量 API 错误响应统一 `code + details + requestId` 三件套(OpenSpec change `harden-api-error-response-consistency` 一次性收口 3 处 P0 + 10 处 P1),前端能稳定解析错误结构;`auth/logout` 失败响应从 500 `INTERNAL_ERROR` 改 401 `AUTH_UNAUTHORIZED` 修正"session 失效 vs 服务器故障"的语义混淆;7 处高成本路径补 `logApiError(module, ...)` 注入到 Sentry,事故后能按业务模块过滤。
 
 这里可以讲成"从功能可用走向可治理":
 
@@ -361,6 +362,8 @@ review pack 需要的是后台播放稳定性，不是音频编辑能力。segme
 - `sentry.server.config.ts` + `sentry.client.config.ts` + `sentry.edge.config.ts`(5xx 自动 capture + requestId tag)
 - `.github/workflows/ci.yml`(PR / push main 跑 lint / mojibake / unit + scripts test / openspec validate / maintenance:check)
 - `deploy/nginx.example.conf` + `deploy/proxy_common.example.conf`(Nginx 反向代理 + 限流模板,直接 cp 即用)
+- `openspec/changes/archive/2026-05-17-harden-api-error-response-consistency/`(API 错误响应一致性收口的完整 spec-driven change:proposal + tasks + spec delta)
+- `docs/dev/api-error-response-audit-2026-05-16.md`(58 个 route + admin server actions 的错误响应一致性原始盘点表,P0 / P1 / P2 分级)
 
 容易被继续追问的点：
 
@@ -368,6 +371,7 @@ review pack 需要的是后台播放稳定性，不是音频编辑能力。segme
 - 邮箱验证码是不是自建：注册页 6 位验证码是项目内最小闭环；账号体系、邮件链接确认、callback、重发入口和未验证拦截仍复用 Supabase Auth。
 - 幂等是不是持久化：当前是轻量内存方案，适合阶段性保护；更高并发可迁到共享存储。
 - RLS 做到什么程度：主要用户态表逐步承接，仍不是完整平台化权限系统。
+- 错误响应一致性怎么收口的:不是改一处补一处,而是先写 `api-error-response-audit-2026-05-16.md` 盘点 58 个 route + admin server actions,分出 P0(响应契约破坏:`auth/logout` 500 → 401 / `csp-report` plain error / `auth/signup` GET 无 try-catch)、P1(可观测性缺失:7 处高成本路径未注入 `logApiError(module)`)、P2(server actions 错误返回模式不统一,留后续);再起 OpenSpec change `harden-api-error-response-consistency` 一次性收口 P0 + P1,补 spec delta「高成本接口必须通过 logApiError 注入 module 关联」+「受控失败类型映射表」,并通过 DI 让单测可隔离 Supabase factory。
 
 ### 13.5 如果问：AI 能力怎么避免变成 demo
 
@@ -586,6 +590,9 @@ review pack 需要的是后台播放稳定性，不是音频编辑能力。segme
 - 来源区分 `initial` / `idle` / `playback`。
 - `user-click` 不算 warmup source，因为用户点击是 demand，不是预热收益。
 - Admin summary 基于本地 client-events 计算，不代表全量用户数据。
+- 生命周期事件覆盖 `warmup_task_finished` / `warmup_task_promoted` / `warmup_task_reset` / `warmup_task_cancelled` / `warmup_idle_round_skipped` / `tts_request_cooling_down`,任务每一次状态转折和 idle scheduler 因 `page-hidden` / `save-data-or-2g` / `playback-loading` / `interaction-recent` 而跳过的原因都会落事件,能回答"预热是不是被环境抑制"。
+- 跨场景 cancel:用户从 scene A 切到 scene B 时 `cancelWarmupsBySceneSlug(slug)` 把 A 的 queued 任务 promoted 到 skipped,loading 任务通过 `AbortController.abort()` 中断,避免后台空跑还占带宽。
+- sentence / chunk 失败 cooldown ladder:`[0, 5s, 60s, 300s, 1800s]` 阶梯,疑难内容失败后不会立即重试,30 分钟静默后失败计数才重置;scene full 走自己的 45 秒独立路径,不混进通用 ladder。
 
 可以补一句边界：
 
@@ -726,16 +733,64 @@ review pack 需要的是后台播放稳定性，不是音频编辑能力。segme
 
 | 入口 | 用于 | 时效 |
 | --- | --- | --- |
-| `Sentry` | 生产 5xx 自动聚合 + requestId tag + breadcrumb | 分钟级告警 |
+| `Sentry` | 生产 5xx 自动聚合 + requestId tag + breadcrumb + 高成本路径按 `logApiError(module)` 分桶 | 分钟级告警 |
 | `[boot]` 日志 | 启动期 env 漂移检测(10 个字段) | 部署后第一时间 |
 | `/admin/status` | 实时观察 rateLimitBackend / todayHighCostUsage / quota | 即时 |
 | `/admin/observability` | 本地浏览器回看最近业务事件(today continue / review submit / 场景完成 / 音频失败 / 替代 CTA) | 会话内 |
 | `pnpm run usage:snapshot` | 当日高成本能力用量(3 段汇总 + 明细 + JSON) | 可被 PM2 cron 定时采集 |
 | `requestId` 贯穿 | 把 middleware → route → service → 错误响应 → Sentry 串成同一线索 | 任意时刻 |
+| TTS warmup 生命周期事件 | `warmup_task_finished` / `warmup_task_promoted` / `warmup_task_reset` / `warmup_task_cancelled` / `warmup_idle_round_skipped` / `tts_request_cooling_down`,回答"预热到底有没有命中" + 失败回退到第几档 | 会话内 |
 
 可以这样答：
 
-> 我没把可观测性当成"上 Sentry 就够了",而是按事故类型分入口。生产 5xx 走 Sentry 告警;部署后看 `[boot]` 日志确认 env 没漂;实时排查走 `/admin/status` 和 `/admin/observability`;成本异常用 `usage:snapshot` 看当日用量趋势;用户报某个 requestId 时,Sentry / PM2 / route 日志能用同一个 ID 串起来。
+> 我没把可观测性当成"上 Sentry 就够了",而是按事故类型分入口。生产 5xx 走 Sentry 告警 + 按 `logApiError(module)` 自动分桶(scene 生成 / 表达 AI 补全 / 相似表达等各模块独立);部署后看 `[boot]` 日志确认 env 没漂;实时排查走 `/admin/status` 和 `/admin/observability`;成本异常用 `usage:snapshot` 看当日用量趋势;TTS warmup 是不是被环境抑制或者失败进了 cooldown 第几档,看 warmup_* 事件;用户报某个 requestId 时,Sentry / PM2 / route 日志能用同一个 ID 串起来。
+
+### 14.14 page.tsx 多轮拆分:工程能力的可量化案例
+
+被问"项目里有哪些能体现工程方法论的东西"时,这是一条很有说服力的链路,因为它既有量化数据,又有"失败 → 反思 → 改策略 → 验证"的完整闭环。
+
+#### 背景
+
+`chunks/page.tsx` 一开始是 2368 行单一 default function,是仓库 LoC 最大前端文件。直接拆有两个问题:1) 一次性大拆容易破回归;2) 不知道哪种拆法 ROI 最高。所以走"按 OpenSpec change 多轮迭代"的路径,每一轮 LoC 减幅 + 拆离方式 + 关键发现都进 spec 留档,给下一轮策略提供数据。
+
+#### 时间线 + 量化结果
+
+| 轮次 | 起始 LoC | 收口 LoC | 减幅 | 拆离对象 | 关键策略 |
+| --- | --- | --- | --- | --- | --- |
+| r2 | 2368 | 2125 | -243 (-10.3%) | `chunks-page-styles.ts` + 3 hook + `chunks-page-hero.tsx` | 抽 className 常量 + 单一动作 hook + sticky header section |
+| r3 | 2125 | 2102 | -23 (-1.1%) | 3 hook + `chunks-page-focus-mode-section.tsx` | 抽 state + 小 handler 组合 |
+| r4 | 2108 | 2041 | -67 (-3.2%) | `chunks-page-list-section.tsx`(ChunksListView 装配 wrapper) | 抽高 props-cost 子树 + 一并迁入与该子树强耦合的常量 / helper |
+
+`scene-detail-page.tsx` 同模式应用一次:**1326 → 849 行(-36%)**,抽 practice run lifecycle / generation prewarm / variant run lifecycle / view switch 4 块。
+
+#### 关键发现(写进 r3 spec delta,直接指导 r4)
+
+r3 拆完发现减幅远低于 proposal 预期。逐对象算账:
+
+| 抽离对象 | 移走代码量 | page.tsx 新增装配 | 净减 |
+| --- | --- | --- | --- |
+| `use-expression-map` | ~10 行 | ~20 行解构 | **+10**(反而增长) |
+| `use-sentence-expression-save` | ~26 行 | ~8 行解构 | -18 |
+| `use-focus-relation-tab` | ~10 行 | ~13 行解构 | +3 |
+| `chunks-page-focus-mode-section` | ~55 行 JSX | ~42 行 props 透传 | -13 |
+
+**关键发现**:抽 state + 简单 handler 时"装配回调 / 解构 / props 透传"开销与抽走代码量近似抵消,page.tsx 几乎不瘦身。
+
+**对 r4 策略的指导**:r4 应优先抽**高 props-cost 子树**(如 chunks-list-view 装配 wrapper,page.tsx 当时 ~87 行 props 列表),而不是继续抽 state + 小 handler。
+
+#### r4 验证发现成立
+
+r4 按 r3 策略只抽一个高 props-cost 子树(`<ChunksListView>` 装配 + 41 字段 labels 闭包 + 18 handler props),把与子树强耦合的 `reviewStatusLabel` / `extractExpressionsFromSentenceItem` 一并迁入,减幅 **-67 行,约为 r3 的 3 倍**。策略验证成立,r5 应继续沿这个方向(候选:`<FocusDetailSheet>` 装配等)。
+
+#### 怎么讲
+
+> 这条线最值得讲的不是"我把 page.tsx 拆小了",而是"我把'怎么拆'变成了一个可量化、可迭代的工程治理问题"。r2 收口后我没有立刻跳进下一轮,而是先看减幅;r3 减幅远低于预期,我把每个抽离对象的"移走代码 vs 新增装配开销"拆开算账,发现"装配回调 / 解构 / props 透传"开销与抽走的量近似抵消;这个发现直接写进 r3 spec delta,指导 r4 改抽"高 props-cost 子树",实际减幅立刻翻 3 倍。这套做法的核心是把策略验证留在 spec 里,下一个维护者(或 AI)能直接复用结论,不用从头试错。
+
+#### 容易被继续追问的点
+
+- 为什么不一次重写:重写成本高 + 风险大,且不知道目标值;多轮迭代每次有 OpenSpec change 把 spec / tasks / 量化都留档,r5/r6 维护者(或 AI)直接接续。
+- 怎么保证不破回归:每轮拆分都要求 DOM 输出字节级兼容(相同的外层 className / aria-label / data-testid),`chunks/page.interaction.test.tsx` 等入口级测试不弱化断言、不允许重写;r4 完整跑过 chunks 全套 114/114 测试。
+- 为什么把"关键发现"写进 spec 而不是 dev-log:spec 是给"未来推 r5 / r6 的人"看的硬约束,dev-log 是给当下的人看的实施记录;r3 §5.9 写进 spec 后,r4 的 proposal 直接 cite 它作为前置依据,避免重复试错。
 
 ## 15. 分模块深挖准备卡
 
@@ -1059,6 +1114,8 @@ review pack 需要的是后台播放稳定性，不是音频编辑能力。segme
 - 实现 TTS 音频生成、Storage 持久化、浏览器 Cache Storage 缓存、空闲预热、review pack 循环播放与播放兜底，降低重复请求、二次播放延迟和后台切歌失败概率。
 - 建设接口治理基线，包括 `requestId` 追踪、统一错误响应、服务端注册准入、邮箱验证码与邮箱验证闭环、高成本接口限流和 quota、关键写接口幂等、Origin 校验与用户态数据权限边界收紧。
 - 建设可观测性与上线治理:接入 `@sentry/nextjs` 自动捕获 5xx 并注入 requestId tag,启动期 `[boot]` 自检 10 个关键 env 就绪状态,落地 `Content-Security-Policy-Report-Only` + `/api/csp-report` 收集,搭建 GitHub Actions CI 工作流跑全套护栏,产出灾备 / 事故响应剧本和可直接 cp 启用的 Nginx 反向代理 + 限流模板。
+- 主导 API 错误响应一致性收口(OpenSpec change `harden-api-error-response-consistency`):先对 58 个 route + admin server actions 做盘点(P0/P1/P2 分级),再一次性收口 P0(响应契约破坏)+ P1(高成本路径可观测性缺失),全量错误响应统一 `code + details + requestId`,7 处高成本路径补 `logApiError(module)` 注入到 Sentry 实现按业务模块分桶。
+- 主导超重页面多轮拆分(OpenSpec spec `feature-component-decomposition`):chunks/page.tsx 经 r2/r3/r4 三轮拆分(2368 → 2041 行)、scene-detail-page.tsx 经 r2(1326 → 849 行,-36%);r3 收口后建立"装配开销 vs 抽走开销"量化算账方法,把"高 props-cost 子树优先"策略写进 spec 指导 r4,r4 实际减幅是 r3 的 3 倍,验证策略成立。
 
 ### 19.2 优化点表达
 
@@ -1068,14 +1125,16 @@ review pack 需要的是后台播放稳定性，不是音频编辑能力。segme
 - 通过用户态查询与写入逐步切换到 `createSupabaseServerClient + RLS`，提升后端最小权限边界与安全纵深。
 - 通过 Sentry 5xx 聚合 + `[boot]` 启动自检 + CSP report-only + GitHub Actions CI 工作流,把事故响应从"等用户截图"降到分钟级,把 env 漂移检测前置到部署后第一时间,把规范漂移检测前置到 PR 阶段。
 - 通过 Review 调度消费 5 类正式信号(`recognitionState` / `outputConfidence` / `fullOutputStatus` / `variantRewriteStatus` / `fullOutputCoverage`),让复习节奏按"在哪个训练深度卡住"细调,而不是只靠 again / hard / good 三档。
+- 通过跨场景 cancel + sentence/chunk 失败 cooldown ladder(5s/60s/300s/1800s)+ Upstash Redis 签名 URL 缓存共享,避免后台空跑 / 反复打上游 / PM2 多 worker 命中率打折三类 TTS 高成本资源失败放大问题。
+- 通过 API 错误响应契约一次性收口(OpenSpec change `harden-api-error-response-consistency`,3 P0 + 10 P1),全量错误响应带 `code + details + requestId`,前端能稳定解析,后端高成本路径自动按模块进入 Sentry 分桶。
 
 ### 19.3 招聘平台短版
 
-负责基于 `Next.js 16 + React 19 + Supabase` 搭建英语学习全栈应用，围绕 `Today -> Scene -> Chunks -> Review -> Progress` 建立完整学习闭环。主导学习状态回写、表达资产沉淀、TTS 音频链路、Review 5 类正式信号调度和后端接口治理,落地场景预取、音频多层缓存、空闲预热、review pack 循环播放、服务端注册准入、邮箱验证码与邮箱验证闭环、接口限流、幂等去重、Sentry 5xx 聚合、`[boot]` 启动期 env 自检、CSP report-only、GitHub Actions CI 护栏、Nginx 反向代理 + 限流部署模板和基于 `RLS` 的用户态数据权限边界收紧。
+负责基于 `Next.js 16 + React 19 + Supabase` 搭建英语学习全栈应用，围绕 `Today -> Scene -> Chunks -> Review -> Progress` 建立完整学习闭环。主导学习状态回写、表达资产沉淀、TTS 音频链路、Review 5 类正式信号调度、后端接口治理和超重页面多轮拆分治理,落地场景预取、音频多层缓存、空闲预热、review pack 循环播放、跨场景 cancel + 失败 cooldown ladder + Upstash Redis 签名 URL 缓存共享、服务端注册准入、邮箱验证码与邮箱验证闭环、接口限流、幂等去重、API 错误响应契约一致性收口、Sentry 5xx 聚合按 `logApiError(module)` 分桶、`[boot]` 启动期 env 自检、CSP report-only、GitHub Actions CI 护栏、Nginx 反向代理 + 限流部署模板和基于 `RLS` 的用户态数据权限边界收紧。chunks/page.tsx 经多轮 OpenSpec change 拆分(2368 → 2041 行),并把"装配开销 vs 抽走开销"量化反思写进 spec 指导后续轮次。
 
 ### 19.4 口头自我介绍版
 
-我这个项目比较偏全栈产品工程，不只是做页面，而是把学习主链路、表达资产、AI 能力、后端治理和可观测性一起做了。前端用的是 `Next.js 16 + React 19`，后端主要依赖 `Supabase`。我自己做得比较重的部分,一块是 TTS 音频链路和缓存预热,一块是学习状态闭环和 Review 多信号调度,一块是后端接口治理和上线可观测性,比如限流、幂等、requestId、RLS、Sentry 5xx 聚合、启动期 env 自检、CSP 安全策略和 CI 护栏这些。
+我这个项目比较偏全栈产品工程，不只是做页面，而是把学习主链路、表达资产、AI 能力、后端治理和可观测性一起做了。前端用的是 `Next.js 16 + React 19`，后端主要依赖 `Supabase`。我自己做得比较重的部分,一块是 TTS 音频链路和缓存预热(含跨场景 cancel / 失败 cooldown ladder / Upstash 签名 URL 共享),一块是学习状态闭环和 Review 多信号调度,一块是后端接口治理和上线可观测性,比如限流、幂等、requestId、RLS、Sentry 5xx 聚合按 `logApiError(module)` 分桶、API 错误响应契约一致性收口、启动期 env 自检、CSP 安全策略和 CI 护栏这些。另外有个我比较喜欢讲的方法论的例子:超重页面拆分我做了多轮 OpenSpec change,r3 减幅低于预期时我把"装配开销 vs 抽走开销"逐对象算账,发现关键 anti-pattern,把发现写进 spec 指导 r4,r4 减幅直接翻 3 倍——这是工程治理可量化、可迭代的一个真实案例。
 
 ## 20. 推荐背诵顺序
 
