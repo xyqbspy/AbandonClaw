@@ -4,14 +4,14 @@ import { __testables } from "./process-guard";
 
 const { isKnownMsEdgeTtsWebSocketRace } = __testables;
 
-const buildError = (message: string, stack: string) => {
-  const error = new Error(message);
-  error.stack = stack;
+const buildTypeError = (message: string, stack?: string) => {
+  const error = new TypeError(message);
+  if (stack !== undefined) error.stack = stack;
   return error;
 };
 
-test("matches msedge-tts websocket race by message + stack", () => {
-  const error = buildError(
+test("matches with full msedge-tts stack (dev mode)", () => {
+  const error = buildTypeError(
     "Cannot read properties of undefined (reading 'audio')",
     "TypeError: Cannot read properties of undefined (reading 'audio')\n" +
       "    at WebSocket.onmessage (/app/node_modules/msedge-tts/dist/MsEdgeTTS.js:142:42)",
@@ -19,26 +19,32 @@ test("matches msedge-tts websocket race by message + stack", () => {
   assert.equal(isKnownMsEdgeTtsWebSocketRace(error), true);
 });
 
-test("matches when stack mentions MsEdgeTTS class name", () => {
-  const error = buildError(
-    'Cannot read properties of undefined (reading "audio")',
-    "TypeError: ...\n    at Object.<anonymous> (/x/MsEdgeTTS.js:209:5)",
+test("matches with Next.js production ignore-listed stack", () => {
+  const error = buildTypeError(
+    "Cannot read properties of undefined (reading 'audio')",
+    "TypeError: Cannot read properties of undefined (reading 'audio')\n" +
+      "    at ignore-listed frames",
   );
   assert.equal(isKnownMsEdgeTtsWebSocketRace(error), true);
 });
 
-test("does not match similar-looking errors from our own code", () => {
-  const error = buildError(
-    "Cannot read properties of undefined (reading 'audio')",
-    "TypeError: ...\n    at /app/src/features/lesson/audio/use-learning-audio-controller.ts:10:5",
+test("matches double-quoted variant", () => {
+  const error = buildTypeError(
+    'Cannot read properties of undefined (reading "audio")',
+  );
+  assert.equal(isKnownMsEdgeTtsWebSocketRace(error), true);
+});
+
+test("does not match different property name TypeError", () => {
+  const error = buildTypeError(
+    "Cannot read properties of undefined (reading 'metadata')",
   );
   assert.equal(isKnownMsEdgeTtsWebSocketRace(error), false);
 });
 
-test("does not match unrelated TypeError from msedge-tts", () => {
-  const error = buildError(
-    "Cannot read properties of undefined (reading 'metadata')",
-    "    at /app/node_modules/msedge-tts/dist/MsEdgeTTS.js:153:5",
+test("does not match similar message on non-TypeError", () => {
+  const error = new Error(
+    "Cannot read properties of undefined (reading 'audio')",
   );
   assert.equal(isKnownMsEdgeTtsWebSocketRace(error), false);
 });
