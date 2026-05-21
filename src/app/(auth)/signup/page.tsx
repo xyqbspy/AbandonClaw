@@ -19,7 +19,9 @@ import {
   buildAuthRedirectHref,
   getAuthRedirectTargetFromSearchParams,
   isSafeRedirectTarget,
+  resolveSafeRedirectTarget,
 } from "@/lib/shared/auth-redirect";
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 type RegistrationMode = "closed" | "invite_only" | "open";
 
@@ -28,6 +30,8 @@ const SIGNUP_TIMEOUT_MS = 20000;
 const SIGNUP_TIMEOUT_MESSAGE = "注册请求超时，请检查网络后重试";
 const SEND_CODE_TIMEOUT_MS = 15000;
 const SEND_CODE_TIMEOUT_MESSAGE = "验证码发送超时，请稍后再试";
+const AUTO_SIGN_IN_TIMEOUT_MS = 15000;
+const AUTO_SIGN_IN_TIMEOUT_MESSAGE = "自动登录超时，请稍后手动登录";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -38,6 +42,10 @@ export default function SignupPage() {
   const [registrationMode, setRegistrationMode] = useState<RegistrationMode>("closed");
   const [consentAccepted, setConsentAccepted] = useState(false);
   const redirectTo = getAuthRedirectTargetFromSearchParams(searchParams);
+  const postSignupTarget = resolveSafeRedirectTarget(redirectTo);
+  const fallbackLoginHref = isSafeRedirectTarget(redirectTo)
+    ? `/login?redirect=${encodeURIComponent(redirectTo)}`
+    : "/login";
 
   useEffect(() => {
     let cancelled = false;
@@ -171,12 +179,30 @@ export default function SignupPage() {
         });
       }
 
-      toast.success("账号已创建，请登录继续");
-      router.replace(
-        isSafeRedirectTarget(redirectTo)
-          ? `/login?redirect=${encodeURIComponent(redirectTo)}`
-          : "/login",
-      );
+      try {
+        const supabase = createSupabaseBrowserClient();
+        const { error: signInError } = await withClientActionTimeout(
+          supabase.auth.signInWithPassword({ email, password }),
+          {
+            timeoutMs: AUTO_SIGN_IN_TIMEOUT_MS,
+            timeoutMessage: AUTO_SIGN_IN_TIMEOUT_MESSAGE,
+          },
+        );
+        if (signInError) {
+          throw signInError;
+        }
+
+        toast.success("账号已创建，已自动登录");
+        router.replace(postSignupTarget);
+        router.refresh();
+      } catch (autoSignInError) {
+        const message =
+          autoSignInError instanceof ClientActionTimeoutError
+            ? autoSignInError.message
+            : "账号已创建，请登录继续";
+        toast.success(message);
+        router.replace(fallbackLoginHref);
+      }
     } catch (error) {
       if (error instanceof ClientActionTimeoutError) {
         toast.error(error.message);

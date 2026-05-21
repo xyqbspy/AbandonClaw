@@ -9,7 +9,10 @@ const localRequire = createRequire(import.meta.url);
 const nodeModule = localRequire("node:module") as typeof import("node:module");
 
 const routerReplaceCalls: string[] = [];
+let routerRefreshCalls = 0;
 const toastMessages: string[] = [];
+let signInCalls = 0;
+let signInResult: { error: unknown | null } = { error: null };
 let searchParams = new URLSearchParams();
 
 const mockedModules = {
@@ -18,7 +21,9 @@ const mockedModules = {
       replace: (href: string) => {
         routerReplaceCalls.push(href);
       },
-      refresh: () => undefined,
+      refresh: () => {
+        routerRefreshCalls += 1;
+      },
     }),
     useSearchParams: () => searchParams,
   },
@@ -43,6 +48,16 @@ const mockedModules = {
         toastMessages.push(message);
       },
     },
+  },
+  "@/lib/supabase/client": {
+    createSupabaseBrowserClient: () => ({
+      auth: {
+        signInWithPassword: async () => {
+          signInCalls += 1;
+          return signInResult;
+        },
+      },
+    }),
   },
 } satisfies Record<string, unknown>;
 
@@ -95,7 +110,10 @@ function getSignupPage() {
 afterEach(() => {
   cleanup();
   routerReplaceCalls.length = 0;
+  routerRefreshCalls = 0;
   toastMessages.length = 0;
+  signInCalls = 0;
+  signInResult = { error: null };
   searchParams = new URLSearchParams();
   SignupPageModule = null;
   globalThis.FormData = OriginalFormData;
@@ -207,7 +225,7 @@ test("/signup 会把验证码发送限流映射为中文提示", async () => {
   }
 });
 
-test("/signup 注册成功后会回到登录页并保留合法 redirect", async () => {
+test("/signup 注册成功后会自动登录并跳到合法 redirect", async () => {
   installFormDataShim();
   searchParams = new URLSearchParams("redirectTo=%2Freview");
   const originalFetch = globalThis.fetch;
@@ -229,7 +247,44 @@ test("/signup 注册成功后会回到登录页并保留合法 redirect", async 
     await userEvent.click(screen.getByRole("button", { name: "创建账号" }));
 
     await waitFor(() => {
+      assert.deepEqual(routerReplaceCalls, ["/review"]);
+      assert.equal(routerRefreshCalls, 1);
+      assert.equal(signInCalls, 1);
+      assert.ok(toastMessages.includes("账号已创建，已自动登录"));
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("/signup 自动登录失败时会回退到 /login 并保留 redirect", async () => {
+  installFormDataShim();
+  searchParams = new URLSearchParams("redirectTo=%2Freview");
+  signInResult = {
+    error: { code: "invalid_credentials", message: "Invalid login credentials" },
+  };
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async (url: RequestInfo | URL, init?: RequestInit) => {
+    if (String(url) === "/api/auth/signup" && init?.method !== "POST") {
+      return Response.json({ mode: "open" }, { status: 200 });
+    }
+    return Response.json({});
+  }) as typeof fetch;
+
+  try {
+    const SignupPage = getSignupPage();
+    render(<SignupPage />);
+
+    await userEvent.type(screen.getByLabelText("邮箱地址"), "user@example.com");
+    await userEvent.type(screen.getByLabelText("密码"), "password123");
+    await userEvent.type(screen.getByLabelText("邮箱验证码"), "123456");
+    await userEvent.click(screen.getByLabelText(/我已阅读并同意/));
+    await userEvent.click(screen.getByRole("button", { name: "创建账号" }));
+
+    await waitFor(() => {
       assert.deepEqual(routerReplaceCalls, ["/login?redirect=%2Freview"]);
+      assert.equal(routerRefreshCalls, 0);
+      assert.ok(toastMessages.includes("账号已创建，请登录继续"));
     });
   } finally {
     globalThis.fetch = originalFetch;
