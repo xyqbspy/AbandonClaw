@@ -923,6 +923,7 @@ Safari 一直没实现 `requestIdleCallback`。我做了 polyfill 兜底(用 `se
 - 管理后台的统计是基于本地事件计算的,不代表全量用户数据
 - 失败有冷却阶梯(5 秒 → 60 秒 → 5 分钟 → 30 分钟),疑难内容失败后不会立即重试;30 分钟静默后失败计数才重置
 - **跨场景取消**:用户从场景 A 切到场景 B 时,A 的预加载任务会被取消,避免后台空跑占带宽
+- **弱网统一守卫**:`scheduleLessonAudioWarmup` / `scheduleSceneIdleAudioWarmup` 内置 `shouldAvoidHeavyAudioWarmup()`(检测 `saveData` / `2g` / `slow-2g`);[chunks 页](src/app/(app)/chunks/page.tsx)用的是更底层的 `scheduleChunkAudioWarmup`,守卫要在调用处加 —— 不然首屏 6 条 × 2 套预热在 2G 下会把带宽打满
 
 补边界:
 
@@ -1240,6 +1241,17 @@ warmupGain = warmHitRate − coldHitRate
 
 这个故事闭合了「做优化 → 量化收益」这个环。没埋点平台不代表没数据驱动,我用 120 条本地事件 + 一个 React 算的 summary 表就能回答「这个优化是不是真的有用」。面试里如果问「你怎么证明你做的优化有效」,这是最直接的答案。
 
+**还有第二条观测维度:用户点击的瞬间到底踩没踩到预热好的数据**
+
+`warmupGain` 测的是「整体看预热值不值」,但还有个更直接的问题:**用户点「打开练习/变体」的那一下,数据是不是已经备好了**。这个事件叫 `practice_open_prewarm_hit/miss` 和 `variant_open_prewarm_hit/miss`(在 [src/lib/utils/client-events.ts](src/lib/utils/client-events.ts) 的 `ClientEventName`,记录在 [src/app/(app)/scene/[slug]/use-scene-detail-actions.ts](src/app/(app)/scene/[slug]/use-scene-detail-actions.ts) 的 `ensurePracticeSetReady` / `ensureVariantSetReady`)。
+
+- `hit`:用户点开时数据已经在缓存里 → 预热确实在用户感知前面跑完了
+- `miss`:用户点开时还在请求 → 预热没追上点击,或者根本没预热
+
+跟 `warmupGain` 配着看:`warmupGain` 高说明缓存命中率提升明显,但如果 `variant_open_prewarm_miss` 很多,说明预热触发得太晚或者太窄(只预热了一部分变体)。这两个指标一起才能说清「预热到底有没有救到具体的开屏体验」。
+
+顺带一提,**变体打开这条路径之前漏了音频预热** —— `handleOpenVariant` 只在切换 ID 时刷 token,没顺手把变体课的音频暖起来。补上 `scheduleLessonAudioWarmup(variantLesson, { sentenceLimit: 2, chunkLimit: 2 })` 之后,变体页打开时音频已经能命中浏览器缓存。这个改动让 `variant_open_prewarm_hit` 的统计变得有意义 —— 之前根本没在预热,统计永远是 miss。
+
 ### 14.17 高消耗接口的额度是「两阶段」写的(reserve → mark)
 
 §10 提了「每日额度 + 后台紧急开关」,但**怎么实现「成功才扣、失败回滚、并发安全」**这个细节值得展开。
@@ -1340,6 +1352,42 @@ export const buildDeterministicIdempotencyKey = (...parts) =>
 **Q:进程内 Map 在 PM2 cluster 下会不会失效?**
 
 会。这是已知 gap —— 跨 worker 的去重目前没做。理由是:这套 idempotency 主要防「同一用户连点」,同一用户的连续请求大概率粘在同一个 worker(sticky session 或 nginx ip_hash),跨 worker 的真并发概率低。如果将来要做严格跨进程去重,把 Map 换成 Upstash Redis 就行,接口签名不变。
+
+**Q:客户端这边还有没有去重?**
+
+有,而且必要 —— 服务端 idempotency 是「跨进程的兜底层」,客户端 inflight Promise 是「同一会话里的第一道闸」。代码在 [src/app/(app)/scene/[slug]/use-scene-detail-actions.ts](src/app/(app)/scene/[slug]/use-scene-detail-actions.ts) 的 `ensurePracticeSetReady` / `ensureVariantSetReady`,用 `useRef<Promise<T | null> | null>` 存「正在跑的生成请求」:
+
+```typescript
+const inflightPracticeRef = useRef<Promise<PracticeSet | null> | null>(null);
+// ...
+let generationPromise = inflightPracticeRef.current;
+if (!generationPromise) {
+  generationPromise = (async () => { /* 真正发请求 */ })();
+  inflightPracticeRef.current = generationPromise;
+  const clearInflight = () => {
+    if (inflightPracticeRef.current === generationPromise) {
+      inflightPracticeRef.current = null;
+    }
+  };
+  generationPromise.then(clearInflight, clearInflight);
+}
+await generationPromise;
+```
+
+**为什么不是只靠 `scheduleIdleAction` 的 key 去重?**
+
+`scheduleIdleAction` 的 key 去重发生在「调度入队」这一层 —— 同一个 idle key 不会被排队两次。但**走快路径绕过 scheduler 的调用**(比如用户点击立刻触发 `ensurePracticeSetReady`)就跟 scheduler 排队的那次成了**真并发**,各自跑一次生成 API。Promise 引用 dedup 是在更下游的「发请求」这一层合并,这两条路径无论谁先到都会复用同一个 Promise。
+
+**`.then(cleanup, cleanup)` 而不是 `.finally(cleanup)`,为什么?**
+
+`.finally()` 链出来的是一个新 Promise,如果原 Promise reject 而新 Promise 没被消费,Node 会报 unhandled rejection。`.then(onFulfilled, onRejected)` 两个回调都返回 `undefined`,无论 resolve / reject 这条链都是「已处理」的,不会污染外部错误监控。
+
+**两层一起讲是「双保险」叙事:**
+
+- 客户端 inflight:同一会话里把「用户连点」「点击 vs 空闲预热」这种**真并发**合并成一个 API 调用 —— 网络都不发第二次
+- 服务端 idempotency:即使客户端漏了(比如不同标签页同时点),Promise/Value 双态 Map 在服务端这一层再合并一次 —— 业务函数只跑一次
+
+这是 §10「重复请求去重」在前后端都落地的具体形态,面试时可以连着 14.18 一起讲完。
 
 ### 14.19 客户端有一层错误 normalize,把后端契约翻译成用户中文
 
