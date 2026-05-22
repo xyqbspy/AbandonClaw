@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
   deleteAllVariantSets,
   deletePracticeSet,
@@ -21,6 +21,7 @@ import { Lesson } from "@/lib/types";
 import { ExpressionMapResponse } from "@/lib/types/expression-map";
 import { PracticeSet, VariantSet } from "@/lib/types/learning-flow";
 import { recordClientEvent } from "@/lib/utils/client-events";
+import { scheduleLessonAudioWarmup } from "@/lib/utils/resource-actions";
 
 import {
   resolveSceneToolIntent,
@@ -110,6 +111,8 @@ export function useSceneDetailActions({
   const [expressionMap, setExpressionMap] = useState<ExpressionMapResponse | null>(null);
   const [expressionMapVariantSetId, setExpressionMapVariantSetId] =
     useState<string | null>(null);
+  const inflightPracticeRef = useRef<Promise<PracticeSet | null> | null>(null);
+  const inflightVariantsRef = useRef<Promise<VariantSet | null> | null>(null);
 
   const canGeneratePractice =
     latestPracticeSet === null
@@ -188,7 +191,7 @@ export function useSceneDetailActions({
         }
         return latestPracticeSet;
       }
-      if (!canGeneratePractice) return null;
+      if (!canGeneratePractice && !inflightPracticeRef.current) return null;
 
       if (openOnReady) {
         recordClientEvent("practice_open_prewarm_miss", {
@@ -198,20 +201,34 @@ export function useSceneDetailActions({
         });
       }
 
+      let generationPromise = inflightPracticeRef.current;
+      if (!generationPromise) {
+        generationPromise = (async () => {
+          const practiceSet = await generateScenePracticeSet({
+            baseLesson,
+            sourceLesson,
+            requestPolicy,
+          });
+          return persistPracticeSet({
+            sceneSlug: baseLesson.slug,
+            practiceSet,
+            replaceExisting: false,
+          });
+        })();
+        inflightPracticeRef.current = generationPromise;
+        const clearInflight = () => {
+          if (inflightPracticeRef.current === generationPromise) {
+            inflightPracticeRef.current = null;
+          }
+        };
+        generationPromise.then(clearInflight, clearInflight);
+      }
+
       setPracticeLoading(true);
       setPracticeError(null);
       try {
-        const practiceSet = await generateScenePracticeSet({
-          baseLesson,
-          sourceLesson,
-          requestPolicy,
-        });
-        const persistedPracticeSet = await persistPracticeSet({
-          sceneSlug: baseLesson.slug,
-          practiceSet,
-          replaceExisting: false,
-        });
-
+        const persistedPracticeSet = await generationPromise;
+        if (!persistedPracticeSet) return null;
         savePracticeSet(persistedPracticeSet);
         refreshGeneratedState(baseLesson.id);
         setShowAnswerMap({});
@@ -328,7 +345,7 @@ export function useSceneDetailActions({
         }
         return latestVariantSet;
       }
-      if (!canGenerateVariants) return null;
+      if (!canGenerateVariants && !inflightVariantsRef.current) return null;
 
       if (openOnReady) {
         recordClientEvent("variant_open_prewarm_miss", {
@@ -337,13 +354,25 @@ export function useSceneDetailActions({
         });
       }
 
+      let generationPromise = inflightVariantsRef.current;
+      if (!generationPromise) {
+        generationPromise = generateSceneVariantSet({
+          baseLesson,
+        });
+        inflightVariantsRef.current = generationPromise;
+        const clearInflight = () => {
+          if (inflightVariantsRef.current === generationPromise) {
+            inflightVariantsRef.current = null;
+          }
+        };
+        generationPromise.then(clearInflight, clearInflight);
+      }
+
       setVariantsLoading(true);
       setVariantsError(null);
       try {
-        const variantSet = await generateSceneVariantSet({
-          baseLesson,
-        });
-
+        const variantSet = await generationPromise;
+        if (!variantSet) return null;
         saveVariantSet(variantSet);
         refreshGeneratedState(baseLesson.id);
         setActiveVariantId(null);
@@ -490,6 +519,16 @@ export function useSceneDetailActions({
       }).catch(() => {
         // Non-blocking.
       });
+      const variantLesson = latestVariantSet.variants.find(
+        (variant) => variant.id === variantId,
+      )?.lesson;
+      if (variantLesson) {
+        scheduleLessonAudioWarmup(variantLesson, {
+          sentenceLimit: 2,
+          chunkLimit: 2,
+          key: `variant-open-audio:${baseLesson.id}:${variantId}`,
+        });
+      }
       setActiveVariantId(variantId);
       setViewModeWithRoute("variant-study", variantId);
     },
