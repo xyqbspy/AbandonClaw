@@ -148,6 +148,228 @@
 
 > **30 秒电梯版**:"音频在我们这是高成本资源 —— 生成慢、收费、用户会反复听。所以我把它做成稳定资源:服务端按内容算一个钥匙,文件存到 Supabase 上;客户端做了内存缓存、浏览器本地音频缓存、避免重复请求几层,即使下载链接过期了,本地音频还能继续播。"
 
+### 7.1 前端这几层缓存具体是什么(追问时展开)
+
+「内存里记一份网址」「浏览器本地存一份音频文件」其实是两类完全不一样的东西。
+
+**第一类:内存缓存(关掉 tab 就没的那种)**
+
+我用的就是普通的 JS `Map` 和 `Set`,挂在模块 scope 上 —— **不是 React state**,因为缓存要跨组件、跨页面共享,写到组件 state 里换个页面就全没了。一共四张表,各自分工:
+
+| 内存表 | 存的是什么 | 解决什么问题 |
+|---|---|---|
+| `ttsUrlCache` | 内容哈希 → 音频 URL | 主缓存,45 分钟内同一段音频不再打接口 |
+| `pendingTtsUrlRequests` | 内容哈希 → 正在跑的 Promise | 并发去重,场景页和 chunks 页同时要同一段音频,只发一个请求 |
+| `preloadedAudioUrls` | 已经 preload 过的 URL 集合 | 避免重复 `<audio preload>` 把同一个文件下两遍 |
+| `persistentAudioObjectUrls` | 内容哈希 → `blob:` URL | 从本地音频缓存取出的文件转成 blob URL 之后留着复用 |
+
+为什么内存层这么快:这些 `Map` 就是 JS 堆内存,读写是纳秒级,不走 IO,也不走主线程之外的事件循环。代价就是 tab 一关全没,且每个 tab 都各有一份(不跨 tab 共享)。
+
+**第二类:浏览器本地缓存(关 tab、刷新、断网都还在的那种)**
+
+我用的是 **Cache Storage API**(`window.caches.open("tts-audio-v2")`),**不是 localStorage、不是 IndexedDB、不是 cookies**。这是浏览器自带的一套持久化 key-value 存储,跟 Service Worker / PWA 离线缓存底层是同一套东西。存到浏览器自己管理的磁盘空间里,容量很大(几十 GB 配额量级),关 tab、刷新、断网都还在。
+
+我自己叠了一层 LRU 管理:单个 cache 上限 120 个文件 / 24 MB,超出就按写入顺序淘汰最旧的;淘汰的同时把对应的内存表也清掉、把 `blob:` URL `revokeObjectURL`,保持两层一致、避免内存泄漏。
+
+### 7.2 几个会被追问的边界问题
+
+**Q:为什么不用 localStorage?**
+
+四个原因,任一个都足以否决:
+
+1. 只能存字符串,二进制音频要 base64 编码,体积膨胀 33%
+2. 同步 API,读写直接卡主线程
+3. 容量上限大概 5MB,一个音频几 MB,存不了几条
+4. 没有过期、没有 LRU,要自己写一套淘汰
+
+**Q:为什么不用 IndexedDB?**
+
+IndexedDB 也能存 Blob、容量也够,但:
+
+- API 重得多(事务、版本号、游标),代码量上去
+- 我这个场景就是 key-value 拿文件,不需要查询能力
+- Cache Storage 天生为 Request/Response 设计,跟 fetch 无缝衔接,写起来很短
+
+如果将来要做更复杂的本地学习数据(比如带索引的离线题库),那时候才考虑 IndexedDB。
+
+**Q:为什么不用浏览器原生 HTTP 缓存(Cache-Control)?**
+
+- HTTP 缓存的 key 是请求 URL,而 Supabase 临时链接每次签发都不一样,根本命不中
+- 我的缓存 key 是「内容哈希」,URL 怎么变都不影响
+- HTTP 缓存的过期策略由服务端响应头决定,我前端不可控
+
+**Q:`blob:` URL 是怎么回事?要不要 revoke?**
+
+`URL.createObjectURL(blob)` 把内存里的二进制 Blob 包装成一个临时 URL(形如 `blob:https://xxx/uuid`),让 `<audio src=...>` 不走网络就能直接播。这个 URL 跟 Blob 绑定,浏览器一直持有对应内存,**不主动 `URL.revokeObjectURL` 就会内存泄漏**。我在 LRU 淘汰那张 `persistentAudioObjectUrls` 表的时候顺手 revoke。
+
+**Q:多个 tab 打开同一个场景会怎么样?**
+
+- 内存层不共享(每个 tab 一个 JS 运行时,各自一份 `Map`),所以两个 tab 第一次都会各自打一次接口
+- 但 Cache Storage 是同 origin 共享的,所以**第一个 tab 命中并写入之后,第二个 tab 下次播放就能直接从 Cache Storage 命中,不再打接口**
+- 如果将来要做 tab 间也去重,可以接 `BroadcastChannel` 或者用 Service Worker 集中拦截,但目前不值当
+
+**Q:Cache Storage 配额满了浏览器会怎么处理?**
+
+浏览器有自己的全局存储配额(基于磁盘剩余空间动态算的)。我自己的 24MB 上限远小于这个,正常不会触发浏览器层面驱逐;万一真触发了,浏览器会按 LRU 把整个站的存储清掉(包括我的 Cache Storage),下次再播就是冷启动重新走链路,不会出错,只是慢一次。
+
+### 7.3 服务端音频是怎么生成的(为什么这么选)
+
+很多面试官会顺着前端 cache 追问"那音频本身是怎么生成的、为什么用这家",所以提前准备一下技术选型的理由。
+
+**TTS 引擎用的是微软 Edge TTS**(`msedge-tts` npm 包)。它的本质是把浏览器 Edge 内置的「朗读网页」功能反向出来,通过 WebSocket 调用微软的免费 TTS 服务,返回的是高质量的 Neural Voice 音频。
+
+为什么选它,而不是其他几个选项:
+
+| 候选方案 | 不选的原因 |
+|---|---|
+| OpenAI TTS / ElevenLabs | 按字符收费,英语学习场景文本量大,跑起来成本扛不住 |
+| Google Cloud TTS / Azure 官方接口 | 都要付费 + 配额管理 + 计费监控,工程化成本高 |
+| 浏览器 `SpeechSynthesis` API | 音色取决于用户设备/系统,Mac/Windows/iOS/Android 出来声音都不一样,无法预生成、无法缓存、无法分发 |
+| 自己跑开源 TTS(Bark / Coqui 等) | 要自己撑 GPU 推理,完全不划算 |
+
+Edge TTS 在我这个场景里基本免费 + 音质够好(微软 Neural 系列)+ 支持 SSML 控制语速,是性价比最高的方案。代价是接口不稳定(详见 §14.15 那次进程级崩溃事故),所以服务端要做白名单兜底。
+
+**缓存 key 用的是内容哈希,不是用户 ID 或者业务 ID**。这是音频缓存能跨用户复用的关键:
+
+- 不同用户、不同设备,只要播的是同一段英文文本,都会算出同一个 key
+- 所以一段热门场景的音频,全站只生成一次,所有人复用
+- 如果用业务 ID(比如「场景 42 的第 3 句」)做 key,场景内容微调一下就要重新生成全部音频
+
+实现见 [src/lib/shared/tts.ts](src/lib/shared/tts.ts) 的 `buildSentenceAudioKey` 和 `buildChunkAudioKey`:把文本归一化(去标点、小写、去多余空白)之后算一个稳定 hash,挂上一些可读前缀(便于存储里翻找)。
+
+**音频文件存到 Supabase Storage**(不是放服务器本地、不是自建 CDN)。理由:
+
+- 本地磁盘:多机器部署的时候音频文件不共享,要么做 NFS 要么每台都重生成
+- 自建 CDN:运维成本太高,流量也不大
+- Supabase Storage:免费额度够用,跟 Auth/数据库同源,生成签名链接就能直接给前端,**省掉一整套对象存储 + 鉴权 + CDN 的搭建**
+
+**给前端的不是公开链接,是带签名的临时下载链接**(60 分钟有效)。理由:
+
+- 防止音频被外站直接 hotlink 盗用
+- 链接里带签名,改一个字节都拒绝
+- 链接过期了不影响已经下到本地的音频(因为前端已经持久化到 Cache Storage,见 §7.1)
+
+### 7.4 服务端这块也会被追问的边界问题
+
+**Q:Edge TTS 是免费的?会不会被微软掐了?**
+
+是的,有这个风险。我做了两层兜底:服务端调用失败时降级到浏览器原生 `SpeechSynthesis` 播放(声音差但能用),错误率聚合到 Sentry 监控趋势。如果将来真的不可用,可以切到付费 TTS,因为我把 TTS 调用封装成了独立 service([src/lib/server/tts/service.ts](src/lib/server/tts/service.ts)),换引擎只改这一处。
+
+**Q:同一段文本同时被 100 个用户播,会生成 100 次吗?**
+
+不会。服务端有一层「pending 请求合并」(类似前端 `pendingTtsUrlRequests` 那个 Map,见 [src/lib/server/tts/service.ts](src/lib/server/tts/service.ts) 的 `pendingSignedUrlRequests`):同一个 cache key 正在生成时,后来的请求都共享同一个 Promise,只生成一次。
+
+**Q:为什么 SSML 这块没讲?**
+
+SSML 是 TTS 行业标准,可以控制语速、停顿、强调等。我目前只用到语速控制(`<prosody rate="0.8">`)做慢速朗读,没用到更复杂的 SSML 标签。提一句让对方知道我懂这个概念就行,不展开。
+
+**Q:音频文件大概多大?生成要多久?**
+
+一句话 mp3 大概 20-80KB,生成耗时 1-3 秒(取决于文本长度和 Edge TTS 响应)。整段场景音频(几十句拼起来)大概 500KB - 2MB,生成 5-10 秒。所以**冷启动那次必然慢**,这也是为什么前端要做这么多层预热(见 §9)。
+
+### 7.5 响应里的 cached/source 字段(接口能直接看到的证据)
+
+讲完缓存层和生成路径之后,有一个**别人能在 Network 面板直接验证你说真话**的细节值得拎出来讲。`/api/tts` 的响应体除了 `url`,还带两个观测字段:
+
+```typescript
+// src/app/api/tts/route.ts 返回的形状
+{ url: "...", cached: boolean, source: "storage-hit" | "fresh-upload" | "inline-fallback" }
+```
+
+| source | cached | 含义 | 触发场景 |
+|---|---|---|---|
+| `storage-hit` | `true` | Supabase Storage 已经有这段音频,直接返回 60min 签名 URL | **别的用户**之前生成过同样 hash 的内容 |
+| `fresh-upload` | `false` | 这次是 msedge-tts 现场生成 + 上传 Storage 成功 | 内容是新的 |
+| `inline-fallback` | `false` | 生成成功但 Storage 上传失败,把 mp3 直接 base64 内联到 data URL 返回 | Supabase Storage 临时故障 |
+
+(代码在 [src/lib/server/tts/service.ts:392-427](src/lib/server/tts/service.ts#L392-L427))
+
+**为什么这三个字段值得拎出来讲:**
+
+1. **`cached: true` 是「跨用户共享」那一层的实锤**。§7.1 讲的几层缓存全是「本浏览器」(每个用户自己),`cached: true` 是说**别人已经生成过这段了,你直接用**。在「同一个 chunk 被 N 个用户学」的场景下,TTS 只花了 1 次成本。同 hash → 同 storage path → 同文件,这条链路 §7.3 已经讲过,`cached` 是它的可观测证据。
+
+2. **`inline-fallback` 是一个有面子的降级故事**。Supabase Storage 上传失败的时候,**不抛错让用户看到「播放失败」**,而是把刚生成的 mp3 直接 base64 编码成 `data:audio/mp3;base64,...` 内联到 URL 里返回。用户感知不到 Storage 挂了,音频照常播。代价是这一次的音频跨用户不可复用(下次还得现场生成),但是「先让用户能听到」优先于「先存起来」。
+
+3. **F12 → Network → `/api/tts` 响应体能直接看到 `cached: true`**。面试官想验证你说的真假很容易,这种「自带证据的字段」可信度比口头描述高很多。
+
+### 7.6 cached/source 也会被追问的边界问题
+
+**Q:客户端拿到 `cached: true` 之后做什么?**
+
+什么都不做。客户端只用 `data.url`,不用 `data.cached` 做控制流(见 [src/lib/utils/tts-api.ts:860](src/lib/utils/tts-api.ts#L860) 附近)。原因是**服务端 cached 是「跨用户共享」的信号,客户端有自己独立的多层缓存判断**(见 §7.1)。两个维度分开:服务端关心「这段音频之前生成过没」,客户端关心「这个浏览器之前播过没」。混在一起反而难维护。`cached` 字段保留下来主要是埋点/调试用 —— 排查问题时直接看响应就能判断「是不是命中了 Storage」。
+
+**Q:为什么 source 里没有 `"local-cache-hit"` 之类的客户端命中?**
+
+不需要。客户端命中根本不会发出 `/api/tts` 请求(memory cache、persistent cache 命中都在 fetch 之前就 return 了)。所以 `source` 天然只描述「请求真的到了服务端之后」的三种结果,语义清晰。
+
+**Q:`inline-fallback` 的 base64 URL 会不会爆内存?**
+
+一句话 mp3 大概 20-80KB,base64 之后膨胀 1.33 倍,30-100KB 完全可接受。整段场景音频(500KB-2MB)走 inline-fallback 会比较大,但这种情况只在 Storage 真挂掉时才发生,优先保证「能播」就够了。
+
+### 7.7 AI 文本结果也走同一套内容寻址(把缓存做成方法论)
+
+「内容相同就共享」这套思路不只 TTS 用,**AI 文本生成也走同一套**。代码在 [src/lib/server/ai-cache/service.ts:26-73](src/lib/server/ai-cache/service.ts#L26-L73):
+
+```typescript
+export const buildStableCacheKey = (scope, payload) =>
+  `${scope}:${sha256(stableStringify(payload))}`;
+```
+
+关键设计:
+
+- **`stableStringify` 自己实现的排序序列化** —— 不用 `JSON.stringify`,因为 JSON.stringify 不保证对象 key 顺序。`{a:1,b:2}` 和 `{b:2,a:1}` 在标准 stringify 下可能产生不同字符串,导致同输入算出不同 hash → 缓存命中率掉零。`stableStringify` 强制对 key 排序,**同输入永远同 hash**。
+- **scope 前缀做命名空间** —— `scene-parse:xxx`、`scene-variants:xxx`、`scene-generate:xxx`,三类业务不会撞 key。
+- **`scene-parse` / `scene-variants` 的 key 里完全不带 userId** —— 全用户共享。一段英文文本 N 个用户用 AI 解析,只生成 1 次。`scene-generate` 带 userId 是因为它要做个性化(基于用户已经学过的内容来生成新场景),个性化输出不能跨用户复用。
+- **观察工具有现成的** —— 后台 `/admin/cache` 能直接看 ai_cache 表的命中情况、最新写入时间、行数。
+
+**为什么值得讲:** 一句话把它和 §7.3 的 TTS 跨用户共享挂钩,从「我做了一个缓存」升级成「我把这个内容寻址的思路抽象成方法论,在两条不同业务线上都生效」。面试里这种「同一个抽象 N 处复用」的故事很值钱。
+
+**Q:为什么不直接用 stringify + key.sort()?**
+
+stableStringify 是**递归**的:嵌套对象、嵌套数组每一层都排序。`JSON.stringify(obj, Object.keys(obj).sort())` 只能排第一层,嵌套层级仍然按插入顺序输出。我项目里 AI prompt 的参数对象有 3-4 层嵌套,必须递归排序才能稳。
+
+**Q:hash 冲突怎么办?**
+
+sha256 输出 256 bit,理论冲突概率小到可以忽略(生日攻击大概要 2^128 次)。业务侧不做额外防御,出问题再说。
+
+### 7.8 Signed URL 缓存的 Redis + Memory 双后端(生产学到的)
+
+§7.3 提了「Storage 签名 URL 60min 有效,我们做了缓存避免反复签」。但**怎么缓存**这件事在生产踩过坑,值得展开。
+
+代码:[src/lib/server/tts/signed-url-cache.ts](src/lib/server/tts/signed-url-cache.ts)(文件头注释写得很完整,可以照念)
+
+**最早只用进程内 Map,生产命中率掉了一截:**
+
+线上跑 PM2 cluster 模式(多 worker 利用多核),每个 worker 自己的 Map 互不相通。同一个 storagePath 用户第一次落在 worker A 上,缓存只进了 A 的 Map;同一用户下一次请求路由到 worker B,Map miss,又得去 Supabase 签一次。**命中率被 worker 数量稀释**,默认 4 个 worker → 命中率最多 25%。
+
+**改成 Upstash Redis 共享 + Memory 兜底:**
+
+```typescript
+// 写的时候 Redis + Memory 都写一份
+backend.fallback.set(storagePath, { url, expiresAt });
+try { await callUpstash(['SET', key, url, 'EX', ttl]); }
+catch { /* 静默吞,Memory 已经写了 */ }
+```
+
+- **写双份**:Redis 抖动时本进程内 Map 还能继续命中,不会因为 Redis 临时不可用导致大量重复签名
+- **读优先 Redis,失败退化到 Memory** —— 跨 worker 命中由 Redis 提供,worker 内命中由 Memory 提供
+- **零配置开发**:本地没有 `UPSTASH_REDIS_REST_URL` 环境变量时自动只用 Memory,不强求开发者搭 Redis
+
+这跟 §7.5 的 `inline-fallback` 是同一种设计哲学 —— **第三方存储抖动时不让用户感知**。两个点凑起来就是一个「存储链路降级」的完整故事:
+
+| 抖动来源 | 降级策略 |
+|---|---|
+| Supabase Storage 上传失败 | inline-fallback:把 mp3 直接 base64 内联返回 |
+| Upstash Redis 不可用 | 退化到进程内 Map,命中率打折但服务不中断 |
+
+**Q:为什么不用 Supabase 自己的 KV?**
+
+Supabase 没有原生 KV/Redis 服务。要么自建 Redis,要么走第三方。Upstash 免费额度够用 + REST API 不需要长连接(serverless 友好),最适合 PM2 worker 这种短生命周期场景。
+
+**Q:Memory 兜底的内存会不会涨爆?**
+
+每个 entry 是 `{ url: 200 字符左右, expiresAt: 8 字节 }`,1000 个 entry 大概 200KB。签名 URL 1h TTL,过期会被 `readMemoryEntry` 主动清理。即使被穿透,内存压力也极小。
+
 ## 8. 技术亮点四:场景循环播放(后台播放优化)
 
 这是最近做的一块音频后台播放优化,面试时可以讲,但要讲准。
@@ -179,6 +401,94 @@
 
 > 我没有做文件级别的音频拼接,而是把多个场景先转成统一格式的音频片段,再复用现有 TTS 通道生成一个能循环播放的整体音频,用稳定性换掉后台 JavaScript 切歌的不确定性。
 
+### 8.1 为什么不能让前端 JS 一段段切歌(展开后台播放的真正难点)
+
+这是这一块最值得讲的部分,也是前端面试官最容易追的角度。
+
+**痛点 1:后台 tab 的 setTimeout / setInterval 会被节流**
+
+现代浏览器为了省电,**对后台 tab 的定时器最低降到 1 Hz 甚至更慢**。如果我用 `audio.onended` 触发"下一段开始",这个回调在前台没问题,切到后台后回调延迟会被拉到秒级 —— 中间就会有明显空档。
+
+**痛点 2:移动端锁屏后 JS 完全暂停**
+
+这个比节流更狠。iOS Safari 锁屏后,整个 JavaScript runtime 会被冻结。无论你怎么注册回调、怎么定时,都不会执行。**但 HTML5 `<audio>` 是浏览器主线程之外的原生组件,JS 冻死了它也能继续播下去**。所以唯一稳定的后台播放,必须是「交给浏览器原生播放器播一个连续音频」,不能让 JS 参与切歌。
+
+**痛点 3:autoplay policy**
+
+浏览器(尤其 iOS Safari)禁止页面在没有用户交互的情况下自动开始播放。这意味着我不能"用户切到后台之后悄悄起一个新 `<audio>`"。只能在用户点击「开始播放」那一刻就把所有要播的内容串成一个连续音频,后续靠浏览器自己循环。
+
+**这就是为什么我选「整段打包 + `audio.loop = true`」而不是「N 段音频 + JS 控制切换」**:
+
+- JS 后台靠不住 → 让浏览器原生组件接管
+- 单 `<audio>` 元素 + `loop` 属性,浏览器自己负责无缝循环,不需要任何 JS 介入
+- 哪怕用户锁屏 10 分钟回来,音频还在播放,因为浏览器播放器跟 JS 不在一个线程
+
+**为什么不用 Web Audio API?**
+
+Web Audio API 能力更强(可以做 EQ、淡入淡出、变速变调),但:
+
+- 它依赖 `AudioContext`,后台同样会被挂起(`suspend` 状态)
+- 拼接多段音频需要自己做时间轴调度,代码复杂度高
+- 我这里只需要"循环播放一个文件",`<audio loop>` 已经够用
+- Web Audio API 在 iOS Safari 锁屏后表现比 HTML5 audio 更不稳定
+
+**为什么不用 Service Worker?**
+
+Service Worker 可以拦截网络请求、做离线缓存,但**它不能直接控制音频播放**。Service Worker 适合做"音频文件持久化"(我用 Cache Storage 已经实现等效效果),不适合做"调度音频片段连续播放"。
+
+### 8.2 后台播放也会被追问的边界问题
+
+**Q:那用户锁屏的时候能看到「正在播放 XX」吗?能从锁屏控制吗?**
+
+可以,用 **Media Session API**(`navigator.mediaSession`)。设置 `metadata`(标题/封面)和 `setActionHandler`(播放/暂停/上一首),浏览器就会把这些信息推到系统播放控制中心(iOS 锁屏、Android 通知栏、Mac 触控栏)。目前项目还没接,是已知的可以补的能力。
+
+**Q:整段打包了,那用户想从第 5 段开始听怎么办?**
+
+目前不支持。代价已经在文档里讲了 —— 用稳定性换掉了「实时切换当前场景」的能力。如果要做章节跳转,可以记录每段在合并音频里的时间偏移,用 `audio.currentTime = offset` 跳转,但代码复杂度上来,目前没做。
+
+**Q:那如果合并音频生成失败/超时呢?**
+
+整段 fallback 到逐段播放(浏览器在前台时仍能跑),并把失败原因聚合到 Sentry。同一段会进入冷却期(45 秒),避免反复打失败的请求。详见 [src/lib/utils/tts-api.ts](src/lib/utils/tts-api.ts) 的 `sceneFullFailureCooldowns`。
+
+**Q:iOS Safari 跟 Android Chrome 表现一致吗?**
+
+不完全一致,但 `<audio loop>` 这条路径在两边都最稳定。iOS Safari 更严格(autoplay policy、AudioContext 限制),所以我按 iOS 的约束来设计,Android 自然能跑。
+
+**Q:能不能用 Web Worker 在后台调度?**
+
+不行。Web Worker 跟主线程一样会被后台节流,而且 Worker 也不能访问 `<audio>` 元素(DOM 在主线程)。唯一能在锁屏后继续运行的是浏览器原生播放器本身。
+
+### 8.3 失败冷却用了两套(场景级 vs 单元级,刻意拆开)
+
+§8.2 提了「整段场景音频失败会进入 45s 冷却」,§14.6 里也提了一句「失败有冷却阶梯(5s → 60s → 5min → 30min)」。**这两个是不同的两套机制**,刻意拆开,值得展开讲:
+
+| 维度 | 整段场景(sceneFull) | 单句/段(sentence/chunk) |
+|---|---|---|
+| 触发对象 | 一整场音频的预加载或播放 | 单个 sentence/chunk 的 TTS 请求 |
+| 冷却长度 | 固定 45 秒 | 阶梯式:5s → 60s → 5min → 30min |
+| 重置条件 | 45s 过完即结束 | **静默 30 分钟后失败计数清零**,下次失败重新从 5s 起算 |
+| 设计意图 | 整场失败是大事,先快速止血,等浏览器/网络状态变化再说 | 单句失败可能只是瞬时抖动,头几次快速重试;**反复失败的疑难内容才进入长期回避** |
+
+代码:[src/lib/utils/tts-api.ts:151-209](src/lib/utils/tts-api.ts#L151-L209) 的 `audioRetryCooldownLadderMs` + `markAudioRetryFailure` + `audioRetryRecordIdleResetMs`。
+
+**为什么这样拆:**
+
+- 整场失败是「这一次播 30 句拼起来的音频不行」,**重试代价高**(要重新拉一大包),所以冷却长一点(45s)防止反复重试拖死。
+- 单句失败是「这一句话的 TTS 出错」,**重试代价低**(就一句话),所以前 2 次快速重试(5s、60s);但如果反复失败,说明这句内容本身有问题(比如包含 Edge TTS 处理不了的特殊字符),**继续重试是浪费**,所以阶梯到 5min、30min。
+- 「静默 30min 后重置计数」是为了**给修复留余地** —— 比如开发改了 prompt、清了脏数据,30min 没碰过这句话,下次失败重新从 5s 起算,而不是被永久惩罚。
+
+**可观测性:**
+
+每次进入冷却都会发 `tts_request_cooling_down` 事件(见 [src/lib/utils/client-events.ts](src/lib/utils/client-events.ts)),带 `failureCount`、`cooldownMs`、`remainingMs` 三个维度。管理后台能看到「哪个 cacheKey 反复失败 N 次,当前还要冷却多少毫秒」,直接定位问题内容。
+
+**Q:为什么不用统一的「指数退避」,非要分两套?**
+
+统一的话要么对整场太敏感(45s 太短反复打)要么对单句太迟钝(单句一次失败就等 5min 体验很差)。两类失败的「重试代价」和「常态恢复时间」不一样,分两套调起来才能各自最优。
+
+**Q:30 分钟这个数字怎么定的?**
+
+经验值,不是算出来的。**够长**:确保大部分瞬时抖动(微软 TTS 偶发延迟、网络微断)都过去了;**不太长**:用户回来重新学的时候(典型间隔 1-2 天)早已重置。如果以后做用户分群,可以再细调。
+
 ## 9. 技术亮点五:缓存和预加载策略
 
 这个项目里**缓存不是单点优化,而是围绕学习体验做了多层兜底**。
@@ -197,6 +507,79 @@
 典型策略可以一句话概括:**先用缓存把页面打开,再去后台拉新数据;重资源放到空闲时预加载;弱网或者用户开了省流量模式时,自动减少预加载**。
 
 面试可以强调:这不是为了炫技,而是学习产品的访问很碎片化 —— 用户会反复进入同一个场景、看同一个表达、播同一段音频。所以缓存收益很直接。
+
+### 9.1 多层缓存的具体打法(前端面试展开)
+
+「先用缓存把页面打开」这一行的背后,是一套**业内叫 stale-while-revalidate(简称 SWR)**的常用模式。展开讲就是:
+
+1. 用户进页面时,**立刻**用本地缓存把 UI 渲染出来 —— 看到旧数据没关系,先有响应
+2. **同时**在后台发请求拉新数据
+3. 新数据回来后,如果跟缓存不一样,静默更新 UI;一样就不动
+4. **零阻塞、零白屏、零 loading 转圈**(这是关键卖点)
+
+我没有用社区的 SWR 库或者 React Query,而是自己写了一套统一的缓存层在 [src/lib/cache/](src/lib/cache/),理由是:
+
+- 这些库默认是 in-memory,但我需要跨页面、跨刷新都稳定的多层缓存
+- 我的不同数据类型有不同的失效策略(场景列表 30 分钟,表达列表实时跟随用户操作),用库需要按每个查询配,反而麻烦
+- 项目里 cache key 跟 TTS / 学习状态这些复杂资产强耦合,自己维护更直观
+
+**缓存层次按"读的成本"分**,典型路径是这样的:
+
+```
+用户进 /scenes 列表页
+ ↓
+1. 内存(JS 模块级 Map)──命中→ 立刻渲染
+ ↓
+2. sessionStorage(同 tab 内持久)──命中→ 立刻渲染 + 回填内存
+ ↓
+3. 服务端响应(实际网络请求)→ 渲染 + 回填两层缓存
+```
+
+**预加载的两类时机**:
+
+- **「下一步可能要看」型**:用户在场景详情页时,我会提前 fetch 这个场景里前 2 个 chunk 的音频(`prefetchChunkAudio`),这样他真点击播放时基本是命中状态
+- **「空闲时间偷偷准备」型**:用户在主页待着没操作时,后台用 `requestIdleCallback` 跑 idle warmup,把后面 2-3 段场景的音频也预热到 Cache Storage —— **关键是利用浏览器告诉我「现在没事干」的空闲帧,不抢用户交互的优先级**
+
+**弱网/省流量模式自动跳过预热**:
+
+我在 [src/lib/utils/resource-actions.ts](src/lib/utils/resource-actions.ts) 检测了 `navigator.connection.saveData` 和 `effectiveType`(2g / slow-2g),如果用户开了数据节省模式或者当前是 2G 网络,**所有预热都自动跳过,只保留按需加载**。理由很简单:在 2G 下预下载几 MB 音频是欺负用户。
+
+### 9.2 缓存策略会被追问的边界问题
+
+**Q:用户改了一个表达,缓存怎么失效?**
+
+按数据生命周期分两类处理:
+
+- **用户自己写的数据**(表达、学习进度):写操作成功后立即清掉本地对应 cache key,下次读必走网络
+- **平台内容**(场景列表、场景详情):TTL 过期(几分钟到半小时不等),不主动失效。代价是用户偶尔会看到稍旧的数据,但场景内容更新频率很低,影响小
+
+**Q:为什么不用 React Query / SWR?**
+
+不是不能用,是几个具体原因让自建更合适:
+
+- 我的缓存要跨 tab 持久(Cache Storage 那层),React Query 默认只管内存
+- TTS 音频缓存跟通用数据缓存机制完全不同,塞到 React Query 里反而别扭
+- 项目用 Next.js App Router + Server Components,服务端预渲染本身就消化了一部分「初次加载」的需求,客户端缓存层简单点更好
+
+不过单纯的「列表 + 详情」型数据,如果将来要新接一块业务,会考虑直接上 React Query,没必要重复造。
+
+**Q:saveData 怎么检测?哪些浏览器支持?**
+
+`navigator.connection.saveData`(布尔)+ `navigator.connection.effectiveType`(`"2g" / "slow-2g" / "3g" / "4g"`),具体在 [src/lib/utils/resource-actions.ts](src/lib/utils/resource-actions.ts) 的 `isLowBandwidthEnvironment`。
+
+支持情况:Chromium 系全支持(包括移动端 Chrome、Edge、国内大部分浏览器内核),Safari 和 Firefox 不支持 —— 那两家拿不到 `connection` 就当成「网络正常」处理,不影响主流程,只是省流量优化失效。
+
+**Q:`requestIdleCallback` 在 Safari 上不支持怎么办?**
+
+Safari 一直没实现 `requestIdleCallback`。我做了 polyfill 兜底(用 `setTimeout(fn, 1)` 模拟),功能上不损失,只是空闲调度的精度差一些。详见 [src/lib/utils/resource-actions.ts](src/lib/utils/resource-actions.ts) 的 `getRequestIdleCallback`。
+
+**Q:页面缓存怎么避免越积越多?**
+
+每一层都有自己的容量上限和 TTL:
+
+- 内存层:`Map` 大小不主动限制,但每个独立 cache 都有 TTL,过期就清(45 分钟左右)
+- sessionStorage:只在当前 tab 生命周期内存活,关 tab 自动清掉
+- Cache Storage(音频):LRU,120 文件 / 24MB 上限(见 §7.1)
 
 ## 10. 技术亮点六:后端接口治理和权限边界
 
@@ -825,6 +1208,180 @@ const isKnownMsEdgeTtsWebSocketRace = (error: unknown): boolean => {
 - **怎么定位到是这个库的问题**:我们应用层所有读 `.audio` 的地方都有可选链保护,但日志反复出现同一个消息 → 只有这个库的源码里有裸读 `.audio` → 唯一嫌疑源
 - **怎么验证不是误判**:不是看"崩溃消失了",而是看"已吞下"这条日志出现了 → 证明守卫确实在干活,race 还在发生只是被吞了。**如果消失了反而要怀疑是不是没生效**
 
+### 14.16 预热效果怎么量化(warmupGain 这个指标怎么来的)
+
+§14.6 提了「我做了预加载登记表能区分预热和冷启动」,但**怎么从这两个数算出「预热到底有没有用」**值得展开。
+
+代码:[src/lib/utils/client-events.ts](src/lib/utils/client-events.ts) 的 `buildTtsWarmupEffectivenessSummary`,管理后台展示在 [src/components/admin/client-events-panel.tsx:81-120](src/components/admin/client-events-panel.tsx#L81-L120)。
+
+**埋点维度的设计:**
+
+每个音频播放事件带 6 个维度:`audioUnit`(sentence/chunk/scene_full)、`readiness`(cache/network/wait_fetch)、`wasWarmed`(布尔)、`warmupSource`(initial/idle/playback)、`failureReason`、`cooldownMs`。
+
+**关键计算:**
+
+```
+warmHitRate = 预热过且命中缓存 / 预热过的总数
+coldHitRate = 没预热过且命中缓存 / 没预热过的总数
+warmupGain = warmHitRate − coldHitRate
+```
+
+`warmupGain` 这个差值就是**「预热到底带来了多少额外命中」**的直接量化。比如冷启动命中率 30%,预热后命中率 85%,gain = 55 个百分点。如果 gain ≈ 0,说明预热完全没用,该改逻辑;如果 gain 是负数(罕见),说明预热反而干扰了 —— 比如预热把不该缓存的内容塞进去挤掉热数据。
+
+**为什么不直接看「总命中率」?**
+
+总命中率会被「这一阵子用户都在看老内容(本来就命中)」拉高,看不出预热的边际贡献。`warmupGain` 是**控制变量**(同样是这批内容,有预热 vs 没预热的差),才能归因到预热本身。
+
+**还按 source 分了三档:**
+
+`sources.initial`、`sources.idle`、`sources.playback` 各算一份命中率。能看出「进页面就预热」「空闲时预热」「播放中预热」哪一档收益最大。如果发现 `idle` 的命中率比 `initial` 还高,说明用户行为决定的「真用到」的内容比「我猜用户要用的」更准 —— 那 initial 阶段可以收缩。
+
+**为什么值得讲:**
+
+这个故事闭合了「做优化 → 量化收益」这个环。没埋点平台不代表没数据驱动,我用 120 条本地事件 + 一个 React 算的 summary 表就能回答「这个优化是不是真的有用」。面试里如果问「你怎么证明你做的优化有效」,这是最直接的答案。
+
+### 14.17 高消耗接口的额度是「两阶段」写的(reserve → mark)
+
+§10 提了「每日额度 + 后台紧急开关」,但**怎么实现「成功才扣、失败回滚、并发安全」**这个细节值得展开。
+
+代码:[src/lib/server/high-cost-usage.ts:105-171](src/lib/server/high-cost-usage.ts#L105-L171),调用样式 [src/app/api/tts/route.ts:28-39](src/app/api/tts/route.ts#L28-L39)。
+
+**两阶段:**
+
+```typescript
+// 阶段 1:reserve(占名额,数据库 RPC 原子操作)
+const reservation = await reserveHighCostUsage({ userId, capability: 'tts_generate' });
+
+// 阶段 2:try 业务,然后 markSuccess / markFailed
+try {
+  result = await generateTtsAudio(payload);
+  await markHighCostUsage(reservation, 'success');
+} catch (error) {
+  await markHighCostUsage(reservation, 'failed');
+  throw error;
+}
+```
+
+**数据库里维护 3 个计数,不是 1 个:**
+
+- `reserved_count`:占了几次额度(还没出结果)
+- `success_count`:成功几次
+- `failed_count`:失败几次
+
+`reserved_count` 是限流上限的依据(预防并发把额度打穿),`success_count` + `failed_count` 用来对账:**reserved - success - failed 应该 = 0**,如果不为 0 说明有请求挂了没回写,可以排查问题。
+
+**为什么不只用「成功才扣」?**
+
+如果只在成功后扣,**并发场景下额度会被打穿** —— 用户限 10 次,同时发起 20 个请求,先到的还没完成,后到的看「success_count=0」全部放行。reserve 阶段先把名额占住,后来者就被挡了。
+
+**为什么不只用「先扣后看是否成功」?**
+
+那样失败的请求也占额度,用户体验差(我点了 10 次接口都挂了,告诉我额度满了)。所以失败要回滚 —— `markFailed` 这一步会把 `failed_count` 加一同时把 `reserved_count` 减一(或者用其他对账方式),让额度可以重试。
+
+**紧急开关:**
+
+`app_runtime_settings.high_cost_disabled_capabilities` 是个 JSON 数组,后台改一行 → 所有 `reserveHighCostUsage` 调用都抛 `HighCostCapabilityDisabledError`,立刻阻断。**不用重启服务**。这是 §10 提的「紧急开关」的具体实现。
+
+**Q:reserve 用的是什么?DB 事务?**
+
+是 Postgres 的 RPC(`reserve_daily_high_cost_usage`),SQL 函数里做「读当前 count + 比对 limit + 写新行」三步,数据库层面保证原子性,Node 这边只要 await。比应用层 SELECT-then-UPDATE 安全得多(后者要自己加分布式锁)。
+
+**Q:跟限流 (rate-limit) 是什么关系?**
+
+两个不同维度。**限流**是「单位时间不能超 N 次」(防爆击),**额度**是「单天累计不能超 M 次」(控成本)。一个用户能一天均匀地把额度跑满,但不能 1 秒内全打过来。代码里两者也分离:`enforceHighCostRateLimit` 和 `reserveHighCostUsage` 是独立两层,顺序是「限流先过 → 额度再占 → 业务跑」。
+
+### 14.18 关键写接口的去重保护是 Promise/Value 双态切换
+
+§10 提了「重复请求去重」,但**怎么做到「连点 2 次的并发请求也合并、不只是顺序请求合并」**这个细节是关键加分点。
+
+代码:[src/lib/server/idempotency.ts](src/lib/server/idempotency.ts) 的 `runIdempotentMutation`,调用样式 [src/app/api/phrases/save/route.ts:25-33](src/app/api/phrases/save/route.ts#L25-L33)。
+
+**核心数据结构:**
+
+```typescript
+interface CachedEntry {
+  expiresAt: number;
+  value?: unknown;    // 已经出结果
+  promise?: Promise<unknown>;  // 还在进行
+}
+```
+
+同一个 key 在 Map 里有**两种状态**:进行中(挂 Promise) / 已完成(挂 value)。来一个新请求:
+
+- 如果 entry 不存在 → 执行业务,立刻把 promise 塞进 Map(**这一步是关键**),执行完切成 value
+- 如果 entry 存在且挂的是 promise → **直接返回这个 promise**(并发请求复用)
+- 如果 entry 存在且挂的是 value → 直接返回 value(15s 内的重复请求复用)
+
+**这跟「先查 value、查不到再写 value」的朴素版本区别:**
+
+朴素版本在并发场景下两个请求会同时看到「value 不存在」,各自跑一次业务,**完全没去重**。这套 promise/value 双态切换在第一个请求**进入 Map 的瞬间**就让第二个请求看到 promise 拿来 await,**真正合并了并发**。
+
+**deterministic key 兜底(客户端忘传 header 也接得住):**
+
+```typescript
+export const buildDeterministicIdempotencyKey = (...parts) =>
+  sha256(stableStringify(parts));
+```
+
+调用方:`getRequestIdempotencyKey(request, buildDeterministicIdempotencyKey(scope, userId, payload))`。客户端**没传** `x-idempotency-key` header 也会被服务端**用 scope+userId+payload 的 sha256 作为兜底 key**。所以连点两次同 payload 的请求,即使前端没生成 UUID,后端也能合并。
+
+**失败立刻清掉:**
+
+业务抛错时 `idempotencyStore.delete(normalizedKey)`,**不缓存失败结果**。下次同 key 请求会重新跑,不会被一个偶发失败永久卡住。
+
+**为什么值得讲:**
+
+去重听起来是个简单需求,但**「并发去重 + 自动兜底 key + 失败立刻重试」三件事一起做对**的实现不多。这套写法把「客户端忘传 header」「网络重试」「连点」「真并发」四种触发都覆盖了。
+
+**Q:为什么 TTL 是 15 秒?**
+
+经验值。够长:覆盖大部分「连点 / 重试 / 网络抖」的间隔;不太长:不会让用户「真心改了内容再提交」被旧结果拦截(15s 后人为修改重提交是正常的写)。
+
+**Q:进程内 Map 在 PM2 cluster 下会不会失效?**
+
+会。这是已知 gap —— 跨 worker 的去重目前没做。理由是:这套 idempotency 主要防「同一用户连点」,同一用户的连续请求大概率粘在同一个 worker(sticky session 或 nginx ip_hash),跨 worker 的真并发概率低。如果将来要做严格跨进程去重,把 Map 换成 Upstash Redis 就行,接口签名不变。
+
+### 14.19 客户端有一层错误 normalize,把后端契约翻译成用户中文
+
+§10 讲了「所有接口出错都返回同一种结构(错误码 + 详情 + 请求编号)」,但**前端怎么消费这套契约**是闭环的另一半,值得讲。
+
+代码:[src/lib/client/api-error.ts:100-225](src/lib/client/api-error.ts#L100-L225) 的 `resolveReadableMessage` + `createClientApiError`。
+
+**翻译规则按优先级排:**
+
+1. **网络层失败**(`Failed to fetch` / `NetworkError`) → "网络异常,请检查连接"
+2. **限流**(status=429 / code=RATE_LIMITED) → "操作太频繁,请稍后再试"
+3. **邀请码无效** → "邀请码无效或已过期"
+4. **登录页 401** → "邮箱或密码不正确"(语义化,不暴露后端原话)
+5. **其他 401 / AUTH_UNAUTHORIZED** → "登录已失效,请重新登录"
+6. **403** → "没有权限执行此操作"
+7. **5xx** → fallback message 或 "服务暂时不可用"
+8. **兜底**:rawMessage 直接显示,但**排除包含 request id 字样的内部消息**(那是给开发者看的,不该让用户看到)
+
+**requestId 一律打进 console:**
+
+```typescript
+console.error(`[client-api:${context}] requestId=${requestId}`, { status, code, error });
+```
+
+用户截图给客服时,console 里有 requestId,**直接拿去后端日志搜就能定位到具体一次调用**。不用让用户复述时间、操作步骤。
+
+**ClientApiError 是个真实 Error 实例往上抛:**
+
+带 status / code / requestId / rawMessage 四个字段,组件层 catch 之后既能 `toast.error(error.message)` 给用户看翻译版,也能拿 code/requestId 做更精细的处理(比如登录页拿到 invalid_credentials 就高亮密码框)。
+
+**为什么值得讲:**
+
+后端契约只是「材料」,把材料翻译成用户能看懂的中文是前端的本分。这套 normalize 把「错误响应契约 → 客户端消费 → 用户文案 + 开发者可排查」整条链路闭合了。面试如果问「你们怎么处理后端错误」,展开讲这一套比泛泛说「弹个 toast」深得多。
+
+**Q:为什么不让后端直接返回中文?**
+
+两个原因:① 后端 message 可能给多个端用(Web/API/未来 mobile),保持 English 更通用;② 同一个后端错误在不同上下文需要不同文案(401 在登录页是「密码错」,在其他页是「登录失效」),前端按 `context` 路由更灵活。
+
+**Q:遇到 rawMessage 是合法英文怎么办?**
+
+兜底显示。但加了一道过滤:`REQUEST_ID_PATTERN.test(rawMessage)` 命中就走 fallback,不显示。这是因为有些内部错误的 message 里带「Request ID: xxx」字样,直接给用户看体验差。
+
 ## 15. 分模块讲解卡
 
 面试前快速过一遍每个模块讲什么、做到哪里、边界是什么。
@@ -1117,6 +1674,34 @@ const isKnownMsEdgeTtsWebSocketRace = (error: unknown): boolean => {
 ### 18.5 这个项目还有哪些没做完
 
 > 还没有做完整离线应用、平台级熔断、全面强制执行的内容安全策略和更细粒度的推荐模型。当前阶段重点是先把学习闭环、表达资产、音频链路和接口治理跑稳。
+
+### 18.6 工程侧已知的几个 gap(被追问时主动讲反而加分)
+
+下面三个是「做了一半 / 没做」但**有清晰下一步计划**的工程点。面试官问「还有什么没做完」时主动讲,比被追问出来好得多。
+
+**1. `Retry-After` 标准 HTTP header 没设(只在 JSON body 里给)**
+
+- 现状:429 响应只在 `body.details.retryAfterSeconds` 里给重试时间(代码 [src/lib/server/errors.ts](src/lib/server/errors.ts)),HTTP header 那一层缺。
+- 影响:浏览器和中间层(nginx / fetch 内部重试)看不到标准 `Retry-After`,不能自动 backoff,得前端自己读 body 处理。
+- 下一步:在 `toApiErrorResponse` 里把 `retryAfterSeconds` 同时写进 response header,客户端老逻辑不受影响,中间层能受益。
+- 一句话讲:「我们 429 给了重试时间,但只在 body 里,标准 header 那一层还没补,这是个 5 分钟的活,先去补别的了。」
+
+**2. `withClientActionTimeout` 只包了认证流,其他 fetch 没普及**
+
+- 现状:登录 / 注册 / 发邮箱码 / 自动登录这几条客户端 fetch 都包了 15-20 秒超时(代码 [src/lib/client/action-timeout.ts](src/lib/client/action-timeout.ts) 是通用的),但 TTS / AI explain / scene parse / phrase save 这些还没套上。
+- 影响:遇到上游卡住(比如 Edge TTS 长连接挂死、AI 接口不返回)时,前端可能转圈一直等。
+- 下一步:把所有「会真的卡」的客户端 fetch 都套上 timeoutMs,然后 toast 一个友好提示。属于是「现成轮子,只是没批量铺开」。
+- 一句话讲:「客户端超时这套机制写好了,只在认证流先验证了一遍,接下来要铺到 TTS、AI 这些更可能卡的接口。」
+
+**3. AI 接口不是 SSE 流式响应**
+
+- 现状:`/api/explain-selection` 是一次性 POST,等 AI 全部生成完再一起返回。没做 chunk 流式输出。
+- 影响:首字时延等同于全文时延,UI 上「思考中…」要持续几秒。
+- 为什么不做:当前业务里 AI 释义都是短文案(< 200 字),全文时延也就 1-3 秒,**首字时延的优化收益相对小**。更划算的是先把缓存命中率(§7.7 的 ai_cache)打上去,让大部分请求根本不走 AI,而不是优化单次 AI 调用的体验。
+- 下一步:如果将来做长输出场景(比如「AI 生成一篇 500 字的解析」),才有意义切到 SSE。
+- 一句话讲:「AI 接口我现在用一次性返回,因为业务里都是短文案,流式收益小。缓存命中率优先,真要做长输出场景再切 SSE。」
+
+**讲这种 gap 的姿势:** 不要说「这个我没做」,要说「这个我现在是这样做的、为什么、下一步打算怎么演进」。**让面试官看到的是「我清楚自己的取舍和路线」,而不是「我没做完」。**
 
 ## 19. 简历版表达
 
