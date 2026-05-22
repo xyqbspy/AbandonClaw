@@ -7,7 +7,10 @@ import { clearAllPhraseListCache } from "@/lib/cache/phrase-list-cache";
 import { prefetchSceneDetail } from "@/lib/cache/scene-prefetch";
 import { useTtsPlaybackController } from "@/hooks/use-tts-playback-controller";
 import { normalizePhraseText } from "@/lib/shared/phrases";
-import { scheduleChunkAudioWarmup } from "@/lib/utils/resource-actions";
+import {
+  scheduleChunkAudioWarmup,
+  shouldAvoidHeavyAudioWarmup,
+} from "@/lib/utils/resource-actions";
 import {
   enrichSimilarExpressionFromApi,
   ManualExpressionAssistResponse,
@@ -1159,6 +1162,7 @@ export default function ChunksPage() {
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
+      if (shouldAvoidHeavyAudioWarmup()) return;
       const warmupItems = phrases.slice(0, 6);
       for (const item of warmupItems) {
         scheduleChunkAudioWarmup([
@@ -1238,6 +1242,7 @@ export default function ChunksPage() {
     if (!focusDetailOpen || !focusDetail) return;
 
     const timer = window.setTimeout(() => {
+      if (shouldAvoidHeavyAudioWarmup()) return;
       const candidateTexts = [
         focusDetailViewModel.detailSpeakText,
         ...(focusDetail.savedItem?.exampleSentences ?? focusDetailViewModel.activeAssistItem?.examples ?? [])

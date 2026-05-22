@@ -257,6 +257,7 @@ const mockedModules = {
   },
   "@/lib/utils/resource-actions": {
     scheduleChunkAudioWarmup: () => undefined,
+    shouldAvoidHeavyAudioWarmup: () => false,
   },
   "@/lib/utils/expression-map-api": {
     generateExpressionMapFromApi: async () => ({ clusters: [] }),

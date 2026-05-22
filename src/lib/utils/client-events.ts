@@ -24,7 +24,11 @@ export type ClientEventName =
   | "warmup_task_reset"
   | "warmup_task_cancelled"
   | "warmup_idle_round_skipped"
-  | "tts_request_cooling_down";
+  | "tts_request_cooling_down"
+  | "practice_open_prewarm_hit"
+  | "practice_open_prewarm_miss"
+  | "variant_open_prewarm_hit"
+  | "variant_open_prewarm_miss";
 
 export type ClientFailureName = "tts_scene_loop_failed" | "scene_full_play_fallback";
 

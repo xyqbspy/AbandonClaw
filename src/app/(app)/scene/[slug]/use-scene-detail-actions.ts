@@ -20,6 +20,7 @@ import {
 import { Lesson } from "@/lib/types";
 import { ExpressionMapResponse } from "@/lib/types/expression-map";
 import { PracticeSet, VariantSet } from "@/lib/types/learning-flow";
+import { recordClientEvent } from "@/lib/utils/client-events";
 
 import {
   resolveSceneToolIntent,
@@ -177,12 +178,25 @@ export function useSceneDetailActions({
       if (!baseLesson) return null;
       if (latestPracticeSet) {
         if (openOnReady) {
+          recordClientEvent("practice_open_prewarm_hit", {
+            sceneId: baseLesson.id,
+            sceneSlug: baseLesson.slug,
+            requestPolicy,
+          });
           setShowAnswerMap({});
           setViewModeWithRoute("practice");
         }
         return latestPracticeSet;
       }
       if (!canGeneratePractice) return null;
+
+      if (openOnReady) {
+        recordClientEvent("practice_open_prewarm_miss", {
+          sceneId: baseLesson.id,
+          sceneSlug: baseLesson.slug,
+          requestPolicy,
+        });
+      }
 
       setPracticeLoading(true);
       setPracticeError(null);
@@ -306,11 +320,22 @@ export function useSceneDetailActions({
       if (!baseLesson) return null;
       if (latestVariantSet) {
         if (openOnReady) {
+          recordClientEvent("variant_open_prewarm_hit", {
+            sceneId: baseLesson.id,
+            sceneSlug: baseLesson.slug,
+          });
           setViewModeWithRoute("variants");
         }
         return latestVariantSet;
       }
       if (!canGenerateVariants) return null;
+
+      if (openOnReady) {
+        recordClientEvent("variant_open_prewarm_miss", {
+          sceneId: baseLesson.id,
+          sceneSlug: baseLesson.slug,
+        });
+      }
 
       setVariantsLoading(true);
       setVariantsError(null);
