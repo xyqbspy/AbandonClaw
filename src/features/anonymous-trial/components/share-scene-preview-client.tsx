@@ -70,6 +70,17 @@ interface ExplainErrorResponse {
   details?: { capability?: string };
 }
 
+interface TtsPlaybackSuccessResponse {
+  signedUrl?: string;
+  source?: string;
+}
+
+type SentencePlaybackState =
+  | { kind: "idle" }
+  | { kind: "loading"; sentenceId: string }
+  | { kind: "playing"; sentenceId: string }
+  | { kind: "unavailable"; sentenceId: string };
+
 export type ShareScenePreviewClientProps = {
   initialLesson: Lesson;
   registerHref: string;
@@ -224,6 +235,105 @@ export function ShareScenePreviewClient({
     setExplainError(null);
   }, []);
 
+  // ---- 句子级 TTS 预生成播放 ----
+  const [playbackState, setPlaybackState] = useState<SentencePlaybackState>({ kind: "idle" });
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  const stopCurrentAudio = useCallback(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    audio.onended = null;
+    audio.onerror = null;
+    audio.pause();
+    audio.currentTime = 0;
+    audioRef.current = null;
+  }, []);
+
+  useEffect(() => () => stopCurrentAudio(), [stopCurrentAudio]);
+
+  const handlePlaySentence = useCallback(
+    async (sentence: LessonSentence) => {
+      // 同一句已在播放 → 切换为停止
+      if (playbackState.kind === "playing" && playbackState.sentenceId === sentence.id) {
+        stopCurrentAudio();
+        setPlaybackState({ kind: "idle" });
+        return;
+      }
+
+      // 切换到别的句子前先停旧的
+      stopCurrentAudio();
+      setPlaybackState({ kind: "loading", sentenceId: sentence.id });
+
+      getOrCreateAnonymousId();
+      try {
+        const url = new URL("/api/anonymous/tts/play", window.location.origin);
+        url.searchParams.set("kind", "sentence");
+        url.searchParams.set("sceneSlug", lesson.slug);
+        url.searchParams.set("sentenceId", sentence.id);
+        url.searchParams.set("text", sentence.text);
+        if (sentence.speaker) url.searchParams.set("speaker", sentence.speaker);
+
+        const response = await fetch(url.toString(), {
+          method: "GET",
+          headers: { ...buildAnonymousHeaders() },
+        });
+        anonState.syncFromResponse(response);
+
+        if (response.status === 404) {
+          setPlaybackState({ kind: "unavailable", sentenceId: sentence.id });
+          return;
+        }
+        if (response.status === 429) {
+          const body = (await response.json().catch(() => ({}))) as ExplainErrorResponse;
+          if (
+            body.code === "ANON_QUOTA_EXCEEDED_SESSION" ||
+            body.code === "ANON_QUOTA_EXCEEDED_GLOBAL"
+          ) {
+            setBlockTrigger("tts_quota_exhausted");
+            setPlaybackState({ kind: "idle" });
+            return;
+          }
+          if (body.code === "ANON_IP_RATE_LIMITED") {
+            setBlockTrigger("tts_quota_exhausted");
+            setPlaybackState({ kind: "idle" });
+            return;
+          }
+        }
+        if (!response.ok) {
+          setPlaybackState({ kind: "unavailable", sentenceId: sentence.id });
+          return;
+        }
+
+        const data = (await response.json()) as TtsPlaybackSuccessResponse;
+        if (!data.signedUrl) {
+          setPlaybackState({ kind: "unavailable", sentenceId: sentence.id });
+          return;
+        }
+
+        const audio = new Audio(data.signedUrl);
+        audioRef.current = audio;
+        audio.onended = () => {
+          if (audioRef.current === audio) audioRef.current = null;
+          setPlaybackState({ kind: "idle" });
+        };
+        audio.onerror = () => {
+          if (audioRef.current === audio) audioRef.current = null;
+          setPlaybackState({ kind: "unavailable", sentenceId: sentence.id });
+        };
+        try {
+          await audio.play();
+          setPlaybackState({ kind: "playing", sentenceId: sentence.id });
+        } catch {
+          // 浏览器自动播放策略 / Audio 元素问题
+          setPlaybackState({ kind: "unavailable", sentenceId: sentence.id });
+        }
+      } catch {
+        setPlaybackState({ kind: "unavailable", sentenceId: sentence.id });
+      }
+    },
+    [anonState, lesson.slug, playbackState, stopCurrentAudio],
+  );
+
   return (
     <div className="flex w-full flex-col" data-testid="share-scene-preview">
       <AnonymousTopbarBanner
@@ -260,6 +370,13 @@ export function ShareScenePreviewClient({
                       key={sentence.id}
                       sentence={sentence}
                       onExplain={(chunkText) => handleExplain(chunkText, sentence)}
+                      onPlay={() => handlePlaySentence(sentence)}
+                      playbackState={
+                        playbackState.kind !== "idle" &&
+                        playbackState.sentenceId === sentence.id
+                          ? playbackState.kind
+                          : "idle"
+                      }
                     />
                   ))}
                 </div>
@@ -313,11 +430,23 @@ export function ShareScenePreviewClient({
 function SentenceCard({
   sentence,
   onExplain,
+  onPlay,
+  playbackState,
 }: {
   sentence: LessonSentence;
   onExplain: (chunkText: string) => void;
+  onPlay: () => void;
+  playbackState: "idle" | "loading" | "playing" | "unavailable";
 }) {
   const chunks = useMemo(() => collectSentenceChunks(sentence), [sentence]);
+  const playButtonLabel =
+    playbackState === "loading"
+      ? "加载中"
+      : playbackState === "playing"
+        ? "停止"
+        : playbackState === "unavailable"
+          ? "音频暂时不可用"
+          : "听一遍";
   return (
     <Card size="sm" className="border border-border/50 bg-card/80">
       <CardContent className="space-y-2 px-4 pb-4 text-sm leading-6">
@@ -330,23 +459,33 @@ function SentenceCard({
         {sentence.translation ? (
           <p className="text-foreground/65">{sentence.translation}</p>
         ) : null}
-        {chunks.length > 0 ? (
-          <div className="flex flex-wrap gap-2 pt-1">
-            {chunks.map((chunk) => (
-              <Button
-                key={chunk}
-                size="sm"
-                variant="outline"
-                radius="sm"
-                data-testid="share-scene-explain-chunk"
-                onClick={() => onExplain(chunk)}
-                className="h-7 px-2 text-xs"
-              >
-                解释 · {chunk}
-              </Button>
-            ))}
-          </div>
-        ) : null}
+        <div className="flex flex-wrap items-center gap-2 pt-1">
+          <Button
+            size="sm"
+            variant={playbackState === "playing" ? "default" : "outline"}
+            radius="sm"
+            data-testid="share-scene-play-sentence"
+            data-playback-state={playbackState}
+            onClick={onPlay}
+            disabled={playbackState === "loading" || playbackState === "unavailable"}
+            className="h-7 px-2 text-xs"
+          >
+            ▶ {playButtonLabel}
+          </Button>
+          {chunks.map((chunk) => (
+            <Button
+              key={chunk}
+              size="sm"
+              variant="outline"
+              radius="sm"
+              data-testid="share-scene-explain-chunk"
+              onClick={() => onExplain(chunk)}
+              className="h-7 px-2 text-xs"
+            >
+              解释 · {chunk}
+            </Button>
+          ))}
+        </div>
       </CardContent>
     </Card>
   );

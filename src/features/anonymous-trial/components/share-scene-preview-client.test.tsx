@@ -39,6 +39,29 @@ let fetchCalls: FetchCall[] = [];
 let fetchResponder: (call: FetchCall) => Response | Promise<Response>;
 const originalFetch = globalThis.fetch;
 
+// 全量记录创建的 Audio 实例,便于断言 src + 触发 onended/onerror
+class MockAudio {
+  src: string;
+  onended: (() => void) | null = null;
+  onerror: ((event?: unknown) => void) | null = null;
+  currentTime = 0;
+  paused = true;
+  playInvocations = 0;
+  constructor(src?: string) {
+    this.src = src ?? "";
+    mockedAudios.push(this);
+  }
+  async play() {
+    this.playInvocations += 1;
+    this.paused = false;
+  }
+  pause() {
+    this.paused = true;
+  }
+}
+let mockedAudios: MockAudio[] = [];
+const originalAudio = (globalThis as { Audio?: unknown }).Audio;
+
 const recordFetch = (input: RequestInfo | URL, init?: RequestInit): FetchCall => {
   const url = typeof input === "string" ? input : input.toString();
   const method = init?.method ?? "GET";
@@ -68,6 +91,7 @@ const recordFetch = (input: RequestInfo | URL, init?: RequestInit): FetchCall =>
 
 beforeEach(() => {
   fetchCalls = [];
+  mockedAudios = [];
   window.localStorage.clear();
   fetchResponder = () => new Response(null, { status: 204 });
   globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -75,11 +99,17 @@ beforeEach(() => {
     fetchCalls.push(call);
     return await fetchResponder(call);
   }) as typeof fetch;
+  (globalThis as { Audio: unknown }).Audio = MockAudio;
 });
 
 afterEach(() => {
   cleanup();
   globalThis.fetch = originalFetch;
+  if (originalAudio === undefined) {
+    delete (globalThis as { Audio?: unknown }).Audio;
+  } else {
+    (globalThis as { Audio: unknown }).Audio = originalAudio;
+  }
 });
 
 const SAMPLE_LESSON: Lesson = {
@@ -343,4 +373,162 @@ test("ShareScenePreviewClient 点击 inline upsell 注册按钮上报 anon_regis
       (call.body as { payload?: { prompt_level?: string } }).payload?.prompt_level === "L2",
   );
   assert.equal(clickedCalls.length, 1, "inline upsell 点击应触发 1 次 L2 clicked 上报");
+});
+
+// === 句子级 TTS 预生成播放 ===
+
+test("ShareScenePreviewClient 渲染每个 sentence 的播放按钮(初始 idle 状态)", async () => {
+  const Component = getComponent();
+  const result = render(
+    <Component initialLesson={SAMPLE_LESSON} registerHref="/register" />,
+  );
+  await flushAsync();
+
+  const playButtons = result.container.querySelectorAll(
+    '[data-testid="share-scene-play-sentence"]',
+  );
+  assert.equal(playButtons.length, 2, "2 个 sentence 各一个播放按钮");
+  for (const button of playButtons) {
+    assert.equal(button.getAttribute("data-playback-state"), "idle");
+  }
+});
+
+test("ShareScenePreviewClient 点击播放按钮触发 GET /api/anonymous/tts/play 带 sceneSlug/sentenceId/text + 创建 Audio 播放", async () => {
+  fetchResponder = (call) => {
+    if (call.url.includes("/api/anonymous/tts/play")) {
+      return new Response(
+        JSON.stringify({
+          signedUrl: "https://storage.example.com/signed/sen-1.mp3?token=abc",
+          source: "storage-hit",
+        }),
+        {
+          status: 200,
+          headers: {
+            "content-type": "application/json",
+            "X-Quota-Type": "tts_play",
+            "X-Quota-Session-Limit": "30",
+            "X-Quota-Session-Remaining": "29",
+            "X-Quota-Daily-Limit": "unlimited",
+            "X-Quota-Daily-Remaining": "unlimited",
+            "X-Quota-Reset-At": "2026-05-29T00:00:00.000Z",
+          },
+        },
+      );
+    }
+    return new Response(null, { status: 204 });
+  };
+
+  const Component = getComponent();
+  const result = render(
+    <Component initialLesson={SAMPLE_LESSON} registerHref="/register" />,
+  );
+  await flushAsync();
+
+  const firstPlayButton = result.container.querySelector(
+    '[data-testid="share-scene-play-sentence"]',
+  ) as HTMLElement;
+  await act(async () => {
+    fireEvent.click(firstPlayButton);
+  });
+  await flushAsync();
+
+  const playCalls = findFetchCalls((url) => url.includes("/api/anonymous/tts/play"));
+  assert.equal(playCalls.length, 1, "应该恰好 1 次 tts/play 调用");
+  assert.equal(playCalls[0].method, "GET");
+  assert.match(playCalls[0].url, /kind=sentence/);
+  assert.match(playCalls[0].url, /sceneSlug=share-sample/);
+  assert.match(playCalls[0].url, /sentenceId=sen-1/);
+  assert.match(playCalls[0].url, /text=I\+just\+wrapped\+up\+the\+report\./);
+  assert.ok(
+    playCalls[0].headers["x-anonymous-id"]?.length === 36,
+    "应带 X-Anonymous-Id 头",
+  );
+
+  assert.equal(mockedAudios.length, 1, "成功响应后应该创建 1 个 Audio");
+  assert.match(mockedAudios[0].src, /signed\/sen-1\.mp3/);
+  assert.equal(mockedAudios[0].playInvocations, 1);
+
+  await waitFor(() =>
+    assert.equal(
+      firstPlayButton.getAttribute("data-playback-state"),
+      "playing",
+      "Audio.play() 后按钮 state 应该是 playing",
+    ),
+  );
+});
+
+test("ShareScenePreviewClient TTS 配额耗尽(429 ANON_QUOTA_EXCEEDED_SESSION)弹出 tts_quota_exhausted L3 modal", async () => {
+  fetchResponder = (call) => {
+    if (call.url.includes("/api/anonymous/tts/play")) {
+      return new Response(
+        JSON.stringify({
+          code: "ANON_QUOTA_EXCEEDED_SESSION",
+          error: "session quota exceeded",
+          details: { capability: "tts_play" },
+        }),
+        { status: 429, headers: { "content-type": "application/json" } },
+      );
+    }
+    return new Response(null, { status: 204 });
+  };
+
+  const Component = getComponent();
+  const result = render(
+    <Component initialLesson={SAMPLE_LESSON} registerHref="/register" />,
+  );
+  await flushAsync();
+
+  const firstPlayButton = result.container.querySelector(
+    '[data-testid="share-scene-play-sentence"]',
+  ) as HTMLElement;
+  await act(async () => {
+    fireEvent.click(firstPlayButton);
+  });
+  await flushAsync();
+
+  await waitFor(() => {
+    const modal = result.container.querySelector('[data-testid="anonymous-block-modal"]');
+    assert.ok(modal, "TTS 配额耗尽应弹出 block modal");
+    assert.equal(modal!.getAttribute("data-trigger"), "tts_quota_exhausted");
+  });
+
+  assert.equal(mockedAudios.length, 0, "配额耗尽不应创建 Audio 实例");
+});
+
+test("ShareScenePreviewClient TTS storage miss(404)按钮状态置为 unavailable,不弹 modal", async () => {
+  fetchResponder = (call) => {
+    if (call.url.includes("/api/anonymous/tts/play")) {
+      return new Response(
+        JSON.stringify({ code: "NOT_FOUND", error: "audio not found" }),
+        { status: 404, headers: { "content-type": "application/json" } },
+      );
+    }
+    return new Response(null, { status: 204 });
+  };
+
+  const Component = getComponent();
+  const result = render(
+    <Component initialLesson={SAMPLE_LESSON} registerHref="/register" />,
+  );
+  await flushAsync();
+
+  const firstPlayButton = result.container.querySelector(
+    '[data-testid="share-scene-play-sentence"]',
+  ) as HTMLElement;
+  await act(async () => {
+    fireEvent.click(firstPlayButton);
+  });
+  await flushAsync();
+
+  await waitFor(() =>
+    assert.equal(
+      firstPlayButton.getAttribute("data-playback-state"),
+      "unavailable",
+      "404 后按钮 state 置为 unavailable",
+    ),
+  );
+
+  const modal = result.container.querySelector('[data-testid="anonymous-block-modal"]');
+  assert.equal(modal, null, "storage miss 不应弹 L3 modal(只是单句不可用)");
+  assert.equal(mockedAudios.length, 0, "storage miss 不应创建 Audio");
 });

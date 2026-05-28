@@ -1,5 +1,46 @@
 # Dev Log
 
+### [2026-05-28] 匿名 TTS 预生成播放接入(灰度 V2 第一项)
+- 类型:enable-anonymous-trial-mode 续期(原 P0-3 推到 V2 项,本轮落地)
+- 状态:落地(unit 610/610 全绿;interaction 367/367 全绿)
+
+#### 设计选择
+
+| 决策 | 取舍 |
+| --- | --- |
+| `tts_play` 不进 `HighCostCapability` 数组 | 预生成播放只读 Supabase Storage 已存在的 mp3,**无上游付费成本**。加入 HighCostCapability 会污染 admin 紧急关闭面板 / 用户每日 quota 表 / usage 统计的"高成本"语义。新独立模块 `tts-playback-quota.ts` 复用 counter + IP 滑窗 + funnel 埋点基础设施,但不沾 emergency disable / DailyQuotaExceededError 分支。 |
+| `quota-headers.ts` 重构为 structural 类型 | 原 `buildAnonymousQuotaHeaders` 入参锁死 `AnonymousQuotaResult`(只接 HighCostCapability)。改成 `AnonymousQuotaHeadersInput` 结构化接口后,explain_selection 与 tts_play 两类匿名 quota 都能复用同一套 `X-Quota-*` 头格式化,响应契约对前端透明。 |
+| 新路由 `/api/anonymous/tts/play` 而不是改造 `/api/tts` | `/api/tts` 在 PROTECTED_API_PREFIXES,匿名会被 middleware 401 拦截。改 PROTECTED 列表风险大(可能误开 `/api/tts` 主路径)。新路径放 `/api/anonymous/*` 跟既有 funnel-event 路径同 prefix,middleware 自然透传。已登录 fast path 仍走主路径 `/api/tts`(本身有 storage hit 不调上游的优化)。 |
+| GET + query params,storage miss 返 404 不 fallback | 跟 explain_selection 用 POST + body 不同,TTS lookup 是"读"语义。**关键:即使 storage miss 也只回 404,不 fallback 生成**——这是匿名分支不允许触发付费链路的硬约束。已登录用户拿到 404 后可以自己改调 `/api/tts` POST 触发生成(本期 ShareScenePreviewClient 不做这步,匿名直接显示"音频暂时不可用")。 |
+| 防御维度比 explain_selection 少一层(无全站池) | TTS storage hit 几乎零成本(HEAD + signed URL 签发),不需要"全站池"防失控。保留 IP 滑窗(共享 explain_selection 的 `anon-ip-rate` scope)+ 单 anon 会话 30 次/天(env `ANON_QUOTA_SESSION_TTS_PLAY` 可调)。 |
+| storage lookup 在 quota check 之后 | 顺序:鉴权 → quota check(INCR) → storage lookup → 命中返 URL / miss 返 404。这样命中阈值不会跳过 storage lookup,但 storage miss 后 quota 已经被消耗 1 次——这是有意的"次签发数"语义,跟 explain_selection 失败也算 quota 一致。 |
+
+#### 客户端集成
+
+- ShareScenePreviewClient 每个 SentenceCard 新增"听一遍"按钮,管理 4 种状态:idle / loading / playing / unavailable。同一句再点切换为停止;切别的句子前先停旧的;组件 unmount 时 `stopCurrentAudio` 清理 `HTMLAudioElement`。
+- 状态机走中央 `playbackState: { kind, sentenceId }`,渲染时按 `sentenceId` 派分到每个 SentenceCard,避免每个卡片各持 state 时的同步问题。
+- 429 ANON_QUOTA_EXCEEDED_SESSION → 复用既有 L3 `tts_quota_exhausted` block modal(组件早就预留了这个 trigger,文案也写好了)。404 storage miss 只在那一句旁显示"音频暂时不可用",不全局弹窗——这是用户体验权衡:数据缺失不是用户的错,不应该当成"配额耗尽"那样阻断。
+- 顶栏 banner 仍只展示 `explain_selection` 配额(`primaryCapability` prop 默认值),tts_play 配额不进顶栏避免视觉拥挤。anonState.quotaByCapability 仍然存 tts_play 快照,但目前 UI 不消费——L3 modal 是主要反馈通道。
+
+#### 漏斗与可观测性
+
+- TTS quota 命中也走同一个 `recordAnonymousFunnelEventSafe("anon_quota_blocked")`,payload 区分 `capability: "tts_play"`, `blocked_layer: "ip_rate" | "session"`。daily 聚合 SQL 已经按 `payload->>'capability' = 'tts_play'` 统计 tts_play 调用量(phase27 SQL 已经预留这个聚合分支),所以 dashboard 不用改 schema。
+- Sentry user_type tag 由 `logApiError(..., { userType })` 注入,跟 explain-selection 一致。
+
+#### 验收
+
+- 新单测覆盖:`tts-playback-quota.test.ts` 7 例(默认/env/递减/上限/回滚/IP/session 独立/peek 不消耗)+ `tts/play/route.test.ts` 9 例(已登录命中/miss/开关关闭 401/匿名命中/配额耗尽/缺头 400/爬虫 401/query 校验失败 x2)
+- 新 interaction 测试 4 例:渲染播放按钮 idle / 点击触发 fetch + Audio / 429 弹 L3 / 404 unavailable
+- 总计 unit 610/610 + interaction 367/367 全绿
+
+#### 仍未做(单独 V2 列表保留)
+
+- 匿名→注册数据迁移(`anon_registered` 事件带 `from_anon_id`)
+- Button asChild TS 类型(main 已有 5 处 + 我新增 1 处共 6 处)
+- TTS scene_full(整篇音频)给匿名:同一 API 已经支持 `kind=scene_full`,但 ShareScenePreviewClient UI 没接入(暂留 V3)
+
+---
+
 ### [2026-05-28] 自评审补丁:share 灰度真接 + 漏斗实接 + 中间件 cache 头 + counter/quota 健壮化
 - 类型:Self-review patch(对 145686a 的实施补缺)
 - 状态:落地(单元 588 全绿 + audit 11 全绿;type-check 仅剩 main 已有的 Button asChild 类型问题,未在本轮范围)

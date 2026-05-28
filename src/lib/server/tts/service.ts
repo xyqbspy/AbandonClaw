@@ -345,6 +345,56 @@ const resolveAudioTarget = (payload: {
   };
 };
 
+/**
+ * 仅查询已存在于 Storage 的预生成 TTS 音频签名 URL,不调用上游 MsEdgeTTS。
+ * 命中返回 { signedUrl, storagePath, source: "storage-hit" };未命中返回 null。
+ *
+ * 给"匿名访客试用 + 主路径快速命中"场景用:匿名分支不允许触发上游 TTS 生成
+ * (会产生付费),已登录主路径在 storage 已有时也可以省一次 generate 流程。
+ * 调用方负责自己的鉴权/配额/限流,本函数不带这些副作用。
+ */
+export async function getPreGeneratedTtsAudioUrl(payload: TtsRequestPayload) {
+  const kind = parseTtsKind(payload.kind);
+  const mode = parseTtsMode(payload.mode, payload.speed);
+  const speaker = parseOptionalSpeaker(payload.speaker);
+  const sceneType =
+    payload.sceneType === "dialogue" || payload.sceneType === "monologue"
+      ? payload.sceneType
+      : "monologue";
+  const sceneFullSegments = kind === "scene_full" ? parseSceneFullSegments(payload.segments) : [];
+  const mergedSceneFullSegments =
+    kind === "scene_full" ? mergeSceneFullSegments(sceneFullSegments, sceneType) : [];
+  const text = kind === "scene_full" ? "[scene_full]" : parseRequiredText(payload.text);
+  const target = resolveAudioTarget({
+    kind,
+    mode,
+    speaker,
+    sceneSlug: payload.sceneSlug,
+    sentenceId: payload.sentenceId,
+    chunkKey: payload.chunkKey,
+    sceneFullKey:
+      kind === "scene_full" ? buildSceneFullAudioKey(mergedSceneFullSegments, sceneType) : undefined,
+    sentenceAudioKey:
+      kind === "sentence"
+        ? buildSentenceAudioKey({
+            sentenceId: parseRequiredString(payload.sentenceId, "sentenceId"),
+            text,
+            speaker,
+            mode,
+          })
+        : undefined,
+    text,
+  });
+
+  const signedUrl = await getStorageSignedUrlIfExists(target.storagePath);
+  if (!signedUrl) return null;
+  return {
+    signedUrl,
+    storagePath: target.storagePath,
+    source: "storage-hit" as const,
+  };
+}
+
 export async function generateTtsAudio(payload: TtsRequestPayload) {
   const kind = parseTtsKind(payload.kind);
   const mode = parseTtsMode(payload.mode, payload.speed);

@@ -1,5 +1,17 @@
 import { NextResponse } from "next/server";
-import type { AnonymousQuotaResult } from "@/lib/server/anonymous/quota";
+
+/**
+ * Structural 类型,兼容 AnonymousQuotaResult(HighCostCapability)与
+ * AnonymousTtsPlaybackQuotaResult(`tts_play`),让两类匿名配额都能复用响应头格式化。
+ */
+export interface AnonymousQuotaHeadersInput {
+  capability: string;
+  globalDailyLimit: number;
+  globalDailyRemaining: number;
+  sessionDailyLimit: number;
+  sessionDailyRemaining: number;
+  resetAt: Date;
+}
 
 const formatRemaining = (value: number) =>
   Number.isFinite(value) ? String(value) : "unlimited";
@@ -7,7 +19,7 @@ const formatLimit = (value: number) =>
   value < 0 ? "unlimited" : String(value);
 
 export const buildAnonymousQuotaHeaders = (
-  result: AnonymousQuotaResult,
+  result: AnonymousQuotaHeadersInput,
 ): Record<string, string> => ({
   "X-Quota-Type": result.capability,
   "X-Quota-Daily-Limit": formatLimit(result.globalDailyLimit),
@@ -19,7 +31,7 @@ export const buildAnonymousQuotaHeaders = (
 
 export const attachAnonymousQuotaHeaders = <T extends NextResponse>(
   response: T,
-  result: AnonymousQuotaResult,
+  result: AnonymousQuotaHeadersInput,
 ): T => {
   for (const [key, value] of Object.entries(buildAnonymousQuotaHeaders(result))) {
     response.headers.set(key, value);
