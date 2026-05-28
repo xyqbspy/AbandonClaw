@@ -3,6 +3,8 @@ interface CounterState {
   resetAt: number;
 }
 
+import { logServerEvent } from "@/lib/server/logger";
+
 const memoryStore = new Map<string, CounterState>();
 
 const getUpstashConfig = () => {
@@ -108,7 +110,13 @@ const peekUpstashCounter = async (
   };
 };
 
-/** INCR + EXPIRE NX,返回当前 count 与剩余 TTL。后端不可用时自动回退到内存计数器。 */
+/**
+ * INCR + EXPIRE NX,返回当前 count 与剩余 TTL。
+ *
+ * Upstash 不可用时回退到内存计数器并 warn。多实例部署下,内存计数器互不共享,
+ * 全站日上限会被实际放大到实例数倍 — 这是 fail-open 选择,业务可用性优先于配额精度。
+ * 运维收到 warn 后需排查 Upstash 健康度,并视情况临时关闭 ALLOW_ANONYMOUS_TRIAL 止血。
+ */
 export const incrDailyCounter = async (
   key: string,
   ttlSeconds: number,
@@ -118,11 +126,62 @@ export const incrDailyCounter = async (
   if (upstash) {
     try {
       return await incrUpstashCounter(upstash, key, ttlSeconds);
-    } catch {
+    } catch (error) {
+      logServerEvent(
+        "warn",
+        "[anonymous-counter] upstash incr failed, falling back to in-memory counter. Daily anonymous quotas may be inflated by instance count.",
+        {
+          module: "anonymous/counter",
+          error,
+          details: { key, ttlSeconds },
+        },
+      );
       return incrMemoryCounter(key, ttlSeconds, now);
     }
   }
   return incrMemoryCounter(key, ttlSeconds, now);
+};
+
+const decrMemoryCounter = (key: string, now: number): void => {
+  const current = memoryStore.get(key);
+  if (!current || current.resetAt <= now) return;
+  current.count = Math.max(0, current.count - 1);
+  memoryStore.set(key, current);
+};
+
+const decrUpstashCounter = async (
+  config: { url: string; token: string },
+  key: string,
+): Promise<void> => {
+  await callUpstashPipeline(config, [["DECR", key]]);
+};
+
+/**
+ * 回滚一次 INCR(配额命中阈值后调用,避免持续失败请求让计数无限漂移)。
+ * 失败时静默——计数轻微漂移不算正确性问题,与 INCR 自身的 fail-open 策略一致。
+ */
+export const decrDailyCounter = async (
+  key: string,
+  now: number = Date.now(),
+): Promise<void> => {
+  const upstash = getUpstashConfig();
+  if (upstash) {
+    try {
+      await decrUpstashCounter(upstash, key);
+      return;
+    } catch (error) {
+      logServerEvent(
+        "warn",
+        "[anonymous-counter] upstash decr failed; counter may drift by 1 until next reset.",
+        {
+          module: "anonymous/counter",
+          error,
+          details: { key },
+        },
+      );
+    }
+  }
+  decrMemoryCounter(key, now);
 };
 
 export const peekDailyCounter = async (
@@ -133,7 +192,16 @@ export const peekDailyCounter = async (
   if (upstash) {
     try {
       return await peekUpstashCounter(upstash, key);
-    } catch {
+    } catch (error) {
+      logServerEvent(
+        "warn",
+        "[anonymous-counter] upstash peek failed, falling back to in-memory counter.",
+        {
+          module: "anonymous/counter",
+          error,
+          details: { key },
+        },
+      );
       return peekMemoryCounter(key, now);
     }
   }

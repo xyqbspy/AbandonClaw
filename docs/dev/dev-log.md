@@ -1,5 +1,35 @@
 # Dev Log
 
+### [2026-05-28] 自评审补丁:share 灰度真接 + 漏斗实接 + 中间件 cache 头 + counter/quota 健壮化
+- 类型:Self-review patch(对 145686a 的实施补缺)
+- 状态:落地(单元 588 全绿 + audit 11 全绿;type-check 仅剩 main 已有的 Button asChild 类型问题,未在本轮范围)
+
+#### 评审发现的 7 个问题与处理
+
+| # | 问题 | 处理 |
+| - | --- | --- |
+| P0-1 | `/share/scene/[slug]` 只渲染 GuidanceState,匿名用户进来仍是"功能不可用"卡片,核心假设无法验证 | 新增 `getPublicSceneBySlug`(走 anon RLS,只回 is_public=true)+ 新建 `ShareScenePreviewClient`(读 + 选词 + AI 解释最小闭环)。**SceneDetailClientPage 未动**,避开不收项 §11.2。搜索引擎爬虫分支仍渲染 GuidanceState,不触发付费链路。 |
+| P0-2 | 8 个漏斗事件 0 业务调用,daily 报表永远空 | 接入 4 个关键事件:`anon_session_created`(session-store)/ `anon_quota_blocked`(quota.ts,带 blocked_layer=ip/global/session)/ `anon_ai_explain_used`(explain-selection 路由)/ `anon_register_prompt_shown`(client 通过新 `/api/anonymous/funnel-event` 上报 L2/L3)。新增 `recordAnonymousFunnelEventSafe` fire-and-forget 包装,埋点失败只 warn 不影响业务。 |
+| P0-3 | TTS 预生成播放未接匿名分支 | 评估后**推到 V2**:需要 Storage signed URL 配额 + 客户端播放器接入,工作量超本轮 budget,且 explain_selection 单接入已能验证核心假设。 |
+| P0-4 | `setAnonymousResponseHeaders(new Headers(outgoing))` 创建临时对象后丢弃,无效调用 | 改在 middleware 统一注入 `Cache-Control: private, no-store` 给所有 `/share/*` 路径。page.tsx 不再依赖手动设头。 |
+| P1-5 | counter Upstash 失败静默 fallback 内存,多实例下日上限会放大 N 倍 | `incrDailyCounter` / `peekDailyCounter` / 新增 `decrDailyCounter` 失败时 `logServerEvent("warn", ...)` 暴露,运维可据此判定是否止血。 |
+| P1-6 | GuidanceState `nowAction.href = "/share"` 是 404 死链 | 改为 `/`(首页),文案配套调整为"回到首页"。 |
+| P1-7 | `ANON_QUOTA_EXCEEDED_GLOBAL` / `_SESSION` 命中后 INCR 不回滚,持续失败请求让 count 漂移 | quota.ts 在 throw 前调 `decrDailyCounter` 回滚刚才那次 INCR;session 命中时一并回滚已 INCR 的 global,避免单 session 满后仍消耗全站池。 |
+
+#### 范围/边界
+
+- **不动 SceneDetailClientPage**:避免触发不收项 §11.2"已登录用户主链路语义不变"。匿名分支走完全独立的 `ShareScenePreviewClient`,不污染 SceneDetailClient 的 hook 调用图。
+- **TTS 不接**:推到 V2,留有 `TTS_PLAYBACK_ANONYMOUS_SESSION_DAILY_LIMIT = 30` 占位常量。
+- **2 个 register_prompt_clicked 类事件不接**:三层引导组件目前不接受 onClick prop,加 click 上报需要改组件接口;按"先量 shown 再量 clicked"的漏斗优先级,先接 shown 已足以算 L2/L3 → 注册转化率。
+
+#### 验收
+
+- 单元测试:`pnpm test:unit` 588/588 全绿
+- audit 测试:`src/app/share/scene/[slug]/page.audit.test.ts` 11/11 全绿(覆盖 SSR 路径、爬虫分支、Cache-Control 中间件注入、PROTECTED_PAGE_PREFIXES 不含 /share、显式包含 6 个主入口)
+- type-check:本轮新增代码仅引入 1 个 Button `asChild` 类型错误(`share-scene-preview-client.tsx:438`),延续 main 已有 5 处 anonymous-\* 组件同款写法,Button 组件自身签名问题需单独 spec 处理,不在本轮范围
+
+---
+
 ### [2026-05-28] 收口与最终验证(enable-anonymous-trial-mode §10/§11)
 - 类型:Spec-Driven(OpenSpec change `enable-anonymous-trial-mode` Section 10/11)
 - 状态:落地(灰度部署冒烟项见 10.5 转交项)

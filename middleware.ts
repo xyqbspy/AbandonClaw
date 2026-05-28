@@ -14,6 +14,7 @@ import {
 
 const AUTH_PAGE_PATHS = new Set(["/login", "/signup"]);
 const VERIFY_EMAIL_PATH = "/verify-email";
+const ANONYMOUS_SHARE_PATH_PREFIX = "/share";
 const PROTECTED_PAGE_PREFIXES = [
   "/today",
   "/scenes",
@@ -49,6 +50,17 @@ const isProtectedApiPath = (pathname: string) =>
   PROTECTED_API_PREFIXES.some(
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
   );
+
+const isAnonymousSharePath = (pathname: string) =>
+  pathname === ANONYMOUS_SHARE_PATH_PREFIX ||
+  pathname.startsWith(`${ANONYMOUS_SHARE_PATH_PREFIX}/`);
+
+const ANONYMOUS_CACHE_CONTROL = "private, no-store";
+
+const applyAnonymousCacheHeaders = (response: NextResponse): NextResponse => {
+  response.headers.set("Cache-Control", ANONYMOUS_CACHE_CONTROL);
+  return response;
+};
 
 const isEmailVerifiedUser = (
   user: { email_confirmed_at?: string | null; confirmed_at?: string | null } | null,
@@ -99,7 +111,14 @@ export async function handleMiddleware(
     pathname !== VERIFY_EMAIL_PATH &&
     !isProtectedApiPath(pathname)
   ) {
-    return attachRequestIdToResponse(dependencies.next(request, requestId), requestId);
+    const passthrough = attachRequestIdToResponse(
+      dependencies.next(request, requestId),
+      requestId,
+    );
+    if (isAnonymousSharePath(pathname)) {
+      applyAnonymousCacheHeaders(passthrough);
+    }
+    return passthrough;
   }
 
   const response = attachRequestIdToResponse(

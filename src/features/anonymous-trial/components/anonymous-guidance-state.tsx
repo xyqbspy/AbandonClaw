@@ -28,8 +28,8 @@ const COPY: Record<AnonymousGuidancePage, GuidanceCopy> = {
       "在场景里随时切回复习并打上信号",
     ],
     nowHeading: "现在可以做什么",
-    now: "回到分享的场景继续读一段,体会一下 AI 表达解释的玩法,觉得有用再注册保存。",
-    nowAction: { label: "回到场景", href: "/share" },
+    now: "回到首页找一个你感兴趣的场景继续读一段,体会一下 AI 表达解释的玩法,觉得有用再注册保存。",
+    nowAction: { label: "回到首页", href: "/" },
   },
   progress: {
     title: "学习进度需要先登录",
@@ -43,7 +43,7 @@ const COPY: Record<AnonymousGuidancePage, GuidanceCopy> = {
     ],
     nowHeading: "现在可以做什么",
     now: "先在分享场景里完整体验一次「看 + 听 + 拆」,再决定要不要注册积累自己的学习轨迹。",
-    nowAction: { label: "回到场景", href: "/share" },
+    nowAction: { label: "回到首页", href: "/" },
   },
   chunks: {
     title: "我的表达库需要先登录",
@@ -57,7 +57,7 @@ const COPY: Record<AnonymousGuidancePage, GuidanceCopy> = {
     ],
     nowHeading: "现在可以做什么",
     now: "在场景里碰到喜欢的表达,先用 AI 解释看清用法,等想保存再注册。",
-    nowAction: { label: "回到场景", href: "/share" },
+    nowAction: { label: "回到首页", href: "/" },
   },
 };
 

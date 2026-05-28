@@ -1,4 +1,5 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { logServerEvent } from "@/lib/server/logger";
 
 export const ANONYMOUS_FUNNEL_EVENT_NAMES = [
   "anon_session_created",
@@ -64,3 +65,23 @@ export async function recordAnonymousFunnelEvent(
     );
   }
 }
+
+/**
+ * Fire-and-forget 版本:埋点失败时只记日志,不影响业务链路。
+ * 适用于所有"业务链路调用埋点"的场景(身份/配额/解释成功路径)。
+ */
+export const recordAnonymousFunnelEventSafe = (
+  params: RecordAnonymousFunnelEventParams,
+  dependencies?: AnonymousFunnelEventDependencies,
+): void => {
+  void recordAnonymousFunnelEvent(params, dependencies).catch((error) => {
+    logServerEvent("warn", "[anonymous-funnel] failed to record event", {
+      module: "anonymous/funnel-events",
+      error,
+      details: {
+        eventName: params.eventName,
+        anonId: params.anonId,
+      },
+    });
+  });
+};

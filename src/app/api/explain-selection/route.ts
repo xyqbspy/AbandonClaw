@@ -24,6 +24,7 @@ import {
   attachAnonymousQuotaHeaders,
   buildAnonymousQuotaHeaders,
 } from "@/lib/server/anonymous/quota-headers";
+import { recordAnonymousFunnelEventSafe } from "@/lib/server/anonymous/funnel-events";
 
 const EXPLAIN_SELECTION_RATE_LIMIT = 5;
 const RATE_LIMIT_WINDOW_MS = 60_000;
@@ -85,8 +86,16 @@ export async function handleExplainSelectionPost(
       }
     }
 
-    const { quotaResult } = accessResult;
+    const { quotaResult, anonContext } = accessResult;
     const result = await dependencies.explainSelection(normalizedPayload);
+    if (!anonContext.isSearchEngineBot) {
+      recordAnonymousFunnelEventSafe({
+        eventName: "anon_ai_explain_used",
+        anonId: anonContext.anonId,
+        ipHash: anonContext.ipHash,
+        payload: { capability: "explain_selection" },
+      });
+    }
     return attachAnonymousQuotaHeaders(
       NextResponse.json(result, { status: 200 }),
       quotaResult,

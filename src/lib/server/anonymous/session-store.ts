@@ -1,5 +1,6 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { AnonIpRateLimitedError } from "@/lib/server/errors";
+import { recordAnonymousFunnelEventSafe } from "@/lib/server/anonymous/funnel-events";
 
 const DEFAULT_IP_SESSION_DAILY_LIMIT = 5;
 
@@ -94,6 +95,14 @@ export async function upsertAnonymousSession(
   if (insertError) {
     throw new Error(`Failed to insert anonymous_session: ${insertError.message}`);
   }
+
+  recordAnonymousFunnelEventSafe({
+    eventName: "anon_session_created",
+    anonId: params.anonId,
+    ipHash: params.ipHash,
+    payload: { ip_session_count_today: ipSessionCountToday + 1 },
+    now,
+  });
 
   return { isNewAnonId: true, ipSessionCountToday: ipSessionCountToday + 1 };
 }

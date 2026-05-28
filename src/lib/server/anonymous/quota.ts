@@ -14,7 +14,8 @@ import {
 } from "@/lib/server/high-cost-usage";
 import { getTodayUtcDateKey } from "@/lib/server/anonymous/daily-salt";
 import { getAnonymousFeatureConfig } from "@/lib/server/anonymous/feature-matrix";
-import { incrDailyCounter, peekDailyCounter } from "@/lib/server/anonymous/counter";
+import { incrDailyCounter, peekDailyCounter, decrDailyCounter } from "@/lib/server/anonymous/counter";
+import { recordAnonymousFunnelEventSafe } from "@/lib/server/anonymous/funnel-events";
 
 const DAILY_COUNTER_TTL_SECONDS = 60 * 60 * 25; // 25h,允许跨日少量缓冲
 
@@ -79,7 +80,11 @@ const assertNotEmergencyDisabled = async (
   }
 };
 
-const enforceIpSlidingWindow = async (ipHash: string) => {
+const enforceIpSlidingWindow = async (
+  ipHash: string,
+  anonId: string,
+  capability: HighCostCapability,
+) => {
   try {
     await enforceRateLimit({
       key: `ip:${ipHash}`,
@@ -89,6 +94,12 @@ const enforceIpSlidingWindow = async (ipHash: string) => {
     });
   } catch (error) {
     if (error instanceof RateLimitError) {
+      recordAnonymousFunnelEventSafe({
+        eventName: "anon_quota_blocked",
+        anonId,
+        ipHash,
+        payload: { capability, blocked_layer: "ip_rate" },
+      });
       throw new AnonIpRateLimitedError();
     }
     throw error;
@@ -124,22 +135,38 @@ export async function checkAnonymousQuota(
     throw new AnonFeatureDisabledError(capability);
   }
 
-  await enforceIpSlidingWindow(ipHash);
+  await enforceIpSlidingWindow(ipHash, anonId, capability);
 
   const dateKey = getTodayUtcDateKey(now);
   const resetAt = startOfNextUtcDay(now);
 
   let globalCount = 0;
+  let globalKeyForRollback: string | null = null;
   if (config.globalDailyLimit >= 0) {
     const globalKey = buildGlobalKey(capability, dateKey);
     const globalIncr = await incrDailyCounter(globalKey, DAILY_COUNTER_TTL_SECONDS, now.getTime());
     globalCount = globalIncr.count;
     if (globalCount > config.globalDailyLimit) {
+      // 已经命中阈值,DECR 把刚才那次 INCR 回滚,避免持续失败请求让计数无限漂移。
+      await decrDailyCounter(globalKey, now.getTime());
+      globalCount = config.globalDailyLimit;
+      recordAnonymousFunnelEventSafe({
+        eventName: "anon_quota_blocked",
+        anonId,
+        ipHash,
+        payload: {
+          capability,
+          blocked_layer: "global",
+          limit: config.globalDailyLimit,
+          count: globalCount,
+        },
+      });
       throw new AnonQuotaExceededGlobalError(capability, {
         globalDailyLimit: config.globalDailyLimit,
         resetAt: resetAt.toISOString(),
       });
     }
+    globalKeyForRollback = globalKey;
   }
 
   let sessionCount = 0;
@@ -148,6 +175,24 @@ export async function checkAnonymousQuota(
     const sessionIncr = await incrDailyCounter(sessionKey, DAILY_COUNTER_TTL_SECONDS, now.getTime());
     sessionCount = sessionIncr.count;
     if (sessionCount > config.sessionDailyLimit) {
+      // 同 global:回滚 session 计数;同时也回滚已经 INCR 的 global,
+      // 避免单 session 已满后还在持续消耗全站匿名池。
+      await decrDailyCounter(sessionKey, now.getTime());
+      if (globalKeyForRollback) {
+        await decrDailyCounter(globalKeyForRollback, now.getTime());
+      }
+      sessionCount = config.sessionDailyLimit;
+      recordAnonymousFunnelEventSafe({
+        eventName: "anon_quota_blocked",
+        anonId,
+        ipHash,
+        payload: {
+          capability,
+          blocked_layer: "session",
+          limit: config.sessionDailyLimit,
+          count: sessionCount,
+        },
+      });
       throw new AnonQuotaExceededSessionError(capability, {
         sessionDailyLimit: config.sessionDailyLimit,
         resetAt: resetAt.toISOString(),

@@ -6,6 +6,7 @@ import { normalizeParsedSceneDialogue } from "@/lib/shared/scene-dialogue";
 import { SceneRow, UserSceneProgressRow } from "@/lib/server/db/types";
 import { getSceneVariantsBySceneId } from "@/lib/server/scene/variants";
 import { deleteSceneTtsAudioBySlug, warmLessonTtsAudio } from "@/lib/server/tts/storage";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
   deleteObsoleteSeedScenes,
   deleteImportedSceneByOwner,
@@ -259,6 +260,27 @@ export async function getSceneBySlug(params: { slug: string; userId: string }) {
   await runSeedScenesSync();
   const data = await getVisibleSceneBySlug(params);
 
+  if (!data) return null;
+  return rowToLesson(data);
+}
+
+/**
+ * 匿名 SSR 入口:仅返回 is_public=true 的公开场景,用于 /share/scene/[slug] 灰度。
+ * 不依赖 userId,内部走 createSupabaseServerClient(无 session 时为 anon role,
+ * RLS 自动限制 is_public=true,这里 eq 再加一层显式过滤作双保险)。
+ */
+export async function getPublicSceneBySlug(slug: string): Promise<Lesson | null> {
+  await runSeedScenesSync();
+  const client = await createSupabaseServerClient();
+  const { data, error } = await client
+    .from("scenes")
+    .select("*")
+    .eq("slug", slug)
+    .eq("is_public", true)
+    .maybeSingle<SceneRow>();
+  if (error) {
+    throw new Error(`Failed to load public scene by slug: ${error.message}`);
+  }
   if (!data) return null;
   return rowToLesson(data);
 }
