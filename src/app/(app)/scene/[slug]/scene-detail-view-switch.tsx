@@ -58,7 +58,6 @@ type SceneDetailViewSwitchProps = {
     toggleSceneLoopPlayback: () => void;
   }) => ReactNode;
   chunkDetailSheet: ReactNode;
-  onBackToList: () => void;
   onBackToSceneView: () => void;
   onOpenVariantsView: () => void;
   onRegeneratePracticeFromView: () => void;
@@ -125,7 +124,6 @@ export function SceneDetailViewSwitch({
   appleDangerButtonSmClassName,
   trainingNextStep,
   chunkDetailSheet,
-  onBackToList,
   onBackToSceneView,
   onOpenVariantsView,
   onRegeneratePracticeFromView,
@@ -280,7 +278,6 @@ export function SceneDetailViewSwitch({
       trainingNextStep={trainingNextStep}
       headerTools={null}
       headerTitle={baseLesson.subtitle?.trim() || baseLesson.sections[0]?.summary?.trim() || baseLesson.title}
-      onBackToList={onBackToList}
       interactionMode="training"
       savedPhraseTexts={savedPhraseTexts}
       onSavePhrase={onSavePhrase}

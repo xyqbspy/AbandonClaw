@@ -807,7 +807,6 @@ export default function SceneDetailClientPage({
       appleDangerButtonSmClassName={SCENE_DANGER_ACTION_BUTTON_SM_CLASSNAME}
       trainingNextStep={trainingNextStep}
       chunkDetailSheet={chunkDetailSheet}
-      onBackToList={() => router.push("/scenes")}
       onBackToSceneView={handleBackToSceneView}
       onOpenVariantsView={handleOpenVariantsView}
       onRegeneratePracticeFromView={handleRegeneratePracticeFromView}

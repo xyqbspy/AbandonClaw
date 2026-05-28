@@ -1,5 +1,37 @@
 # Dev Log
 
+### [2026-05-28] 修 next build 失败:Button asChild 类型 + scene-detail-view-switch dead prop
+- 类型:Cleanup(修工程债 + 清理 dead pass-through prop)
+- 状态:落地(`pnpm run build` PASS;unit 610/610 + interaction 367/367 全绿)
+
+#### 触发情形
+
+`pnpm run build` 失败,两个连锁 TS error:
+
+1. `scene-detail-view-switch.tsx:283` 把 `onBackToList={onBackToList}` 传给 `SceneBaseView`,但 SceneBaseView 的 props 类型不接受这个 prop。
+2. 第 1 个修完后第 2 个错暴露:`anonymous-block-modal.tsx:101` 等 5 处用 `<Button asChild><Link>...</Link></Button>`,但 Button 组件签名(`@base-ui/react/button` 的 ButtonPrimitive.Props)不支持 `asChild` prop。
+
+第 2 个是 main 145686a 已有的工程债(`docs/dev/dev-log.md` 顶部 2026-05-28 自评审 entry 已记录"留作单独 spec 改 Button 组件"),原本只是 TS warning 不阻塞 dev/test,但 `next build` 严格 TypeScript 检查会拒绝。
+
+#### 修法
+
+**问题 1**:`onBackToList` 在 scene-detail-view-switch 是个 dead pass-through——view-switch 解构接住后只在 training mode 一处传给 SceneBaseView,但 SceneBaseView 内部用的 SceneTrainingNextStepStrip 自带 `onBack={() => router.push("/scenes")}`,根本不需要外面再传一遍。一次性清理 4 处:
+- `scene-detail-view-switch.tsx` 类型声明 / 解构 / 第 283 行传递
+- `scene-detail-page.tsx:810` 调用处 `onBackToList={() => router.push("/scenes")}`
+
+**问题 2**:给 `src/components/ui/button.tsx` 加 `asChild?: boolean` prop 支持,内部用 `React.cloneElement` 把 className + data-slot 合并到 children,不引入 `@radix-ui/react-slot`(项目没装,只用 @base-ui/react)。逻辑:
+- `asChild=true` + 合法 React element 子节点 → cloneElement,合并 styled className,丢弃 ButtonPrimitive 包装
+- 否则保持原行为(ButtonPrimitive + spread props)
+
+这样 main 已有的 5 处 + 之前我新加的 share-scene-preview-client.tsx 1 处共 6 处 `<Button asChild><Link>` 写法都合法。
+
+#### 边界
+
+- Button asChild 实现是最小化的,只合并 className + data-slot,**不**把 Button 的 onClick / disabled / aria 等转发给 children——因为现有调用方都是 `<Button asChild><Link href={x} onClick={y}>` 这种,Link 自己已有完整 props 不需要 Button 注入。如果将来有"需要 Button 把动作合并到 children"的用法,要扩 cloneElement 逻辑。
+- 没补 `docs/system-design/component-library.md` 的 Button API——该文档只讲组件归位规则(`Button` 放 `src/components/ui`),不讲 API 详解;asChild 改造只是补足 main 已有写法的类型合规,不算"组件归位规则变化"。
+
+---
+
 ### [2026-05-28] 匿名 TTS 预生成播放接入(灰度 V2 第一项)
 - 类型:enable-anonymous-trial-mode 续期(原 P0-3 推到 V2 项,本轮落地)
 - 状态:落地(unit 610/610 全绿;interaction 367/367 全绿)

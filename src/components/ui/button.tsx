@@ -1,5 +1,6 @@
 "use client"
 
+import * as React from "react"
 import { Button as ButtonPrimitive } from "@base-ui/react/button"
 import { cva, type VariantProps } from "class-variance-authority"
 
@@ -44,21 +45,43 @@ const buttonVariants = cva(
   }
 )
 
-type ButtonProps = ButtonPrimitive.Props & VariantProps<typeof buttonVariants>
+type ButtonProps = ButtonPrimitive.Props &
+  VariantProps<typeof buttonVariants> & {
+    /**
+     * 当 asChild=true 时,Button 不渲染自己的 ButtonPrimitive,而是把 className 与
+     * data-slot 合并到 children 上(典型用法:`<Button asChild><Link>...</Link></Button>`,
+     * 让 Link 拿到按钮样式但保留路由语义)。
+     */
+    asChild?: boolean
+  }
 
 function Button({
   className,
   variant = "default",
   radius = "default",
   size = "default",
+  asChild = false,
+  children,
   ...props
 }: ButtonProps) {
+  const styled = cn(buttonVariants({ variant, radius, size, className }))
+
+  if (asChild && React.isValidElement<{ className?: string }>(children)) {
+    const childClassName = (children.props.className as string | undefined) ?? ""
+    return React.cloneElement(children, {
+      "data-slot": "button",
+      className: cn(childClassName, styled),
+    } as React.HTMLAttributes<HTMLElement>)
+  }
+
   return (
     <ButtonPrimitive
       data-slot="button"
-      className={cn(buttonVariants({ variant, radius, size, className }))}
+      className={styled}
       {...props}
-    />
+    >
+      {children}
+    </ButtonPrimitive>
   )
 }
 
