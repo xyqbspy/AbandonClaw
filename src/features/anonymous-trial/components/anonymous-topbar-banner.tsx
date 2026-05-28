@@ -27,12 +27,14 @@ export function AnonymousTopbarBanner({
   primaryCapability = "explain_selection",
   quotaByCapability,
   registerHref = "/register",
+  onRegisterClick,
   className,
 }: {
   isAnonymous: boolean;
   primaryCapability?: string;
   quotaByCapability: Record<string, AnonymousQuotaSnapshot>;
   registerHref?: string;
+  onRegisterClick?: () => void;
   className?: string;
 }) {
   if (!isAnonymous) return null;
@@ -55,7 +57,11 @@ export function AnonymousTopbarBanner({
         {formatQuotaLine(snapshot)}
       </span>
       <Button asChild radius="sm" size="sm">
-        <Link href={registerHref} data-testid="anonymous-topbar-register-action">
+        <Link
+          href={registerHref}
+          data-testid="anonymous-topbar-register-action"
+          onClick={onRegisterClick}
+        >
           立即注册解锁
         </Link>
       </Button>

@@ -46,6 +46,7 @@ export function AnonymousBlockModal({
   trigger,
   onDismiss,
   registerHref = "/register",
+  onRegisterClick,
   capabilityLabel,
   className,
 }: {
@@ -54,6 +55,7 @@ export function AnonymousBlockModal({
   trigger: AnonymousBlockTrigger;
   onDismiss: () => void;
   registerHref?: string;
+  onRegisterClick?: () => void;
   capabilityLabel?: string;
   className?: string;
 }) {
@@ -100,6 +102,7 @@ export function AnonymousBlockModal({
             <Link
               href={registerHref}
               data-testid="anonymous-block-modal-register"
+              onClick={onRegisterClick}
             >
               {copy.primaryLabel}
             </Link>

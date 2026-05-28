@@ -11,6 +11,7 @@ export function AnonymousInlineUpsellCard({
   onDismiss,
   expressionCount,
   registerHref = "/register",
+  onRegisterClick,
   className,
 }: {
   isAnonymous: boolean;
@@ -18,6 +19,7 @@ export function AnonymousInlineUpsellCard({
   onDismiss: () => void;
   expressionCount: number;
   registerHref?: string;
+  onRegisterClick?: () => void;
   className?: string;
 }) {
   if (!isAnonymous || !visible) return null;
@@ -41,6 +43,7 @@ export function AnonymousInlineUpsellCard({
             <Link
               href={registerHref}
               data-testid="anonymous-inline-upsell-register"
+              onClick={onRegisterClick}
             >
               注册保存
             </Link>

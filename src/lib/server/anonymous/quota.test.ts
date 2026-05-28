@@ -8,7 +8,7 @@ import {
   HighCostCapabilityDisabledError,
 } from "@/lib/server/errors";
 import { clearRateLimitStore } from "@/lib/server/rate-limit";
-import { clearAnonymousCounterStore } from "./counter";
+import { clearAnonymousCounterStore, peekDailyCounter } from "./counter";
 import { checkAnonymousQuota } from "./quota";
 
 const VALID_ANON_ID = "11111111-2222-4333-8444-555555555555";
@@ -169,4 +169,86 @@ test("checkAnonymousQuota: 返回的 resetAt 为次日 00:00:00 UTC", async () =
     noDisabledDeps,
   );
   assert.equal(result.resetAt.toISOString(), "2026-05-29T00:00:00.000Z");
+});
+
+// === 回滚行为(decrDailyCounter)===
+// key 格式见 quota.ts buildGlobalKey / buildSessionKey,与 spec 文档一致
+
+const dateKey = "2026-05-28";
+const globalKey = `anon:quota:global:explain_selection:${dateKey}`;
+const sessionKey = (anonId: string) =>
+  `anon:quota:session:${anonId}:explain_selection:${dateKey}`;
+
+test("checkAnonymousQuota: global 命中后 DECR 回滚,持续失败请求 count 不会无限漂移", async () => {
+  process.env.ANON_QUOTA_GLOBAL_EXPLAIN_SELECTION = "1";
+  process.env.ANON_QUOTA_SESSION_EXPLAIN_SELECTION = "100";
+
+  // 1 次成功
+  await checkAnonymousQuota(
+    { capability: "explain_selection", anonId: VALID_ANON_ID, ipHash: IP_HASH, now: FIXED_NOW },
+    noDisabledDeps,
+  );
+  let peek = await peekDailyCounter(globalKey, FIXED_NOW.getTime());
+  assert.equal(peek.count, 1, "成功 1 次后 global count = 1");
+
+  // 5 次失败,每次都命中 global 阈值并应该 DECR 回滚
+  for (let i = 0; i < 5; i += 1) {
+    await assert.rejects(
+      () =>
+        checkAnonymousQuota(
+          {
+            capability: "explain_selection",
+            anonId: `2222222${i}-2222-4222-8222-222222222222`,
+            ipHash: `b${i}`.repeat(32).slice(0, 64),
+            now: FIXED_NOW,
+          },
+          noDisabledDeps,
+        ),
+      AnonQuotaExceededGlobalError,
+    );
+  }
+  peek = await peekDailyCounter(globalKey, FIXED_NOW.getTime());
+  assert.equal(
+    peek.count,
+    1,
+    "5 次失败请求都被 DECR 回滚后,global count 应仍为 1(命中阈值时的快照值),不会涨到 6",
+  );
+});
+
+test("checkAnonymousQuota: session 命中后,session + global 都被回滚(避免单 session 满后仍消耗全站池)", async () => {
+  process.env.ANON_QUOTA_GLOBAL_EXPLAIN_SELECTION = "100";
+  process.env.ANON_QUOTA_SESSION_EXPLAIN_SELECTION = "3";
+
+  for (let i = 0; i < 3; i += 1) {
+    await checkAnonymousQuota(
+      { capability: "explain_selection", anonId: VALID_ANON_ID, ipHash: IP_HASH, now: FIXED_NOW },
+      noDisabledDeps,
+    );
+  }
+
+  const globalAfterSuccess = await peekDailyCounter(globalKey, FIXED_NOW.getTime());
+  assert.equal(globalAfterSuccess.count, 3);
+  const sessionAfterSuccess = await peekDailyCounter(sessionKey(VALID_ANON_ID), FIXED_NOW.getTime());
+  assert.equal(sessionAfterSuccess.count, 3);
+
+  // 第 4 次同 anonId 命中 session 上限
+  await assert.rejects(
+    () =>
+      checkAnonymousQuota(
+        { capability: "explain_selection", anonId: VALID_ANON_ID, ipHash: IP_HASH, now: FIXED_NOW },
+        noDisabledDeps,
+      ),
+    AnonQuotaExceededSessionError,
+  );
+
+  // session 应被回滚回 3 而不是 4
+  const sessionAfterFail = await peekDailyCounter(sessionKey(VALID_ANON_ID), FIXED_NOW.getTime());
+  assert.equal(sessionAfterFail.count, 3, "session count 应回滚回 3,不是漂到 4");
+  // 关键:global 也应被回滚(单 session 已满,不该再吃全站池)
+  const globalAfterFail = await peekDailyCounter(globalKey, FIXED_NOW.getTime());
+  assert.equal(
+    globalAfterFail.count,
+    3,
+    "session 命中时 global 也要回滚,否则单 session 满后仍持续消耗全站池",
+  );
 });

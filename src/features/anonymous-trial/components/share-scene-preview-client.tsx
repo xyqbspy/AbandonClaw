@@ -44,6 +44,16 @@ const reportAnonymousEvent = (
   });
 };
 
+const reportRegisterClicked = (
+  level: "L1" | "L2" | "L3",
+  extra?: Record<string, unknown>,
+) => {
+  reportAnonymousEvent("anon_register_prompt_clicked", {
+    prompt_level: level,
+    ...(extra ?? {}),
+  });
+};
+
 interface ExplainSuccessResponse {
   chunk?: {
     text?: string;
@@ -221,6 +231,7 @@ export function ShareScenePreviewClient({
         primaryCapability="explain_selection"
         quotaByCapability={anonState.quotaByCapability}
         registerHref={registerHref}
+        onRegisterClick={() => reportRegisterClicked("L1", { surface: "share_scene_topbar" })}
       />
 
       <article className="mx-auto w-full max-w-3xl px-4 py-6 sm:py-8">
@@ -264,6 +275,9 @@ export function ShareScenePreviewClient({
             onDismiss={() => setInlineCardVisible(false)}
             expressionCount={totalChunkCount}
             registerHref={registerHref}
+            onRegisterClick={() =>
+              reportRegisterClicked("L2", { surface: "share_scene_inline_card" })
+            }
           />
         </div>
       </article>
@@ -277,6 +291,9 @@ export function ShareScenePreviewClient({
         registerHref={registerHref}
         quotaSnapshot={explainSnapshot}
         onClose={handleCloseSheet}
+        onRegisterClick={() =>
+          reportRegisterClicked("L2", { surface: "share_scene_explain_sheet" })
+        }
       />
 
       <AnonymousBlockModal
@@ -285,6 +302,9 @@ export function ShareScenePreviewClient({
         trigger={blockTrigger ?? "feature_disabled"}
         onDismiss={() => setBlockTrigger(null)}
         registerHref={registerHref}
+        onRegisterClick={() =>
+          reportRegisterClicked("L3", { trigger: blockTrigger ?? "feature_disabled" })
+        }
       />
     </div>
   );
@@ -341,6 +361,7 @@ function ExplainResultSheet({
   registerHref,
   quotaSnapshot,
   onClose,
+  onRegisterClick,
 }: {
   open: boolean;
   chunk: { text: string; sentence: LessonSentence } | null;
@@ -350,6 +371,7 @@ function ExplainResultSheet({
   registerHref: string;
   quotaSnapshot: AnonymousQuotaSnapshot | null;
   onClose: () => void;
+  onRegisterClick?: () => void;
 }) {
   if (!open || !chunk) return null;
   return (
@@ -439,6 +461,7 @@ function ExplainResultSheet({
             <Link
               href={registerHref}
               data-testid="share-scene-explain-register"
+              onClick={onRegisterClick}
             >
               注册保存到表达库
             </Link>
