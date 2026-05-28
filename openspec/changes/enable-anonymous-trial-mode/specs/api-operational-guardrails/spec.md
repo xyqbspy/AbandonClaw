@@ -118,6 +118,30 @@
 - **THEN** 所有匿名场景 MUST 全部表现为"未登录拒绝"(即行为退化为本变更前)
 - **AND** baseline MUST 将匿名场景标记为 `gated_off` 而非失败
 
+### Requirement: 零边际成本匿名 capability 必须走独立 quota 模块不污染 HighCostCapability
+匿名 capability 若**不调用任何付费上游**(仅读 Storage、仅读公开内容表、仅返已缓存结果),MUST 走独立 quota 模块实施,MUST NOT 加入 `HIGH_COST_CAPABILITIES` 数组。理由:加入会污染 admin 紧急关闭面板、用户每日 quota 表(`user_daily_high_cost_usage`)、usage 统计的"高成本"语义,让运维误以为它会产生外部账单。
+
+#### Scenario: TTS 预生成播放接入匿名访问
+- **WHEN** 维护者为匿名 TTS 预生成播放(`tts_play`)实施配额
+- **THEN** 配额 MUST 在新独立模块 `src/lib/server/anonymous/tts-playback-quota.ts` 实现
+- **AND** `tts_play` MUST NOT 出现在 `src/lib/server/high-cost-usage.ts` 的 `HIGH_COST_CAPABILITIES` 数组
+- **AND** 该模块 MUST 复用 `counter.ts` 的 `incrDailyCounter` / `decrDailyCounter` 与 IP 滑窗(共享 `anon-ip-rate` scope),但 MUST NOT 走 `checkAnonymousQuota`(后者签名限定 HighCostCapability)
+- **AND** 该模块 MUST NOT 调用 admin emergency disable 判定(只读 Storage 没有 emergency 需求)
+- **AND** 命中阈值 MUST 触发 `recordAnonymousFunnelEventSafe({ eventName: "anon_quota_blocked", payload: { capability: "tts_play", blocked_layer } })`,跟主 quota 行为一致
+
+#### Scenario: TTS 预生成播放无全站日预算
+- **WHEN** 实施 tts_play 配额
+- **THEN** MUST 仅有 IP 滑窗 + 单 anon session 两层(默认 30/anon/天)
+- **AND** MUST NOT 设全站日预算(storage hit 签发 signed URL 几乎零成本,防失控由 IP 滑窗 30/min 兜底足够)
+- **AND** 返回的 `AnonymousTtsPlaybackQuotaResult.globalDailyLimit` MUST 为 `-1`,响应头 `X-Quota-Daily-Limit` MUST 格式化为 `"unlimited"`
+
+#### Scenario: 命中 tts_play 阈值后计数器回滚
+- **WHEN** 单 anon 当日 tts_play 调用数达到 `getAnonymousTtsPlaybackSessionDailyLimit()` 阈值
+- **AND** 同一 anon 继续调用
+- **THEN** 配额函数 MUST 在 throw `AnonQuotaExceededSessionError` 之前调 `decrDailyCounter` 回滚刚才 INCR
+- **AND** 持续失败请求 MUST NOT 让 Redis 计数无限漂移到 `limit + N`,而 MUST 稳定在阈值
+- **AND** 与 HighCostCapability 的 explain_selection 回滚语义一致(`quota.ts` 内 global/session 命中也 DECR)
+
 ## MODIFIED Requirements
 
 ### Requirement: 未知服务端异常必须被错误追踪系统捕获

@@ -966,6 +966,23 @@
 
 这样读，理解成本最低。
 
+### 第五轮：读匿名试用与灰度入口（可选）
+
+如果想理解"如何把一个新功能完全隔离地接入,不污染已有主链路",读 enable-anonymous-trial-mode 这条灰度功能。建议顺序：
+
+1. `openspec/changes/enable-anonymous-trial-mode/proposal.md` + `design.md` 先看为什么这样设计
+2. `src/lib/server/anonymous/identity.ts` 看身份识别(localStorage UUID + ip_hash daily salt)
+3. `src/lib/server/anonymous/quota.ts` + `tts-playback-quota.ts` 对照看两类 capability 走两套 quota 的取舍(为什么 tts_play 不进 HighCostCapability)
+4. `src/lib/server/anonymous/counter.ts` 看 INCR / DECR 配额回滚 + Upstash 失败 fallback 内存 warn
+5. `src/lib/server/anonymous/route-guard.ts` 看 `ensureProfileOrRejectAnonymous` 与 `ensureProfileOrAnonymousQuota` 两态 helper 的接入模式
+6. `src/lib/server/anonymous/rls-policy-audit.test.ts` 看 SQL parser 守护 "用户态表不能给 anon 加 SELECT" 不变量(audit test 而非文档防呆)
+7. `src/app/share/scene/[slug]/page.tsx` + `src/features/anonymous-trial/components/share-scene-preview-client.tsx` 看灰度入口怎么 SSR 直读公共表 + 客户端 inline fetch 配额头
+8. `middleware.ts` `PROTECTED_PAGE_PREFIXES` + `isAnonymousSharePath` 看主入口怎么显式守护、`/share/*` 怎么注入 Cache-Control
+9. `supabase/sql/20260528_phase25/26/27_*.sql` 看三件套 migration(身份表 + 漏斗 + daily 聚合函数)
+10. `docs/feature-map/anonymous-trial.md` + `docs/domain-rules/auth-api-boundaries.md` §3.8 看模块地图与边界规则
+
+读完后你会理解一个"灰度功能"在工程上至少要解决:身份 / 配额 / 表权限 / 引导漏斗 / 紧急止血 / 不变量守护 / 文档同步 七件事,缺一就有真实风险。
+
 ---
 
 ## 15. 可以直接复述给别人的总结版本

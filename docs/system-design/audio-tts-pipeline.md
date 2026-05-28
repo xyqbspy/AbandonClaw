@@ -808,3 +808,52 @@ review pack 链路会通过现有本地 `client-events` 记录：
 - 同日稳定顺序优先于完全随机；如后续要恢复更强随机性，应先保证随机包也能提前准备并命中同一资源。
 - 不承诺所有浏览器在锁屏或后台状态下都允许启动新音频；本优化关注的是音频启动后的连续播放。
 - 不把 scene full 自动降级为逐句串播；如需逐句降级，应作为新的行为变更单独评估。
+
+## 17. 匿名访客 TTS 预生成播放分支(灰度入口)
+
+### 17.1 这条分支为什么存在
+
+匿名访客(`/share/scene/[slug]` 灰度入口下的未登录访客)需要能听场景音频以感知"看 + 听 + 解释"完整学习闭环,但匿名分支**不允许触发上游 MsEdgeTTS 合成**(防付费链路被脚本薅成本)。本分支只暴露"读 Storage 已存在 mp3"这条 fast path,storage miss 直接返 404 不 fallback 到生成。
+
+### 17.2 实现锚点
+
+- 服务端 fast path:`src/lib/server/tts/service.ts:getPreGeneratedTtsAudioUrl(payload)` — 复用 `resolveAudioTarget()` + 内部 `getStorageSignedUrlIfExists()`(带签名 URL 缓存层),命中返 `{ signedUrl, storagePath, source: "storage-hit" }`,miss 返 null
+- 匿名专属路由:`src/app/api/anonymous/tts/play/route.ts` GET — 接收 `kind / sceneSlug / sentenceId / chunkKey / text / speaker / mode` query,通过路由前缀 `/api/anonymous/*` 让 middleware 自然透传(不在 PROTECTED_API_PREFIXES 内,无 401 拦截)
+- 匿名配额模块:`src/lib/server/anonymous/tts-playback-quota.ts` — `checkAnonymousTtsPlaybackQuota({ anonId, ipHash })`,独立于 HighCostCapability,只做 IP 滑窗(共享 explain_selection 的 `anon-ip-rate` scope)+ 单 anon 30 次/天(env `ANON_QUOTA_SESSION_TTS_PLAY` 可调)
+- 客户端调用:`src/features/anonymous-trial/components/share-scene-preview-client.tsx` 句子级播放按钮,fetch + `new Audio(signedUrl).play()`,状态机 idle / loading / playing / unavailable
+
+### 17.3 跟主路径 `/api/tts` 的区别
+
+| 维度 | `/api/tts` POST(主路径) | `/api/anonymous/tts/play` GET(匿名分支) |
+| --- | --- | --- |
+| 鉴权 | 必须已登录 + 邮箱验证 | 已登录或匿名都允许 |
+| storage miss 后行为 | fallback 调 MsEdgeTTS 合成 + 上传 | 直接返 404,不 fallback |
+| 配额 | 已登录用户每日 quota(`user_daily_high_cost_usage`) | 匿名走 `anon:quota:session:{anonId}:tts_play:*`;已登录走本路由不计任何 quota |
+| 限流 | `enforceHighCostRateLimit` 5/min user + 10/min IP | IP 滑窗共享 `anon-ip-rate` 30/min,session 30/天 |
+| 紧急关闭 | admin 紧急面板覆盖(走 `HighCostCapability`) | 不参与紧急关闭(零边际成本) |
+| 客户端使用 | `requestTtsUrl()` `useTtsPlaybackController` 等已登录链路 | 匿名 `share-scene-preview-client.tsx` inline fetch + 原生 Audio,不复用 `useLessonReaderPlayback` 那一套重 hook |
+
+### 17.4 已登录用户也可以调
+
+虽然路由放在 `/api/anonymous/*` prefix 下,但已登录用户也允许调它作为 fast path——拿到 200 + signedUrl 直接放,拿到 404 后客户端自己决定要不要改调 `/api/tts` POST 触发生成。本期客户端没用这个 fast path(主路径 `/api/tts` 自身已经有 storage hit 优化),只在匿名 `share-scene-preview-client.tsx` 内调用。
+
+### 17.5 配额响应头
+
+成功响应或 429 受控错误响应都带:
+
+```
+X-Quota-Type: tts_play
+X-Quota-Session-Limit: 30
+X-Quota-Session-Remaining: <number>
+X-Quota-Daily-Limit: unlimited
+X-Quota-Daily-Remaining: unlimited
+X-Quota-Reset-At: 2026-05-29T00:00:00.000Z
+```
+
+`X-Quota-Daily-Limit=unlimited` 是有意为之——本分支不设全站日预算(storage hit 几乎零成本,防失控由 IP 滑窗兜底),前端 banner 渲染时不展示 daily 字段。
+
+### 17.6 不变量
+
+- 匿名分支永远不调 MsEdgeTTS、不走 `synthesizeToBuffer` / `synthesizeSceneFullBuffer`(可通过 grep `/api/anonymous/tts/play` route handler 内是否引用这两个函数验证,目前都没引用)
+- `tts_play` 字面值不进 `src/lib/server/high-cost-usage.ts` 的 `HIGH_COST_CAPABILITIES` 数组,加进去会污染紧急关闭面板 / 用户日 quota 表 / usage 统计的"高成本"语义
+- 配额命中阈值时 DECR 回滚 + 触发 `anon_quota_blocked(capability=tts_play)` 漂移,跟 explain_selection 行为一致

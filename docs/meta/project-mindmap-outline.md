@@ -161,3 +161,31 @@
     - review loop
     - phrase relations
     - expression clusters
+  - Anonymous Trial(灰度入口,独立层)
+    - 入口
+      - /share/scene/[slug]
+      - /api/anonymous/tts/play
+      - /api/anonymous/funnel-event
+    - 身份四道防线
+      - localStorage UUID + X-Anonymous-Id 头
+      - SHA256(ip + daily_salt)
+      - anonymous_sessions 同 IP 当日上限
+      - 搜索引擎爬虫识别
+    - 配额隔离
+      - explain_selection 走 HighCostCapability + 全站日预算
+      - tts_play 走独立 tts-playback-quota 不进 HighCostCapability
+      - 已登录 quota:{userId}:* 完全不动
+    - 表权限
+      - 公共内容表显式 anon SELECT
+      - 用户态表 deny-by-default + audit test 守护
+    - 三层注册引导
+      - L1 顶栏配额条
+      - L2 内联卡片(完成首场景)
+      - L3 阻断弹窗(配额耗尽 / 功能禁用)
+    - 漏斗与成本看板
+      - 8 事件 server / client 双路上报
+      - daily_anon_cost_report cron 聚合
+      - Sentry user_type tag
+    - 紧急止血
+      - ALLOW_ANONYMOUS_TRIAL env 一切
+      - 飞书三条告警

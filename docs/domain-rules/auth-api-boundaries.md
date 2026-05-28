@@ -74,6 +74,23 @@
 - 邮箱未验证用户不得进入 `/today`、`/scenes`、`/scene`、`/review`、`/chunks`、`/progress`、`/settings`、`/lesson` 或 `/admin`。
 - 邮箱未验证用户调用受保护 API 时应返回受控 403，不得触发模型、TTS 或学习数据写入。
 
+### 3.8 匿名访问只走灰度路径，且必须独立四道防线
+
+匿名访问（未持有 Supabase Auth session 的访客）默认仍被拒绝；只有当 `ALLOW_ANONYMOUS_TRIAL=true` 且访问路径在显式灰度白名单内时才放行。规则边界：
+
+- **路径白名单**：当前仅 `/share/scene/[slug]` 与 `/api/anonymous/*` 走匿名分支；主入口前缀（today / scenes / scene / review / chunks / progress / settings / lesson / admin）由 middleware `PROTECTED_PAGE_PREFIXES` 显式守护，匿名访问被强制重定向到 `/login`。该白名单不得在未补充身份/配额/RLS/漏斗四件套的情况下扩展。
+- **身份识别**：匿名访客通过 localStorage UUID + `X-Anonymous-Id` 请求头识别；后端用 `SHA256(req.ip + 每日轮换 salt)` 做 IP 维度防绕过。salt 每日 0:00 UTC 轮换，不存明文 IP，过期不可关联自然人。
+- **配额隔离**：匿名 Redis 命名空间 `anon:quota:*` 与已登录 `quota:{userId}:*` 完全分离；改一边不影响另一边。每个匿名 capability 必须明确配置 IP 滑窗 + session 日上限，可选全站日预算（仅当 capability 会消耗付费上游时必须）。
+- **表权限默认 deny**：所有用户态表（profiles / user_* / phrase_* / *_logs）不得对 anon role 加任何 SELECT 策略；新建用户态表必须保持 RLS deny-by-default。`rls-policy-audit.test.ts` 用 SQL parser 守护这一不变量。
+- **写入完全禁止**：匿名访客不得写入任何业务表（保存表达 / 提交 review / 写 progress / 导入导出）。所有写入入口在匿名分支统一返回 `ANON_FEATURE_DISABLED(403)`，由 `ensureProfileOrRejectAnonymous(capability, ...)` 收敛。
+- **允许 + 配额型 capability**：可允许匿名调用的 capability（当前只有 `explain_selection` 和 `tts_play`）必须走 `ensureProfileOrAnonymousQuota` 或同等 helper，返回的 quota result 必须挂到 `X-Quota-*` 响应头让前端显示剩余次数。
+- **零边际成本 capability 不进 HighCostCapability**：只读 Storage 的 `tts_play` 走独立 `tts-playback-quota` 模块，不进 `HighCostCapability` 数组，避免污染 admin 紧急关闭面板 / 用户日 quota 表 / usage 统计的"高成本"语义。
+- **匿名学习态不持久化**：所有匿名期间产生的学习态走 sessionStorage，关浏览器即清；唯一持久化的匿名数据是 `anonymous_sessions`（4 字段），仅供配额判定与防绕过，不存业务语义。
+- **搜索引擎爬虫绕开配额**：UA 命中 Googlebot / Bingbot 等已知爬虫时不创建 anonymous_session、不计配额、不签发 TTS signed URL，仅渲染最小可索引内容。
+- **匿名漏斗事件强校验**：8 个事件名硬编码 union type，未知名直接抛错防漏斗失真；事件经 `recordAnonymousFunnelEventSafe` fire-and-forget 写入 `anonymous_funnel_events`，失败只 warn 不影响业务。
+- **Cache-Control 强制 private no-store**：所有 `/share/*` 路径由 middleware 统一注入 `Cache-Control: private, no-store`,避免阻断弹窗状态或 signed URL 被 CDN 缓存命中。
+- **一键止血**：`ALLOW_ANONYMOUS_TRIAL=false` 即所有匿名分支跳过，行为回归"必须登录"；既有登录用户主链路零影响。
+
 ## 4. 消费边界
 
 - `openspec/specs/auth-api-boundaries/spec.md`

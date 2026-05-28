@@ -6,6 +6,8 @@
 
 `/scenes` 列表页现在同时承担移动端学习入口职责：新用户应能直接看到 Start Here 推荐路径、默认 builtin 入门场景、筛选入口和底部开始/继续学习主 CTA，而不是先被生成或导入动作拦住。
 
+**匿名灰度入口边界**：`/share/scene/[slug]` 是分享链接专属的匿名访问路径，**不属于本模块职责**——它由 `src/features/anonymous-trial/components/share-scene-preview-client.tsx` 独立承载，SSR 走 `getPublicSceneBySlug()`（anon RLS + is_public=true 过滤），不复用 `SceneDetailClientPage` 的练习/变体/保存/学习态 hook 链。本模块的变化（学习状态字段、scene_json 结构、is_public 语义）会被 `ShareScenePreviewClient` 间接消费,改动时一并检查。详见 [feature-map/anonymous-trial.md](/d:/WorkCode/AbandonClaw/docs/feature-map/anonymous-trial.md)。
+
 ## 2. 输入
 
 - scene 详情内容
@@ -60,6 +62,7 @@
 - `/scenes` 新入口绕过 `openSceneRoute()`，导致预热、进入中 overlay 或重复点击保护丢失
 - 筛选、排序、pack 和底部 CTA 逻辑散落到页面 JSX，造成 scenes 与 today 的 continue fallback 语义漂移
 - 默认场景只做静态展示，无法进入 chunks / review 主链路
+- 改 `scenes.is_public` 语义或 RLS、改 `scene_json` 结构、改公共内容表关联时，必须一并检查 `/share/scene/[slug]` 灰度入口（`ShareScenePreviewClient`）是否仍能正确渲染，否则匿名访客会看到不一致的内容
 
 ## 7. 测试关注点
 

@@ -18,6 +18,7 @@
 - [session.md](/d:/WorkCode/AbandonClaw/docs/feature-map/session.md)
 - [expression-item.md](/d:/WorkCode/AbandonClaw/docs/feature-map/expression-item.md)
 - [review.md](/d:/WorkCode/AbandonClaw/docs/feature-map/review.md)
+- [anonymous-trial.md](/d:/WorkCode/AbandonClaw/docs/feature-map/anonymous-trial.md) — 独立灰度入口层,与主链路完全隔离
 
 ## 推荐使用方式
 

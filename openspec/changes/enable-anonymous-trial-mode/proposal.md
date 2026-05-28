@@ -67,3 +67,5 @@
 ### 延后原因与风险记录
 
 匿名→注册的数据迁移、主入口匿名开放、AI 场景生成的少量匿名配额放开,均依赖本轮埋点产出的"匿名转化数据"才能合理决策。本轮先用最保守阈值跑灰度,1-2 周后基于数据另起 V2 变更。若灰度期发现匿名 AI 成本失控或被批量脚本攻击,需立即关闭 env gate 并复盘,不在本轮内做应急扩展。
+
+**V2 第 1 项已落地(2026-05-28,commit 7f6aff5):** "TTS 预生成播放给匿名访客"原计划列在 V2,实施 9b917c6 / b2aef79 / 7f6aff5 三个补丁 commit 时一并落地。新增独立路由 `/api/anonymous/tts/play` + 独立 quota 模块 `tts-playback-quota.ts`(不进 HighCostCapability,理由见 spec delta `api-operational-guardrails/spec.md` 末尾 Requirement),ShareScenePreviewClient 句子级播放按钮串通。剩余 V2 项目(匿名→注册数据迁移、主入口开放、AI 场景生成放开)仍待灰度数据决策。详见 `docs/dev/dev-log.md` 顶部"匿名 TTS 预生成播放接入(灰度 V2 第一项)" entry。

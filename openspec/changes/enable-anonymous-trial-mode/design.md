@@ -242,6 +242,8 @@ CREATE INDEX idx_anon_funnel_events_event_name_created_at ON anonymous_funnel_ev
 
 **后续路由规划:** 若 V2 扩展到分享表达包、分享场景集合,统一在 `/share/*` 下扩展(`/share/expression-pack/[id]`、`/share/scene-pack/[id]`),保持路径前缀语义一致。
 
+**实施偏离记录(2026-05-28 评审补丁 9b917c6):** 上面"实施方式"段约定的"复用 `scene-detail-page.tsx` client 组件"在代码现实中**做不到**——`SceneDetailClientPage` 强依赖 7+ 个受保护 API(学习态记录 / 练习集生成 / 变体训练 / 保存表达 / scene 复用 hook 链),搬到匿名分支会一连串 401。最终实施改成**新建 `src/features/anonymous-trial/components/share-scene-preview-client.tsx` 子组件**,独立承载匿名场景预览(SSR 走 `getPublicSceneBySlug` + anon RLS,client 处理选词触发 explain-selection + 句子级 TTS 播放),`SceneDetailClientPage` 完全未动,严格遵守不收项 §11.2("不改变已登录用户主链路语义")。这个偏离是工程现实的取舍,不是设计缺陷——原计划低估了复合组件的耦合面。详见 `docs/dev/dev-log.md` 顶部"自评审补丁"entry。
+
 ## Stability Closure
 
 ### 不稳定点

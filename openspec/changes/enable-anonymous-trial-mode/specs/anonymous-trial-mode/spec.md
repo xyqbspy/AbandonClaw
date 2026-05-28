@@ -268,3 +268,57 @@
 - **THEN** 维护者 MUST 能通过关闭 `ALLOW_ANONYMOUS_TRIAL` 实现即时全量回退
 - **AND** `anonymous_sessions` 表数据 MUST 保留以便复盘
 - **AND** 已登录用户主链路 MUST NOT 受关闭影响
+
+### Requirement: 匿名 TTS 预生成播放必须经由独立路由仅查 Storage 不触发生成
+匿名访客 MUST 通过专属路由 `/api/anonymous/tts/play` 获取已存在于 Storage 的预生成 TTS 签名 URL;该路由 MUST 仅做 storage lookup 且 storage miss 时返 404,MUST NOT 在匿名分支 fallback 调用上游 TTS 合成(MsEdgeTTS),以防止匿名访客触发付费链路。
+
+#### Scenario: 匿名访客请求已存在的预生成音频
+- **WHEN** 匿名访客 GET `/api/anonymous/tts/play?kind=sentence&sceneSlug=...&sentenceId=...&text=...` 且对应音频已存在于 `tts-audio` bucket
+- **THEN** 路由 MUST 先通过 `resolveAnonymousContext` 解析身份并执行 `checkAnonymousTtsPlaybackQuota`
+- **AND** 通过后 MUST 返回 200 + `{ signedUrl, source: "storage-hit" }`
+- **AND** 响应 MUST 携带 `Cache-Control: private, no-store`
+- **AND** 响应 MUST 携带配额头 `X-Quota-Type=tts_play` / `X-Quota-Session-Limit` / `X-Quota-Session-Remaining` / `X-Quota-Daily-Limit=unlimited` / `X-Quota-Daily-Remaining=unlimited` / `X-Quota-Reset-At`
+
+#### Scenario: 匿名访客请求不存在的音频
+- **WHEN** 匿名访客 GET `/api/anonymous/tts/play?...` 但对应 storage 路径无 mp3
+- **THEN** 路由 MUST 返回 404 + `code=NOT_FOUND`
+- **AND** MUST NOT 调用 MsEdgeTTS 合成新音频
+- **AND** MUST NOT 在主路由 `/api/tts` 上 fallback
+
+#### Scenario: 匿名访客超 TTS 单会话配额
+- **WHEN** 同一 anon_id 当日 `tts_play` 调用数超过 `getAnonymousTtsPlaybackSessionDailyLimit()`(默认 30,env `ANON_QUOTA_SESSION_TTS_PLAY` 可覆盖)
+- **THEN** 路由 MUST 返回 429 + `code=ANON_QUOTA_EXCEEDED_SESSION` + `details.capability=tts_play`
+- **AND** MUST 在 throw 前 DECR 回滚刚才那次 INCR,确保 count 稳定在阈值不漂移
+- **AND** MUST NOT 进入 storage lookup
+
+#### Scenario: 已登录用户调用同一路由
+- **WHEN** 已登录用户调 `/api/anonymous/tts/play`(作为 fast path 跳过主路由 generate fallback)
+- **THEN** 路由 MUST 通过 `requireCurrentProfile()` 鉴权
+- **AND** MUST NOT 计入任何匿名配额(已登录用户不应消耗匿名池)
+- **AND** storage hit MUST 返 200 + signedUrl,storage miss MUST 返 404,客户端可自行决定是否改调主路由 `/api/tts` POST 触发生成
+
+#### Scenario: 搜索引擎爬虫请求 TTS
+- **WHEN** UA 命中 Googlebot / Bingbot 等已知爬虫的匿名请求到达本路由
+- **THEN** `resolveAnonymousContext` MUST 返 `isSearchEngineBot: true`
+- **AND** 路由 MUST 透传 401(爬虫不应签发 signed URL)
+- **AND** MUST NOT 创建 anonymous_session 或消耗任何 quota
+
+### Requirement: 客户端可上报的匿名漏斗事件必须经由专属路由收敛且强校验
+客户端触发的匿名漏斗事件(用户行为类:`anon_first_scene_viewed` / `anon_first_scene_completed` / `anon_register_prompt_shown` / `anon_register_prompt_clicked`)MUST 通过专属路由 `/api/anonymous/funnel-event` 上报;路由 MUST 验证事件名在客户端可上报白名单内,server 端触发的事件(`anon_session_created` / `anon_quota_blocked` / `anon_ai_explain_used`)MUST 由对应业务路径在 server 侧内部 fire-and-forget 调用 `recordAnonymousFunnelEventSafe`,不得允许客户端伪造关键指标。
+
+#### Scenario: 客户端上报合法的用户行为事件
+- **WHEN** ShareScenePreviewClient 在 mount 后调 `POST /api/anonymous/funnel-event` 带 `{ event: "anon_first_scene_viewed", payload: { scene_slug, scene_id } }`
+- **AND** `ALLOW_ANONYMOUS_TRIAL=true`
+- **AND** 请求带合法 `X-Anonymous-Id` 头
+- **THEN** 路由 MUST 解析匿名身份并 fire-and-forget 写入 `anonymous_funnel_events`
+- **AND** MUST 返回 204 无 body
+
+#### Scenario: 客户端尝试上报 server 专属事件
+- **WHEN** 客户端调 `POST /api/anonymous/funnel-event` 带 `{ event: "anon_session_created" }` 或其他 server-only 事件名
+- **THEN** 路由 MUST 返回 400 `code=VALIDATION_ERROR` + `message=This funnel event is not reportable from the client.`
+- **AND** MUST NOT 写入 `anonymous_funnel_events`(防客户端伪造 session 创建数膨胀转化率分母)
+
+#### Scenario: 客户端上报未知事件名
+- **WHEN** 客户端调 `POST /api/anonymous/funnel-event` 带未在 `ANONYMOUS_FUNNEL_EVENT_NAMES` 枚举内的事件名
+- **THEN** 路由 MUST 返回 400 `code=VALIDATION_ERROR`
+- **AND** MUST NOT 写入数据库
