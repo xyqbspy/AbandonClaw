@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { assertProfileCanWrite, requireCurrentProfile } from "@/lib/server/auth";
 import { toApiErrorResponse } from "@/lib/server/api-error";
+import { ensureProfileOrRejectAnonymous } from "@/lib/server/anonymous/route-guard";
 import { assertAllowedOrigin } from "@/lib/server/request-guard";
 import { completeSceneLearning } from "@/lib/server/learning/service";
 import { logServerEvent } from "@/lib/server/logger";
@@ -25,7 +26,10 @@ export async function POST(
 ) {
   try {
     assertAllowedOrigin(request);
-    const { user, profile } = await requireCurrentProfile();
+    const { user, profile } = await ensureProfileOrRejectAnonymous(
+      "progress_write",
+      () => requireCurrentProfile(),
+    );
     assertProfileCanWrite(profile);
     const { slug } = await context.params;
     const payload = await parseLearningCompleteRequest(request);

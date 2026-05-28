@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { toApiErrorResponse } from "@/lib/server/api-error";
 import { logApiError } from "@/lib/server/logger";
 import { enforceRateLimit } from "@/lib/server/rate-limit";
+import { ensureProfileOrRejectAnonymous } from "@/lib/server/anonymous/route-guard";
 import { assertAllowedOrigin } from "@/lib/server/request-guard";
 import {
   normalizeImportScenePayload,
@@ -34,7 +35,10 @@ export async function handleSceneImportPost(
 ) {
   try {
     assertAllowedOrigin(request);
-    const { user } = await dependencies.requireCurrentProfile();
+    const { user } = await ensureProfileOrRejectAnonymous(
+      "scene_import",
+      () => dependencies.requireCurrentProfile(),
+    );
     await enforceRateLimit({
       key: user.id,
       limit: SCENE_IMPORT_RATE_LIMIT,

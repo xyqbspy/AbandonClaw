@@ -1,5 +1,169 @@
 # Dev Log
 
+### [2026-05-28] 收口与最终验证(enable-anonymous-trial-mode §10/§11)
+- 类型:Spec-Driven(OpenSpec change `enable-anonymous-trial-mode` Section 10/11)
+- 状态:落地(灰度部署冒烟项见 10.5 转交项)
+
+#### 10.5 灰度入口人工冒烟项(转交部署阶段)
+人工冒烟需要真实匿名链路 + 真实 Supabase + 真实 Redis,无法在 CI 内全自动跑。落地清单提前列好,部署日按顺序勾选,出错回填到本节:
+
+| 步骤 | 期望行为 | 失败回滚动作 |
+| --- | --- | --- |
+| 1. 浏览器无痕模式访问 `/share/scene/{slug}`(真实 slug) | 渲染 AnonymousGuidanceState,顶栏出现"体验模式 · AI 表达解释剩 3/3 次" | 502/白屏 → 回滚 `ALLOW_ANONYMOUS_TRIAL=false`,排查 SSR 错误 |
+| 2. 触发 3 次 AI 表达解释 | 第 1-3 次返 200 + 计数递减;第 4 次返 429 `ANON_QUOTA_EXCEEDED_SESSION` | 4 次仍可调用 → 回滚 env,排查 quota helper |
+| 3. 第 4 次后弹出 L3 阻断弹窗 | 弹窗文案"AI 表达解释已用完","立即注册"按钮跳 `/register?from=share&scene={slug}` | 弹窗不出 → 排查 use-anonymous-mode hook |
+| 4. 注册完成 → 回跳 `/share/scene/{slug}` 或 `/today` | 注册用户身份接管,banner 消失,主链路正常 | 跳到错误页 → 排查回跳参数透传 |
+| 5. 切到 `/today` `/scenes` `/scene/{slug}` `/review` `/chunks` `/progress` 路径 | 全部 302 → `/login?redirect=...`,与既有匿名行为一致 | 任一路径裸渲染或抛错 → 立即排查 middleware PROTECTED_PAGE_PREFIXES |
+| 6. 切到 `/share/scene/{slug}`(SE 爬虫 UA) | 返公开 SSR,不创建 anonymous_session,不计 quota | 爬虫触发 quota 计数 → 排查 anon-identity bot 分支 |
+
+冒烟完成后回到本节签字(部署者署名 + 时间),并把 `daily_anon_cost_report` 第一天数据快照贴下来作为基线。
+
+#### 10.6 实现 Review:已登录用户主链路语义未变
+对照 proposal/design/spec delta 做了一遍源码审计。受影响的 9 个高成本接口均按"两态 helper"接入:
+
+- 写入/生成类 7 个(scene complete / phrase save / phrase save-all / review submit / scene generate / expression-map generate / similar generate / scene import / tts generate):全部用 `ensureProfileOrRejectAnonymous(capability, () => requireCurrentProfile())` 包裹,**已登录分支返回 `{ user, profile }` 与原签名一致**,所有后续逻辑(`assertProfileCanWrite` / `assertProfileCanGenerate` / `enforceHighCostRateLimit` / `reserveHighCostUsage`/`markHighCostUsage` 双阶段写额)未动一行。匿名分支抛 `AnonFeatureDisabledError(403)`。
+- 配额隔离类 1 个(explain-selection):用 `ensureProfileOrAnonymousQuota` 返 discriminated union。`mode === "registered"` 分支与改造前完全等价(`assertProfileCanGenerate` → `enforceHighCostRateLimit` → `reserveHighCostUsage` → `explainSelection` → `markHighCostUsage`)。`mode === "anonymous"` 分支跳过 reserve/mark(无 user.id 可绑定),但 quota 计数已经在 `checkAnonymousQuota` 内 INCR + EXPIRE 25h 完成。
+
+下列模块**未做任何改动**,主链路语义保证不动:
+- 推荐策略:`src/lib/server/scenes/today.ts` 等推荐入口未触碰。
+- Scene 完成判定:`src/lib/server/learning/service.ts#completeSceneLearning` 与判定阈值未触碰。
+- Chunks 保存语义:`src/lib/server/chunks/service.ts#trackChunksForUser` 未触碰。
+- Review 调度算法:`src/lib/server/review/scheduler.ts`(SM-2 间隔、due cutoff、五类信号消费)未触碰。
+- TTS 缓存链路 + 失败冷却:`src/lib/server/tts/service.ts`、签名 URL 缓存(Redis + Memory)、场景级 / 单元级冷却均未触碰。
+
+回归保护:
+- 现有 7 个改造接口的 .test.ts 都已新增"匿名 + 试用关闭仍 401" + "匿名 + 试用打开返 403/429" 两类断言。已登录原有测试用例继续通过。
+- 总体测试:585 unit + 357 interaction = 942 全绿;`npm run text:check-mojibake`、`openspec validate enable-anonymous-trial-mode --strict` 均通过。
+
+### [2026-05-28] 稳定性收口(enable-anonymous-trial-mode §11)
+- 类型:Spec-Driven(收口章节,无新增代码;锁清单 + 不收清单 + 失控应急流程)
+- 状态:落地
+
+#### 11.1 本轮已收口(锁定边界,后续 PR 不许越界改)
+- **匿名身份四层防御**:`getOrCreateAnonId`(localStorage,UUID + 校验)→ `X-Anonymous-Id` 头 → 中间件 `resolveAnonymousContext`(env gate + bot 识别)→ `hashIp(ip, dailySalt)` → upsert `anonymous_sessions`。
+- **配额隔离四层闸**:IP 滑窗(`ANON_IP_SESSION_DAILY_LIMIT`)→ session 维度(`ANON_SESSION_LIMIT_*`)→ 全站日预算(`ANON_DAILY_LIMIT_*`)→ feature 黑/白名单(`anonymous-feature-matrix.ts`)。
+- **紧急止血开关**:`ALLOW_ANONYMOUS_TRIAL` env 单切。关掉后所有匿名分支立刻回退 `/login`,Redis 已落键不污染已登录配额(命名空间隔离)。
+- **SSR 引导态**:`AnonymousGuidanceState` 一个组件三套文案(review/progress/chunks),所有匿名 SSR 强制 `Cache-Control: private, no-store`(中间件层 + `setAnonymousResponseHeaders` 双保险)。
+- **三层注册引导**:L1 顶栏 banner(实时配额)+ L2 inline 卡片(首场景后,本会话可关一次,持久化 sessionStorage)+ L3 阻断弹窗(触发禁用功能 / 配额耗尽两类触发文案)。
+- **漏斗埋点 + 成本看板**:`anonymous_funnel_events` 8 个事件 + `daily_anon_cost_report` daily 聚合(单价常量 `c_explain=0.0009`、`c_tts=0.0003` USD)+ Sentry `user_type` tag + 飞书告警(IP 异常 / 池消耗 / 阻断率)。
+- **灰度入口**:`/share/scene/[slug]` 路径级隔离,中间件 `PROTECTED_PAGE_PREFIXES` 显式守护主入口。
+
+#### 11.2 明确不收项(后续 PR 想动需另立 Spec)
+- **已登录用户主链路语义**:Today 推荐 / Scene 详情 / Chunks 写入 / Review 调度 / Settings,任何改动都需新 OpenSpec change。
+- **推荐策略**:`scenes/today.ts` 当前打法保持。匿名灰度结束后是否要"分享链接也推 today"另议。
+- **Scene 完成判定**:`completeSceneLearning` 阈值与五类信号映射不动。
+- **Chunks 保存语义**:`trackChunksForUser` 命中策略、源类型(builtin/user)、变体提取规则不动。
+- **Review 调度算法**:SM-2 间隔曲线、due 截断、五类正式信号消费策略不动。
+- **匿名 → 注册数据迁移**:匿名 session 计数 / 浏览记录 / 临时表达不迁到注册账号。当前定位是"先开闸看转化",数据迁移要另开 Spec(涉及隐私 / 审计 / 迁移失败补偿)。
+- **主入口匿名开放**:`/today` `/scenes` 等不放给匿名。只有 `/share/scene/{slug}` 灰度可匿名落地。
+- **AI 场景生成匿名配额**:`anonAllowed:false` 锁死,不暴露成本不可控的生成接口给匿名。
+
+#### 11.3 不收项缺陷处理流程
+若实现中发现不收项存在真实缺陷(不是本轮 P0):
+1. 记录到本 dev-log:bug 现象 + 触发条件 + 业务影响 + 暂时绕过办法。
+2. 另起 Spec-Driven change(OpenSpec `propose` → `validate` → 评审)。
+3. 不在本轮 PR 内塞修复,避免范围蔓延。
+4. 若 bug 影响生产可用性,可以走 hotfix 分支,但 hotfix 也要在 dev-log 记录,等 v2 把 hotfix 收编。
+
+#### 11.4 灰度失控应急流程
+触发任一条件即视为失控:
+- 匿名 AI 实际成本 > 阈值上限(daily $0.18 = 200 × $0.0009);
+- IP 维度异常告警(单 IP > 10 session/天);
+- 漏斗阻断率(`anon_quota_blocked / anon_session_created` > 60%)。
+
+应急动作:
+1. **5 分钟内**:运维设 `ALLOW_ANONYMOUS_TRIAL=false`,Vercel 立刻 redeploy(或 PM2 reload)。中间件下一次请求即生效,匿名链路 100% 回退 `/login`。
+2. **30 分钟内**:dev-log 复盘:触发条件 / 实际成本 / 异常 IP / 是否需要清理 anonymous_sessions 表残留 / 是否需要轮换 `ANON_DAILY_SALT_SECRET`(若怀疑 salt 泄漏)。
+3. **V2 决策方向**:基于复盘决定下一轮是收紧配额、改阈值告警、还是直接放弃匿名灰度。任何 v2 改动走新 Spec-Driven change,不在原 change 上追加。
+
+### [2026-05-28] 灰度发布与配置(enable-anonymous-trial-mode §9)
+- 类型:Spec-Driven(OpenSpec change `enable-anonymous-trial-mode` Section 9)
+- 状态:落地(灰度上线后第 3/7 天复盘待补)
+
+#### 9.1 灰度路由形式:`/share/scene/[slug]`
+- 备选:`/share/scene/{slug}` vs `/scene/{slug}?from=share`。
+- 决策:**选 `/share/scene/{slug}`**。理由:
+  - 路径级隔离比 query 参数更稳。中间件可以靠 prefix 一刀切判定,不会被绕过(query 可被剥)。
+  - 现有 `(app)/scene/[slug]/page.tsx` 已强制 `requireCurrentProfile()`,任何在原路径下加 query 都需要重构 layout,改动范围远大于新建路由。
+  - 分享链接出现在第三方时(SEO / SNS / 消息卡片),`/share/...` 在 URL 一眼可识别为"非主入口",运维与告警查询更直观。
+- 实施:`src/app/share/layout.tsx` + `src/app/share/scene/[slug]/page.tsx`,共享 marketing layout(SiteHeader + MarketingFooter),不进 `(app)` group。
+
+#### 9.2 主入口在中间件层显式排除匿名
+- `middleware.ts` 的 `PROTECTED_PAGE_PREFIXES` = `["/today", "/scenes", "/scene", "/review", "/chunks", "/progress", "/settings", "/lesson", "/admin"]`,匿名访问命中前缀 → 重定向到 `/login?redirect=...`,跟既有行为一致。
+- `/share` 不在 PROTECTED_PAGE_PREFIXES,因此中间件直接放行,匿名 SSR 才能落地。
+- 注册页 `/login` `/signup` `/verify-email` 走 `AUTH_PAGE_PATHS` / `VERIFY_EMAIL_PATH` 分支,与匿名灰度互不干扰。
+- 审计测试:`src/app/share/scene/[slug]/page.audit.test.ts` 静态断言中间件 prefix 列表 + 不含 `/share`。
+
+#### 9.3 env 配置说明(同步入 .env.example)
+| 变量 | 必填 | 默认 | 说明 |
+| --- | --- | --- | --- |
+| `ALLOW_ANONYMOUS_TRIAL` | 否 | false | 总开关。true/1/on 打开匿名试用,关闭后所有匿名路径回退 /login。灰度异常立刻切回 false。 |
+| `ANON_DAILY_SALT_SECRET` | 生产必填 | fallback salt | 匿名 IP hash 每日 salt,至少 32 字符随机串,每日轮换。 |
+| `ANON_IP_SESSION_DAILY_LIMIT` | 否 | 5 | 同 IP 当日匿名 session 上限,超过返回 ANON_IP_RATE_LIMITED(429)。 |
+| `ANON_DAILY_LIMIT_EXPLAIN_SELECTION` | 否 | 200 | 全站匿名 AI 表达解释日配额。 |
+| `ANON_SESSION_LIMIT_EXPLAIN_SELECTION` | 否 | 3 | 每个匿名 session AI 表达解释次数。 |
+| `ANON_DAILY_LIMIT_TTS_PLAY` | 否 | 600 | 全站匿名 TTS 播放日配额。 |
+| `ANON_SESSION_LIMIT_TTS_PLAY` | 否 | 30 | 每个匿名 session TTS 播放次数。 |
+
+Redis 命名空间(`src/lib/server/anonymous/quota.ts`)严格隔离匿名与已登录键:
+- 匿名:`anon:quota:{cap}:session:{anon_id}:{date}` / `anon:quota:{cap}:global:{date}`
+- 已登录:既有 `quota:{userId}:{cap}:{date}` 完全不变
+
+Supabase RLS 部署顺序(每个生产环境一次性应用):
+1. `20260528_phase25_anonymous_trial_mode.sql` — 创建 anonymous_sessions / anonymous_funnel_events / daily_anon_cost_report 表 + cleanup_anonymous_sessions RPC
+2. `20260528_phase26_anonymous_rls_public_content.sql` — 公共内容表(scenes / scene_variants / chunks / phrases) 添加 anon SELECT 策略
+3. `20260528_phase27_anonymous_funnel_daily_aggregation.sql` — 聚合函数
+
+应用顺序错位会导致漏斗事件写入或公共内容查询失败,部署脚本必须按此顺序串行执行。
+
+#### 9.4 灰度上线复盘(待补)
+- 第 3 天 / 第 7 天后回到本节,补:漏斗各阶段数 / AI 实际成本 / IP 攻击告警情况 / 阈值是否需调整。
+- 若任一阶段失败率 > spec 阈值,在此节同时记录"已切回 `ALLOW_ANONYMOUS_TRIAL=false`"与回滚时间。
+
+### [2026-05-28] 匿名漏斗埋点与成本看板(enable-anonymous-trial-mode §8)
+- 类型:Spec-Driven(OpenSpec change `enable-anonymous-trial-mode` Section 8)
+- 状态:落地
+
+#### 8.1 表设计决策:为什么不复用 learning_events
+- 项目现有客户端事件流走 `src/lib/utils/client-events.ts` 写 localStorage,供 admin 观测面板回放,**没有任何持久化到 Supabase 的服务端事件表**。
+- 决策:不新建一个泛用 `learning_events`,而是在 phase25 同迁移内创建独立的 `anonymous_funnel_events` + `daily_anon_cost_report` 两表,理由如下:
+  - 漏斗事件 schema(`event_name` 枚举 8 个 + `anon_id` + `ip_hash` + `payload jsonb`)与已登录用户的"业务行为日志"不同质,合并会污染查询索引。
+  - 匿名表必须 deny-by-default + 只允许 service role 写,与未来可能要做的"已登录用户行为审计"权限模型不同。
+  - 隐私最小化:匿名表显式只存 `ip_hash`(SHA256+daily salt),不留明文 IP / UA。
+- 表字段在 `supabase/sql/20260528_phase25_anonymous_trial_mode.sql`。
+
+#### 8.2 8 事件枚举(代码门禁)
+- `src/lib/server/anonymous/funnel-events.ts` 导出 `ANONYMOUS_FUNNEL_EVENT_NAMES`(`anon_session_created` / `anon_first_scene_viewed` / `anon_first_scene_completed` / `anon_ai_explain_used` / `anon_quota_blocked` / `anon_register_prompt_shown` / `anon_register_prompt_clicked` / `anon_registered`)+ `isAnonymousFunnelEventName` 守卫 + `recordAnonymousFunnelEvent` 写入 helper。
+- helper 强校验事件名是否在枚举内,未知名抛错 → 防止"漏斗失真"被静默吃掉。
+- `anon_registered` 事件 payload 携带 `from_anon_id` 关联匿名 → 注册转化,看板侧据此算 conversion_rate。
+
+#### 8.3 日聚合 SQL 函数
+- `supabase/sql/20260528_phase27_anonymous_funnel_daily_aggregation.sql`:
+  - `aggregate_daily_anon_cost_report(p_date date default current_date - 1)` 函数,security definer + search_path = public,仅 service_role 可执行。
+  - 单价以函数内常量定义:`c_explain_unit_usd = 0.0009`(Anthropic Sonnet 短输入)、`c_tts_unit_usd = 0.0003`(OpenAI tts-1 单段),变动时改一处。
+  - upsert 到 `daily_anon_cost_report`(on conflict report_date),便于人工回灌历史日。
+  - conversion_rate / cost_per_conversion 在分母 0 时返 null,前端看板要兼容渲染。
+- cron 接入方式:Section 9 灰度上线后通过 PM2 nightly job 调用 `select aggregate_daily_anon_cost_report();`。
+
+#### 8.4 Sentry user_type tag
+- `src/lib/server/anonymous/sentry-tags.ts` 导出 `setSentryUserTypeTag(userType)` / `setSentryUserTypeTagFromAuthenticated(isAuthenticated)`。
+- Sentry 未初始化时静默不抛错(本地 / 单测场景兼容)。
+- 与 `logApiError` 现有 `userType` breadcrumb 配对:tag 用于 Sentry 事件级别检索 / 分组,breadcrumb 保留逐次调用的上下文。
+- 调用位置:Section 9 主链路路由中(`/api/explain-selection`、`/api/tts`、`/share/...` SSR)接入。
+
+#### 8.5 告警阈值(三条飞书通知)
+| 指标 | 阈值 | 触发动作 | 数据源 |
+| --- | --- | --- | --- |
+| 同 IP 当日匿名 session 数 | > 10 | 飞书通知 oncall + 临时拉低 `ANON_IP_SESSION_DAILY_LIMIT` 至 3 | `select count(*) from anonymous_sessions where ip_hash=? and created_at >= today` |
+| 全站匿名 AI 池 18:00 UTC 前消耗 | > 80% | 飞书通知 + 检查是否触发 `ALLOW_ANONYMOUS_TRIAL=false` 紧急关闭 | `aggregate_daily_anon_cost_report` 实时调用 |
+| `anon_quota_blocked / anon_session_created` 比 | > 60% | 飞书通知:阈值可能过紧 → 复盘单价配比 | `anonymous_funnel_events` 按当日聚合 |
+- 告警通道沿用 `incident-response-runbook.md §3.2`(企微 / 飞书 / 邮件),具体 webhook URL 走 env 注入,不入仓。
+
+#### 8.6 测试覆盖
+- `src/lib/server/anonymous/funnel-events.test.ts`:8 个事件名完整性 / 守卫 / payload 写入 / 异常分支 / from_anon_id 关联(8 测试)
+- `src/lib/server/anonymous/funnel-daily-aggregation-audit.test.ts`:SQL 文本静态解析,验证函数签名 / security definer / 9 类聚合行为 / grant 安全(9 测试)
+- `src/lib/server/anonymous/sentry-tags.test.ts`:setTag 注入 + 静默兜底(5 测试)
+
 ### [2026-05-17] chunks/page.tsx 第四轮拆分（decompose-chunks-page-r4 落地）
 - 类型：Spec-Driven（OpenSpec change `decompose-chunks-page-r4`）
 - 状态：实施 + 测试 + 验证 + meta 三件套同步 + archive 完成

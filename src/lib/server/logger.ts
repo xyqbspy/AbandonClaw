@@ -3,12 +3,15 @@ import { getOrCreateRequestId } from "@/lib/server/request-context";
 
 type LogLevel = "info" | "warn" | "error";
 
+export type RequestUserType = "anonymous" | "registered";
+
 type LogContext = {
   request?: Request | null;
   requestId?: string;
   path?: string;
   method?: string;
   userId?: string | null;
+  userType?: RequestUserType | null;
   module?: string;
   errorCode?: string;
   error?: unknown;
@@ -28,6 +31,7 @@ export const logServerEvent = (
     path: context.path ?? context.request?.url ?? undefined,
     method: context.method ?? context.request?.method ?? undefined,
     userId: context.userId ?? null,
+    userType: context.userType ?? null,
     module: context.module ?? "server",
     errorCode: context.errorCode,
     details: context.details ?? null,
@@ -53,6 +57,7 @@ export const logApiError = (
       path: context.path ?? context.request?.url,
       method: context.method ?? context.request?.method,
       userId: context.userId ?? null,
+      userType: context.userType ?? null,
       errorCode: context.errorCode,
       errorMessage: toErrorMessage(error),
     },

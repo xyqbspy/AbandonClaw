@@ -5,6 +5,7 @@ import {
   attachRequestIdToResponse,
   getOrCreateRequestId,
 } from "@/lib/server/request-context";
+import type { RequestUserType } from "@/lib/server/logger";
 
 const mapLegacyMessageToStatus = (message: string) => {
   if (message === "Unauthorized") return 401;
@@ -12,11 +13,16 @@ const mapLegacyMessageToStatus = (message: string) => {
   return 500;
 };
 
-type CaptureUnknownServerError = (error: unknown, requestId: string) => void;
+type CaptureUnknownServerError = (
+  error: unknown,
+  requestId: string,
+  userType?: RequestUserType | null,
+) => void;
 
-const defaultCaptureUnknownServerError: CaptureUnknownServerError = (error, requestId) => {
+const defaultCaptureUnknownServerError: CaptureUnknownServerError = (error, requestId, userType) => {
   Sentry.withScope((scope) => {
     scope.setTag("requestId", requestId);
+    if (userType) scope.setTag("user_type", userType);
     Sentry.captureException(error);
   });
 };
@@ -27,10 +33,12 @@ export const toApiErrorResponse = (
   options?: {
     request?: Request | Headers | null;
     requestId?: string;
+    userType?: RequestUserType | null;
     captureUnknownServerError?: CaptureUnknownServerError;
   },
 ) => {
   const requestId = options?.requestId ?? getOrCreateRequestId(options?.request);
+  const userType = options?.userType ?? null;
   const captureUnknownServerError =
     options?.captureUnknownServerError ?? defaultCaptureUnknownServerError;
 
@@ -58,7 +66,7 @@ export const toApiErrorResponse = (
       );
     }
 
-    captureUnknownServerError(error, requestId);
+    captureUnknownServerError(error, requestId, userType);
 
     return attachRequestIdToResponse(
       NextResponse.json(
@@ -74,7 +82,7 @@ export const toApiErrorResponse = (
     );
   }
 
-  captureUnknownServerError(error, requestId);
+  captureUnknownServerError(error, requestId, userType);
 
   return attachRequestIdToResponse(
     NextResponse.json(

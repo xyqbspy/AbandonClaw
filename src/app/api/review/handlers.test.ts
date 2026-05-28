@@ -1,7 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { AuthError } from "@/lib/server/errors";
 import { clearIdempotencyStore } from "@/lib/server/idempotency";
 import { handleReviewDueGet, handleReviewSubmitPost } from "./handlers";
+
+const ORIGINAL_TRIAL = process.env.ALLOW_ANONYMOUS_TRIAL;
+const restoreEnv = () => {
+  if (ORIGINAL_TRIAL === undefined) delete process.env.ALLOW_ANONYMOUS_TRIAL;
+  else process.env.ALLOW_ANONYMOUS_TRIAL = ORIGINAL_TRIAL;
+};
 
 const createJsonRequest = (
   url: string,
@@ -17,6 +24,55 @@ const createJsonRequest = (
 
 test.beforeEach(() => {
   clearIdempotencyStore();
+});
+
+test.afterEach(() => {
+  restoreEnv();
+});
+
+test("review submit handler 匿名 + 试用打开返 403 ANON_FEATURE_DISABLED 带 capability", async () => {
+  process.env.ALLOW_ANONYMOUS_TRIAL = "true";
+  const response = await handleReviewSubmitPost(
+    new Request("http://localhost/api/review/submit", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ userPhraseId: "phrase-1", reviewResult: "good" }),
+    }),
+    {
+      requireCurrentProfile: async () => {
+        throw new AuthError();
+      },
+      submitPhraseReview: async () => ({}) as never,
+      getReviewSummary: async () => ({}) as never,
+    },
+  );
+
+  const body = await response.json();
+  assert.equal(response.status, 403);
+  assert.equal(body.code, "ANON_FEATURE_DISABLED");
+  assert.equal(body.details.capability, "review_submit");
+});
+
+test("review submit handler 匿名 + 试用关闭仍返 401 AUTH_UNAUTHORIZED(回归既有行为)", async () => {
+  delete process.env.ALLOW_ANONYMOUS_TRIAL;
+  const response = await handleReviewSubmitPost(
+    new Request("http://localhost/api/review/submit", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ userPhraseId: "phrase-1", reviewResult: "good" }),
+    }),
+    {
+      requireCurrentProfile: async () => {
+        throw new AuthError();
+      },
+      submitPhraseReview: async () => ({}) as never,
+      getReviewSummary: async () => ({}) as never,
+    },
+  );
+
+  const body = await response.json();
+  assert.equal(response.status, 401);
+  assert.equal(body.code, "AUTH_UNAUTHORIZED");
 });
 
 test("review due handler 会规范 limit 并透传给两类 service", async () => {

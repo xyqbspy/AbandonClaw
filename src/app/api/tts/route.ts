@@ -4,6 +4,7 @@ import { toApiErrorResponse } from "@/lib/server/api-error";
 import { markHighCostUsage, reserveHighCostUsage } from "@/lib/server/high-cost-usage";
 import { logApiError } from "@/lib/server/logger";
 import { enforceHighCostRateLimit } from "@/lib/server/rate-limit";
+import { ensureProfileOrRejectAnonymous } from "@/lib/server/anonymous/route-guard";
 import { assertAllowedOrigin } from "@/lib/server/request-guard";
 import { generateTtsAudio, TtsRequestPayload } from "@/lib/server/tts/service";
 import { parseJsonBody } from "@/lib/server/validation";
@@ -14,7 +15,10 @@ const RATE_LIMIT_WINDOW_MS = 60_000;
 export async function POST(request: Request) {
   try {
     assertAllowedOrigin(request);
-    const { user, profile } = await requireVerifiedCurrentProfile();
+    const { user, profile } = await ensureProfileOrRejectAnonymous(
+      "tts_generate",
+      () => requireVerifiedCurrentProfile(),
+    );
     assertProfileCanGenerate(profile);
     await enforceHighCostRateLimit({
       request,

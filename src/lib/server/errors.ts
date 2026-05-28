@@ -95,6 +95,56 @@ export class TtsGenerationError extends AppError {
   }
 }
 
+export class AnonIdRequiredError extends AppError {
+  constructor(message = "Anonymous identifier is required.") {
+    super({ message, status: 400, code: "ANON_ID_REQUIRED" });
+    this.name = "AnonIdRequiredError";
+  }
+}
+
+export class AnonFeatureDisabledError extends AppError {
+  constructor(capability: string, message = "This feature is not available in anonymous mode.") {
+    super({
+      message,
+      status: 403,
+      code: "ANON_FEATURE_DISABLED",
+      details: { capability },
+    });
+    this.name = "AnonFeatureDisabledError";
+  }
+}
+
+export class AnonIpRateLimitedError extends AppError {
+  constructor(message = "Too many anonymous requests from this network.") {
+    super({ message, status: 429, code: "ANON_IP_RATE_LIMITED" });
+    this.name = "AnonIpRateLimitedError";
+  }
+}
+
+export class AnonQuotaExceededGlobalError extends AppError {
+  constructor(capability: string, details?: Record<string, unknown>) {
+    super({
+      message: "Anonymous global daily quota exceeded.",
+      status: 429,
+      code: "ANON_QUOTA_EXCEEDED_GLOBAL",
+      details: { capability, ...(details ?? {}) },
+    });
+    this.name = "AnonQuotaExceededGlobalError";
+  }
+}
+
+export class AnonQuotaExceededSessionError extends AppError {
+  constructor(capability: string, details?: Record<string, unknown>) {
+    super({
+      message: "Anonymous session daily quota exceeded.",
+      status: 429,
+      code: "ANON_QUOTA_EXCEEDED_SESSION",
+      details: { capability, ...(details ?? {}) },
+    });
+    this.name = "AnonQuotaExceededSessionError";
+  }
+}
+
 export const isAppError = (error: unknown): error is AppError =>
   error instanceof AppError;
 

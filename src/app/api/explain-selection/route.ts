@@ -14,6 +14,16 @@ import {
   normalizeExplainSelectionPayload,
   parseExplainSelectionRequest,
 } from "@/lib/server/request-schemas";
+import {
+  ensureProfileOrAnonymousQuota,
+  isAnonymousAccessError,
+  type ProfileOrAnonymousDependencies,
+  type ProfileOrAnonymousResult,
+} from "@/lib/server/anonymous/route-guard";
+import {
+  attachAnonymousQuotaHeaders,
+  buildAnonymousQuotaHeaders,
+} from "@/lib/server/anonymous/quota-headers";
 
 const EXPLAIN_SELECTION_RATE_LIMIT = 5;
 const RATE_LIMIT_WINDOW_MS = 60_000;
@@ -23,6 +33,7 @@ interface ExplainSelectionDependencies {
   explainSelection: typeof explainSelection;
   reserveHighCostUsage: typeof reserveHighCostUsage;
   markHighCostUsage: typeof markHighCostUsage;
+  anonymous?: ProfileOrAnonymousDependencies;
 }
 
 const defaultDependencies: ExplainSelectionDependencies = {
@@ -36,37 +47,67 @@ export async function handleExplainSelectionPost(
   request: Request,
   dependencies: ExplainSelectionDependencies = defaultDependencies,
 ) {
+  let accessResult: ProfileOrAnonymousResult | null = null;
   try {
     assertAllowedOrigin(request);
-    const { user, profile } = await dependencies.requireCurrentProfile();
-    assertProfileCanGenerate(profile);
-    await enforceHighCostRateLimit({
+    accessResult = await ensureProfileOrAnonymousQuota(
+      "explain_selection",
       request,
-      userId: user.id,
-      scope: "api-explain-selection",
-      userLimit: EXPLAIN_SELECTION_RATE_LIMIT,
-      ipLimit: EXPLAIN_SELECTION_RATE_LIMIT * 2,
-      windowMs: RATE_LIMIT_WINDOW_MS,
-    });
+      () => dependencies.requireCurrentProfile(),
+      dependencies.anonymous,
+    );
+
     const payload = await parseExplainSelectionRequest(request);
     const normalizedPayload = normalizeExplainSelectionPayload(payload);
-    const reservation = await dependencies.reserveHighCostUsage({
-      userId: user.id,
-      capability: "explain_selection",
-    });
-    try {
-      const result = await dependencies.explainSelection(normalizedPayload);
-      await dependencies.markHighCostUsage(reservation, "success");
-      return NextResponse.json(result, { status: 200 });
-    } catch (error) {
-      await dependencies.markHighCostUsage(reservation, "failed");
-      throw error;
+
+    if (accessResult.mode === "registered") {
+      const { user, profile } = accessResult;
+      assertProfileCanGenerate(profile);
+      await enforceHighCostRateLimit({
+        request,
+        userId: user.id,
+        scope: "api-explain-selection",
+        userLimit: EXPLAIN_SELECTION_RATE_LIMIT,
+        ipLimit: EXPLAIN_SELECTION_RATE_LIMIT * 2,
+        windowMs: RATE_LIMIT_WINDOW_MS,
+      });
+      const reservation = await dependencies.reserveHighCostUsage({
+        userId: user.id,
+        capability: "explain_selection",
+      });
+      try {
+        const result = await dependencies.explainSelection(normalizedPayload);
+        await dependencies.markHighCostUsage(reservation, "success");
+        return NextResponse.json(result, { status: 200 });
+      } catch (error) {
+        await dependencies.markHighCostUsage(reservation, "failed");
+        throw error;
+      }
     }
+
+    const { quotaResult } = accessResult;
+    const result = await dependencies.explainSelection(normalizedPayload);
+    return attachAnonymousQuotaHeaders(
+      NextResponse.json(result, { status: 200 }),
+      quotaResult,
+    );
   } catch (error) {
-    logApiError("api/explain-selection", error, {
+    const userType =
+      accessResult?.mode === "anonymous" || isAnonymousAccessError(error)
+        ? "anonymous"
+        : "registered";
+    logApiError("api/explain-selection", error, { request, userType });
+    const response = toApiErrorResponse(error, "释义服务暂时不可用。", {
       request,
+      userType,
     });
-    return toApiErrorResponse(error, "释义服务暂时不可用。", { request });
+    if (accessResult?.mode === "anonymous") {
+      const headers = buildAnonymousQuotaHeaders(accessResult.quotaResult);
+      for (const [name, value] of Object.entries(headers)) {
+        response.headers.set(name, value);
+      }
+    }
+    return response;
   }
 }
 

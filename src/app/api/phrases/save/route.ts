@@ -3,6 +3,7 @@ import { assertProfileCanWrite, requireCurrentProfile } from "@/lib/server/auth"
 import { toApiErrorResponse } from "@/lib/server/api-error";
 import { savePhraseForUser } from "@/lib/server/phrases/service";
 import { trackChunksForUser } from "@/lib/server/chunks/service";
+import { ensureProfileOrRejectAnonymous } from "@/lib/server/anonymous/route-guard";
 import { assertAllowedOrigin } from "@/lib/server/request-guard";
 import { logServerEvent } from "@/lib/server/logger";
 import {
@@ -18,7 +19,10 @@ import {
 export async function POST(request: Request) {
   try {
     assertAllowedOrigin(request);
-    const { user, profile } = await requireCurrentProfile();
+    const { user, profile } = await ensureProfileOrRejectAnonymous(
+      "save_phrase",
+      () => requireCurrentProfile(),
+    );
     assertProfileCanWrite(profile);
     const payload = await parseSavePhraseRequest(request);
     const normalizedPayload = normalizeSavePhrasePayload(payload);

@@ -12,6 +12,7 @@ import {
   parseReviewSubmitRequest,
 } from "@/lib/server/request-schemas";
 import { ValidationError } from "@/lib/server/errors";
+import { ensureProfileOrRejectAnonymous } from "@/lib/server/anonymous/route-guard";
 import { assertAllowedOrigin } from "@/lib/server/request-guard";
 import {
   buildDeterministicIdempotencyKey,
@@ -76,7 +77,10 @@ export async function handleReviewSubmitPost(
 ) {
   try {
     assertAllowedOrigin(request);
-    const { user } = await dependencies.requireCurrentProfile();
+    const { user } = await ensureProfileOrRejectAnonymous(
+      "review_submit",
+      () => dependencies.requireCurrentProfile(),
+    );
     const payload = await parseReviewSubmitRequest(request);
     const normalizedPayload = normalizeReviewSubmitPayload(payload);
     const idempotencyKey = getRequestIdempotencyKey(
