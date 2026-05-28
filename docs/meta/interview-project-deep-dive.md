@@ -638,15 +638,21 @@ Safari 一直没实现 `requestIdleCallback`。我做了 polyfill 兜底(用 `se
 
 ### 12.2 身份层:四道防线套娃
 
-1. **HTTPOnly cookie 里的 `anon_id`**(UUID v4)— 客户端不可读写,只能后端 set,绕开 LocalStorage 类绕过。
-2. **请求侧 `ip_hash = SHA256(ip + daily_salt)`** — 每日 salt 轮换,不存明文 IP,做 IP 维度限流但保留隐私最小化。
+1. **localStorage 里的 `abridge:anon_id`**(UUID v4)+ **`X-Anonymous-Id` 请求头透传** — 不用 Cookie 是为了让分享链接跨域场景下 SPA 调用稳定;后端只要看到这个头就知道访客身份。脚本伪造头几乎免成本,所以**不靠这个做安全**,只用它做"同一访客"识别。
+2. **请求侧 `ip_hash = SHA256(ip + daily_salt)`** — 每日 salt 轮换,不存明文 IP,做 IP 维度限流但保留隐私最小化。这才是真正的防绕过主力(改 anon_id 没用,IP 还在)。
 3. **数据库 `anonymous_sessions`** — 同 IP 当日 session 数有上限(默认 5),触顶返 `ANON_IP_RATE_LIMITED(429)`。
 4. **搜索引擎爬虫识别** — UA 命中 Googlebot/Bingbot 时不进配额扣减分支,只渲染最小可索引引导态,避免爬虫把全站匿名 AI 池薅光。
 
-### 12.3 配额层:每会话 + 全站日预算双闸
+### 12.3 配额层:两类匿名 capability 走两套 quota,严格隔离
 
-- Redis 命名空间严格隔离:`anon:quota:{cap}:session:{anon_id}:{date}` / `anon:quota:{cap}:global:{date}`;已登录的 `quota:{userId}:{cap}:{date}` 完全不动,改一边不影响另一边。
-- AI 表达解释默认每会话 3 次、全站日 200 次;TTS 播放每会话 30 次、全站日 600 次。
+- Redis 命名空间严格隔离:已登录的 `quota:{userId}:{cap}:{date}` 完全不动,改一边不影响另一边。
+- **AI 表达解释**(`explain_selection`,会调付费上游)走完整四层防御 + 全站日预算:
+  - key:`anon:quota:global:explain_selection:{date}` + `anon:quota:session:{anonId}:explain_selection:{date}`
+  - 默认:全站 200 次/天(对应 ≈ $0.14/天),单 anon 3 次/天,IP 滑窗 30/min
+- **TTS 预生成播放**(`tts_play`,只读 Storage 零边际成本)走独立轻量 quota,**没有全站池**:
+  - 只有 session 一层 + 共享同一个 IP 滑窗 scope
+  - 默认:单 anon 30 次/天,IP 滑窗复用 explain 同一个限速桶
+  - 设计取舍:预生成播放只是签发一次 signed URL,不调 MsEdgeTTS,全站池防失控的需求不存在;留 IP 滑窗就够防 DDoS 风格爆量
 - 单价以函数内常量(`c_explain_unit_usd = 0.0009`,`c_tts_unit_usd = 0.0003`)推算每日估算成本,直接写进 `daily_anon_cost_report` 看板。
 
 ### 12.4 表权限层:Supabase RLS 显式 deny-by-default
@@ -672,7 +678,20 @@ Safari 一直没实现 `requestIdleCallback`。我做了 polyfill 兜底(用 `se
 - `ALLOW_ANONYMOUS_TRIAL` 总开关,异常情况下切回 false → 所有 `/share/...` 路径退回 `/login`,既有登录用户主链路零影响。
 - 三条飞书告警:同 IP 当日 session > 10、全站匿名 AI 池 18:00 UTC 前 > 80%、`anon_quota_blocked / anon_session_created > 60%`,各对应一个明确的预案动作。
 
-### 12.8 面试可以这样讲
+### 12.8 实施现实:开发完后自评审,3 个补丁 commit 闭环
+
+灰度功能首版 (`145686a`) 跑完后我做了一次全局自评审,发现 7 个让"灰度核心目标失效"的问题。3 个 commit 闭环:
+
+- `9b917c6` **share 真接场景**:design D4 原计划"复用 SceneDetailClientPage",但代码现实是这个组件强依赖 7+ 个受保护 API(学习态/练习/保存),搬过去会一连串 401。改成**新建 `ShareScenePreviewClient` 子组件**——主路由完全不动(保护不收项 §11.2)、走 supabase anon client 直读 scenes 表(RLS 已开 is_public=true)、触发 `explain-selection` 时带 X-Anonymous-Id 头。**面试讲点**:决策跟实施不一致时,选"不污染主链路"而不是"硬塞 anonymous mode 进主组件"。
+- `b2aef79` **漏斗 + 回滚**:`anon_register_prompt_clicked` 4 个触发点接入(L1/L2/L3 各点击都上报);counter 加 `decrDailyCounter`,quota 命中阈值后 INCR 回滚,防止持续失败请求让 count 漂移到 limit+N(否则 Redis 计数会一直涨,虽然不影响判定但脏)。
+- `7f6aff5` **TTS 接匿名**:design 说"TTS 在匿名分支仅允许播放预生成音频",但首版漏接了。补一个新路由 `/api/anonymous/tts/play` GET,**关键决策:`tts_play` 不进 HighCostCapability 数组**(它只读 Storage 零边际成本,加进去会污染 admin 紧急关闭面板 / 用户日 quota 表 / usage 统计的"高成本"语义)。新建独立 `tts-playback-quota.ts` 模块,复用 counter + IP 滑窗 + 漏斗埋点基础设施,但 quota 体系完全分家。
+
+### 12.9 这次自评审的两个工程方法可以单独讲
+
+1. **跟自己的代码做 code-review**:不只是 PR 流程那种"看了再说",而是把 proposal/design/spec 跟实际实现逐条比对,找"设计了但没接通"的事(这次发现的 7 个问题里有 4 个属于这类:漏斗 0 调用、share 渲染引导墙、cache 头无效注入、TTS 没接)。
+2. **依赖注入 + audit test 双护栏**:server 模块全部把外部依赖(supabase admin / counter / requireProfile)作为 dependencies 形参,测试用 fake 注入;再加一个 SQL parser 解析 migration 文件的 audit test,守护"所有用户态表不能给 anon 加 SELECT 策略"这类**不变量**——文档说"以后新建表要注意"是没用的,改了测试会红才有用。
+
+### 12.10 面试可以这样讲
 
 > 这个能力做下来,核心收获不是"实现了匿名访问",而是"想清楚了一个新增功能怎么不去污染已有链路"。每一层都有显式的隔离边界:cookie / Redis 命名空间 / RLS 策略 / 路由前缀 / env 开关。出问题能精确归因(漏斗 + Sentry user_type tag),能精确止血(env gate 一切)。
 
