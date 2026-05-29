@@ -10,7 +10,8 @@ export const mainNav = [
 ];
 
 export const marketingNav = [
-  { title: "\u6f14\u793a", href: "/demo" },
+  { title: "\u6f14\u793a", href: "/#demo" },
+  { title: "\u8bd5\u7528", href: "/share/scene/canceling-plans-politely" },
   { title: "\u767b\u5f55", href: "/login" },
   { title: "\u6ce8\u518c", href: "/signup" },
 ];

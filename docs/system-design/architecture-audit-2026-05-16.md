@@ -21,7 +21,7 @@
 | --- | --- | --- |
 | `src/app/(app)/*` | 主应用路由层 | today / scenes / scene / chunks / review / progress / settings / admin / lesson(legacy redirect) |
 | `src/app/(auth)/*` | 认证路由层 | login / signup / verify-email |
-| `src/app/(marketing)/*` | 营销路由层 | landing / demo / privacy / terms |
+| `src/app/(marketing)/*` | 营销路由层 | landing / privacy / terms（原 demo 卡片已内嵌到 landing） |
 | `src/components/ui/*` | UI primitives | 17 个文件（avatar / badge / button / card / drawer / input / ...） |
 | `src/components/shared/*` | 跨 feature 稳定复用 | 22 个文件，但混了 4 个 admin-* 实际只服务 admin |
 | `src/components/audio/*` | 音频动作子域 | 4 个 |

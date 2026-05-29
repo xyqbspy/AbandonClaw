@@ -27,7 +27,7 @@ test("share/scene/[slug] 开关关闭时 redirect 到 /login,带 redirect 回跳
 });
 
 test("share/scene/[slug] 注册按钮链接带 from=share 与 scene slug,便于漏斗归因", () => {
-  assert.match(pageSource, /\/register\?from=share&scene=\$\{encodeURIComponent\(slug\)\}/);
+  assert.match(pageSource, /\/signup\?from=share&scene=\$\{encodeURIComponent\(slug\)\}/);
 });
 
 test("share/scene/[slug] 调 detectAnonymousSsrContext 识别搜索引擎爬虫", () => {

@@ -26,7 +26,7 @@ export function AnonymousTopbarBanner({
   isAnonymous,
   primaryCapability = "explain_selection",
   quotaByCapability,
-  registerHref = "/register",
+  registerHref = "/signup",
   onRegisterClick,
   className,
 }: {

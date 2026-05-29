@@ -23,7 +23,6 @@ import {
   buildAnonymousQuotaHeaders,
 } from "@/lib/server/anonymous/quota-headers";
 import { isAnonymousAccessError } from "@/lib/server/anonymous/route-guard";
-import { recordAnonymousFunnelEventSafe } from "@/lib/server/anonymous/funnel-events";
 import { assertAllowedOrigin } from "@/lib/server/request-guard";
 import type { AnonymousSessionStoreDependencies } from "@/lib/server/anonymous/session-store";
 

@@ -183,7 +183,7 @@ const findFetchCalls = (matcher: (url: string) => boolean) =>
 test("ShareScenePreviewClient 渲染场景标题/句子/chunk 按钮", async () => {
   const Component = getComponent();
   const result = render(
-    <Component initialLesson={SAMPLE_LESSON} registerHref="/register?from=share&scene=share-sample" />,
+    <Component initialLesson={SAMPLE_LESSON} registerHref="/signup?from=share&scene=share-sample" />,
   );
 
   await flushAsync();
@@ -200,7 +200,7 @@ test("ShareScenePreviewClient 渲染场景标题/句子/chunk 按钮", async () 
 test("ShareScenePreviewClient mount 后上报 anon_first_scene_viewed 并保证 anonId 已落盘", async () => {
   const Component = getComponent();
   render(
-    <Component initialLesson={SAMPLE_LESSON} registerHref="/register" />,
+    <Component initialLesson={SAMPLE_LESSON} registerHref="/signup" />,
   );
 
   await flushAsync();
@@ -245,7 +245,7 @@ test("ShareScenePreviewClient 点击 chunk 按钮触发 explain-selection 调用
 
   const Component = getComponent();
   const result = render(
-    <Component initialLesson={SAMPLE_LESSON} registerHref="/register" />,
+    <Component initialLesson={SAMPLE_LESSON} registerHref="/signup" />,
   );
   await flushAsync();
 
@@ -292,7 +292,7 @@ test("ShareScenePreviewClient 配额耗尽(429 ANON_QUOTA_EXCEEDED_SESSION)弹�
 
   const Component = getComponent();
   const result = render(
-    <Component initialLesson={SAMPLE_LESSON} registerHref="/register" />,
+    <Component initialLesson={SAMPLE_LESSON} registerHref="/signup" />,
   );
   await flushAsync();
 
@@ -324,7 +324,7 @@ test("ShareScenePreviewClient 配额耗尽(429 ANON_QUOTA_EXCEEDED_SESSION)弹�
 test("ShareScenePreviewClient 点击顶栏注册按钮上报 anon_register_prompt_clicked L1", async () => {
   const Component = getComponent();
   const result = render(
-    <Component initialLesson={SAMPLE_LESSON} registerHref="/register" />,
+    <Component initialLesson={SAMPLE_LESSON} registerHref="/signup" />,
   );
   await flushAsync();
 
@@ -351,7 +351,7 @@ test("ShareScenePreviewClient 点击顶栏注册按钮上报 anon_register_promp
 test("ShareScenePreviewClient 点击 inline upsell 注册按钮上报 anon_register_prompt_clicked L2", async () => {
   const Component = getComponent();
   const result = render(
-    <Component initialLesson={SAMPLE_LESSON} registerHref="/register" />,
+    <Component initialLesson={SAMPLE_LESSON} registerHref="/signup" />,
   );
   await flushAsync();
 
@@ -380,7 +380,7 @@ test("ShareScenePreviewClient 点击 inline upsell 注册按钮上报 anon_regis
 test("ShareScenePreviewClient 渲染每个 sentence 的播放按钮(初始 idle 状态)", async () => {
   const Component = getComponent();
   const result = render(
-    <Component initialLesson={SAMPLE_LESSON} registerHref="/register" />,
+    <Component initialLesson={SAMPLE_LESSON} registerHref="/signup" />,
   );
   await flushAsync();
 
@@ -420,7 +420,7 @@ test("ShareScenePreviewClient 点击播放按钮触发 GET /api/anonymous/tts/pl
 
   const Component = getComponent();
   const result = render(
-    <Component initialLesson={SAMPLE_LESSON} registerHref="/register" />,
+    <Component initialLesson={SAMPLE_LESSON} registerHref="/signup" />,
   );
   await flushAsync();
 
@@ -474,7 +474,7 @@ test("ShareScenePreviewClient TTS 配额耗尽(429 ANON_QUOTA_EXCEEDED_SESSION)�
 
   const Component = getComponent();
   const result = render(
-    <Component initialLesson={SAMPLE_LESSON} registerHref="/register" />,
+    <Component initialLesson={SAMPLE_LESSON} registerHref="/signup" />,
   );
   await flushAsync();
 
@@ -508,7 +508,7 @@ test("ShareScenePreviewClient TTS storage miss(404)按钮状态置为 unavailabl
 
   const Component = getComponent();
   const result = render(
-    <Component initialLesson={SAMPLE_LESSON} registerHref="/register" />,
+    <Component initialLesson={SAMPLE_LESSON} registerHref="/signup" />,
   );
   await flushAsync();
 

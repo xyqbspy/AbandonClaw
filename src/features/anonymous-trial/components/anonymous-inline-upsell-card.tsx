@@ -10,7 +10,7 @@ export function AnonymousInlineUpsellCard({
   visible,
   onDismiss,
   expressionCount,
-  registerHref = "/register",
+  registerHref = "/signup",
   onRegisterClick,
   className,
 }: {

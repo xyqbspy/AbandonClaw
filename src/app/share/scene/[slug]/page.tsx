@@ -37,7 +37,7 @@ export default async function ShareScenePage({
   }
 
   const { isSearchEngineBot } = await detectAnonymousSsrContext();
-  const registerHref = `/register?from=share&scene=${encodeURIComponent(slug)}`;
+  const registerHref = `/signup?from=share&scene=${encodeURIComponent(slug)}`;
 
   if (isSearchEngineBot) {
     return <AnonymousGuidanceState page="chunks" registerHref={registerHref} />;

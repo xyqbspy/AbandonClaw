@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { peekAnonymousId } from "@/lib/anonymous-client";
 
 export type AnonymousPromptLevel = "L1" | "L2" | "L3";
@@ -14,6 +14,8 @@ export type AnonymousQuotaSnapshot = {
   resetAt: string | null;
 };
 
+type PromptVisibility = Record<AnonymousPromptLevel, boolean>;
+
 const QUOTA_HEADER_NAMES = {
   type: "X-Quota-Type",
   dailyLimit: "X-Quota-Daily-Limit",
@@ -24,6 +26,12 @@ const QUOTA_HEADER_NAMES = {
 } as const;
 
 const STORAGE_PREFIX = "abridge:anon:";
+
+const EMPTY_PROMPT_VISIBILITY: PromptVisibility = {
+  L1: false,
+  L2: false,
+  L3: false,
+};
 
 const parseInteger = (raw: string | null): number | null => {
   if (raw === null || raw === "") return null;
@@ -80,7 +88,7 @@ export type AnonymousModeState = {
   }) => void;
   getSessionFlag: (suffix: string) => boolean;
   setSessionFlag: (suffix: string, value: boolean) => void;
-  promptVisible: Record<AnonymousPromptLevel, boolean>;
+  promptVisible: PromptVisibility;
   showRegisterPrompt: (level: AnonymousPromptLevel) => void;
   dismissRegisterPrompt: (level: AnonymousPromptLevel) => void;
 };
@@ -91,7 +99,9 @@ export const useAnonymousMode = (params: {
 }): AnonymousModeState => {
   const { isAuthenticated, initialQuotaSnapshots = [] } = params;
 
-  const [anonId, setAnonId] = useState<string | null>(null);
+  const isAnonymous = !isAuthenticated;
+
+  const [initialAnonId] = useState<string | null>(() => peekAnonymousId());
   const [quotaByCapability, setQuotaByCapability] = useState<
     Record<string, AnonymousQuotaSnapshot>
   >(() => {
@@ -102,29 +112,11 @@ export const useAnonymousMode = (params: {
     return initial;
   });
 
-  const [promptVisible, setPromptVisible] = useState<Record<AnonymousPromptLevel, boolean>>({
+  const [promptVisible, setPromptVisible] = useState<PromptVisibility>({
     L1: false,
     L2: false,
     L3: false,
   });
-
-  const isAnonymous = !isAuthenticated;
-
-  useEffect(() => {
-    if (!isAnonymous) {
-      setAnonId(null);
-      return;
-    }
-    setAnonId(peekAnonymousId());
-  }, [isAnonymous]);
-
-  useEffect(() => {
-    if (isAnonymous) {
-      setPromptVisible((prev) => ({ ...prev, L1: true }));
-    } else {
-      setPromptVisible({ L1: false, L2: false, L3: false });
-    }
-  }, [isAnonymous]);
 
   const syncQuota = useCallback((snapshot: AnonymousQuotaSnapshot) => {
     setQuotaByCapability((prev) => ({ ...prev, [snapshot.capability]: snapshot }));
@@ -156,20 +148,20 @@ export const useAnonymousMode = (params: {
   return useMemo<AnonymousModeState>(
     () => ({
       isAnonymous,
-      anonId,
+      anonId: isAnonymous ? initialAnonId : null,
       quotaByCapability,
       syncQuota,
       syncFromResponse,
       getSessionFlag: (suffix) => safeReadSessionFlag(sessionStorageKey(suffix)),
       setSessionFlag: (suffix, value) =>
         safeWriteSessionFlag(sessionStorageKey(suffix), value),
-      promptVisible,
+      promptVisible: isAnonymous ? { ...promptVisible, L1: true } : EMPTY_PROMPT_VISIBILITY,
       showRegisterPrompt,
       dismissRegisterPrompt,
     }),
     [
       isAnonymous,
-      anonId,
+      initialAnonId,
       quotaByCapability,
       syncQuota,
       syncFromResponse,

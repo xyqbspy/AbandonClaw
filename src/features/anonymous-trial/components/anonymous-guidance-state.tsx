@@ -64,7 +64,7 @@ const COPY: Record<AnonymousGuidancePage, GuidanceCopy> = {
 export function AnonymousGuidanceState({
   page,
   className,
-  registerHref = "/register",
+  registerHref = "/signup",
 }: {
   page: AnonymousGuidancePage;
   className?: string;

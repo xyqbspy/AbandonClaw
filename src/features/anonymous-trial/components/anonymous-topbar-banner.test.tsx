@@ -89,7 +89,7 @@ test("AnonymousTopbarBanner 渲染配额行 + 注册按钮", () => {
   const quotaLine = result.getByTestId("anonymous-topbar-quota-line");
   assert.match(quotaLine.textContent ?? "", /AI 表达解释 剩 2\/3 次/);
   const action = result.getByTestId("anonymous-topbar-register-action");
-  assert.equal(action.getAttribute("href"), "/register");
+  assert.equal(action.getAttribute("href"), "/signup");
 });
 
 test("AnonymousTopbarBanner sessionRemaining<=1 时标记 critical + ⚠️ 前缀", () => {
@@ -139,11 +139,11 @@ test("AnonymousTopbarBanner 支持自定义 registerHref(灰度场景)", () => {
     <Component
       isAnonymous={true}
       quotaByCapability={{}}
-      registerHref="/share/register?from=topbar"
+      registerHref="/signup?from=topbar"
     />,
   );
   const action = result.getByTestId("anonymous-topbar-register-action");
-  assert.equal(action.getAttribute("href"), "/share/register?from=topbar");
+  assert.equal(action.getAttribute("href"), "/signup?from=topbar");
 });
 
 test("AnonymousTopbarBanner sessionLimit=null 时显示加载中文案", () => {

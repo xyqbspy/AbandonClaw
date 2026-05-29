@@ -2,13 +2,13 @@
 
 ## 1. 模块目标
 
-匿名试用模块负责把"未注册访客通过分享链接首次接触产品"这一漏斗第一步从"看到登录墙"改成"先体验再决定"，同时把 AI / TTS 等付费链路的成本严格隔离在已登录用户配额体系之外。
+匿名试用模块负责把"未注册访客通过首页试用入口或分享链接首次接触产品"这一漏斗第一步从"看到登录墙"改成"先体验再决定"，同时把 AI / TTS 等付费链路的成本严格隔离在已登录用户配额体系之外。
 
 它**不是产品主链路**，而是一个独立的灰度入口层，由 `ALLOW_ANONYMOUS_TRIAL` env 总开关控制开放。关闭时所有匿名路径直接退回 `/login`，主入口 today / scenes / scene / review / chunks / progress 永远要求登录。
 
 ## 2. 输入
 
-- 外部分享链接（用户从微信 / 邮件 / 社媒等渠道分享 `/share/scene/[slug]` URL 给非用户）
+- 首页试用入口或外部分享链接（都指向 `/share/scene/[slug]` 灰度 URL）
 - 公共内容表（`scenes` is_public=true / `scene_variants` / `chunks` / `phrases` is_builtin|is_core）
 - 已上传的预生成 TTS 音频（Supabase Storage `tts-audio` bucket）
 - `X-Anonymous-Id` 请求头（前端 localStorage UUID v4 透传）
@@ -84,7 +84,7 @@
 - 飞书告警（同 IP session > 10 / 全站匿名 AI 池 18:00 UTC 前 > 80% / quota_blocked / session_created > 60%）
 
 **反向触发**：
-- 注册转化（`/register?from=share&scene={slug}` 回跳路径）→ 后续 V2 接 `anon_registered` 事件
+- 注册转化（`/signup?from=share&scene={slug}` 回跳路径）→ 后续 V2 接 `anon_registered` 事件
 
 ## 6. 常见改动风险
 

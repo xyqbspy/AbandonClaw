@@ -171,7 +171,7 @@ test("AnonymousBlockModal 未传 capabilityLabel 时不渲染该段", () => {
   );
 });
 
-test("AnonymousBlockModal 注册按钮指向 /register 默认地址", () => {
+test("AnonymousBlockModal 注册按钮指向 /signup 默认地址", () => {
   const Component = getComponent();
   const result = render(
     <Component
@@ -182,7 +182,7 @@ test("AnonymousBlockModal 注册按钮指向 /register 默认地址", () => {
     />,
   );
   const register = result.getByTestId("anonymous-block-modal-register");
-  assert.equal(register.getAttribute("href"), "/register");
+  assert.equal(register.getAttribute("href"), "/signup");
 });
 
 test("AnonymousBlockModal 支持自定义 registerHref(灰度场景)", () => {
@@ -193,11 +193,11 @@ test("AnonymousBlockModal 支持自定义 registerHref(灰度场景)", () => {
       visible={true}
       trigger="explain_quota_exhausted"
       onDismiss={() => {}}
-      registerHref="/share/register?from=quota_modal"
+      registerHref="/signup?from=quota_modal"
     />,
   );
   const register = result.getByTestId("anonymous-block-modal-register");
-  assert.equal(register.getAttribute("href"), "/share/register?from=quota_modal");
+  assert.equal(register.getAttribute("href"), "/signup?from=quota_modal");
 });
 
 test("AnonymousBlockModal 稍后按钮触发 onDismiss", () => {

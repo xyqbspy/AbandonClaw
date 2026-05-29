@@ -2,12 +2,18 @@ import Link from "next/link";
 import {
   ArrowRight,
   BookOpenText,
+  CalendarCheck,
   Check,
   Gem,
+  Highlighter,
   Layers3,
+  Map,
+  Sparkles,
   Volume2,
 } from "lucide-react";
 import { appCopy } from "@/lib/constants/copy";
+
+const trialHref = "/share/scene/canceling-plans-politely";
 
 const stats = [
   ["12 分钟", "平均单次学习时长"],
@@ -27,6 +33,89 @@ const featureItems = [
   [Layers3, "短语理解", "点选任意短语，立即查看中文释义、用法讲解、例句与发音。"],
   [Gem, "复习沉淀", "把值得反复接触的表达加入复习，让短时理解慢慢沉淀为长期资产。"],
 ] as const;
+
+const demoCards = [
+  {
+    step: "1",
+    title: "场景选择",
+    icon: Map,
+    dark: false,
+    body: (
+      <>
+        <div className="rounded-2xl border border-slate-100 bg-slate-50/50 p-6">
+          <h4 className="mb-1 text-lg font-bold text-blue-600">Dinner Plan Cancelled</h4>
+          <p className="mb-4 text-xs text-slate-400">难度: Intermediate · 预计 10 mins</p>
+          <div className="space-y-2">
+            <div className="h-2 w-full rounded-full bg-slate-200" />
+            <div className="h-2 w-3/4 rounded-full bg-slate-200" />
+          </div>
+        </div>
+        <p className="mt-6 text-sm leading-relaxed text-slate-500">进入真实对话语境，感受母语者的表达逻辑。</p>
+      </>
+    ),
+  },
+  {
+    step: "2",
+    title: "短语捕获",
+    icon: Highlighter,
+    dark: false,
+    body: (
+      <>
+        <div className="rounded-r-2xl border-l-4 border-blue-600 bg-[linear-gradient(120deg,rgba(147,197,253,0.3)_0%,rgba(147,197,253,0)_100%)] p-6">
+          <span className="mb-2 block font-mono text-2xl font-bold text-slate-800">as soon as...</span>
+          <p className="text-sm text-blue-600/80">一......就......</p>
+        </div>
+        <p className="mt-8 text-sm text-slate-500">
+          点击场景中的任何短语，系统会自动解析用法并将其加入你的私人表达库。
+        </p>
+      </>
+    ),
+  },
+  {
+    step: "3",
+    title: "智能任务分配",
+    icon: CalendarCheck,
+    dark: false,
+    body: (
+      <>
+        <div className="mb-6 grid grid-cols-3 gap-2">
+          {[
+            ["1", "场景"],
+            ["2", "复习"],
+            ["1", "练习"],
+          ].map(([value, label]) => (
+            <div key={label} className="rounded-xl bg-blue-50 p-3 text-center">
+              <span className="block font-bold text-blue-600">{value}</span>
+              <span className="text-[10px] uppercase text-blue-400">{label}</span>
+            </div>
+          ))}
+        </div>
+        <p className="text-sm text-slate-500">根据艾宾浩斯曲线，AI 每日为你定制最合理的复习与新知比例。</p>
+      </>
+    ),
+  },
+  {
+    step: "4",
+    title: "深度复习",
+    icon: Sparkles,
+    dark: true,
+    body: (
+      <div className="relative py-4">
+        <div className="absolute left-0 top-0 h-full w-full translate-x-2 translate-y-2 rounded-2xl bg-blue-500/20" />
+        <div className="relative rounded-2xl bg-white p-6 text-slate-800 shadow-xl">
+          <span className="mb-1 block text-sm font-bold text-blue-600">Pick up useful expressions</span>
+          <p className="text-xs text-slate-400">在语境中自然习得实用表达</p>
+          <Link
+            href="/review"
+            className="mt-4 inline-flex w-full items-center justify-center rounded-lg bg-slate-900 py-2 text-xs font-bold text-white transition-colors hover:bg-slate-700"
+          >
+            开始复习
+          </Link>
+        </div>
+      </div>
+    ),
+  },
+];
 
 export default function HomePage() {
   return (
@@ -54,10 +143,16 @@ export default function HomePage() {
             <ArrowRight className="size-5" />
           </Link>
           <Link
-            href="/demo"
+            href="#demo"
             className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-[#007aff] px-8 py-3 text-base font-semibold text-[#007aff] transition hover:bg-[#e5f1ff] sm:text-lg"
           >
             {appCopy.marketing.secondaryCta}
+          </Link>
+          <Link
+            href={trialHref}
+            className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-[#1d1d1f] px-8 py-3 text-base font-semibold text-[#1d1d1f] transition hover:bg-[#f2f2f7] sm:text-lg"
+          >
+            免登录试用
           </Link>
         </div>
       </section>
@@ -120,6 +215,44 @@ export default function HomePage() {
               加入收藏复习
             </button>
           </div>
+        </div>
+      </section>
+
+      <section id="demo" className="mx-auto max-w-7xl scroll-mt-24 px-5 py-16 sm:px-8 sm:py-20 lg:px-12">
+        <div className="mb-10 max-w-2xl">
+          <p className="text-sm font-semibold text-[#007aff]">完整学习流</p>
+          <h2 className="mt-3 text-3xl font-extrabold leading-tight tracking-normal text-[#1d1d1f] sm:text-4xl">
+            从看懂一句话，到沉淀一组表达
+          </h2>
+          <p className="mt-4 text-base leading-8 text-[#86868b]">
+            演示不再单独放一个页面，而是嵌在首页的产品语境里：你看到的是同一条学习链路如何继续推进。
+          </p>
+        </div>
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+          {demoCards.map((card) => {
+            const Icon = card.icon;
+
+            return (
+              <article
+                key={card.step}
+                className={[
+                  "group relative overflow-hidden rounded-3xl border p-8 transition-all duration-300 hover:-translate-y-2 hover:border-blue-500 hover:shadow-[0_20px_25px_-5px_rgba(0,0,0,0.05),0_10px_10px_-5px_rgba(0,0,0,0.02)]",
+                  card.dark ? "border-slate-900 bg-slate-900 text-white" : "border-[#edf2f7] bg-white",
+                ].join(" ")}
+              >
+                <div className="pointer-events-none absolute right-0 top-0 p-6 opacity-10 transition-opacity group-hover:opacity-20">
+                  <Icon className="size-16" aria-hidden="true" />
+                </div>
+                <div className="mb-6 flex items-center gap-3">
+                  <span className="flex size-8 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">
+                    {card.step}
+                  </span>
+                  <h3 className={card.dark ? "font-bold text-white" : "font-bold text-slate-800"}>{card.title}</h3>
+                </div>
+                {card.body}
+              </article>
+            );
+          })}
         </div>
       </section>
 

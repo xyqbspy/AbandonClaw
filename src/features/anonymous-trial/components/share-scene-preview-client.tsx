@@ -11,7 +11,6 @@ import {
   getOrCreateAnonymousId,
 } from "@/lib/anonymous-client";
 import {
-  readQuotaFromResponse,
   useAnonymousMode,
   type AnonymousQuotaSnapshot,
 } from "@/features/anonymous-trial/use-anonymous-mode";

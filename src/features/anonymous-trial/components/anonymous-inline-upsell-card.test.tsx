@@ -88,7 +88,7 @@ test("AnonymousInlineUpsellCard visible=false 时不渲染(模拟 L2 已 dismiss
   );
 });
 
-test("AnonymousInlineUpsellCard 渲染表达数量 + 注册按钮指向 /register", () => {
+test("AnonymousInlineUpsellCard 渲染表达数量 + 注册按钮指向 /signup", () => {
   const Component = getComponent();
   const result = render(
     <Component
@@ -100,7 +100,7 @@ test("AnonymousInlineUpsellCard 渲染表达数量 + 注册按钮指向 /registe
   );
   assert.match(result.container.textContent ?? "", /刚刚学的这个场景里有 7 个表达/);
   const register = result.getByTestId("anonymous-inline-upsell-register");
-  assert.equal(register.getAttribute("href"), "/register");
+  assert.equal(register.getAttribute("href"), "/signup");
 });
 
 test("AnonymousInlineUpsellCard 稍后按钮触发 onDismiss", () => {
@@ -129,9 +129,9 @@ test("AnonymousInlineUpsellCard 支持自定义 registerHref(灰度场景)", () 
       visible={true}
       onDismiss={() => {}}
       expressionCount={2}
-      registerHref="/share/register?from=scene"
+      registerHref="/signup?from=scene"
     />,
   );
   const register = result.getByTestId("anonymous-inline-upsell-register");
-  assert.equal(register.getAttribute("href"), "/share/register?from=scene");
+  assert.equal(register.getAttribute("href"), "/signup?from=scene");
 });

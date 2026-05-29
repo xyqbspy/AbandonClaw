@@ -51,7 +51,7 @@ function getComponent() {
   return GuidanceModule!.AnonymousGuidanceState;
 }
 
-test("AnonymousGuidanceState review 页渲染三段式 + 立即注册按钮指向 /register", () => {
+test("AnonymousGuidanceState review 页渲染三段式 + 立即注册按钮指向 /signup", () => {
   const Component = getComponent();
   const result = render(<Component page="review" />);
   const container = result.getByTestId("anonymous-guidance-state");
@@ -61,7 +61,7 @@ test("AnonymousGuidanceState review 页渲染三段式 + 立即注册按钮指�
   assert.match(result.container.textContent ?? "", /注册后可解锁/);
   assert.match(result.container.textContent ?? "", /现在可以做什么/);
   const primary = result.getByTestId("anonymous-guidance-primary-action");
-  assert.equal(primary.getAttribute("href"), "/register");
+  assert.equal(primary.getAttribute("href"), "/signup");
 });
 
 test("AnonymousGuidanceState progress 页文案聚焦学习时长 / 连续打卡", () => {
@@ -81,11 +81,11 @@ test("AnonymousGuidanceState chunks 页文案聚焦表达库 / 保存按钮", ()
   assert.match(text, /保存/);
 });
 
-test("AnonymousGuidanceState 支持自定义 registerHref(灰度可指向 /share/register)", () => {
+test("AnonymousGuidanceState 支持自定义 registerHref(灰度可指向 /signup)", () => {
   const Component = getComponent();
   const result = render(
-    <Component page="review" registerHref="/share/register?from=review" />,
+    <Component page="review" registerHref="/signup?from=review" />,
   );
   const primary = result.getByTestId("anonymous-guidance-primary-action");
-  assert.equal(primary.getAttribute("href"), "/share/register?from=review");
+  assert.equal(primary.getAttribute("href"), "/signup?from=review");
 });

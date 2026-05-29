@@ -45,7 +45,7 @@ export function AnonymousBlockModal({
   visible,
   trigger,
   onDismiss,
-  registerHref = "/register",
+  registerHref = "/signup",
   onRegisterClick,
   capabilityLabel,
   className,

@@ -1,5 +1,22 @@
 # Dev Log
 
+### [2026-05-29] 首页试用入口与 demo 页面收口
+- 类型:Fast Track + Cleanup(营销页入口与展示内容重排)
+- 状态:落地(anonymous trial 相关 54/54 测试通过;`pnpm run lint` 0 error/4 warning;`pnpm run build` PASS)
+
+#### 变更
+
+- 首页 hero CTA 旁新增“免登录试用”,指向 `/share/scene/canceling-plans-politely`。
+- 原 `/demo` 的 4 张演示卡片迁入首页“语境内即时理解”模块下方,营销导航“演示”改为 `/#demo`。
+- 删除独立 `/demo` 页面,并把匿名页注册引导从不存在的 `/register` 改到实际注册页 `/signup?from=share&scene={slug}`。
+
+#### 边界
+
+- 不扩展 middleware 匿名白名单,不开放 `/today`、`/scenes`、`/scene` 等主入口匿名访问。
+- 不改变匿名身份、配额、RLS、漏斗事件和已登录用户主链路语义。
+
+---
+
 ### [2026-05-28] 修 next build 失败:Button asChild 类型 + scene-detail-view-switch dead prop
 - 类型:Cleanup(修工程债 + 清理 dead pass-through prop)
 - 状态:落地(`pnpm run build` PASS;unit 610/610 + interaction 367/367 全绿)
@@ -114,7 +131,7 @@
 | --- | --- | --- |
 | 1. 浏览器无痕模式访问 `/share/scene/{slug}`(真实 slug) | 渲染 AnonymousGuidanceState,顶栏出现"体验模式 · AI 表达解释剩 3/3 次" | 502/白屏 → 回滚 `ALLOW_ANONYMOUS_TRIAL=false`,排查 SSR 错误 |
 | 2. 触发 3 次 AI 表达解释 | 第 1-3 次返 200 + 计数递减;第 4 次返 429 `ANON_QUOTA_EXCEEDED_SESSION` | 4 次仍可调用 → 回滚 env,排查 quota helper |
-| 3. 第 4 次后弹出 L3 阻断弹窗 | 弹窗文案"AI 表达解释已用完","立即注册"按钮跳 `/register?from=share&scene={slug}` | 弹窗不出 → 排查 use-anonymous-mode hook |
+| 3. 第 4 次后弹出 L3 阻断弹窗 | 弹窗文案"AI 表达解释已用完","立即注册"按钮跳 `/signup?from=share&scene={slug}` | 弹窗不出 → 排查 use-anonymous-mode hook |
 | 4. 注册完成 → 回跳 `/share/scene/{slug}` 或 `/today` | 注册用户身份接管,banner 消失,主链路正常 | 跳到错误页 → 排查回跳参数透传 |
 | 5. 切到 `/today` `/scenes` `/scene/{slug}` `/review` `/chunks` `/progress` 路径 | 全部 302 → `/login?redirect=...`,与既有匿名行为一致 | 任一路径裸渲染或抛错 → 立即排查 middleware PROTECTED_PAGE_PREFIXES |
 | 6. 切到 `/share/scene/{slug}`(SE 爬虫 UA) | 返公开 SSR,不创建 anonymous_session,不计 quota | 爬虫触发 quota 计数 → 排查 anon-identity bot 分支 |
