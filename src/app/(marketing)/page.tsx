@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { appCopy } from "@/lib/constants/copy";
 
-const trialHref = "/share/scene/canceling-plans-politely";
+const trialHref = "/trial";
 
 const stats = [
   ["12 分钟", "平均单次学习时长"],

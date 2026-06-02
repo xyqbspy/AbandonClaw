@@ -8,7 +8,7 @@
 
 ## 2. 输入
 
-- 首页试用入口或外部分享链接（都指向 `/share/scene/[slug]` 灰度 URL）
+- 首页试用入口（指向 `/trial`）或外部分享链接（指向 `/share/scene/[slug]` 灰度 URL）
 - 公共内容表（`scenes` is_public=true / `scene_variants` / `chunks` / `phrases` is_builtin|is_core）
 - 已上传的预生成 TTS 音频（Supabase Storage `tts-audio` bucket）
 - `X-Anonymous-Id` 请求头（前端 localStorage UUID v4 透传）
@@ -16,9 +16,11 @@
 
 ## 3. 输出
 
-- `/share/scene/[slug]` 渲染场景内容（标题 / 句子 / 中英对照）
+- `/trial` 展示 4-5 条精选公开场景，进入 `/trial/scene/[slug]` 后渲染场景内容（标题 / 句子 / 中英对照）
+- `/share/scene/[slug]` 保留为单场景分享入口，继续复用同一匿名预览 UI
 - 句子级 TTS 播放（点击触发，调 `/api/anonymous/tts/play`）
 - 选词触发 AI 表达解释（调 `/api/explain-selection` 带 X-Anonymous-Id 头）
+- 预生成练习题的本地作答体验（仅前端反馈，不提交、不写入、不加入复习）
 - 三层注册引导：L1 顶栏配额条 / L2 内联卡片 / L3 阻断弹窗
 - 8 个漏斗事件落盘到 `anonymous_funnel_events` 表
 - 每日 cron 聚合到 `daily_anon_cost_report`（转化率 + 单转化成本 + AI/TTS 调用量）
@@ -28,8 +30,9 @@
 ### 4.1 主入口完全不受灰度影响
 
 - middleware `PROTECTED_PAGE_PREFIXES` 显式守护 today / scenes / scene / review / chunks / progress / settings / lesson / admin，匿名访问被强制重定向到 `/login`
-- 该列表**不得**加 `/share`；`/share/*` 由 middleware 透传到页面，页面自己判 env 开关
+- 该列表**不得**加 `/share` 或 `/trial`；`/share/*` 与 `/trial/*` 由 middleware 透传到页面，页面自己判 env 开关
 - `SceneDetailClientPage`（主路由 `/scene/[slug]`）**不动**，匿名分支完全走独立的 `ShareScenePreviewClient`
+- `/trial/scene/[slug]` 可以传 `showPracticePreview` 开启本地练习区，但仍不得复用强依赖登录态 API 的主场景详情页
 
 ### 4.2 身份四道防线（按强度递增）
 
@@ -52,7 +55,7 @@
 
 ### 4.5 匿名学习态不持久化
 
-- 所有匿名期间产生的学习状态（已浏览场景、AI 解释结果、临时"学过"标记）走 sessionStorage，关浏览器即清
+- 所有匿名期间产生的学习状态（已浏览场景、AI 解释结果、临时"学过"标记、本地练习答案）走 sessionStorage 或前端内存，关浏览器即清
 - 唯一持久化的匿名数据是 `anonymous_sessions`（4 字段：anon_id / ip_hash / created_at / last_active_at），不存任何业务语义
 - daily cron 清理 `last_active_at < now() - 7 days` 的记录
 - 注册后从零开始，本期**不做**匿名 → 注册数据迁移（属于 V2 项）
@@ -66,7 +69,7 @@
 
 ### 4.7 一键止血
 
-- `ALLOW_ANONYMOUS_TRIAL=false` → 所有 `/share/*` 退回 `/login`，主链路零影响
+- `ALLOW_ANONYMOUS_TRIAL=false` → 所有 `/share/*` 与 `/trial/*` 退回 `/login`，主链路零影响
 - 紧急关闭单个高成本 capability（admin emergency disable）会同时拒绝已登录与匿名分支
 - 内存 counter fallback 时 logger.warn 暴露（多实例下日上限会被放大,运维要看 warn 决策是否止血）
 
@@ -84,7 +87,7 @@
 - 飞书告警（同 IP session > 10 / 全站匿名 AI 池 18:00 UTC 前 > 80% / quota_blocked / session_created > 60%）
 
 **反向触发**：
-- 注册转化（`/signup?from=share&scene={slug}` 回跳路径）→ 后续 V2 接 `anon_registered` 事件
+- 注册转化（`/signup?from=share&scene={slug}` / `/signup?from=trial&scene={slug}` 回跳路径）→ 后续 V2 接 `anon_registered` 事件
 
 ## 6. 常见改动风险
 
@@ -92,7 +95,7 @@
 - **改主路由 `/scene/[slug]` 的 `SceneDetailClientPage`** → 不要 leak 到匿名分支；本模块不收项 §11.2 严格禁止改已登录用户主链路语义
 - **改 `HighCostCapability` 数组** → 不要把 `tts_play` 加进去（zero edge cost capability 加进去会污染 admin 紧急关闭面板 / 用户日 quota 表）
 - **改 quota counter key 格式** → spec 文档约定的 key 模板被 `peekDailyCounter` 测试硬编码引用,改了会让 quota 回滚 audit test 失效
-- **改 middleware `PROTECTED_PAGE_PREFIXES`** → 把 `/share` 加进去会让匿名路径全死掉;`audit test` 守护这点不变
+- **改 middleware `PROTECTED_PAGE_PREFIXES`** → 把 `/share` 或 `/trial` 加进去会让匿名路径全死掉;`audit test` 守护这点不变
 - **改 `tts-audio` bucket public/private** → 当前是 private + signed URL,改 public 会让 TTS 配额形同虚设
 - **加新 capability 给匿名** → 必须显式设计 quota / 防绕过 / 漏斗 / 紧急关闭 / 文档,不能"顺手开"
 
@@ -108,13 +111,13 @@
 - **API 路由单测**:
   - `src/app/api/explain-selection/route.test.ts`(匿名分支挂 quota 头 + 配额耗尽)
   - `src/app/api/anonymous/tts/play/route.test.ts`(9 例,已登录命中/miss/匿名命中/配额耗尽/缺头/爬虫/query 校验)
-- **页面 audit 测试**:`src/app/share/scene/[slug]/page.audit.test.ts`(SSR 路径 + 爬虫分支 + middleware Cache-Control 注入 + PROTECTED_PAGE_PREFIXES 不含 /share)
-- **客户端 interaction 测试**:`src/features/anonymous-trial/components/share-scene-preview-client.test.tsx`(10 例,渲染 + 选词 explain + L1/L2 注册点击 + TTS 播放 + 配额耗尽 + storage miss)
+- **页面 audit 测试**:`src/app/share/scene/[slug]/page.audit.test.ts` + `src/app/trial/page.audit.test.ts`(SSR 路径 + 爬虫分支 + middleware Cache-Control 注入 + PROTECTED_PAGE_PREFIXES 不含 /share 和 /trial)
+- **客户端 interaction 测试**:`src/features/anonymous-trial/components/share-scene-preview-client.test.tsx`(渲染 + 选词 explain + L1/L2 注册点击 + TTS 播放 + 配额耗尽 + storage miss + 试用练习本地反馈/提交阻断)
 - **migration audit**:`src/lib/server/anonymous/funnel-daily-aggregation-audit.test.ts`(phase27 SQL 函数签名 + 单价常量 + 防除零)
 
 ## 8. 相关锚点
 
-- 实现:`src/features/anonymous-trial/`(client) + `src/lib/server/anonymous/`(server) + `src/app/api/anonymous/`(API) + `src/app/share/scene/[slug]/`(灰度页)
+- 实现:`src/features/anonymous-trial/`(client) + `src/lib/server/anonymous/`(server) + `src/app/api/anonymous/`(API) + `src/app/share/scene/[slug]/`(分享灰度页) + `src/app/trial/`(匿名试用列表与详情页)
 - Spec:`openspec/specs/anonymous-trial-mode/spec.md` + `openspec/specs/api-operational-guardrails/spec.md`
 - Migration:`supabase/sql/20260528_phase25_anonymous_trial_mode.sql`(三张表)+ `20260528_phase26_anonymous_rls_public_content.sql`(RLS)+ `20260528_phase27_anonymous_funnel_daily_aggregation.sql`(daily 聚合)
 - Env:`.env.example` "匿名试用灰度" 段(总开关 + daily salt + IP session 上限 + 各 capability 配额)

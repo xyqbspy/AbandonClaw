@@ -45,6 +45,14 @@ export interface SceneListItem {
   lastViewedAt: string | null;
 }
 
+export const ANONYMOUS_TRIAL_SCENE_SLUGS = [
+  "daily-greeting",
+  "ordering-coffee",
+  "canceling-plans-politely",
+  "making-small-talk",
+  "saying-no-politely",
+] as const;
+
 const SCENE_PARSE_PROMPT_VERSION = "scene-parse-v1";
 const toSceneSourceType = (
   row: Pick<SceneRow, "origin" | "source_type">,
@@ -283,6 +291,28 @@ export async function getPublicSceneBySlug(slug: string): Promise<Lesson | null>
   }
   if (!data) return null;
   return rowToLesson(data);
+}
+
+export async function listPublicTrialScenes(): Promise<Lesson[]> {
+  await runSeedScenesSync();
+  const client = await createSupabaseServerClient();
+  const { data, error } = await client
+    .from("scenes")
+    .select("*")
+    .in("slug", [...ANONYMOUS_TRIAL_SCENE_SLUGS])
+    .eq("is_public", true);
+
+  if (error) {
+    throw new Error(`Failed to load public trial scenes: ${error.message}`);
+  }
+
+  const rowsBySlug = new Map(
+    ((data ?? []) as SceneRow[]).map((row) => [row.slug, row]),
+  );
+
+  return ANONYMOUS_TRIAL_SCENE_SLUGS.map((slug) => rowsBySlug.get(slug))
+    .filter((row): row is SceneRow => Boolean(row))
+    .map(rowToLesson);
 }
 
 export async function getSceneRecordBySlug(params: { slug: string; userId: string }) {

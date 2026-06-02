@@ -83,6 +83,8 @@ type SentencePlaybackState =
 export type ShareScenePreviewClientProps = {
   initialLesson: Lesson;
   registerHref: string;
+  showPracticePreview?: boolean;
+  backHref?: string;
 };
 
 const collectSentenceChunks = (sentence: LessonSentence): string[] => {
@@ -116,6 +118,8 @@ const errorCodeToTrigger = (code: string | undefined): AnonymousBlockTrigger | n
 export function ShareScenePreviewClient({
   initialLesson,
   registerHref,
+  showPracticePreview = false,
+  backHref,
 }: ShareScenePreviewClientProps) {
   const lesson = initialLesson;
   const anonState = useAnonymousMode({ isAuthenticated: false });
@@ -345,6 +349,14 @@ export function ShareScenePreviewClient({
 
       <article className="mx-auto w-full max-w-3xl px-4 py-6 sm:py-8">
         <header className="mb-6 space-y-1">
+          {backHref ? (
+            <Link
+              href={backHref}
+              className="mb-3 inline-flex text-xs font-medium text-foreground/55 transition hover:text-foreground"
+            >
+              ← 返回试用场景
+            </Link>
+          ) : null}
           <h1 className="text-2xl font-semibold text-foreground sm:text-3xl">
             {lesson.title}
           </h1>
@@ -383,6 +395,14 @@ export function ShareScenePreviewClient({
             </section>
           ))}
         </div>
+
+        {showPracticePreview ? (
+          <AnonymousPracticePreview
+            lesson={lesson}
+            registerHref={registerHref}
+            onBlocked={() => setBlockTrigger("feature_disabled")}
+          />
+        ) : null}
 
         <div className="mt-8">
           <AnonymousInlineUpsellCard
@@ -423,6 +443,147 @@ export function ShareScenePreviewClient({
         }
       />
     </div>
+  );
+}
+
+type TrialPracticeExercise = {
+  id: string;
+  prompt: string;
+  answer: string;
+  hint: string;
+};
+
+const normalizePracticeAnswer = (value: string) =>
+  value
+    .trim()
+    .toLowerCase()
+    .replace(/[.,!?;:'"’]/g, "")
+    .replace(/\s+/g, " ");
+
+const buildTrialPracticeExercises = (lesson: Lesson): TrialPracticeExercise[] => {
+  const exercises: TrialPracticeExercise[] = [];
+  for (const sentence of flattenSentences(lesson)) {
+    const detail = sentence.chunkDetails?.find((item) => item.text.trim());
+    const chunkText = detail?.text?.trim() || sentence.chunks?.find((item) => item.trim())?.trim();
+    if (!chunkText) continue;
+    const displayText = sentence.text.replace(chunkText, "____");
+    exercises.push({
+      id: `${sentence.id}:${chunkText}`,
+      prompt: displayText === sentence.text ? sentence.translation : displayText,
+      answer: chunkText,
+      hint: sentence.translation || detail?.translation || "根据语境补出表达",
+    });
+    if (exercises.length >= 3) break;
+  }
+  return exercises;
+};
+
+function AnonymousPracticePreview({
+  lesson,
+  registerHref,
+  onBlocked,
+}: {
+  lesson: Lesson;
+  registerHref: string;
+  onBlocked: () => void;
+}) {
+  const exercises = useMemo(() => buildTrialPracticeExercises(lesson), [lesson]);
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [checked, setChecked] = useState<Record<string, boolean>>({});
+
+  if (exercises.length === 0) {
+    return (
+      <section className="mt-8 rounded-lg border border-dashed border-border bg-card/70 p-4">
+        <p className="text-sm font-medium text-foreground">练习题将在注册后生成</p>
+        <p className="mt-1 text-sm leading-6 text-foreground/65">
+          这个场景暂时没有预生成练习题。注册后可以为自己的学习进度生成更多练习。
+        </p>
+        <Button asChild className="mt-4" radius="sm" size="sm">
+          <Link href={registerHref}>注册后练习</Link>
+        </Button>
+      </section>
+    );
+  }
+
+  return (
+    <section className="mt-8 rounded-lg border border-border/60 bg-card/80 p-4">
+      <div className="mb-4 flex flex-col gap-1">
+        <p className="text-sm font-semibold text-foreground">预生成练习题</p>
+        <p className="text-xs leading-5 text-foreground/55">
+          可以本地作答和查看答案,但体验模式不会提交或保存结果。
+        </p>
+      </div>
+      <div className="space-y-3">
+        {exercises.map((exercise, index) => {
+          const currentAnswer = answers[exercise.id] ?? "";
+          const hasChecked = checked[exercise.id] ?? false;
+          const isCorrect =
+            normalizePracticeAnswer(currentAnswer) ===
+            normalizePracticeAnswer(exercise.answer);
+          return (
+            <div
+              key={exercise.id}
+              className="rounded-lg border border-border/50 bg-background/60 p-3"
+            >
+              <p className="text-xs text-foreground/55">第 {index + 1} 题</p>
+              <p className="mt-1 text-sm leading-6 text-foreground">{exercise.prompt}</p>
+              <p className="mt-1 text-xs text-foreground/50">{exercise.hint}</p>
+              <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                <input
+                  value={currentAnswer}
+                  onChange={(event) => {
+                    setAnswers((prev) => ({
+                      ...prev,
+                      [exercise.id]: event.target.value,
+                    }));
+                    setChecked((prev) => ({
+                      ...prev,
+                      [exercise.id]: false,
+                    }));
+                  }}
+                  className="min-h-9 flex-1 rounded-md border border-border bg-background px-3 text-sm outline-none transition focus:border-foreground/35"
+                  placeholder="输入缺失表达"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  radius="sm"
+                  size="sm"
+                  onClick={() =>
+                    setChecked((prev) => ({
+                      ...prev,
+                      [exercise.id]: true,
+                    }))
+                  }
+                >
+                  查看本地反馈
+                </Button>
+              </div>
+              {hasChecked ? (
+                <p
+                  className={cn(
+                    "mt-2 text-xs",
+                    isCorrect ? "text-emerald-600" : "text-foreground/60",
+                  )}
+                >
+                  {isCorrect
+                    ? "答对了。这个结果只保存在当前页面。"
+                    : `参考答案: ${exercise.answer}`}
+                </p>
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
+      <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-xs leading-5 text-foreground/55">
+          提交记录、错题复习和加入复习需要注册账号。
+        </p>
+        <Button type="button" radius="sm" size="sm" onClick={onBlocked}>
+          提交并保存
+        </Button>
+      </div>
+    </section>
   );
 }
 

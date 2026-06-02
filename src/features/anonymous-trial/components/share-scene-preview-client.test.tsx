@@ -159,6 +159,8 @@ let ClientModule: {
   ShareScenePreviewClient: (props: {
     initialLesson: Lesson;
     registerHref: string;
+    showPracticePreview?: boolean;
+    backHref?: string;
   }) => React.ReactElement | null;
 } | null = null;
 
@@ -531,4 +533,50 @@ test("ShareScenePreviewClient TTS storage miss(404)按钮状态置为 unavailabl
   const modal = result.container.querySelector('[data-testid="anonymous-block-modal"]');
   assert.equal(modal, null, "storage miss 不应弹 L3 modal(只是单句不可用)");
   assert.equal(mockedAudios.length, 0, "storage miss 不应创建 Audio");
+});
+
+test("ShareScenePreviewClient 试用练习只做本地反馈,提交保存会触发注册阻断", async () => {
+  const Component = getComponent();
+  const result = render(
+    <Component
+      initialLesson={SAMPLE_LESSON}
+      registerHref="/signup?from=trial&scene=share-sample"
+      showPracticePreview
+      backHref="/trial"
+    />,
+  );
+  await flushAsync();
+
+  assert.ok(result.getByText("← 返回试用场景"));
+  assert.ok(result.getByText("预生成练习题"));
+
+  const input = result.container.querySelector("input") as HTMLInputElement;
+  assert.ok(input, "应渲染本地练习输入框");
+  await act(async () => {
+    fireEvent.change(input, { target: { value: "wrapped up" } });
+  });
+
+  await act(async () => {
+    fireEvent.click(result.getAllByText("查看本地反馈")[0]);
+  });
+  assert.ok(result.getByText("答对了。这个结果只保存在当前页面。"));
+
+  const beforeSubmitCalls = fetchCalls.length;
+  await act(async () => {
+    fireEvent.click(result.getByText("提交并保存"));
+  });
+  await flushAsync();
+
+  const modal = result.container.querySelector('[data-testid="anonymous-block-modal"]');
+  assert.ok(modal, "提交保存必须弹注册阻断");
+  assert.equal(modal!.getAttribute("data-trigger"), "feature_disabled");
+  assert.equal(
+    fetchCalls.length,
+    beforeSubmitCalls + 1,
+    "提交保存只允许触发 L3 shown 漏斗事件,不得调用提交/保存 API",
+  );
+  assert.ok(
+    fetchCalls.at(-1)?.url.includes("/api/anonymous/funnel-event"),
+    "最后一次请求应为漏斗事件",
+  );
 });

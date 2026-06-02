@@ -85,7 +85,7 @@ test("middleware 对 /share/* 路径统一注入 Cache-Control: private, no-stor
   );
   assert.match(
     middlewareSource,
-    /isAnonymousSharePath|applyAnonymousCacheHeaders/,
-    "middleware 必须在 /share 路径分支调用 share-cache 头注入函数",
+    /isAnonymousPublicPath|isAnonymousSharePath|applyAnonymousCacheHeaders/,
+    "middleware 必须在匿名公开路径分支调用 cache 头注入函数",
   );
 });

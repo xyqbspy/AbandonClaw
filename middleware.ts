@@ -15,6 +15,7 @@ import {
 const AUTH_PAGE_PATHS = new Set(["/login", "/signup"]);
 const VERIFY_EMAIL_PATH = "/verify-email";
 const ANONYMOUS_SHARE_PATH_PREFIX = "/share";
+const ANONYMOUS_TRIAL_PATH_PREFIX = "/trial";
 const PROTECTED_PAGE_PREFIXES = [
   "/today",
   "/scenes",
@@ -54,6 +55,13 @@ const isProtectedApiPath = (pathname: string) =>
 const isAnonymousSharePath = (pathname: string) =>
   pathname === ANONYMOUS_SHARE_PATH_PREFIX ||
   pathname.startsWith(`${ANONYMOUS_SHARE_PATH_PREFIX}/`);
+
+const isAnonymousTrialPath = (pathname: string) =>
+  pathname === ANONYMOUS_TRIAL_PATH_PREFIX ||
+  pathname.startsWith(`${ANONYMOUS_TRIAL_PATH_PREFIX}/`);
+
+const isAnonymousPublicPath = (pathname: string) =>
+  isAnonymousSharePath(pathname) || isAnonymousTrialPath(pathname);
 
 const ANONYMOUS_CACHE_CONTROL = "private, no-store";
 
@@ -115,7 +123,7 @@ export async function handleMiddleware(
       dependencies.next(request, requestId),
       requestId,
     );
-    if (isAnonymousSharePath(pathname)) {
+    if (isAnonymousPublicPath(pathname)) {
       applyAnonymousCacheHeaders(passthrough);
     }
     return passthrough;

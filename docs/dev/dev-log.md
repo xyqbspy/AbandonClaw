@@ -1,5 +1,37 @@
 # Dev Log
 
+### [2026-05-31] 匿名试用扩展为 `/trial` 场景列表
+- 类型:Spec-Driven(`expand-anonymous-trial-experience`)
+- 状态:落地(已落地 `/trial` 列表与详情;`pnpm run build` PASS;`pnpm run lint` 0 error/4 warning;相关 audit 16/16 通过;匿名预览 interaction 11/11 通过;OpenSpec validate 通过)
+
+#### 变更
+
+- 首页“免登录试用”入口从单场景 `/share/scene/canceling-plans-politely` 改为 `/trial`。
+- 新增 `/trial` 匿名试用列表,展示 5 条精选公开场景:`daily-greeting`、`ordering-coffee`、`canceling-plans-politely`、`making-small-talk`、`saying-no-politely`。
+- 新增 `/trial/scene/[slug]`,复用 `ShareScenePreviewClient` 的匿名只读 UI,支持句子查看、chunk 解释、已生成 TTS 播放。
+- 在 `/trial/scene/[slug]` 打开预生成练习预览:根据公开场景 chunk 构造本地填空题,允许本地作答和查看反馈;“提交并保存”只弹注册阻断,不调用提交/保存 API。
+- middleware 对 `/trial/*` 与 `/share/*` 统一注入 `Cache-Control: private, no-store`;主应用 `/today`、`/scenes`、`/scene`、`/review`、`/chunks`、`/progress` 仍在 `PROTECTED_PAGE_PREFIXES` 内。
+
+#### 验证
+
+- `node --import tsx --test "src/app/trial/page.audit.test.ts" "src/app/share/scene/[[]slug[]]/page.audit.test.ts"` PASS(16/16)。
+- `node --import tsx --import ./src/test/setup-dom.ts --test "src/features/anonymous-trial/components/share-scene-preview-client.test.tsx"` PASS(11/11;jsdom 点击 Link 仍输出历史 navigation not implemented 噪声,不影响断言)。
+- `pnpm run lint` PASS(0 error / 4 existing warnings: anonymous test mock unused args)。
+- `pnpm run build` PASS,Next 路由清单包含 `/trial` 与 `/trial/scene/[slug]`。
+- `pnpm exec openspec validate expand-anonymous-trial-experience --strict` PASS。
+- `pnpm exec openspec archive expand-anonymous-trial-experience -y` PASS,已生成 stable spec `anonymous-trial-mode` 并更新 `auth-api-boundaries`。
+- `pnpm run maintenance:check` 未完全通过:内部 `openspec validate --all --strict` 与 `text:check-mojibake` 均 OK,但仓库既有 active changes `enable-anonymous-trial-mode` 和 `stabilize-auth-session-p0-smoke` 仍有人工/灰度复盘任务未完成,与本轮归档无关。
+- `pnpm exec tsc --noEmit` 单独运行未通过:主要是运行前 `.next/dev` 与 `.next/types` 旧生成路由类型不一致以及仓库既有 test typing 问题(`scripts/test-users-lib.test.ts`、auth/layout/login tests、learning/review test casts)。`pnpm run build` 已重新生成 Next 类型并通过。
+
+#### 边界
+
+- 不开放主应用 `/scenes`、`/scene`、`/today` 等路由给匿名访客。
+- 不新增匿名 AI 生成、练习生成或实时 TTS 生成额度。
+- 不写入 practice run、progress、review、saved phrases 或复习队列。
+- 不改已登录用户主链路和主场景详情页。
+
+---
+
 ### [2026-05-29] 首页试用入口与 demo 页面收口
 - 类型:Fast Track + Cleanup(营销页入口与展示内容重排)
 - 状态:落地(anonymous trial 相关 54/54 测试通过;`pnpm run lint` 0 error/4 warning;`pnpm run build` PASS)
