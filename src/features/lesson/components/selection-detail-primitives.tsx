@@ -8,7 +8,6 @@ import { DetailInfoBlock, DetailLoadingBlock } from "@/components/shared/detail-
 import { ExampleSentenceCards } from "@/components/shared/example-sentence-cards";
 import { SelectionChunkLayer } from "@/lib/types";
 import {
-  APPLE_BADGE_SUCCESS,
   APPLE_BODY_TEXT,
   APPLE_BUTTON_BASE,
   APPLE_BUTTON_STRONG,
@@ -85,12 +84,12 @@ function renderSentenceWithChunkHighlight(sentence: string, expression: string):
     }
 
     return (
-      <mark
+      <strong
         key={`${part}-${index}`}
-        className={`inline-block rounded-full px-[var(--mobile-adapt-space-sm)] py-[2px] font-bold not-italic ${APPLE_BADGE_SUCCESS}`}
+        className="font-bold text-[#1d1d1f]"
       >
         {part}
-      </mark>
+      </strong>
     );
   });
 }
@@ -230,6 +229,7 @@ export function SelectionChunkDetailBlocks({
             onSpeak={onPronounce}
             isSpeakingText={(text) => speakingText === text}
             isLoadingText={(text) => loadingText === text}
+            variant="marketing"
           />
         ) : (
           <p className={detailBodyClassName}>暂无例句。</p>

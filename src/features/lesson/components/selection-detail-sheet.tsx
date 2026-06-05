@@ -101,7 +101,7 @@ export function SelectionDetailSheet({
       closeLabel="关闭学习详情"
       containerClassName="lg:hidden"
       panelClassName="h-[82vh] max-h-[82vh] rounded-t-[28px]"
-      headerClassName="items-center border-b-0 bg-transparent px-4 pb-3 pt-3"
+      headerClassName="items-center border-b border-[var(--app-border-soft)] !bg-white px-4 pb-3 pt-3"
       bodyClassName="h-[calc(82vh-128px)] px-4 pb-6 pt-5"
       footerClassName="border-t border-[var(--app-border-soft)] !bg-white p-4"
       header={<h2 className="text-[16px] font-semibold text-[var(--app-foreground)]">学习详情</h2>}

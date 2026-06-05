@@ -151,14 +151,14 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="mx-auto grid max-w-7xl gap-4 px-5 py-8 sm:grid-cols-3 sm:px-8 lg:gap-8 lg:px-12">
+      <section className="mx-auto grid max-w-7xl grid-cols-3 gap-2 px-5 py-4 sm:gap-4 sm:px-8 sm:py-6 lg:px-12">
         {stats.map(([value, label]) => (
           <div
             key={label}
-            className="rounded-3xl border border-[#f0f0f0] bg-white p-6 text-center shadow-[0_10px_30px_rgba(0,0,0,0.05)] sm:p-8"
+            className="rounded-2xl border border-[#f0f0f0] bg-white p-3 text-center shadow-[0_8px_20px_rgba(0,0,0,0.04)] sm:rounded-3xl sm:p-5"
           >
-            <p className="text-3xl font-extrabold leading-tight text-[#1d1d1f]">{value}</p>
-            <p className="mt-2 text-sm text-[#86868b]">{label}</p>
+            <p className="text-xl font-extrabold leading-tight text-[#1d1d1f] sm:text-3xl">{value}</p>
+            <p className="mt-1 text-[11px] leading-snug text-[#86868b] sm:mt-2 sm:text-sm">{label}</p>
           </div>
         ))}
       </section>
