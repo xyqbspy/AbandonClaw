@@ -161,6 +161,7 @@ const collectTasksFromScene = (row) => {
   const scene = row.scene_json ?? {};
   const sceneSlug = sanitizeSegment(row.slug || scene.slug || "scene", "scene");
   const sections = Array.isArray(scene.sections) ? scene.sections : [];
+  const blockTasks = [];
   const sentenceTasks = [];
   const chunkTasks = [];
 
@@ -169,6 +170,33 @@ const collectTasksFromScene = (row) => {
     for (const block of blocks) {
       const blockSpeaker = block?.speaker;
       const sentences = Array.isArray(block?.sentences) ? block.sentences : [];
+      const blockText = String(
+        block?.tts ||
+          sentences
+            .map((sentence) => String(sentence?.tts || sentence?.audioText || sentence?.text || "").trim())
+            .filter(Boolean)
+            .join(" "),
+      ).trim();
+      const blockId = String(block?.id || "block").trim();
+      const blockSentenceId = `block-${blockId || "block"}`;
+      const blockSpeakerFallback = sentences[0]?.speaker;
+      const resolvedBlockSpeaker = blockSpeaker || blockSpeakerFallback;
+      if (blockText) {
+        const blockAudioKey = buildSentenceAudioKey({
+          sentenceId: blockSentenceId,
+          text: blockText,
+          speaker: resolvedBlockSpeaker,
+          mode: "normal",
+        });
+        blockTasks.push({
+          type: "block",
+          key: `${sceneSlug}/${blockAudioKey}`,
+          text: blockText,
+          voice: voiceForSpeaker(resolvedBlockSpeaker),
+          storagePath: `scenes/${sceneSlug}/sentences/${blockAudioKey}.mp3`,
+        });
+      }
+
       for (const sentence of sentences) {
         const sentenceId = sanitizeSegment(sentence?.id || "sentence", "sentence");
         const sentenceText = String(sentence?.tts || sentence?.text || "").trim();
@@ -214,7 +242,7 @@ const collectTasksFromScene = (row) => {
     }
   }
 
-  return { sentenceTasks, chunkTasks };
+  return { blockTasks, sentenceTasks, chunkTasks };
 };
 
 const runWithConcurrency = async (items, concurrency, worker) => {
@@ -282,11 +310,15 @@ const main = async () => {
   }
 
   const rows = data ?? [];
+  const blockMap = new Map();
   const sentenceMap = new Map();
   const chunkMap = new Map();
 
   for (const row of rows) {
-    const { sentenceTasks, chunkTasks } = collectTasksFromScene(row);
+    const { blockTasks, sentenceTasks, chunkTasks } = collectTasksFromScene(row);
+    for (const task of blockTasks) {
+      blockMap.set(task.key, task);
+    }
     for (const task of sentenceTasks) {
       sentenceMap.set(task.key, task);
     }
@@ -295,13 +327,13 @@ const main = async () => {
     }
   }
 
-  const allTasks = [...sentenceMap.values(), ...chunkMap.values()];
+  const allTasks = [...blockMap.values(), ...sentenceMap.values(), ...chunkMap.values()];
   let generated = 0;
   let reused = 0;
   let failed = 0;
 
   console.log(
-    `[tts:warmup] scenes=${rows.length} sentence=${sentenceMap.size} chunk=${chunkMap.size} total=${allTasks.length} concurrency=${concurrency} force=${force}`,
+    `[tts:warmup] scenes=${rows.length} block=${blockMap.size} sentence=${sentenceMap.size} chunk=${chunkMap.size} total=${allTasks.length} concurrency=${concurrency} force=${force}`,
   );
   console.log("[tts:warmup] slow mode skipped by design (TODO: enable later).");
 

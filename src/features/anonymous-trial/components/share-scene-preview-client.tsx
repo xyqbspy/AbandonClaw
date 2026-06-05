@@ -55,7 +55,7 @@ type PlaybackState =
   | { kind: "idle" }
   | {
       kind: "loading" | "playing" | "unavailable";
-      targetKind: "sentence" | "chunk";
+      targetKind: "sentence" | "chunk" | "scene_full";
       targetId: string;
       text: string;
     };
@@ -316,15 +316,21 @@ function ShareScenePreviewContent({
       text,
       speaker,
       chunkKey,
+      sceneType,
+      segments,
     }: {
-      targetKind: "sentence" | "chunk";
+      targetKind: "sentence" | "chunk" | "scene_full";
       targetId: string;
-      text: string;
+      text?: string;
       speaker?: string;
       chunkKey?: string;
+      sceneType?: "dialogue" | "monologue";
+      segments?: Array<{ text: string; speaker?: string }>;
     }) => {
-      const clean = text.trim();
-      if (!clean) return;
+      const clean = (text ?? "").trim();
+      if (targetKind !== "scene_full" && !clean) return;
+      if (targetKind === "scene_full" && (!segments || segments.length === 0)) return;
+      const displayText = clean || readerLesson.title;
 
       if (
         playbackState.kind === "playing" &&
@@ -337,19 +343,24 @@ function ShareScenePreviewContent({
       }
 
       stopCurrentAudio();
-      setPlaybackState({ kind: "loading", targetKind, targetId, text: clean });
+      setPlaybackState({ kind: "loading", targetKind, targetId, text: displayText });
       getOrCreateAnonymousId();
 
       try {
         const url = new URL("/api/anonymous/tts/play", window.location.origin);
         url.searchParams.set("kind", targetKind);
-        url.searchParams.set("text", clean);
         if (targetKind === "sentence") {
+          url.searchParams.set("text", clean);
           url.searchParams.set("sceneSlug", readerLesson.slug);
           url.searchParams.set("sentenceId", targetId);
           if (speaker) url.searchParams.set("speaker", speaker);
-        } else {
+        } else if (targetKind === "chunk") {
+          url.searchParams.set("text", clean);
           url.searchParams.set("chunkKey", chunkKey ?? buildChunkAudioKey(clean));
+        } else {
+          url.searchParams.set("sceneSlug", readerLesson.slug);
+          url.searchParams.set("sceneType", sceneType ?? readerLesson.sceneType ?? "monologue");
+          url.searchParams.set("segments", JSON.stringify(segments));
         }
 
         const response = await fetch(url.toString(), {
@@ -365,13 +376,13 @@ function ShareScenePreviewContent({
           return;
         }
         if (response.status === 404 || !response.ok) {
-          setPlaybackState({ kind: "unavailable", targetKind, targetId, text: clean });
+          setPlaybackState({ kind: "unavailable", targetKind, targetId, text: displayText });
           return;
         }
 
         const data = (await response.json()) as TtsPlaybackSuccessResponse;
         if (!data.signedUrl) {
-          setPlaybackState({ kind: "unavailable", targetKind, targetId, text: clean });
+          setPlaybackState({ kind: "unavailable", targetKind, targetId, text: displayText });
           return;
         }
 
@@ -383,15 +394,15 @@ function ShareScenePreviewContent({
         };
         audio.onerror = () => {
           if (audioRef.current === audio) audioRef.current = null;
-          setPlaybackState({ kind: "unavailable", targetKind, targetId, text: clean });
+          setPlaybackState({ kind: "unavailable", targetKind, targetId, text: displayText });
         };
         await audio.play();
-        setPlaybackState({ kind: "playing", targetKind, targetId, text: clean });
+        setPlaybackState({ kind: "playing", targetKind, targetId, text: displayText });
       } catch {
-        setPlaybackState({ kind: "unavailable", targetKind, targetId, text: clean });
+        setPlaybackState({ kind: "unavailable", targetKind, targetId, text: displayText });
       }
     },
-    [anonState, playbackState, readerLesson.slug, stopCurrentAudio],
+    [anonState, playbackState, readerLesson.sceneType, readerLesson.slug, readerLesson.title, stopCurrentAudio],
   );
 
   const activateSentence = useCallback(
@@ -515,18 +526,33 @@ function ShareScenePreviewContent({
           if (backHref) router.push(backHref);
         }
       : undefined;
+  const sceneLoopTargetId = `scene:${readerLesson.slug}`;
+  const sceneFullSegments = useMemo(
+    () =>
+      getLessonSentences(readerLesson)
+        .map((sentence) => ({
+          text: getSentenceSpeakText(sentence),
+          speaker: sentence.speaker?.trim().toUpperCase() || undefined,
+        }))
+        .filter((segment) => segment.text),
+    [readerLesson],
+  );
   const isSceneLooping =
     playbackState.kind === "playing" &&
-    playbackState.targetKind === "sentence" &&
-    playbackState.targetId.startsWith("block-");
+    playbackState.targetKind === "scene_full" &&
+    playbackState.targetId === sceneLoopTargetId;
   const isSceneLoopLoading =
     playbackState.kind === "loading" &&
-    playbackState.targetKind === "sentence" &&
-    playbackState.targetId.startsWith("block-");
+    playbackState.targetKind === "scene_full" &&
+    playbackState.targetId === sceneLoopTargetId;
   const handleTrialSceneLoopPlayback = () => {
-    const firstBlock = blockOrder[0];
-    if (!firstBlock) return;
-    void playBlockTts(firstBlock);
+    void playAnonymousTts({
+      targetKind: "scene_full",
+      targetId: sceneLoopTargetId,
+      text: readerLesson.title,
+      sceneType: readerLesson.sceneType ?? "monologue",
+      segments: sceneFullSegments,
+    });
   };
   const handleTrialCurrentStepAction = () => {
     if (trialViewMode === "variant-study") {
@@ -672,7 +698,9 @@ function ShareScenePreviewContent({
                       ? null
                       : playbackState.targetKind === "sentence"
                         ? "sentence"
-                        : "chunk",
+                        : playbackState.targetKind === "chunk"
+                          ? "chunk"
+                          : null,
                   status: playbackState.kind === "idle" ? null : playbackState.kind,
                   sentenceId:
                     playbackState.kind !== "idle" && playbackState.targetKind === "sentence"

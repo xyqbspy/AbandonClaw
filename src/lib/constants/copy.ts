@@ -9,7 +9,6 @@ export const appCopy = {
     heroSubtitle:
       "通过短语、句子和真实语境建立表达感觉。阅读时点选任意短语，即时查看中文释义、用法讲解和例句，再加入每日复习。",
     primaryCta: "开始学习",
-    secondaryCta: "查看演示",
   },
   lesson: {
     prompt: "点选高亮短语或选中文本，查看中文释义与用法讲解。",

@@ -143,12 +143,6 @@ export default function HomePage() {
             <ArrowRight className="size-5" />
           </Link>
           <Link
-            href="#demo"
-            className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-[#007aff] px-8 py-3 text-base font-semibold text-[#007aff] transition hover:bg-[#e5f1ff] sm:text-lg"
-          >
-            {appCopy.marketing.secondaryCta}
-          </Link>
-          <Link
             href={trialHref}
             className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-[#1d1d1f] px-8 py-3 text-base font-semibold text-[#1d1d1f] transition hover:bg-[#f2f2f7] sm:text-lg"
           >
@@ -218,14 +212,14 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section id="demo" className="mx-auto max-w-7xl scroll-mt-24 px-5 py-16 sm:px-8 sm:py-20 lg:px-12">
+      <section className="mx-auto max-w-7xl px-5 py-16 sm:px-8 sm:py-20 lg:px-12">
         <div className="mb-10 max-w-2xl">
           <p className="text-sm font-semibold text-[#007aff]">完整学习流</p>
           <h2 className="mt-3 text-3xl font-extrabold leading-tight tracking-normal text-[#1d1d1f] sm:text-4xl">
             从看懂一句话，到沉淀一组表达
           </h2>
           <p className="mt-4 text-base leading-8 text-[#86868b]">
-            演示不再单独放一个页面，而是嵌在首页的产品语境里：你看到的是同一条学习链路如何继续推进。
+            这组内容嵌在首页的产品语境里：你看到的是同一条学习链路如何继续推进。
           </p>
         </div>
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">

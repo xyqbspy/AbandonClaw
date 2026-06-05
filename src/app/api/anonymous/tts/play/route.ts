@@ -73,6 +73,18 @@ const parsePayloadFromQuery = (request: Request): TtsRequestPayload => {
   if (kind !== "scene_full" && (!text || !text.trim())) {
     throw new ValidationError("`text` query param is required for kind=sentence|chunk.");
   }
+  let segments: unknown;
+  if (kind === "scene_full") {
+    const segmentsRaw = url.searchParams.get("segments");
+    if (!segmentsRaw) {
+      throw new ValidationError("`segments` query param is required for kind=scene_full.");
+    }
+    try {
+      segments = JSON.parse(segmentsRaw);
+    } catch {
+      throw new ValidationError("`segments` query param must be valid JSON for kind=scene_full.");
+    }
+  }
   return {
     kind,
     mode: url.searchParams.get("mode") ?? undefined,
@@ -82,6 +94,7 @@ const parsePayloadFromQuery = (request: Request): TtsRequestPayload => {
     sentenceId: url.searchParams.get("sentenceId") ?? undefined,
     chunkKey: url.searchParams.get("chunkKey") ?? undefined,
     sceneType: url.searchParams.get("sceneType") ?? undefined,
+    segments,
     text,
   };
 };
