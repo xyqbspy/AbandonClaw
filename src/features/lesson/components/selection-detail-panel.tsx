@@ -31,6 +31,7 @@ export function SelectionDetailPanel({
   loadingChunkKey,
   showSpeaker = true,
   sentenceSectionLabel = "当前句子",
+  showRelatedChunkAudio = true,
 }: {
   currentBlock?: LessonBlock | null;
   currentSentence: LessonSentence | null;
@@ -51,6 +52,7 @@ export function SelectionDetailPanel({
   loadingChunkKey?: string | null;
   showSpeaker?: boolean;
   sentenceSectionLabel?: string;
+  showRelatedChunkAudio?: boolean;
 }) {
   const blockText = currentBlock?.sentences.map((sentence) => sentence.text).join(" ");
   const blockTranslation =
@@ -150,28 +152,30 @@ export function SelectionDetailPanel({
                     >
                       {chunk}
                     </button>
-                    <TtsActionButton
-                      active={Boolean(
-                        playingChunkKey && playingChunkKey.toLowerCase() === normalizedChunk,
-                      )}
-                      loading={Boolean(
-                        loadingChunkKey && loadingChunkKey.toLowerCase() === normalizedChunk,
-                      )}
-                      ariaLabel={`朗读 ${chunk}`}
-                      variant="ghost"
-                      size="icon"
-                      surface="soft"
-                      className={cn(
-                        selectionIconButtonClassName,
-                        sounding &&
-                          "bg-[var(--app-chunks-sheet-info-soft)] text-[var(--app-primary)]",
-                      )}
-                      iconClassName="size-4"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        onPronounce(chunk);
-                      }}
-                    />
+                    {showRelatedChunkAudio ? (
+                      <TtsActionButton
+                        active={Boolean(
+                          playingChunkKey && playingChunkKey.toLowerCase() === normalizedChunk,
+                        )}
+                        loading={Boolean(
+                          loadingChunkKey && loadingChunkKey.toLowerCase() === normalizedChunk,
+                        )}
+                        ariaLabel={`朗读 ${chunk}`}
+                        variant="ghost"
+                        size="icon"
+                        surface="soft"
+                        className={cn(
+                          selectionIconButtonClassName,
+                          sounding &&
+                            "bg-[var(--app-chunks-sheet-info-soft)] text-[var(--app-primary)]",
+                        )}
+                        iconClassName="size-4"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onPronounce(chunk);
+                        }}
+                      />
+                    ) : null}
                   </div>
                 );
               })
