@@ -2,26 +2,25 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Dumbbell, GitBranch } from "lucide-react";
 import { LoopActionButton } from "@/components/audio/loop-action-button";
 import { formatLoadingText, LoadingContent } from "@/components/shared/action-loading";
-import type {
-  SceneLearningProgressResponse,
-  ScenePracticeSnapshotResponse,
-} from "@/lib/utils/learning-api";
-import {
-  deriveSceneTrainingCompletedMap,
-  deriveSceneTrainingState,
-} from "./scene-detail-selectors";
-import { getSceneTrainingNextStep, getSceneTrainingStepTitle } from "./scene-detail-messages";
+
+export type SceneTrainingStageAction = {
+  kind: "practice" | "variants";
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+  loading?: boolean;
+  loadingLabel?: string;
+  testId?: string;
+};
 
 type SceneTrainingNextStepStripProps = {
   title: string;
   onBack?: () => void;
-  trainingState: SceneLearningProgressResponse | null;
-  variantUnlocked: boolean;
-  practiceSetStatus: "idle" | "generated" | "completed";
-  practiceSnapshot: ScenePracticeSnapshotResponse | null;
+  supportText: string;
+  nextStepLabel: string;
   isSceneLooping: boolean;
   isSceneLoopLoading: boolean;
   onSceneLoopPlayback: () => void;
@@ -30,23 +29,17 @@ type SceneTrainingNextStepStripProps = {
   onCurrentStepAction?: (() => void) | null;
   currentStepActionDisabled?: boolean;
   progressEntry?: ReactNode;
+  stageActions?: SceneTrainingStageAction[];
 };
 
-const nextStepSupportText = {
-  listen: "先把场景听熟一遍，后面提取表达和练习会更顺。",
-  focus_expression: "现在先抓住一个重点表达，把它沉淀成后续练习的入口。",
-  practice_sentence: "先完成一句复现，再进入整段练习。",
-  scene_practice: "接下来进入整段练习，把看懂推进到能复现。",
-  done: "本轮基础训练已经闭环，可以继续看变体迁移。",
-} as const;
+const getStageIcon = (kind: SceneTrainingStageAction["kind"]) =>
+  kind === "variants" ? GitBranch : Dumbbell;
 
 export function SceneTrainingNextStepStrip({
   title,
   onBack,
-  trainingState,
-  variantUnlocked,
-  practiceSetStatus,
-  practiceSnapshot,
+  supportText,
+  nextStepLabel,
   isSceneLooping,
   isSceneLoopLoading,
   onSceneLoopPlayback,
@@ -55,20 +48,10 @@ export function SceneTrainingNextStepStrip({
   onCurrentStepAction,
   currentStepActionDisabled,
   progressEntry,
+  stageActions = [],
 }: SceneTrainingNextStepStripProps) {
   const [cardLifted, setCardLifted] = useState(false);
   const cardLiftTimerRef = useRef<number | null>(null);
-  const completedMap = deriveSceneTrainingCompletedMap({
-    session: trainingState?.session,
-    practiceSetStatus,
-    practiceSnapshot,
-    variantUnlocked,
-  });
-  const trainingStateModel = deriveSceneTrainingState(completedMap);
-  const currentStep = trainingStateModel.currentStep;
-  const nextStep = getSceneTrainingNextStep(currentStep);
-  const nextStepLabel = nextStep ? getSceneTrainingStepTitle(nextStep) : getSceneTrainingStepTitle("done");
-  const supportText = nextStepSupportText[currentStep] ?? nextStepSupportText.listen;
 
   useEffect(() => {
     return () => {
@@ -163,6 +146,37 @@ export function SceneTrainingNextStepStrip({
           </button>
         ) : null}
       </div>
+
+      {stageActions.length > 0 ? (
+        <div
+          aria-label="阶段入口"
+          className={`mt-[var(--mobile-adapt-space-sm)] grid gap-[var(--mobile-adapt-space-sm)] ${
+            stageActions.length === 1 ? "grid-cols-1" : "grid-cols-2"
+          }`}
+        >
+          {stageActions.map((action) => {
+            const Icon = getStageIcon(action.kind);
+            return (
+              <button
+                key={action.kind}
+                type="button"
+                className="inline-flex min-h-[var(--mobile-adapt-button-height)] w-full items-center justify-center gap-[var(--mobile-adapt-space-sm)] rounded-[14px] border-0 bg-[#E5E5EA] px-[var(--mobile-adapt-space-lg)] py-[var(--mobile-adapt-space-md)] text-[length:var(--mobile-adapt-font-body-sm)] font-semibold text-foreground transition-transform active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={action.disabled}
+                onClick={action.onClick}
+                data-testid={action.testId}
+              >
+                <Icon className="size-4" />
+                <LoadingContent
+                  loading={Boolean(action.loading)}
+                  loadingText={action.loadingLabel ?? formatLoadingText(action.label, "中...")}
+                >
+                  {action.label}
+                </LoadingContent>
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
     </section>
   );
 }

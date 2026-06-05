@@ -1,5 +1,32 @@
 # Dev Log
 
+### [2026-06-05] Scene 阶段入口与匿名固定练习/变体收口
+- 类型:Spec-Driven(`align-scene-stage-actions-and-trial-assets`)
+- 状态:落地(正式 Scene 阶段入口 + 试用页固定练习/变体 + 阻断弹层修复)
+
+#### 变更
+
+- 抽出共享 `SceneTrainingNextStepStrip`，正式 Scene 与匿名试用详情复用同一个当前下一步头部结构。
+- 正式 Scene 主详情页在已到达阶段且已有 generated/completed set 时显示次级 `练习` / `变体`；点击 generated 进入对应 view，点击 completed 开启再练一轮；无 set 时仍只由主 CTA 负责首次生成。
+- 匿名试用详情默认展示 `练习` / `变体`，点击进入固定本地 practice / variant fixture，不调用 AI、practice set、variant run、progress、review 或保存接口。
+- 匿名详情 sheet 内触发保存 / 加入复习时先关闭 sheet，并将注册阻断弹窗提升到 `z-[90]`。
+
+#### 验证
+
+- `pnpm exec eslint -- "src/app/(app)/scene/[slug]/scene-detail-page.tsx" "src/app/(app)/scene/[slug]/page.regression.test.tsx" "src/features/scene/components/scene-training-next-step-strip.tsx" "src/features/anonymous-trial/components/share-scene-preview-client.tsx" "src/features/anonymous-trial/trial-scene-fixtures.ts" "src/features/anonymous-trial/components/anonymous-block-modal.tsx" "src/features/anonymous-trial/components/share-scene-preview-client.test.tsx"` PASS。
+- `node --import tsx --import ./src/test/setup-dom.ts --test "src/features/anonymous-trial/components/share-scene-preview-client.test.tsx"` PASS(8/8)。
+- `node --import tsx --import ./src/test/setup-dom.ts --test "src/app/(app)/scene/[[]slug[]]/page.regression.test.tsx"` PASS(36/36)。
+- `node --import tsx --test "src/app/trial/page.audit.test.ts" "src/app/share/scene/[[]slug[]]/page.audit.test.ts"` PASS(16/16)。
+- `node --import tsx --test "src/app/api/anonymous/tts/play/route.test.ts"` PASS(9/9)。
+- `pnpm exec openspec validate align-scene-stage-actions-and-trial-assets --strict` PASS；`pnpm run text:check-mojibake` PASS。
+- `pnpm exec openspec archive align-scene-stage-actions-and-trial-assets -y` PASS，已更新 stable spec 并归档到 `openspec/changes/archive/2026-06-05-align-scene-stage-actions-and-trial-assets/`。
+- `pnpm run maintenance:check` 未完全通过：OpenSpec 全量与乱码检查 PASS；失败项为仓库既有 active changes `enable-anonymous-trial-mode` 仍有 2 个未完成任务、`stabilize-auth-session-p0-smoke` 仍有 1 个未完成任务，与本轮归档无关。CHANGELOG 已同步本轮用户可感知变化。
+
+#### 边界
+
+- 不改变 Scene 完成判定、today continue、review 调度或服务端学习状态语义。
+- 不开放匿名实时 AI/TTS 生成，不写入匿名 practice run、variant run、progress、review 或 saved phrases。
+
 ### [2026-06-05] 匿名试用场景体验按真实 Scene 收口
 - 类型:Spec-Driven(匿名试用 UI / 能力边界按 stable spec 收口)
 - 状态:落地(`/trial` 默认场景列表;`/trial/scene/[slug]` 复用真实场景详情展示层;写入/AI 能力入口统一注册阻断)

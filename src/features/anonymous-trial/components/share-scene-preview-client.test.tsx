@@ -21,6 +21,11 @@ const mockedModules = {
       </a>
     ),
   },
+  "next/navigation": {
+    useRouter: () => ({
+      push: () => undefined,
+    }),
+  },
 } satisfies Record<string, unknown>;
 
 const originalRequire = nodeModule.Module.prototype.require;
@@ -213,7 +218,7 @@ test("ShareScenePreviewClient 渲染真实场景气泡和详情入口,不再出�
 
   await flushAsync();
 
-  assert.ok(result.getByText("Sharing a small win at work"));
+  assert.ok(result.getByText("在工位上简单分享一件小成就"));
   assert.ok(result.getAllByText("I just wrapped up the report.").length >= 1);
   assert.ok(result.getAllByText("That's a relief.").length >= 1);
   assert.equal(result.queryByText("听一遍"), null);
@@ -278,18 +283,69 @@ test("ShareScenePreviewClient 保存/加入复习只弹注册阻断,不调用 ex
   assert.equal(findFetchCalls((url) => url.includes("/api/explain-selection")).length, 0);
 });
 
-test("ShareScenePreviewClient 练习/变体占位入口只弹注册阻断", async () => {
+test("ShareScenePreviewClient 练习/变体入口进入固定本地体验,不调用生成或写入接口", async () => {
   const Component = getComponent();
   const result = render(<Component initialLesson={SAMPLE_LESSON} registerHref="/signup" />);
   await flushAsync();
 
   await act(async () => {
-    fireEvent.click(result.getByTestId("trial-scene-practice-placeholder"));
+    fireEvent.click(result.getByTestId("trial-scene-practice-entry"));
   });
   await flushAsync();
 
-  assert.ok(result.container.querySelector('[data-testid="anonymous-block-modal"]'));
-  assert.ok(result.getByText("涉及功能: 生成练习"));
+  assert.ok(result.getAllByText("填空练习").length >= 1);
+  assert.equal(result.container.querySelector('[data-testid="anonymous-block-modal"]'), null);
+
+  await act(async () => {
+    fireEvent.click(result.getByText("返回原场景"));
+  });
+  await flushAsync();
+
+  await act(async () => {
+    fireEvent.click(result.getByTestId("trial-scene-variant-entry"));
+  });
+  await flushAsync();
+
+  assert.ok(result.getByText("变体列表"));
+  assert.equal(
+    findFetchCalls((url) =>
+      url.includes("/api/practice") ||
+      url.includes("/api/learning") ||
+      url.includes("/api/scenes/"),
+    ).length,
+    0,
+  );
+});
+
+test("ShareScenePreviewClient 在详情 sheet 内触发保存时先关闭 sheet 且阻断弹层高于详情层", async () => {
+  window.matchMedia = ((query: string) => ({
+    matches: query.includes("max-width"),
+    media: query,
+    onchange: null,
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
+    addListener: () => undefined,
+    removeListener: () => undefined,
+    dispatchEvent: () => false,
+  })) as typeof window.matchMedia;
+
+  const Component = getComponent();
+  const result = render(<Component initialLesson={SAMPLE_LESSON} registerHref="/signup" />);
+  await flushAsync();
+
+  await act(async () => {
+    fireEvent.click(result.getAllByText("I just wrapped up the report.")[0]);
+  });
+  await flushAsync();
+
+  await act(async () => {
+    fireEvent.click(result.getAllByText("收藏短语").at(-1)!);
+  });
+  await flushAsync();
+
+  const backdrop = result.getByTestId("anonymous-block-modal-backdrop");
+  assert.match(backdrop.getAttribute("class") ?? "", /z-\[90\]/);
+  assert.ok(result.getByText("涉及功能: 保存表达"));
 });
 
 test("ShareScenePreviewClient 点击气泡朗读按钮触发匿名 TTS 播放", async () => {

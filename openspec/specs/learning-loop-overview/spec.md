@@ -4,7 +4,6 @@
 
 这条学习闭环服务于产品北极星：让每一次场景学习，都沉淀为用户在未来真实场景中能回忆、能使用、能迁移的表达资产。`today -> scene -> chunks -> review` 是实现机制，不应替代这个用户结果导向。
 ## Requirements
-
 ### Requirement: 学习时长 delta 必须做最小防污染
 系统 MUST 把前端上报的 `studySecondsDelta` 视为个人展示级信号，而不是强可信数据。服务端写入学习时长前 MUST 执行单次上限和最小上报间隔检查。
 
@@ -23,6 +22,7 @@
 - **WHEN** 用户在同一 `user + scene` 距离上次有效写入不足 10 秒时再次上报学习时长
 - **THEN** 系统 MUST 不把该 delta 计入学习统计
 - **AND** 系统 MUST 记录异常事件
+
 ### Requirement: Today 必须作为每日学习入口
 系统 MUST 提供 `today` 入口，把继续学习、复习任务和学习概览聚合成当日可执行入口。涉及 continue 入口优先级、任务解释文案、聚合字段映射与 fallback 语义的专项规则，MUST 遵守 `today-learning-contract` capability，而不是在学习闭环总览中重复展开 today 聚合契约。
 
@@ -149,20 +149,34 @@
 
 #### Scenario: 用户进入 Scene 主学习视图
 - **WHEN** 用户打开 Scene detail 的主学习视图
-- **THEN** 页面 MUST 展示当前训练步骤或下一步训练动作
+- **THEN** 页面 MUST 展示当前训练步骤和下一步动作
 - **AND** 该展示 MUST 围绕“听熟这段 / 看重点表达 / 开始练习 / 解锁变体”等稳定训练步骤组织
-- **AND** 页面 MUST 将返回、标题、当前步骤、循环播放和当前步骤主 CTA 归入同一个当前任务区域
-- **AND** 当前任务区域 MUST 默认折叠辅助说明，只保留标题、返回、当前步骤与当前操作
-- **AND** 浮动训练入口可以继续展示完整进度、步骤列表、统计摘要和已完成步骤的辅助快捷入口
-- **AND** 浮动训练入口不得重复承载当前步骤主 CTA 或“下一步”行动指令
+- **AND** 页面 MAY 在当前下一步之外展示已经到达阶段的次级阶段入口
+- **AND** 阶段入口 MUST NOT 抢占当前下一步主 CTA
 
-#### Scenario: 当前步骤存在可执行动作
-- **WHEN** 当前场景训练步骤存在主 CTA
-- **THEN** Scene 主学习视图的下一步入口 MUST 提供与该步骤一致的主行动入口
-- **AND** 循环播放入口 MAY 作为次级动作与主行动入口并排展示
-- **AND** 循环播放入口 MUST 复用原有 scene full loop 播放逻辑
-- **AND** 浮动训练入口不得同时展示同一当前步骤主 CTA
-- **AND** 系统不得因为增加页面级下一步入口而新增数据库字段、API 字段或独立状态机
+#### Scenario: 用户处于非练习阶段
+- **WHEN** 用户尚未到达 `practice_sentence` 或 `scene_practice`
+- **THEN** Scene 主详情页 MUST NOT 展示可点击的 `练习` 阶段入口
+- **AND** 当前下一步入口仍按训练状态引导用户继续推进
+
+#### Scenario: 用户已到达练习阶段
+- **WHEN** 用户已经到达 `practice_sentence` 或 `scene_practice`
+- **THEN** Scene 主详情页 MAY 展示 `练习` 阶段入口
+- **AND** 若已有 generated practice set，点击 MUST 进入 practice view
+- **AND** 若 latest practice set 已 completed，点击 MUST 开启再练一轮并进入 practice view
+- **AND** 若尚无 practice set，首次生成仍 MUST 由当前下一步主 CTA 承担
+
+#### Scenario: 用户已解锁变体阶段
+- **WHEN** 用户已经解锁 variant 或当前步骤为 `done`
+- **THEN** Scene 主详情页 MAY 展示 `变体` 阶段入口
+- **AND** 若已有 generated variant set，点击 MUST 进入 variants view 或当前 active variant
+- **AND** 若 latest variant set 已 completed，点击 MUST 开启再练一轮并进入 variants view
+- **AND** 若尚无 variant set，首次生成仍 MUST 由当前下一步主 CTA 承担
+
+#### Scenario: 用户未解锁变体阶段
+- **WHEN** 用户尚未解锁 variant
+- **THEN** Scene 主详情页 MUST NOT 展示可点击的 `变体` 阶段入口
+- **AND** 页面不得通过该入口提前生成或打开 variants view
 
 ### Requirement: Scene 辅助和管理动作不得抢占学习主路径
 系统 MUST 在 Scene 学习页面中区分学习主动作与辅助 / 管理动作。删除、管理生成结果、查看详情等动作不得与当前学习主动作处于同等主层级。

@@ -208,7 +208,7 @@
 - **AND** 未登录访客访问 `/trial` 或 `/trial/scene/[slug]`
 - **THEN** 中间件 MAY 放行该请求进入匿名试用分支
 - **AND** `/trial` 页面 MUST 渲染公开试用场景列表
-- **AND** `/trial/scene/[slug]` 页面 MUST 渲染公开只读场景详情
+- **AND** `/trial/scene/[slug]` 页面 MUST 渲染公开场景详情与固定本地练习 / 固定变体体验
 - **AND** 页面 MUST NOT 将 `/trial` 默认跳转到 `/share/scene/[slug]`
 - **AND** API MUST 使用匿名只读边界处理请求
 
@@ -232,11 +232,11 @@
 
 ### Requirement: 匿名试用公开读取必须避免用户私有数据访问
 
-匿名试用的公开读取链路 MUST 只访问明确可公开的场景、句子和音频数据，不得通过用户上下文读取私有学习表。
+匿名试用的公开读取链路 MUST 只访问明确可公开的场景、句子、固定练习 / 固定变体 fixture 和音频数据，不得通过用户上下文读取私有学习表。
 
 #### Scenario: 匿名试用读取场景详情
 
-- **WHEN** 匿名试用页面读取精选场景、句子或 TTS
+- **WHEN** 匿名试用页面读取精选场景、句子、固定 practice fixture、固定 variant fixture 或 TTS
 - **THEN** 读取 helper MUST 使用公开内容边界
 - **AND** MUST NOT 查询用户私有 progress、review、saved phrases、practice run 或 variant run 数据
 
@@ -245,3 +245,10 @@
 - **WHEN** allowlist 中某个 slug 不存在、非公开或缺少必要公开数据
 - **THEN** 系统 MUST 跳过该场景或展示受控空态
 - **AND** 不得回退到用户态读取或绕过权限读取
+
+#### Scenario: 匿名访客触发用户态或高成本能力
+
+- **WHEN** 匿名访客尝试保存表达、加入复习、提交练习、提交变体、写 progress、导入、生成、实时 AI 解释或实时 TTS 生成
+- **THEN** 系统 MUST 返回 `ANON_FEATURE_DISABLED` 或显示注册阻断
+- **AND** 系统 MUST NOT 写入用户态业务表
+- **AND** 系统 MUST NOT 触发上游 AI 或实时 TTS 生成

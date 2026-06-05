@@ -1,29 +1,4 @@
-# anonymous-trial-mode Specification
-
-## Purpose
-
-定义免登录试用与分享灰度入口的稳定边界：访客可以查看公开场景列表与只读场景详情，体验预生成 TTS 播放；任何写入、生成、导入、练习、变体或实时 AI 能力都只能展示入口并提示注册，不得进入真实处理链路。
-## Requirements
-### Requirement: 匿名试用入口必须展示公开场景列表
-
-系统 MUST 将 `/trial` 作为免登录试用的公开场景列表入口，而不是默认跳转到某个固定场景或 `/share/scene/[slug]`。
-
-#### Scenario: 未登录访客访问匿名试用入口
-
-- **WHEN** `ALLOW_ANONYMOUS_TRIAL=true`
-- **AND** 未登录访客访问 `/trial`
-- **THEN** 系统 MUST 查询精选公开场景 allowlist 中 `is_public=true` 的场景
-- **AND** 页面 MUST 使用与主 `/scenes` 列表一致的筛选条、场景卡片和点击进入体验
-- **AND** 用户 MUST 自己点击某个场景后进入 `/trial/scene/[slug]`
-- **AND** 系统 MUST NOT 默认跳转到 `/share/scene/[slug]`
-- **AND** 系统 MUST NOT 查询或展示任何用户私有学习数据
-
-#### Scenario: 匿名试用关闭
-
-- **WHEN** `ALLOW_ANONYMOUS_TRIAL` 未开启
-- **AND** 未登录访客访问 `/trial`
-- **THEN** 系统 MUST 返回受控登录或注册引导
-- **AND** 不得继续加载匿名试用业务数据
+## MODIFIED Requirements
 
 ### Requirement: 匿名场景详情必须复用主场景阅读体验
 

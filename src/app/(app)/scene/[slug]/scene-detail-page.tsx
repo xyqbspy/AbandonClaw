@@ -19,6 +19,10 @@ import {
   SCENE_PAGE_RAISED_SECTION_CLASSNAME,
   SCENE_PAGE_SHEET_PADDING_CLASSNAME,
 } from "@/features/scene/components/scene-page-styles";
+import {
+  SceneTrainingNextStepStrip,
+  type SceneTrainingStageAction,
+} from "@/features/scene/components/scene-training-next-step-strip";
 import { normalizePhraseText } from "@/lib/shared/phrases";
 import { Lesson } from "@/lib/types";
 import { recordClientEvent } from "@/lib/utils/client-events";
@@ -32,7 +36,11 @@ import {
   SceneLearningProgressResponse,
 } from "@/lib/utils/learning-api";
 import { useSceneDetailActions } from "./use-scene-detail-actions";
-import { sceneDetailMessages } from "./scene-detail-messages";
+import {
+  getSceneTrainingNextStep,
+  getSceneTrainingStepTitle,
+  sceneDetailMessages,
+} from "./scene-detail-messages";
 import {
   notifySceneContinueStep,
   notifySceneExpressionFocused,
@@ -51,7 +59,6 @@ import {
   deriveSceneTrainingState,
 } from "./scene-detail-selectors";
 import { SceneTrainingCoachFloatingEntry } from "./scene-training-coach-floating-entry";
-import { SceneTrainingNextStepStrip } from "./scene-training-next-step-strip";
 import { useSceneDetailData } from "./use-scene-detail-data";
 import { useSceneDetailPlayback } from "./use-scene-detail-playback";
 import { useSceneDetailRouteState } from "./use-scene-detail-route-state";
@@ -66,6 +73,14 @@ import { SceneDetailViewSwitch } from "./scene-detail-view-switch";
 
 const appleButtonSmClassName = SCENE_ACTION_BUTTON_SM_CLASSNAME;
 export { resetScenePracticeRunStartDedupForTests };
+
+const sceneNextStepSupportText = {
+  listen: "先把场景听熟一遍，后面提取表达和练习会更顺。",
+  focus_expression: "现在先抓住一个重点表达，把它沉淀成后续练习的入口。",
+  practice_sentence: "先完成一句复现，再进入整段练习。",
+  scene_practice: "接下来进入整段练习，把看懂推进到能复现。",
+  done: "本轮基础训练已经闭环，可以继续看变体迁移。",
+} as const;
 
 type SavePhrasePayload = {
   text: string;
@@ -698,6 +713,66 @@ export default function SceneDetailClientPage({
     practiceLoading,
   ]);
 
+  const stageActions = useMemo<SceneTrainingStageAction[]>(() => {
+    const actions: SceneTrainingStageAction[] = [];
+    const session = trainingState?.session;
+    const currentStep = sceneTrainingState.currentStep;
+    const practiceStageReached =
+      session?.currentStep === "practice_sentence" ||
+      currentStep === "scene_practice" ||
+      currentStep === "done" ||
+      (session?.practicedSentenceCount ?? 0) > 0 ||
+      Boolean(session?.scenePracticeCompleted);
+
+    if (practiceStageReached && latestPracticeSet) {
+      actions.push({
+        kind: "practice",
+        label: "练习",
+        loading: practiceLoading,
+        disabled: practiceLoading,
+        testId: "scene-stage-practice-entry",
+        onClick: () => {
+          if (latestPracticeSet.status === "completed") {
+            handleRepeatPractice();
+            return;
+          }
+          handlePracticeToolClick();
+        },
+      });
+    }
+
+    if (variantUnlocked && latestVariantSet) {
+      actions.push({
+        kind: "variants",
+        label: "变体",
+        loading: variantsLoading,
+        disabled: variantsLoading,
+        testId: "scene-stage-variant-entry",
+        onClick: () => {
+          if (latestVariantSet.status === "completed") {
+            handleRepeatVariants();
+            return;
+          }
+          handleVariantToolClick();
+        },
+      });
+    }
+
+    return actions;
+  }, [
+    handlePracticeToolClick,
+    handleRepeatPractice,
+    handleRepeatVariants,
+    handleVariantToolClick,
+    latestPracticeSet,
+    latestVariantSet,
+    practiceLoading,
+    sceneTrainingState.currentStep,
+    trainingState?.session,
+    variantUnlocked,
+    variantsLoading,
+  ]);
+
   if (sceneLoading) {
     return <SceneDetailSkeleton />;
   }
@@ -732,24 +807,30 @@ export default function SceneDetailClientPage({
     isSceneLooping: boolean;
     isSceneLoopLoading: boolean;
     toggleSceneLoopPlayback: () => void;
-  }) => (
-    <SceneTrainingNextStepStrip
-      title={baseLesson.subtitle?.trim() || baseLesson.sections[0]?.summary?.trim() || baseLesson.title}
-      onBack={() => router.push("/scenes")}
-      trainingState={trainingState}
-      variantUnlocked={variantUnlocked}
-      practiceSetStatus={generatedState.practiceStatus}
-      practiceSnapshot={practiceSnapshot}
-      isSceneLooping={isSceneLooping}
-      isSceneLoopLoading={isSceneLoopLoading}
-      onSceneLoopPlayback={toggleSceneLoopPlayback}
-      currentStepActionLabel={currentStepAction.label}
-      currentStepActionLoading={currentStepAction.loading}
-      onCurrentStepAction={currentStepAction.onClick}
-      currentStepActionDisabled={currentStepAction.disabled}
-      progressEntry={trainingProgressEntry}
-    />
-  );
+  }) => {
+    const currentStep = sceneTrainingState.currentStep;
+    const nextStep = getSceneTrainingNextStep(currentStep);
+    const nextStepLabel = nextStep ? getSceneTrainingStepTitle(nextStep) : getSceneTrainingStepTitle("done");
+    const supportText = sceneNextStepSupportText[currentStep] ?? sceneNextStepSupportText.listen;
+
+    return (
+      <SceneTrainingNextStepStrip
+        title={baseLesson.subtitle?.trim() || baseLesson.sections[0]?.summary?.trim() || baseLesson.title}
+        onBack={() => router.push("/scenes")}
+        supportText={supportText}
+        nextStepLabel={nextStepLabel}
+        isSceneLooping={isSceneLooping}
+        isSceneLoopLoading={isSceneLoopLoading}
+        onSceneLoopPlayback={toggleSceneLoopPlayback}
+        currentStepActionLabel={currentStepAction.label}
+        currentStepActionLoading={currentStepAction.loading}
+        onCurrentStepAction={currentStepAction.onClick}
+        currentStepActionDisabled={currentStepAction.disabled}
+        progressEntry={trainingProgressEntry}
+        stageActions={stageActions}
+      />
+    );
+  };
 
   const chunkDetailSheet = (
     <SelectionDetailSheet

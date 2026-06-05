@@ -83,7 +83,7 @@
 - **配额隔离**：匿名 Redis 命名空间 `anon:quota:*` 与已登录 `quota:{userId}:*` 完全分离；改一边不影响另一边。每个匿名 capability 必须明确配置 IP 滑窗 + session 日上限，可选全站日预算（仅当 capability 会消耗付费上游时必须）。
 - **表权限默认 deny**：所有用户态表（profiles / user_* / phrase_* / *_logs）不得对 anon role 加任何 SELECT 策略；新建用户态表必须保持 RLS deny-by-default。`rls-policy-audit.test.ts` 用 SQL parser 守护这一不变量。
 - **写入和 AI 完全禁止**：匿名访客不得写入任何业务表（保存表达 / 提交 review / 写 progress / 导入导出），也不得触发实时 AI 能力（AI 解释 / 场景生成 / 练习生成 / 变体生成）。这些入口可以展示外观，但触发后只能返回 `ANON_FEATURE_DISABLED(403)` 或显示注册阻断。
-- **试用入口只读展示**：`/trial` 承载公开场景列表，`/trial/scene/[slug]` 承载公开只读详情；两者不得默认跳转 `/share/scene/[slug]`，也不得承载本地练习或任何写入体验。
+- **试用入口固定体验**：`/trial` 承载公开场景列表，`/trial/scene/[slug]` 承载公开详情与固定本地练习 / 固定变体体验；两者不得默认跳转 `/share/scene/[slug]`，固定体验不得触发练习生成、变体生成、run/attempt/complete、progress、review 或任何业务写入。
 - **允许 + 配额型 capability**：当前仅 `tts_play` 可匿名调用，必须走 `checkAnonymousTtsPlaybackQuota` 或同等 helper，返回的 quota result 必须挂到 `X-Quota-*` 响应头让前端显示剩余次数。`explain_selection` 默认匿名禁用；若未来恢复灰度，必须显式设置 `ANON_ALLOW_EXPLAIN_SELECTION=true` 并同步 spec / 文档 / 测试。
 - **零边际成本 capability 不进 HighCostCapability**：只读 Storage 的 `tts_play` 走独立 `tts-playback-quota` 模块，不进 `HighCostCapability` 数组，避免污染 admin 紧急关闭面板 / 用户日 quota 表 / usage 统计的"高成本"语义。
 - **匿名学习态不持久化**：所有匿名期间产生的学习态走 sessionStorage，关浏览器即清；唯一持久化的匿名数据是 `anonymous_sessions`（4 字段），仅供配额判定与防绕过，不存业务语义。

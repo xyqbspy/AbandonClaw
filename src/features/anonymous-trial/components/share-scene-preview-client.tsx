@@ -1,10 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
-import { ArrowLeft, GitBranch, Dumbbell } from "lucide-react";
+import { useRouter } from "next/navigation";
 import type { Lesson, LessonBlock, LessonSentence, SelectionChunkLayer } from "@/lib/types";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
   buildAnonymousHeaders,
@@ -22,6 +20,14 @@ import { LessonReaderDialogueContent } from "@/features/lesson/components/lesson
 import { SentenceBlock } from "@/features/lesson/components/sentence-block";
 import { SelectionDetailPanel } from "@/features/lesson/components/selection-detail-panel";
 import { SelectionDetailSheet } from "@/features/lesson/components/selection-detail-sheet";
+import { ScenePracticeView } from "@/features/scene/components/scene-practice-view";
+import {
+  SCENE_ACTION_BUTTON_SM_CLASSNAME,
+  SCENE_DANGER_ACTION_BUTTON_SM_CLASSNAME,
+} from "@/features/scene/components/scene-page-styles";
+import { SceneTrainingNextStepStrip } from "@/features/scene/components/scene-training-next-step-strip";
+import { SceneVariantsView } from "@/features/scene/components/scene-variants-view";
+import { sceneViewLabels } from "@/features/scene/components/scene-view-labels";
 import { AnonymousTopbarBanner } from "./anonymous-topbar-banner";
 import { AnonymousInlineUpsellCard } from "./anonymous-inline-upsell-card";
 import { AnonymousBlockModal, type AnonymousBlockTrigger } from "./anonymous-block-modal";
@@ -29,6 +35,10 @@ import {
   useAnonymousMode,
   type AnonymousQuotaSnapshot,
 } from "@/features/anonymous-trial/use-anonymous-mode";
+import {
+  buildTrialPracticeSet,
+  buildTrialVariantSet,
+} from "@/features/anonymous-trial/trial-scene-fixtures";
 
 type ShareScenePreviewClientProps = {
   initialLesson: Lesson;
@@ -49,6 +59,8 @@ type PlaybackState =
       targetId: string;
       text: string;
     };
+
+type TrialSceneViewMode = "scene" | "practice" | "variants" | "variant-study";
 
 const hasSpeakerTag = (speaker?: string) => /^[A-Z]$/.test((speaker ?? "").trim().toUpperCase());
 
@@ -108,6 +120,14 @@ const getUniqueChunks = (sentences: LessonSentence[]) =>
 
 const getFirstChunk = (sentence: LessonSentence | null) => sentence?.chunks?.[0] ?? null;
 
+const toTrialVariantTitle = (title: string) => title;
+
+const toTrialVariantStatusLabel = (status: "unviewed" | "viewed" | "completed") => {
+  if (status === "completed") return "已完成";
+  if (status === "viewed") return "已查看";
+  return "待查看";
+};
+
 export function ShareScenePreviewClient({
   initialLesson,
   registerHref,
@@ -134,16 +154,30 @@ function ShareScenePreviewContent({
   registerHref: string;
   backHref?: string;
 }) {
+  const router = useRouter();
   const anonState = useAnonymousMode({ isAuthenticated: false });
   const isMobile = useMobile();
-  const blockOrder = useMemo(() => getLessonBlocks(lesson), [lesson]);
-  const sentenceOrder = useMemo(() => getLessonSentences(lesson), [lesson]);
-  const firstSentence = useMemo(() => getFirstSentence(lesson) ?? null, [lesson]);
+  const trialPracticeSet = useMemo(() => buildTrialPracticeSet(lesson), [lesson]);
+  const trialVariantSet = useMemo(() => buildTrialVariantSet(lesson), [lesson]);
+  const [trialViewMode, setTrialViewMode] = useState<TrialSceneViewMode>("scene");
+  const [activeVariantId, setActiveVariantId] = useState<string | null>(null);
+  const activeVariantItem = useMemo(
+    () =>
+      activeVariantId
+        ? (trialVariantSet.variants.find((variant) => variant.id === activeVariantId) ?? null)
+        : null,
+    [activeVariantId, trialVariantSet],
+  );
+  const readerLesson =
+    trialViewMode === "variant-study" && activeVariantItem ? activeVariantItem.lesson : lesson;
+  const blockOrder = useMemo(() => getLessonBlocks(readerLesson), [readerLesson]);
+  const sentenceOrder = useMemo(() => getLessonSentences(readerLesson), [readerLesson]);
+  const firstSentence = useMemo(() => getFirstSentence(readerLesson) ?? null, [readerLesson]);
   const hasDialogueLikeSpeakers =
     blockOrder.length > 0 && blockOrder.every((block) => hasSpeakerTag(block.speaker));
   const isDialogueScene =
-    lesson.sceneType === "dialogue" ||
-    blockOrder.some((block) => (block.kind ?? lesson.sceneType ?? "monologue") === "dialogue") ||
+    readerLesson.sceneType === "dialogue" ||
+    blockOrder.some((block) => (block.kind ?? readerLesson.sceneType ?? "monologue") === "dialogue") ||
     hasDialogueLikeSpeakers;
 
   const [activeSentenceId, setActiveSentenceId] = useState<string | null>(
@@ -161,9 +195,21 @@ function ShareScenePreviewContent({
   const [blockTrigger, setBlockTrigger] = useState<AnonymousBlockTrigger | null>(null);
   const [capabilityLabel, setCapabilityLabel] = useState<string | null>(null);
   const [playbackState, setPlaybackState] = useState<PlaybackState>({ kind: "idle" });
+  const [showAnswerMap, setShowAnswerMap] = useState<Record<string, boolean>>({});
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const firstViewReportedRef = useRef(false);
   const promptShownReportedRef = useRef<Record<string, boolean>>({});
+
+  const resetReaderSelection = useCallback((nextLesson: Lesson) => {
+    const nextFirstSentence = getFirstSentence(nextLesson) ?? null;
+    const nextBlocks = getLessonBlocks(nextLesson);
+    setActiveSentenceId(nextFirstSentence?.id ?? null);
+    setActiveBlockId(nextBlocks[0]?.id ?? null);
+    setActiveChunkKey(getFirstChunk(nextFirstSentence));
+    setHoveredChunkKey(null);
+    setSheetOpen(false);
+    setShowAnswerMap({});
+  }, []);
 
   useEffect(() => {
     if (firstViewReportedRef.current) return;
@@ -201,9 +247,9 @@ function ShareScenePreviewContent({
   const currentSentence = useMemo(
     () =>
       activeSentenceId
-        ? (getSentenceById(lesson, activeSentenceId) ?? null)
+        ? (getSentenceById(readerLesson, activeSentenceId) ?? null)
         : firstSentence,
-    [activeSentenceId, firstSentence, lesson],
+    [activeSentenceId, firstSentence, readerLesson],
   );
 
   const currentBlock = useMemo(() => {
@@ -227,8 +273,8 @@ function ShareScenePreviewContent({
 
   const chunkDetail = useMemo<SelectionChunkLayer | null>(() => {
     if (!currentSentence || !activeChunkKey) return null;
-    return getChunkLayerFromLesson(lesson, currentSentence, activeChunkKey);
-  }, [activeChunkKey, currentSentence, lesson]);
+    return getChunkLayerFromLesson(readerLesson, currentSentence, activeChunkKey);
+  }, [activeChunkKey, currentSentence, readerLesson]);
 
   const expressionCount = useMemo(() => {
     const seen = new Set<string>();
@@ -255,7 +301,10 @@ function ShareScenePreviewContent({
 
   useEffect(() => () => stopCurrentAudio(), [stopCurrentAudio]);
 
-  const openBlockedCapability = useCallback((label: string) => {
+  const openBlockedCapability = useCallback((label: string, options?: { closeSheet?: boolean }) => {
+    if (options?.closeSheet) {
+      setSheetOpen(false);
+    }
     setCapabilityLabel(label);
     setBlockTrigger("feature_disabled");
   }, []);
@@ -298,7 +347,7 @@ function ShareScenePreviewContent({
         url.searchParams.set("kind", targetKind);
         url.searchParams.set("text", clean);
         if (targetKind === "sentence") {
-          url.searchParams.set("sceneSlug", lesson.slug);
+          url.searchParams.set("sceneSlug", readerLesson.slug);
           url.searchParams.set("sentenceId", requestSentenceId ?? targetId);
           if (speaker) url.searchParams.set("speaker", speaker);
         } else {
@@ -344,12 +393,12 @@ function ShareScenePreviewContent({
         setPlaybackState({ kind: "unavailable", targetKind, targetId, text: clean });
       }
     },
-    [anonState, lesson.slug, playbackState, stopCurrentAudio],
+    [anonState, playbackState, readerLesson.slug, stopCurrentAudio],
   );
 
   const activateSentence = useCallback(
     (sentenceId: string, blockId?: string, options?: { openSheet?: boolean }) => {
-      const sentence = getSentenceById(lesson, sentenceId);
+      const sentence = getSentenceById(readerLesson, sentenceId);
       if (!sentence) return;
       const ownerBlock =
         blockId
@@ -364,7 +413,7 @@ function ShareScenePreviewContent({
         setSheetOpen(true);
       }
     },
-    [blockOrder, isMobile, lesson],
+    [blockOrder, isMobile, readerLesson],
   );
 
   const activateChunk = useCallback(
@@ -456,7 +505,64 @@ function ShareScenePreviewContent({
   const detailLoadingText = playbackState.kind === "loading" ? playbackState.text : null;
 
   const sentenceSectionLabel = isDialogueScene ? "当前对话块" : "当前句子";
-  const headerTitle = lesson.subtitle?.trim() || lesson.sections[0]?.summary?.trim() || lesson.title;
+  const headerTitle =
+    readerLesson.subtitle?.trim() || readerLesson.sections[0]?.summary?.trim() || readerLesson.title;
+  const headerBackHandler =
+    trialViewMode === "variant-study" || backHref
+      ? () => {
+          if (trialViewMode === "variant-study") {
+            setTrialViewMode("variants");
+            return;
+          }
+          if (backHref) router.push(backHref);
+        }
+      : undefined;
+  const isSceneLooping =
+    playbackState.kind === "playing" &&
+    playbackState.targetKind === "sentence" &&
+    playbackState.targetId.startsWith("block-");
+  const isSceneLoopLoading =
+    playbackState.kind === "loading" &&
+    playbackState.targetKind === "sentence" &&
+    playbackState.targetId.startsWith("block-");
+  const handleTrialSceneLoopPlayback = () => {
+    const firstBlock = blockOrder[0];
+    if (!firstBlock) return;
+    void playBlockTts(firstBlock);
+  };
+  const handleTrialCurrentStepAction = () => {
+    if (trialViewMode === "variant-study") {
+      setTrialViewMode("variants");
+      return;
+    }
+    const sentence = firstSentence;
+    if (!sentence) return;
+    activateSentence(sentence.id, blockOrder[0]?.id, { openSheet: true });
+  };
+  const trialStageActions = [
+    {
+      kind: "practice" as const,
+      label: "练习",
+      testId: "trial-scene-practice-entry",
+      onClick: () => setTrialViewMode("practice"),
+    },
+    {
+      kind: "variants" as const,
+      label: "变体",
+      testId: "trial-scene-variant-entry",
+      onClick: () => {
+        setActiveVariantId(null);
+        resetReaderSelection(lesson);
+        setTrialViewMode("variants");
+      },
+    },
+  ];
+  const trialSupportText =
+    trialViewMode === "variant-study"
+      ? "这是试用页的固定变体预览，内容不会写入学习进度。"
+      : "体验模式下练习和变体都已预置好，可以直接查看；保存和提交需要注册。";
+  const trialNextStepLabel =
+    trialViewMode === "variant-study" ? "返回变体列表或继续练习" : "练习 / 变体已解锁";
 
   return (
     <div className="min-h-screen bg-[#f8fafc]" data-testid="share-scene-preview">
@@ -474,59 +580,79 @@ function ShareScenePreviewContent({
       />
 
       <main className="mx-auto w-full max-w-6xl space-y-[var(--mobile-space-xl)] px-3 pb-28 pt-4 lg:px-5">
-        <header className="space-y-[var(--mobile-space-md)]">
-          <div className="flex items-center justify-between gap-3">
-            {backHref ? (
-              <Button asChild variant="ghost" size="sm" radius="pill" className="gap-2">
-                <Link href={backHref} data-testid="trial-scene-back-link">
-                  <ArrowLeft className="size-4" />
-                  场景列表
-                </Link>
-              </Button>
-            ) : (
-              <span />
-            )}
-            <div className="flex items-center gap-2">
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                radius="pill"
-                className="gap-2"
-                onClick={() => openBlockedCapability("生成练习")}
-                data-testid="trial-scene-practice-placeholder"
-              >
-                <Dumbbell className="size-4" />
-                练习
-              </Button>
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                radius="pill"
-                className="gap-2"
-                onClick={() => openBlockedCapability("生成变体")}
-                data-testid="trial-scene-variant-placeholder"
-              >
-                <GitBranch className="size-4" />
-                变体
-              </Button>
-            </div>
-          </div>
-          <div className="space-y-1 px-1.5">
-            <p className="text-[10px] font-black uppercase tracking-tight text-slate-400">
-              体验模式
-            </p>
-            <h1 className="text-2xl font-black leading-tight text-slate-900 sm:text-3xl">
-              {lesson.title}
-            </h1>
-            {headerTitle ? (
-              <p className="max-w-2xl text-sm font-medium leading-6 text-slate-500">
-                {headerTitle}
-              </p>
-            ) : null}
-          </div>
-        </header>
+        {trialViewMode === "practice" ? (
+          <ScenePracticeView
+            practiceSet={trialPracticeSet}
+            practiceSnapshot={null}
+            showAnswerMap={showAnswerMap}
+            appleButtonSmClassName={SCENE_ACTION_BUTTON_SM_CLASSNAME}
+            appleDangerButtonSmClassName={SCENE_DANGER_ACTION_BUTTON_SM_CLASSNAME}
+            labels={sceneViewLabels.practice}
+            regenerating={false}
+            onBack={() => {
+              resetReaderSelection(lesson);
+              setTrialViewMode("scene");
+            }}
+            onDelete={() => openBlockedCapability("删除练习")}
+            onRegenerate={() => openBlockedCapability("重新生成练习")}
+            onComplete={() => openBlockedCapability("提交练习")}
+            completing={false}
+            onReviewScene={() => {
+              resetReaderSelection(lesson);
+              setTrialViewMode("scene");
+            }}
+            onRepeatPractice={() => setShowAnswerMap({})}
+            onOpenVariants={() => setTrialViewMode("variants")}
+            onToggleAnswer={(exerciseId) =>
+              setShowAnswerMap((prev) => ({
+                ...prev,
+                [exerciseId]: !prev[exerciseId],
+              }))
+            }
+          />
+        ) : trialViewMode === "variants" ? (
+          <SceneVariantsView
+            baseLesson={lesson}
+            variantSet={trialVariantSet}
+            expressionMapLoading={false}
+            appleButtonSmClassName={SCENE_ACTION_BUTTON_SM_CLASSNAME}
+            appleDangerButtonSmClassName={SCENE_DANGER_ACTION_BUTTON_SM_CLASSNAME}
+            labels={sceneViewLabels.variants}
+            onBack={() => {
+              resetReaderSelection(lesson);
+              setTrialViewMode("scene");
+            }}
+            onComplete={() => openBlockedCapability("提交变体")}
+            completing={false}
+            onRepeatVariants={() => undefined}
+            onDeleteSet={() => openBlockedCapability("删除变体")}
+            onOpenExpressionMap={() => openBlockedCapability("表达地图")}
+            onOpenChunk={activateChunk}
+            onOpenVariant={(variantId) => {
+              const nextVariant = trialVariantSet.variants.find((variant) => variant.id === variantId);
+              if (nextVariant) resetReaderSelection(nextVariant.lesson);
+              setActiveVariantId(variantId);
+              setTrialViewMode("variant-study");
+            }}
+            onDeleteVariant={() => openBlockedCapability("删除变体")}
+            toVariantTitle={toTrialVariantTitle}
+            toVariantStatusLabel={toTrialVariantStatusLabel}
+          />
+        ) : (
+          <>
+            <SceneTrainingNextStepStrip
+              title={headerTitle}
+              onBack={headerBackHandler}
+              supportText={trialSupportText}
+              nextStepLabel={trialNextStepLabel}
+              isSceneLooping={isSceneLooping}
+              isSceneLoopLoading={isSceneLoopLoading}
+              onSceneLoopPlayback={handleTrialSceneLoopPlayback}
+              currentStepActionLabel={trialViewMode === "variant-study" ? "返回变体" : "看重点表达"}
+              onCurrentStepAction={handleTrialCurrentStepAction}
+              currentStepActionDisabled={false}
+              stageActions={trialStageActions}
+            />
 
         <div
           className={cn(
@@ -561,7 +687,7 @@ function ShareScenePreviewContent({
                 playBlockTts={playBlockTts}
               />
             ) : (
-              lesson.sections.map((section) => (
+              readerLesson.sections.map((section) => (
                 <section key={section.id} className="space-y-3">
                   {section.title ? (
                     <div className="space-y-1 px-1">
@@ -642,6 +768,8 @@ function ShareScenePreviewContent({
             loadingChunkKey={loadingChunkKey}
           />
         </div>
+          </>
+        )}
       </main>
 
       <SelectionDetailSheet
@@ -656,8 +784,8 @@ function ShareScenePreviewContent({
         speakingText={detailSpeakingText}
         loadingText={detailLoadingText}
         onOpenChange={setSheetOpen}
-        onSave={() => openBlockedCapability("保存表达")}
-        onReview={() => openBlockedCapability("加入复习")}
+        onSave={() => openBlockedCapability("保存表达", { closeSheet: true })}
+        onReview={() => openBlockedCapability("加入复习", { closeSheet: true })}
         saved={false}
         onPronounce={playChunk}
         onPronounceBlock={() => {
@@ -681,7 +809,10 @@ function ShareScenePreviewContent({
         visible={blockTrigger !== null}
         trigger={blockTrigger ?? "feature_disabled"}
         capabilityLabel={capabilityLabel ?? undefined}
-        onDismiss={() => setBlockTrigger(null)}
+        onDismiss={() => {
+          setBlockTrigger(null);
+          setCapabilityLabel(null);
+        }}
         registerHref={registerHref}
         onRegisterClick={() =>
           reportAnonymousEvent("anon_register_prompt_clicked", {
