@@ -8,9 +8,3 @@ export const mainNav = [
   { title: "\u5b66\u4e60\u8fdb\u5ea6", href: "/progress", icon: ChartColumnBig },
   { title: "\u8bbe\u7f6e", href: "/settings", icon: Settings },
 ];
-
-export const marketingNav = [
-  { title: "\u8bd5\u7528", href: "/trial" },
-  { title: "\u767b\u5f55", href: "/login" },
-  { title: "\u6ce8\u518c", href: "/signup" },
-];
