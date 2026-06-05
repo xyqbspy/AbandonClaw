@@ -36,9 +36,9 @@ const matrix: Record<HighCostCapability, AnonymousFeatureConfig> = {
     sessionDailyLimit: 0,
     alertThresholdRatio: 0,
   },
-  // AI 表达解释:全站每日 200 / 单会话每日 3(对应 ≈ $0.14/天)
+  // AI 表达解释默认匿名禁用；若后续恢复灰度，可显式打开 env 并沿用 200/3 配额。
   explain_selection: {
-    anonAllowed: true,
+    anonAllowed: false,
     globalDailyLimit: 200,
     sessionDailyLimit: 3,
     alertThresholdRatio: 0.8,
@@ -72,12 +72,24 @@ const parsePositiveIntOrUnlimited = (raw: string | undefined): number | null => 
 
 const ENV_GLOBAL_OVERRIDE_PREFIX = "ANON_QUOTA_GLOBAL_";
 const ENV_SESSION_OVERRIDE_PREFIX = "ANON_QUOTA_SESSION_";
+const ENV_ALLOW_OVERRIDE_PREFIX = "ANON_ALLOW_";
+
+const parseBooleanOverride = (raw: string | undefined): boolean | null => {
+  if (raw === undefined) return null;
+  const normalized = raw.trim().toLowerCase();
+  if (["1", "true", "on", "yes"].includes(normalized)) return true;
+  if (["0", "false", "off", "no"].includes(normalized)) return false;
+  return null;
+};
 
 export const getAnonymousFeatureConfig = (
   capability: HighCostCapability,
 ): AnonymousFeatureConfig => {
   const base = matrix[capability];
   const upperCap = capability.toUpperCase();
+  const allowOverride = parseBooleanOverride(
+    process.env[`${ENV_ALLOW_OVERRIDE_PREFIX}${upperCap}`],
+  );
   const globalOverride = parsePositiveIntOrUnlimited(
     process.env[`${ENV_GLOBAL_OVERRIDE_PREFIX}${upperCap}`],
   );
@@ -86,6 +98,7 @@ export const getAnonymousFeatureConfig = (
   );
   return {
     ...base,
+    anonAllowed: allowOverride ?? base.anonAllowed,
     globalDailyLimit: globalOverride ?? base.globalDailyLimit,
     sessionDailyLimit: sessionOverride ?? base.sessionDailyLimit,
   };

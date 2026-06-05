@@ -1,5 +1,31 @@
 # Dev Log
 
+### [2026-06-05] 匿名试用场景体验按真实 Scene 收口
+- 类型:Spec-Driven(匿名试用 UI / 能力边界按 stable spec 收口)
+- 状态:落地(`/trial` 默认场景列表;`/trial/scene/[slug]` 复用真实场景详情展示层;写入/AI 能力入口统一注册阻断)
+
+#### 变更
+
+- `/trial` 不再自动跳转默认分享详情,改为服务端加载公开场景并渲染匿名试用列表。
+- 匿名详情页删除旧试用卡片 UI,复用 `LessonReaderDialogueContent` / `SentenceBlock` / `SelectionDetailPanel` / `SelectionDetailSheet` 展示句子气泡、翻译、播放和详情面板。
+- 导入、生成、练习、变体、保存、加入复习、实时 AI 解释 / 生成等需要写入或高成本 AI 的入口只保留样式,点击弹注册阻断,不调用真实写入或 AI API。
+- 匿名 TTS 仅走 `/api/anonymous/tts/play` 读取已预生成音频;`explain_selection` 默认匿名禁用,仅保留 env 灰度恢复口径。
+
+#### 验证
+
+- `pnpm exec eslint src/features/anonymous-trial/components/share-scene-preview-client.tsx src/lib/server/anonymous/route-guard.test.ts` PASS。
+- `node --import tsx --test "src/app/trial/page.audit.test.ts"` PASS(5/5)。
+- `node --import tsx --import ./src/test/setup-dom.ts --test "src/features/anonymous-trial/components/share-scene-preview-client.test.tsx"` PASS(7/7)。
+- `node --import tsx --test "src/lib/server/anonymous/feature-matrix.test.ts" "src/lib/server/anonymous/quota.test.ts" "src/lib/server/anonymous/route-guard.test.ts" "src/app/api/explain-selection/route.test.ts"` PASS(29/29)。
+- `pnpm exec openspec validate --specs --strict` PASS;`pnpm run text:check-mojibake` PASS。
+- `pnpm run maintenance:check` 未完全通过:OpenSpec / 乱码检查 PASS,但仓库既有 active changes `enable-anonymous-trial-mode` 与 `stabilize-auth-session-p0-smoke` 仍有未完成 tasks。
+- `pnpm exec tsc --noEmit --pretty false` 未通过:失败集中在既有 test typing(`scripts/test-users-lib.test.ts`、auth layout/login tests、learning/review test casts),本轮修改文件未出现在错误列表。
+
+#### 边界
+
+- 不开放主应用 `/scenes`、`/scene`、`/today`、`/review`、`/chunks`、`/progress` 给匿名访客。
+- 不新增匿名写入、练习提交、保存表达、复习队列写入或实时 AI 生成能力。
+
 ### [2026-05-31] 匿名试用扩展为 `/trial` 场景列表
 - 类型:Spec-Driven(`expand-anonymous-trial-experience`)
 - 状态:落地(已落地 `/trial` 列表与详情;`pnpm run build` PASS;`pnpm run lint` 0 error/4 warning;相关 audit 16/16 通过;匿名预览 interaction 11/11 通过;OpenSpec validate 通过)

@@ -68,7 +68,7 @@ export interface ProfileOrAnonymousDependencies {
 }
 
 /**
- * 适用于"允许匿名 + 配额隔离"的高成本接口入口守护(例如 AI 表达解释、TTS 预生成播放)。
+ * 适用于"允许匿名 + 配额隔离"的高成本接口入口守护。
  * - 已登录:返回 { mode: "registered", user, profile },后续走原 reserveHighCostUsage 流程。
  * - 匿名 + 试用关闭:AuthError 透传(保持 401)。
  * - 匿名 + 试用打开 + featureMatrix.anonAllowed=false:抛 AnonFeatureDisabledError。

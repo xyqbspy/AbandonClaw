@@ -315,6 +315,59 @@ export async function listPublicTrialScenes(): Promise<Lesson[]> {
     .map(rowToLesson);
 }
 
+export async function listPublicTrialSceneItems(): Promise<SceneListItem[]> {
+  await runSeedScenesSync();
+  const client = await createSupabaseServerClient();
+  const { data, error } = await client
+    .from("scenes")
+    .select("*")
+    .in("slug", [...ANONYMOUS_TRIAL_SCENE_SLUGS])
+    .eq("is_public", true);
+
+  if (error) {
+    throw new Error(`Failed to load public trial scene items: ${error.message}`);
+  }
+
+  const rowsBySlug = new Map(
+    ((data ?? []) as SceneRow[]).map((row) => [row.slug, row]),
+  );
+
+  const items: SceneListItem[] = [];
+  for (const slug of ANONYMOUS_TRIAL_SCENE_SLUGS) {
+    const row = rowsBySlug.get(slug);
+    if (!row) continue;
+    const scene = tryNormalizeSceneFromRow(row);
+    if (!scene) continue;
+    items.push({
+      id: row.id,
+      slug: row.slug,
+      title: row.title,
+      subtitle: scene.subtitle ?? "",
+      level: row.level,
+      category: row.category,
+      subcategory: row.subcategory,
+      difficulty: scene.difficulty ?? "Intermediate",
+      estimatedMinutes: row.estimated_minutes ?? scene.estimatedMinutes ?? 8,
+      learningGoal: row.learning_goal,
+      tags: Array.isArray(row.tags) ? (row.tags as string[]) : scene.tags ?? [],
+      sentenceCount: getSceneSentenceCount(scene),
+      sceneType: scene.type ?? "monologue",
+      sourceType: toSceneSourceType(row),
+      isStarter: row.is_starter,
+      starterOrder: row.is_starter ? row.sort_order : null,
+      isFeatured: row.is_featured,
+      sortOrder: row.sort_order,
+      createdAt: row.created_at,
+      variantLinks: [],
+      learningStatus: "not_started",
+      progressPercent: 0,
+      lastViewedAt: null,
+    });
+  }
+
+  return items;
+}
+
 export async function getSceneRecordBySlug(params: { slug: string; userId: string }) {
   await runSeedScenesSync();
   const data = await getVisibleSceneBySlug(params);

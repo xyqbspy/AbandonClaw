@@ -2,29 +2,59 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import type { Lesson, LessonSentence } from "@/lib/types";
+import { ArrowLeft, GitBranch, Dumbbell } from "lucide-react";
+import type { Lesson, LessonBlock, LessonSentence, SelectionChunkLayer } from "@/lib/types";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import {
   buildAnonymousHeaders,
   getOrCreateAnonymousId,
 } from "@/lib/anonymous-client";
+import { buildChunkAudioKey } from "@/lib/shared/tts";
+import { getLessonBlocks, getLessonSentences } from "@/lib/shared/lesson-content";
+import {
+  getChunkLayerFromLesson,
+  getFirstSentence,
+  getSentenceById,
+} from "@/lib/data/mock-lessons";
+import { useMobile } from "@/hooks/use-mobile";
+import { LessonReaderDialogueContent } from "@/features/lesson/components/lesson-reader-dialogue-content";
+import { SentenceBlock } from "@/features/lesson/components/sentence-block";
+import { SelectionDetailPanel } from "@/features/lesson/components/selection-detail-panel";
+import { SelectionDetailSheet } from "@/features/lesson/components/selection-detail-sheet";
+import { AnonymousTopbarBanner } from "./anonymous-topbar-banner";
+import { AnonymousInlineUpsellCard } from "./anonymous-inline-upsell-card";
+import { AnonymousBlockModal, type AnonymousBlockTrigger } from "./anonymous-block-modal";
 import {
   useAnonymousMode,
   type AnonymousQuotaSnapshot,
 } from "@/features/anonymous-trial/use-anonymous-mode";
-import { AnonymousTopbarBanner } from "./anonymous-topbar-banner";
-import { AnonymousInlineUpsellCard } from "./anonymous-inline-upsell-card";
-import {
-  AnonymousBlockModal,
-  type AnonymousBlockTrigger,
-} from "./anonymous-block-modal";
+
+type ShareScenePreviewClientProps = {
+  initialLesson: Lesson;
+  registerHref: string;
+  backHref?: string;
+};
+
+type TtsPlaybackSuccessResponse = {
+  signedUrl?: string;
+  source?: string;
+};
+
+type PlaybackState =
+  | { kind: "idle" }
+  | {
+      kind: "loading" | "playing" | "unavailable";
+      targetKind: "sentence" | "chunk";
+      targetId: string;
+      text: string;
+    };
+
+const hasSpeakerTag = (speaker?: string) => /^[A-Z]$/.test((speaker ?? "").trim().toUpperCase());
 
 const reportAnonymousEvent = (
   event:
     | "anon_first_scene_viewed"
-    | "anon_first_scene_completed"
     | "anon_register_prompt_shown"
     | "anon_register_prompt_clicked",
   payload?: Record<string, unknown>,
@@ -39,104 +69,105 @@ const reportAnonymousEvent = (
     body: JSON.stringify({ event, payload }),
     keepalive: true,
   }).catch(() => {
-    // fire-and-forget; 漏斗失败不阻塞业务
+    // 漏斗失败不阻塞匿名试用体验
   });
 };
 
-const reportRegisterClicked = (
-  level: "L1" | "L2" | "L3",
-  extra?: Record<string, unknown>,
-) => {
-  reportAnonymousEvent("anon_register_prompt_clicked", {
-    prompt_level: level,
-    ...(extra ?? {}),
-  });
-};
+const withChunkDetailTexts = (lesson: Lesson): Lesson => ({
+  ...lesson,
+  sections: lesson.sections.map((section) => ({
+    ...section,
+    blocks: section.blocks.map((block) => ({
+      ...block,
+      sentences: block.sentences.map((sentence) => {
+        const detailTexts =
+          sentence.chunkDetails?.map((detail) => detail.text.trim()).filter(Boolean) ?? [];
+        const chunks = Array.from(
+          new Set([...(sentence.chunks ?? []), ...detailTexts].map((item) => item.trim()).filter(Boolean)),
+        );
+        return { ...sentence, chunks };
+      }),
+    })),
+  })),
+});
 
-interface ExplainSuccessResponse {
-  chunk?: {
-    text?: string;
-    translation?: string;
-    explanation?: string;
-    usageNote?: string;
-  };
-}
+const getSentenceSpeakText = (sentence: LessonSentence) =>
+  (sentence.tts?.trim() || sentence.audioText?.trim() || sentence.text).trim();
 
-interface ExplainErrorResponse {
-  code?: string;
-  error?: string;
-  message?: string;
-  details?: { capability?: string };
-}
+const getBlockSpeakText = (block: LessonBlock) =>
+  (
+    block.tts?.trim() ||
+    block.sentences
+      .map((sentence) => getSentenceSpeakText(sentence))
+      .filter(Boolean)
+      .join(" ")
+  ).trim();
 
-interface TtsPlaybackSuccessResponse {
-  signedUrl?: string;
-  source?: string;
-}
+const getUniqueChunks = (sentences: LessonSentence[]) =>
+  Array.from(new Set(sentences.flatMap((sentence) => sentence.chunks ?? []))).filter(Boolean);
 
-type SentencePlaybackState =
-  | { kind: "idle" }
-  | { kind: "loading"; sentenceId: string }
-  | { kind: "playing"; sentenceId: string }
-  | { kind: "unavailable"; sentenceId: string };
-
-export type ShareScenePreviewClientProps = {
-  initialLesson: Lesson;
-  registerHref: string;
-};
-
-const collectSentenceChunks = (sentence: LessonSentence): string[] => {
-  const fromChunks = (sentence.chunks ?? []).map((s) => s.trim()).filter(Boolean);
-  const fromDetails = (sentence.chunkDetails ?? [])
-    .map((detail) => detail.text?.trim())
-    .filter((value): value is string => Boolean(value));
-  const merged = [...fromDetails, ...fromChunks];
-  return Array.from(new Set(merged));
-};
-
-const flattenSentences = (lesson: Lesson): LessonSentence[] => {
-  const out: LessonSentence[] = [];
-  for (const section of lesson.sections ?? []) {
-    for (const block of section.blocks ?? []) {
-      for (const sentence of block.sentences ?? []) {
-        out.push(sentence);
-      }
-    }
-  }
-  return out;
-};
-
-const errorCodeToTrigger = (code: string | undefined): AnonymousBlockTrigger | null => {
-  if (code === "ANON_QUOTA_EXCEEDED_SESSION") return "explain_quota_exhausted";
-  if (code === "ANON_QUOTA_EXCEEDED_GLOBAL") return "explain_quota_exhausted";
-  if (code === "ANON_FEATURE_DISABLED") return "feature_disabled";
-  return null;
-};
+const getFirstChunk = (sentence: LessonSentence | null) => sentence?.chunks?.[0] ?? null;
 
 export function ShareScenePreviewClient({
   initialLesson,
   registerHref,
+  backHref,
 }: ShareScenePreviewClientProps) {
-  const lesson = initialLesson;
+  const lesson = useMemo(() => withChunkDetailTexts(initialLesson), [initialLesson]);
+
+  return (
+    <ShareScenePreviewContent
+      key={lesson.id}
+      lesson={lesson}
+      registerHref={registerHref}
+      backHref={backHref}
+    />
+  );
+}
+
+function ShareScenePreviewContent({
+  lesson,
+  registerHref,
+  backHref,
+}: {
+  lesson: Lesson;
+  registerHref: string;
+  backHref?: string;
+}) {
   const anonState = useAnonymousMode({ isAuthenticated: false });
+  const isMobile = useMobile();
+  const blockOrder = useMemo(() => getLessonBlocks(lesson), [lesson]);
+  const sentenceOrder = useMemo(() => getLessonSentences(lesson), [lesson]);
+  const firstSentence = useMemo(() => getFirstSentence(lesson) ?? null, [lesson]);
+  const hasDialogueLikeSpeakers =
+    blockOrder.length > 0 && blockOrder.every((block) => hasSpeakerTag(block.speaker));
+  const isDialogueScene =
+    lesson.sceneType === "dialogue" ||
+    blockOrder.some((block) => (block.kind ?? lesson.sceneType ?? "monologue") === "dialogue") ||
+    hasDialogueLikeSpeakers;
 
-  const [activeChunk, setActiveChunk] = useState<{
-    text: string;
-    sentence: LessonSentence;
-  } | null>(null);
-  const [explainResult, setExplainResult] = useState<ExplainSuccessResponse | null>(null);
-  const [explainLoading, setExplainLoading] = useState(false);
-  const [explainError, setExplainError] = useState<string | null>(null);
-  const [blockTrigger, setBlockTrigger] = useState<AnonymousBlockTrigger | null>(null);
+  const [activeSentenceId, setActiveSentenceId] = useState<string | null>(
+    firstSentence?.id ?? null,
+  );
+  const [activeBlockId, setActiveBlockId] = useState<string | null>(
+    blockOrder[0]?.id ?? null,
+  );
+  const [activeChunkKey, setActiveChunkKey] = useState<string | null>(
+    getFirstChunk(firstSentence),
+  );
+  const [hoveredChunkKey, setHoveredChunkKey] = useState<string | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
   const [inlineCardVisible, setInlineCardVisible] = useState(true);
-
+  const [blockTrigger, setBlockTrigger] = useState<AnonymousBlockTrigger | null>(null);
+  const [capabilityLabel, setCapabilityLabel] = useState<string | null>(null);
+  const [playbackState, setPlaybackState] = useState<PlaybackState>({ kind: "idle" });
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const firstViewReportedRef = useRef(false);
   const promptShownReportedRef = useRef<Record<string, boolean>>({});
 
   useEffect(() => {
     if (firstViewReportedRef.current) return;
     firstViewReportedRef.current = true;
-    // 确保 localStorage 里有 anonId,后续请求都能带头
     getOrCreateAnonymousId();
     reportAnonymousEvent("anon_first_scene_viewed", {
       scene_slug: lesson.slug,
@@ -150,93 +181,67 @@ export function ShareScenePreviewClient({
     promptShownReportedRef.current.L2 = true;
     reportAnonymousEvent("anon_register_prompt_shown", {
       prompt_level: "L2",
-      surface: "share_scene_inline_card",
+      surface: "trial_scene_detail_inline_card",
     });
   }, [inlineCardVisible]);
 
   useEffect(() => {
     if (blockTrigger === null) return;
-    const key = `L3:${blockTrigger}`;
+    const key = `L3:${capabilityLabel ?? blockTrigger}`;
     if (promptShownReportedRef.current[key]) return;
     promptShownReportedRef.current[key] = true;
     reportAnonymousEvent("anon_register_prompt_shown", {
       prompt_level: "L3",
       trigger: blockTrigger,
+      capability: capabilityLabel,
+      surface: "trial_scene_detail",
     });
-  }, [blockTrigger]);
+  }, [blockTrigger, capabilityLabel]);
 
-  const totalChunkCount = useMemo(() => {
+  const currentSentence = useMemo(
+    () =>
+      activeSentenceId
+        ? (getSentenceById(lesson, activeSentenceId) ?? null)
+        : firstSentence,
+    [activeSentenceId, firstSentence, lesson],
+  );
+
+  const currentBlock = useMemo(() => {
+    if (isDialogueScene && activeBlockId) {
+      return blockOrder.find((block) => block.id === activeBlockId) ?? null;
+    }
+    return currentSentence
+      ? (blockOrder.find((block) =>
+          block.sentences.some((sentence) => sentence.id === currentSentence.id),
+        ) ?? null)
+      : null;
+  }, [activeBlockId, blockOrder, currentSentence, isDialogueScene]);
+
+  const relatedChunks = useMemo(
+    () =>
+      isDialogueScene && currentBlock
+        ? getUniqueChunks(currentBlock.sentences)
+        : currentSentence?.chunks ?? [],
+    [currentBlock, currentSentence, isDialogueScene],
+  );
+
+  const chunkDetail = useMemo<SelectionChunkLayer | null>(() => {
+    if (!currentSentence || !activeChunkKey) return null;
+    return getChunkLayerFromLesson(lesson, currentSentence, activeChunkKey);
+  }, [activeChunkKey, currentSentence, lesson]);
+
+  const expressionCount = useMemo(() => {
     const seen = new Set<string>();
-    for (const sentence of flattenSentences(lesson)) {
-      for (const chunk of collectSentenceChunks(sentence)) {
+    for (const sentence of sentenceOrder) {
+      for (const chunk of sentence.chunks ?? []) {
         seen.add(chunk);
       }
     }
     return seen.size;
-  }, [lesson]);
+  }, [sentenceOrder]);
 
-  const explainSnapshot: AnonymousQuotaSnapshot | null =
-    anonState.quotaByCapability["explain_selection"] ?? null;
-
-  const handleExplain = useCallback(
-    async (chunkText: string, sentence: LessonSentence) => {
-      if (!chunkText.trim()) return;
-      setExplainLoading(true);
-      setExplainError(null);
-      setActiveChunk({ text: chunkText, sentence });
-      setExplainResult(null);
-      // 确保 localStorage 里有 anonId(初次访问时即时生成)
-      getOrCreateAnonymousId();
-      try {
-        const response = await fetch("/api/explain-selection", {
-          method: "POST",
-          headers: {
-            "content-type": "application/json",
-            ...buildAnonymousHeaders(),
-          },
-          body: JSON.stringify({
-            selectedText: chunkText,
-            sourceSentence: sentence.text,
-            sourceChunks: sentence.chunks ?? [],
-            lessonId: lesson.id,
-            lessonTitle: lesson.title,
-            lessonDifficulty: lesson.difficulty,
-          }),
-        });
-        anonState.syncFromResponse(response);
-
-        if (response.ok) {
-          const data = (await response.json()) as ExplainSuccessResponse;
-          setExplainResult(data);
-          return;
-        }
-
-        const body = (await response.json().catch(() => ({}))) as ExplainErrorResponse;
-        const trigger = errorCodeToTrigger(body.code);
-        if (trigger) {
-          setBlockTrigger(trigger);
-          setActiveChunk(null);
-          return;
-        }
-        setExplainError(body.message ?? body.error ?? "AI 解释暂时不可用,稍后再试。");
-      } catch {
-        setExplainError("AI 解释请求失败,请检查网络后重试。");
-      } finally {
-        setExplainLoading(false);
-      }
-    },
-    [anonState, lesson.difficulty, lesson.id, lesson.title],
-  );
-
-  const handleCloseSheet = useCallback(() => {
-    setActiveChunk(null);
-    setExplainResult(null);
-    setExplainError(null);
-  }, []);
-
-  // ---- 句子级 TTS 预生成播放 ----
-  const [playbackState, setPlaybackState] = useState<SentencePlaybackState>({ kind: "idle" });
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const ttsSnapshot: AnonymousQuotaSnapshot | null =
+    anonState.quotaByCapability.tts_play ?? null;
 
   const stopCurrentAudio = useCallback(() => {
     const audio = audioRef.current;
@@ -250,27 +255,55 @@ export function ShareScenePreviewClient({
 
   useEffect(() => () => stopCurrentAudio(), [stopCurrentAudio]);
 
-  const handlePlaySentence = useCallback(
-    async (sentence: LessonSentence) => {
-      // 同一句已在播放 → 切换为停止
-      if (playbackState.kind === "playing" && playbackState.sentenceId === sentence.id) {
+  const openBlockedCapability = useCallback((label: string) => {
+    setCapabilityLabel(label);
+    setBlockTrigger("feature_disabled");
+  }, []);
+
+  const playAnonymousTts = useCallback(
+    async ({
+      targetKind,
+      targetId,
+      text,
+      speaker,
+      chunkKey,
+      requestSentenceId,
+    }: {
+      targetKind: "sentence" | "chunk";
+      targetId: string;
+      text: string;
+      speaker?: string;
+      chunkKey?: string;
+      requestSentenceId?: string;
+    }) => {
+      const clean = text.trim();
+      if (!clean) return;
+
+      if (
+        playbackState.kind === "playing" &&
+        playbackState.targetId === targetId &&
+        playbackState.targetKind === targetKind
+      ) {
         stopCurrentAudio();
         setPlaybackState({ kind: "idle" });
         return;
       }
 
-      // 切换到别的句子前先停旧的
       stopCurrentAudio();
-      setPlaybackState({ kind: "loading", sentenceId: sentence.id });
-
+      setPlaybackState({ kind: "loading", targetKind, targetId, text: clean });
       getOrCreateAnonymousId();
+
       try {
         const url = new URL("/api/anonymous/tts/play", window.location.origin);
-        url.searchParams.set("kind", "sentence");
-        url.searchParams.set("sceneSlug", lesson.slug);
-        url.searchParams.set("sentenceId", sentence.id);
-        url.searchParams.set("text", sentence.text);
-        if (sentence.speaker) url.searchParams.set("speaker", sentence.speaker);
+        url.searchParams.set("kind", targetKind);
+        url.searchParams.set("text", clean);
+        if (targetKind === "sentence") {
+          url.searchParams.set("sceneSlug", lesson.slug);
+          url.searchParams.set("sentenceId", requestSentenceId ?? targetId);
+          if (speaker) url.searchParams.set("speaker", speaker);
+        } else {
+          url.searchParams.set("chunkKey", chunkKey ?? buildChunkAudioKey(clean));
+        }
 
         const response = await fetch(url.toString(), {
           method: "GET",
@@ -278,34 +311,20 @@ export function ShareScenePreviewClient({
         });
         anonState.syncFromResponse(response);
 
-        if (response.status === 404) {
-          setPlaybackState({ kind: "unavailable", sentenceId: sentence.id });
+        if (response.status === 429) {
+          setPlaybackState({ kind: "idle" });
+          setCapabilityLabel("音频播放");
+          setBlockTrigger("tts_quota_exhausted");
           return;
         }
-        if (response.status === 429) {
-          const body = (await response.json().catch(() => ({}))) as ExplainErrorResponse;
-          if (
-            body.code === "ANON_QUOTA_EXCEEDED_SESSION" ||
-            body.code === "ANON_QUOTA_EXCEEDED_GLOBAL"
-          ) {
-            setBlockTrigger("tts_quota_exhausted");
-            setPlaybackState({ kind: "idle" });
-            return;
-          }
-          if (body.code === "ANON_IP_RATE_LIMITED") {
-            setBlockTrigger("tts_quota_exhausted");
-            setPlaybackState({ kind: "idle" });
-            return;
-          }
-        }
-        if (!response.ok) {
-          setPlaybackState({ kind: "unavailable", sentenceId: sentence.id });
+        if (response.status === 404 || !response.ok) {
+          setPlaybackState({ kind: "unavailable", targetKind, targetId, text: clean });
           return;
         }
 
         const data = (await response.json()) as TtsPlaybackSuccessResponse;
         if (!data.signedUrl) {
-          setPlaybackState({ kind: "unavailable", sentenceId: sentence.id });
+          setPlaybackState({ kind: "unavailable", targetKind, targetId, text: clean });
           return;
         }
 
@@ -317,295 +336,368 @@ export function ShareScenePreviewClient({
         };
         audio.onerror = () => {
           if (audioRef.current === audio) audioRef.current = null;
-          setPlaybackState({ kind: "unavailable", sentenceId: sentence.id });
+          setPlaybackState({ kind: "unavailable", targetKind, targetId, text: clean });
         };
-        try {
-          await audio.play();
-          setPlaybackState({ kind: "playing", sentenceId: sentence.id });
-        } catch {
-          // 浏览器自动播放策略 / Audio 元素问题
-          setPlaybackState({ kind: "unavailable", sentenceId: sentence.id });
-        }
+        await audio.play();
+        setPlaybackState({ kind: "playing", targetKind, targetId, text: clean });
       } catch {
-        setPlaybackState({ kind: "unavailable", sentenceId: sentence.id });
+        setPlaybackState({ kind: "unavailable", targetKind, targetId, text: clean });
       }
     },
     [anonState, lesson.slug, playbackState, stopCurrentAudio],
   );
 
+  const activateSentence = useCallback(
+    (sentenceId: string, blockId?: string, options?: { openSheet?: boolean }) => {
+      const sentence = getSentenceById(lesson, sentenceId);
+      if (!sentence) return;
+      const ownerBlock =
+        blockId
+          ? blockOrder.find((block) => block.id === blockId) ?? null
+          : blockOrder.find((block) =>
+              block.sentences.some((item) => item.id === sentence.id),
+            ) ?? null;
+      setActiveSentenceId(sentence.id);
+      setActiveBlockId(ownerBlock?.id ?? null);
+      setActiveChunkKey(getFirstChunk(sentence));
+      if (options?.openSheet ?? isMobile) {
+        setSheetOpen(true);
+      }
+    },
+    [blockOrder, isMobile, lesson],
+  );
+
+  const activateChunk = useCallback(
+    (chunk: string) => {
+      if (!chunk.trim()) return;
+      const targetSentence =
+        currentBlock?.sentences.find((sentence) =>
+          sentence.chunks.some((item) => item.toLowerCase() === chunk.toLowerCase()),
+        ) ??
+        currentSentence ??
+        firstSentence;
+      if (!targetSentence) return;
+      const ownerBlock =
+        currentBlock ??
+        blockOrder.find((block) =>
+          block.sentences.some((sentence) => sentence.id === targetSentence.id),
+        ) ??
+        null;
+      setActiveSentenceId(targetSentence.id);
+      setActiveBlockId(ownerBlock?.id ?? null);
+      setActiveChunkKey(chunk);
+      if (isMobile) setSheetOpen(true);
+    },
+    [blockOrder, currentBlock, currentSentence, firstSentence, isMobile],
+  );
+
+  const playSentence = useCallback(
+    (sentence: LessonSentence) =>
+      playAnonymousTts({
+        targetKind: "sentence",
+        targetId: sentence.id,
+        text: getSentenceSpeakText(sentence),
+        speaker: sentence.speaker,
+      }),
+    [playAnonymousTts],
+  );
+
+  const playBlockTts = useCallback(
+    (block: LessonBlock) => {
+      const first = block.sentences[0];
+      return playAnonymousTts({
+        targetKind: "sentence",
+        targetId: `block-${block.id}`,
+        text: first ? getSentenceSpeakText(first) : getBlockSpeakText(block),
+        speaker: first?.speaker ?? block.speaker,
+        requestSentenceId: first?.id,
+      });
+    },
+    [playAnonymousTts],
+  );
+
+  const playChunk = useCallback(
+    (text: string) =>
+      playAnonymousTts({
+        targetKind: "chunk",
+        targetId: `chunk:${buildChunkAudioKey(text)}`,
+        text,
+        chunkKey: buildChunkAudioKey(text),
+      }),
+    [playAnonymousTts],
+  );
+
+  const isSentencePlaying = useCallback(
+    (sentenceId: string) =>
+      playbackState.kind === "playing" &&
+      playbackState.targetKind === "sentence" &&
+      playbackState.targetId === sentenceId,
+    [playbackState],
+  );
+
+  const isSentenceLoading = useCallback(
+    (sentenceId: string) =>
+      playbackState.kind === "loading" &&
+      playbackState.targetKind === "sentence" &&
+      playbackState.targetId === sentenceId,
+    [playbackState],
+  );
+
+  const playingChunkKey =
+    playbackState.kind === "playing" && playbackState.targetKind === "chunk"
+      ? playbackState.text
+      : null;
+  const loadingChunkKey =
+    playbackState.kind === "loading" && playbackState.targetKind === "chunk"
+      ? playbackState.text
+      : null;
+
+  const detailSpeakingText = playbackState.kind === "playing" ? playbackState.text : null;
+  const detailLoadingText = playbackState.kind === "loading" ? playbackState.text : null;
+
+  const sentenceSectionLabel = isDialogueScene ? "当前对话块" : "当前句子";
+  const headerTitle = lesson.subtitle?.trim() || lesson.sections[0]?.summary?.trim() || lesson.title;
+
   return (
-    <div className="flex w-full flex-col" data-testid="share-scene-preview">
+    <div className="min-h-screen bg-[#f8fafc]" data-testid="share-scene-preview">
       <AnonymousTopbarBanner
         isAnonymous
-        primaryCapability="explain_selection"
+        primaryCapability="tts_play"
         quotaByCapability={anonState.quotaByCapability}
         registerHref={registerHref}
-        onRegisterClick={() => reportRegisterClicked("L1", { surface: "share_scene_topbar" })}
+        onRegisterClick={() =>
+          reportAnonymousEvent("anon_register_prompt_clicked", {
+            prompt_level: "L1",
+            surface: "trial_scene_detail_topbar",
+          })
+        }
       />
 
-      <article className="mx-auto w-full max-w-3xl px-4 py-6 sm:py-8">
-        <header className="mb-6 space-y-1">
-          <h1 className="text-2xl font-semibold text-foreground sm:text-3xl">
-            {lesson.title}
-          </h1>
-          {lesson.subtitle ? (
-            <p className="text-base text-foreground/70">{lesson.subtitle}</p>
-          ) : null}
-          <p className="text-xs text-foreground/55">
-            体验模式 · 仅展示场景内容,所有学习态不会保存
-          </p>
+      <main className="mx-auto w-full max-w-6xl space-y-[var(--mobile-space-xl)] px-3 pb-28 pt-4 lg:px-5">
+        <header className="space-y-[var(--mobile-space-md)]">
+          <div className="flex items-center justify-between gap-3">
+            {backHref ? (
+              <Button asChild variant="ghost" size="sm" radius="pill" className="gap-2">
+                <Link href={backHref} data-testid="trial-scene-back-link">
+                  <ArrowLeft className="size-4" />
+                  场景列表
+                </Link>
+              </Button>
+            ) : (
+              <span />
+            )}
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                radius="pill"
+                className="gap-2"
+                onClick={() => openBlockedCapability("生成练习")}
+                data-testid="trial-scene-practice-placeholder"
+              >
+                <Dumbbell className="size-4" />
+                练习
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                radius="pill"
+                className="gap-2"
+                onClick={() => openBlockedCapability("生成变体")}
+                data-testid="trial-scene-variant-placeholder"
+              >
+                <GitBranch className="size-4" />
+                变体
+              </Button>
+            </div>
+          </div>
+          <div className="space-y-1 px-1.5">
+            <p className="text-[10px] font-black uppercase tracking-tight text-slate-400">
+              体验模式
+            </p>
+            <h1 className="text-2xl font-black leading-tight text-slate-900 sm:text-3xl">
+              {lesson.title}
+            </h1>
+            {headerTitle ? (
+              <p className="max-w-2xl text-sm font-medium leading-6 text-slate-500">
+                {headerTitle}
+              </p>
+            ) : null}
+          </div>
         </header>
 
-        <div className="space-y-5">
-          {lesson.sections.map((section) => (
-            <section key={section.id} className="space-y-4">
-              {section.title ? (
-                <h2 className="text-sm font-medium text-foreground/65">{section.title}</h2>
-              ) : null}
-              {section.blocks.map((block) => (
-                <div key={block.id} className="space-y-3">
-                  {block.sentences.map((sentence) => (
-                    <SentenceCard
-                      key={sentence.id}
-                      sentence={sentence}
-                      onExplain={(chunkText) => handleExplain(chunkText, sentence)}
-                      onPlay={() => handlePlaySentence(sentence)}
-                      playbackState={
-                        playbackState.kind !== "idle" &&
-                        playbackState.sentenceId === sentence.id
-                          ? playbackState.kind
-                          : "idle"
-                      }
-                    />
-                  ))}
-                </div>
-              ))}
-            </section>
-          ))}
-        </div>
+        <div
+          className={cn(
+            "relative grid gap-6 lg:gap-8",
+            "lg:grid-cols-[minmax(0,1fr)_340px]",
+          )}
+        >
+          <section className="space-y-[var(--mobile-space-xl)] overflow-x-hidden">
+            {isDialogueScene ? (
+              <LessonReaderDialogueContent
+                blockOrder={blockOrder}
+                isMobile={isMobile}
+                isTrainingMode={false}
+                resolvedHeaderTitle={headerTitle}
+                isSentencePlaying={isSentencePlaying}
+                playbackState={{
+                  kind:
+                    playbackState.kind === "idle"
+                      ? null
+                      : playbackState.targetKind === "sentence"
+                        ? "sentence"
+                        : "chunk",
+                  status: playbackState.kind === "idle" ? null : playbackState.kind,
+                  sentenceId:
+                    playbackState.kind !== "idle" && playbackState.targetKind === "sentence"
+                      ? playbackState.targetId
+                      : null,
+                }}
+                handleSentenceTap={(sentenceId, blockId) =>
+                  activateSentence(sentenceId, blockId)
+                }
+                playBlockTts={playBlockTts}
+              />
+            ) : (
+              lesson.sections.map((section) => (
+                <section key={section.id} className="space-y-3">
+                  {section.title ? (
+                    <div className="space-y-1 px-1">
+                      <h2 className="text-xl font-semibold">{section.title}</h2>
+                      {section.summary ? (
+                        <p className="text-sm text-slate-500">{section.summary}</p>
+                      ) : null}
+                    </div>
+                  ) : null}
+                  <div className="space-y-3">
+                    {section.blocks.flatMap((block) =>
+                      block.sentences.map((sentence) => (
+                        <SentenceBlock
+                          key={sentence.id}
+                          sentence={sentence}
+                          showSpeaker={Boolean(sentence.speaker)}
+                          speaking={isSentencePlaying(sentence.id)}
+                          loading={isSentenceLoading(sentence.id)}
+                          activeChunkKey={activeChunkKey}
+                          hoveredChunkKey={hoveredChunkKey}
+                          onPronounce={() => {
+                            void playSentence(sentence);
+                          }}
+                          onSelectText={(chunkText) => activateChunk(chunkText)}
+                          onHoverChunk={setHoveredChunkKey}
+                          onSentenceTap={() => activateSentence(sentence.id, block.id)}
+                          mobileTapEnabled
+                        />
+                      )),
+                    )}
+                  </div>
+                </section>
+              ))
+            )}
 
-        <div className="mt-8">
-          <AnonymousInlineUpsellCard
-            isAnonymous
-            visible={inlineCardVisible}
-            onDismiss={() => setInlineCardVisible(false)}
-            expressionCount={totalChunkCount}
-            registerHref={registerHref}
-            onRegisterClick={() =>
-              reportRegisterClicked("L2", { surface: "share_scene_inline_card" })
-            }
+            <AnonymousInlineUpsellCard
+              isAnonymous
+              visible={inlineCardVisible}
+              onDismiss={() => setInlineCardVisible(false)}
+              expressionCount={expressionCount}
+              registerHref={registerHref}
+              onRegisterClick={() =>
+                reportAnonymousEvent("anon_register_prompt_clicked", {
+                  prompt_level: "L2",
+                  surface: "trial_scene_detail_inline_card",
+                })
+              }
+            />
+          </section>
+
+          <SelectionDetailPanel
+            currentBlock={isDialogueScene ? currentBlock : null}
+            currentSentence={currentSentence}
+            chunkDetail={chunkDetail}
+            relatedChunks={relatedChunks}
+            showSpeaker={isDialogueScene}
+            sentenceSectionLabel={sentenceSectionLabel}
+            loading={false}
+            speakingText={detailSpeakingText}
+            loadingText={detailLoadingText}
+            onSave={() => openBlockedCapability("保存表达")}
+            onReview={() => openBlockedCapability("加入复习")}
+            saved={false}
+            onPronounce={playChunk}
+            onPronounceBlock={() => {
+              if (currentBlock) {
+                void playBlockTts(currentBlock);
+                return;
+              }
+              if (currentSentence) {
+                void playSentence(currentSentence);
+              }
+            }}
+            onSelectRelated={activateChunk}
+            hoveredChunkKey={hoveredChunkKey}
+            onHoverChunk={setHoveredChunkKey}
+            playingChunkKey={playingChunkKey}
+            loadingChunkKey={loadingChunkKey}
           />
         </div>
-      </article>
+      </main>
 
-      <ExplainResultSheet
-        open={activeChunk !== null}
-        chunk={activeChunk}
-        loading={explainLoading}
-        result={explainResult}
-        errorMessage={explainError}
-        registerHref={registerHref}
-        quotaSnapshot={explainSnapshot}
-        onClose={handleCloseSheet}
-        onRegisterClick={() =>
-          reportRegisterClicked("L2", { surface: "share_scene_explain_sheet" })
-        }
+      <SelectionDetailSheet
+        currentBlock={isDialogueScene ? currentBlock : null}
+        currentSentence={currentSentence}
+        chunkDetail={chunkDetail}
+        relatedChunks={relatedChunks}
+        open={sheetOpen}
+        showSpeaker={isDialogueScene}
+        sentenceSectionLabel={sentenceSectionLabel}
+        loading={false}
+        speakingText={detailSpeakingText}
+        loadingText={detailLoadingText}
+        onOpenChange={setSheetOpen}
+        onSave={() => openBlockedCapability("保存表达")}
+        onReview={() => openBlockedCapability("加入复习")}
+        saved={false}
+        onPronounce={playChunk}
+        onPronounceBlock={() => {
+          if (currentBlock) {
+            void playBlockTts(currentBlock);
+            return;
+          }
+          if (currentSentence) {
+            void playSentence(currentSentence);
+          }
+        }}
+        onSelectRelated={activateChunk}
+        hoveredChunkKey={hoveredChunkKey}
+        onHoverChunk={setHoveredChunkKey}
+        playingChunkKey={playingChunkKey}
+        loadingChunkKey={loadingChunkKey}
       />
 
       <AnonymousBlockModal
         isAnonymous
         visible={blockTrigger !== null}
         trigger={blockTrigger ?? "feature_disabled"}
+        capabilityLabel={capabilityLabel ?? undefined}
         onDismiss={() => setBlockTrigger(null)}
         registerHref={registerHref}
         onRegisterClick={() =>
-          reportRegisterClicked("L3", { trigger: blockTrigger ?? "feature_disabled" })
+          reportAnonymousEvent("anon_register_prompt_clicked", {
+            prompt_level: "L3",
+            trigger: blockTrigger ?? "feature_disabled",
+            capability: capabilityLabel,
+            surface: "trial_scene_detail",
+          })
         }
       />
-    </div>
-  );
-}
 
-function SentenceCard({
-  sentence,
-  onExplain,
-  onPlay,
-  playbackState,
-}: {
-  sentence: LessonSentence;
-  onExplain: (chunkText: string) => void;
-  onPlay: () => void;
-  playbackState: "idle" | "loading" | "playing" | "unavailable";
-}) {
-  const chunks = useMemo(() => collectSentenceChunks(sentence), [sentence]);
-  const playButtonLabel =
-    playbackState === "loading"
-      ? "加载中"
-      : playbackState === "playing"
-        ? "停止"
-        : playbackState === "unavailable"
-          ? "音频暂时不可用"
-          : "听一遍";
-  return (
-    <Card size="sm" className="border border-border/50 bg-card/80">
-      <CardContent className="space-y-2 px-4 pb-4 text-sm leading-6">
-        {sentence.speaker ? (
-          <p className="text-xs font-medium uppercase tracking-wide text-foreground/55">
-            {sentence.speaker}
-          </p>
-        ) : null}
-        <p className="text-foreground">{sentence.text}</p>
-        {sentence.translation ? (
-          <p className="text-foreground/65">{sentence.translation}</p>
-        ) : null}
-        <div className="flex flex-wrap items-center gap-2 pt-1">
-          <Button
-            size="sm"
-            variant={playbackState === "playing" ? "default" : "outline"}
-            radius="sm"
-            data-testid="share-scene-play-sentence"
-            data-playback-state={playbackState}
-            onClick={onPlay}
-            disabled={playbackState === "loading" || playbackState === "unavailable"}
-            className="h-7 px-2 text-xs"
-          >
-            ▶ {playButtonLabel}
-          </Button>
-          {chunks.map((chunk) => (
-            <Button
-              key={chunk}
-              size="sm"
-              variant="outline"
-              radius="sm"
-              data-testid="share-scene-explain-chunk"
-              onClick={() => onExplain(chunk)}
-              className="h-7 px-2 text-xs"
-            >
-              解释 · {chunk}
-            </Button>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function ExplainResultSheet({
-  open,
-  chunk,
-  loading,
-  result,
-  errorMessage,
-  registerHref,
-  quotaSnapshot,
-  onClose,
-  onRegisterClick,
-}: {
-  open: boolean;
-  chunk: { text: string; sentence: LessonSentence } | null;
-  loading: boolean;
-  result: ExplainSuccessResponse | null;
-  errorMessage: string | null;
-  registerHref: string;
-  quotaSnapshot: AnonymousQuotaSnapshot | null;
-  onClose: () => void;
-  onRegisterClick?: () => void;
-}) {
-  if (!open || !chunk) return null;
-  return (
-    <div
-      data-testid="share-scene-explain-sheet-backdrop"
-      role="dialog"
-      aria-modal="true"
-      className="fixed inset-0 z-40 flex items-end justify-center bg-background/60 backdrop-blur-sm sm:items-center"
-      onClick={onClose}
-    >
-      <div
-        data-testid="share-scene-explain-sheet"
-        className={cn(
-          "max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-card p-5 shadow-xl ring-1 ring-foreground/10",
-          "sm:rounded-2xl",
-        )}
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-xs text-foreground/55">来自</p>
-            <p className="mt-0.5 text-sm text-foreground/85">{chunk.sentence.text}</p>
-          </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            radius="sm"
-            onClick={onClose}
-            data-testid="share-scene-explain-close"
-          >
-            关
-          </Button>
-        </div>
-
-        <h3 className="mt-4 text-lg font-semibold text-foreground">{chunk.text}</h3>
-
-        <div className="mt-3 space-y-3 text-sm leading-6">
-          {loading ? (
-            <p
-              data-testid="share-scene-explain-loading"
-              className="text-foreground/65"
-            >
-              AI 正在生成解释…
-            </p>
-          ) : errorMessage ? (
-            <p
-              data-testid="share-scene-explain-error"
-              className="text-destructive"
-            >
-              {errorMessage}
-            </p>
-          ) : result?.chunk ? (
-            <div className="space-y-2 text-foreground/85">
-              {result.chunk.translation ? (
-                <p>
-                  <span className="text-foreground/55">中文意思:</span> {result.chunk.translation}
-                </p>
-              ) : null}
-              {result.chunk.explanation ? (
-                <p>
-                  <span className="text-foreground/55">用法说明:</span> {result.chunk.explanation}
-                </p>
-              ) : null}
-              {result.chunk.usageNote ? (
-                <p>
-                  <span className="text-foreground/55">使用提醒:</span> {result.chunk.usageNote}
-                </p>
-              ) : null}
-            </div>
-          ) : null}
-        </div>
-
-        {quotaSnapshot && quotaSnapshot.sessionLimit !== null ? (
-          <p
-            data-testid="share-scene-explain-quota-line"
-            className="mt-4 text-xs text-foreground/55"
-          >
-            体验模式剩 {quotaSnapshot.sessionRemaining ?? 0}/{quotaSnapshot.sessionLimit} 次
-          </p>
-        ) : null}
-
-        <div className="mt-5 flex flex-row items-center justify-end gap-2">
-          <Button variant="ghost" size="sm" radius="sm" onClick={onClose}>
-            继续读
-          </Button>
-          <Button asChild size="sm" radius="sm">
-            <Link
-              href={registerHref}
-              data-testid="share-scene-explain-register"
-              onClick={onRegisterClick}
-            >
-              注册保存到表达库
-            </Link>
-          </Button>
-        </div>
-      </div>
+      {ttsSnapshot?.sessionLimit !== null && ttsSnapshot?.sessionLimit !== undefined ? (
+        <span className="sr-only" data-testid="trial-scene-tts-quota">
+          {ttsSnapshot.sessionRemaining ?? 0}/{ttsSnapshot.sessionLimit}
+        </span>
+      ) : null}
     </div>
   );
 }

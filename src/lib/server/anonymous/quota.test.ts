@@ -19,6 +19,7 @@ const FIXED_NOW = new Date("2026-05-28T10:00:00Z");
 const ORIGINAL_IP_LIMIT = process.env.ANON_IP_RATE_LIMIT_PER_MINUTE;
 const ORIGINAL_GLOBAL_OVERRIDE = process.env.ANON_QUOTA_GLOBAL_EXPLAIN_SELECTION;
 const ORIGINAL_SESSION_OVERRIDE = process.env.ANON_QUOTA_SESSION_EXPLAIN_SELECTION;
+const ORIGINAL_ALLOW_OVERRIDE = process.env.ANON_ALLOW_EXPLAIN_SELECTION;
 
 const restoreEnv = () => {
   if (ORIGINAL_IP_LIMIT === undefined) delete process.env.ANON_IP_RATE_LIMIT_PER_MINUTE;
@@ -27,6 +28,8 @@ const restoreEnv = () => {
   else process.env.ANON_QUOTA_GLOBAL_EXPLAIN_SELECTION = ORIGINAL_GLOBAL_OVERRIDE;
   if (ORIGINAL_SESSION_OVERRIDE === undefined) delete process.env.ANON_QUOTA_SESSION_EXPLAIN_SELECTION;
   else process.env.ANON_QUOTA_SESSION_EXPLAIN_SELECTION = ORIGINAL_SESSION_OVERRIDE;
+  if (ORIGINAL_ALLOW_OVERRIDE === undefined) delete process.env.ANON_ALLOW_EXPLAIN_SELECTION;
+  else process.env.ANON_ALLOW_EXPLAIN_SELECTION = ORIGINAL_ALLOW_OVERRIDE;
 };
 
 const noDisabledDeps = {
@@ -34,6 +37,7 @@ const noDisabledDeps = {
 };
 
 beforeEach(() => {
+  process.env.ANON_ALLOW_EXPLAIN_SELECTION = "true";
   clearAnonymousCounterStore();
   clearRateLimitStore();
 });

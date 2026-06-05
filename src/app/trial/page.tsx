@@ -1,14 +1,19 @@
 import { redirect } from "next/navigation";
 import { isAnonymousTrialEnabled } from "@/lib/server/anonymous/env-gate";
-import { ANONYMOUS_TRIAL_SCENE_SLUGS } from "@/lib/server/scene/service";
+import { listPublicTrialSceneItems } from "@/lib/server/scene/service";
+import { TrialSceneListClient } from "@/features/anonymous-trial/components/trial-scene-list-client";
 
-const DEFAULT_TRIAL_SCENE_SLUG =
-  ANONYMOUS_TRIAL_SCENE_SLUGS[0] ?? "canceling-plans-politely";
-
-export default function TrialPage() {
+export default async function TrialPage() {
   if (!isAnonymousTrialEnabled()) {
     redirect("/login?redirect=/trial");
   }
 
-  redirect(`/share/scene/${encodeURIComponent(DEFAULT_TRIAL_SCENE_SLUG)}`);
+  const scenes = await listPublicTrialSceneItems();
+
+  return (
+    <TrialSceneListClient
+      initialScenes={scenes}
+      registerHref="/signup?from=trial"
+    />
+  );
 }

@@ -207,7 +207,9 @@
 - **WHEN** `ALLOW_ANONYMOUS_TRIAL=true`
 - **AND** 未登录访客访问 `/trial` 或 `/trial/scene/[slug]`
 - **THEN** 中间件 MAY 放行该请求进入匿名试用分支
-- **AND** 页面 MUST 将请求跳转到对应 `/share/scene/[slug]` 匿名预览页
+- **AND** `/trial` 页面 MUST 渲染公开试用场景列表
+- **AND** `/trial/scene/[slug]` 页面 MUST 渲染公开只读场景详情
+- **AND** 页面 MUST NOT 将 `/trial` 默认跳转到 `/share/scene/[slug]`
 - **AND** API MUST 使用匿名只读边界处理请求
 
 #### Scenario: 未登录访客访问主应用学习路由
@@ -220,6 +222,12 @@
 
 - **WHEN** 未登录访客从 `/trial` 页面或其他来源调用导入、生成、保存、提交、加入复习、progress/review 写入类 API
 - **THEN** API MUST 在业务处理前拒绝请求
+- **AND** 不得依赖前端隐藏按钮作为唯一防护
+
+#### Scenario: 匿名访客调用实时 AI API
+
+- **WHEN** 未登录访客从 `/trial`、`/share` 页面或其他来源调用实时 AI 解释、场景生成、练习生成、变体生成或相似表达生成 API
+- **THEN** 默认配置下 API MUST 在外部模型调用前拒绝请求
 - **AND** 不得依赖前端隐藏按钮作为唯一防护
 
 ### Requirement: 匿名试用公开读取必须避免用户私有数据访问

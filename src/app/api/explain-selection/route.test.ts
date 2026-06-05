@@ -8,9 +8,12 @@ import { handleExplainSelectionPost } from "./route";
 const VALID_ANON_ID = "11111111-2222-4333-8444-555555555555";
 
 const ORIGINAL_TRIAL = process.env.ALLOW_ANONYMOUS_TRIAL;
+const ORIGINAL_ALLOW = process.env.ANON_ALLOW_EXPLAIN_SELECTION;
 const restoreEnv = () => {
   if (ORIGINAL_TRIAL === undefined) delete process.env.ALLOW_ANONYMOUS_TRIAL;
   else process.env.ALLOW_ANONYMOUS_TRIAL = ORIGINAL_TRIAL;
+  if (ORIGINAL_ALLOW === undefined) delete process.env.ANON_ALLOW_EXPLAIN_SELECTION;
+  else process.env.ANON_ALLOW_EXPLAIN_SELECTION = ORIGINAL_ALLOW;
 };
 
 afterEach(() => {
@@ -155,10 +158,12 @@ test("explain selection handler 会拒绝超长输入且不预占 quota", async 
   assert.equal(reserveCalled, false);
 });
 
-test("explain selection handler 匿名分支允许调用并挂载配额响应头", async () => {
+test("explain selection handler 匿名分支默认拒绝并返回注册阻断错误", async () => {
   process.env.ALLOW_ANONYMOUS_TRIAL = "true";
+  delete process.env.ANON_ALLOW_EXPLAIN_SELECTION;
   const anonDeps = buildAnonDeps();
   let reserveCalled = false;
+  let explainCalled = false;
 
   const response = await handleExplainSelectionPost(
     createJsonRequest(
@@ -175,7 +180,10 @@ test("explain selection handler 匿名分支允许调用并挂载配额响应头
       requireCurrentProfile: async () => {
         throw new AuthError();
       },
-      explainSelection: async (payload) => ({ chunk: { text: payload.selectedText } }) as never,
+      explainSelection: async (payload) => {
+        explainCalled = true;
+        return ({ chunk: { text: payload.selectedText } }) as never;
+      },
       reserveHighCostUsage: async () => {
         reserveCalled = true;
         return quotaOk.reserveHighCostUsage();
@@ -185,17 +193,18 @@ test("explain selection handler 匿名分支允许调用并挂载配额响应头
     },
   );
 
-  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(response.status, 403);
+  assert.equal(body.code, "ANON_FEATURE_DISABLED");
+  assert.equal(body.details.capability, "explain_selection");
   assert.equal(reserveCalled, false, "匿名分支不应进入 reserveHighCostUsage");
-  assert.equal(response.headers.get("X-Quota-Type"), "explain_selection");
-  assert.equal(response.headers.get("X-Quota-Session-Limit"), "3");
-  assert.equal(response.headers.get("X-Quota-Session-Remaining"), "2");
-  assert.equal(response.headers.get("X-Quota-Daily-Limit"), "200");
-  assert.match(response.headers.get("X-Quota-Reset-At") ?? "", /\d{4}-\d{2}-\d{2}T00:00:00/);
+  assert.equal(explainCalled, false, "默认禁用时不应进入 explain 服务");
+  assert.equal(response.headers.get("X-Quota-Type"), null);
 });
 
-test("explain selection handler 匿名 session 配额耗尽返 429 ANON_QUOTA_EXCEEDED_SESSION 并附 reset 头", async () => {
+test("explain selection handler 显式打开匿名 AI 灰度后,session 配额耗尽返 429", async () => {
   process.env.ALLOW_ANONYMOUS_TRIAL = "true";
+  process.env.ANON_ALLOW_EXPLAIN_SELECTION = "true";
   const anonDeps = buildAnonDeps();
   let explainCallCount = 0;
 

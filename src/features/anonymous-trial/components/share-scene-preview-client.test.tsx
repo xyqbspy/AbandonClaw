@@ -38,8 +38,8 @@ type FetchCall = { url: string; method?: string; body?: unknown; headers: Record
 let fetchCalls: FetchCall[] = [];
 let fetchResponder: (call: FetchCall) => Response | Promise<Response>;
 const originalFetch = globalThis.fetch;
+const originalMatchMedia = window.matchMedia;
 
-// 全量记录创建的 Audio 实例,便于断言 src + 触发 onended/onerror
 class MockAudio {
   src: string;
   onended: (() => void) | null = null;
@@ -93,6 +93,16 @@ beforeEach(() => {
   fetchCalls = [];
   mockedAudios = [];
   window.localStorage.clear();
+  window.matchMedia = ((query: string) => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
+    addListener: () => undefined,
+    removeListener: () => undefined,
+    dispatchEvent: () => false,
+  })) as typeof window.matchMedia;
   fetchResponder = () => new Response(null, { status: 204 });
   globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const call = recordFetch(input, init);
@@ -105,6 +115,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   globalThis.fetch = originalFetch;
+  window.matchMedia = originalMatchMedia;
   if (originalAudio === undefined) {
     delete (globalThis as { Audio?: unknown }).Audio;
   } else {
@@ -135,13 +146,22 @@ const SAMPLE_LESSON: Lesson = {
           sentences: [
             {
               id: "sen-1",
+              speaker: "A",
               text: "I just wrapped up the report.",
               translation: "我刚把报告搞定。",
               chunks: ["wrapped up", "the report"],
               chunkDetails: [],
             },
+          ],
+        },
+        {
+          id: "blk-2",
+          speaker: "B",
+          kind: "dialogue",
+          sentences: [
             {
               id: "sen-2",
+              speaker: "B",
               text: "That's a relief.",
               translation: "总算松了口气。",
               chunks: ["a relief"],
@@ -159,6 +179,7 @@ let ClientModule: {
   ShareScenePreviewClient: (props: {
     initialLesson: Lesson;
     registerHref: string;
+    backHref?: string;
   }) => React.ReactElement | null;
 } | null = null;
 
@@ -180,28 +201,34 @@ const flushAsync = async () => {
 const findFetchCalls = (matcher: (url: string) => boolean) =>
   fetchCalls.filter((call) => matcher(call.url));
 
-test("ShareScenePreviewClient 渲染场景标题/句子/chunk 按钮", async () => {
+test("ShareScenePreviewClient 渲染真实场景气泡和详情入口,不再出现旧试用按钮", async () => {
   const Component = getComponent();
   const result = render(
-    <Component initialLesson={SAMPLE_LESSON} registerHref="/signup?from=share&scene=share-sample" />,
+    <Component
+      initialLesson={SAMPLE_LESSON}
+      registerHref="/signup?from=trial&scene=share-sample"
+      backHref="/trial"
+    />,
   );
 
   await flushAsync();
 
   assert.ok(result.getByText("Sharing a small win at work"));
-  assert.ok(result.getByText("I just wrapped up the report."));
-  assert.ok(result.getByText("我刚把报告搞定。"));
-  const chunkButtons = result.container.querySelectorAll(
-    '[data-testid="share-scene-explain-chunk"]',
+  assert.ok(result.getAllByText("I just wrapped up the report.").length >= 1);
+  assert.ok(result.getAllByText("That's a relief.").length >= 1);
+  assert.equal(result.queryByText("听一遍"), null);
+  assert.equal(result.queryByText(/解释 ·/), null);
+  assert.equal(
+    result.container.querySelector('[data-testid="share-scene-explain-chunk"]'),
+    null,
   );
-  assert.equal(chunkButtons.length, 3, "3 个 unique chunk 按钮(wrapped up / the report / a relief)");
+  assert.ok(result.container.querySelector('[data-sentence-id="sen-1"]'));
+  assert.ok(result.container.querySelector('[data-sentence-id="sen-2"]'));
 });
 
 test("ShareScenePreviewClient mount 后上报 anon_first_scene_viewed 并保证 anonId 已落盘", async () => {
   const Component = getComponent();
-  render(
-    <Component initialLesson={SAMPLE_LESSON} registerHref="/signup" />,
-  );
+  render(<Component initialLesson={SAMPLE_LESSON} registerHref="/signup" />);
 
   await flushAsync();
 
@@ -219,181 +246,53 @@ test("ShareScenePreviewClient mount 后上报 anon_first_scene_viewed 并保证 
   assert.ok(anonId && anonId.length === 36, "localStorage 应该已经落盘 UUID");
 });
 
-test("ShareScenePreviewClient 点击 chunk 按钮触发 explain-selection 调用,带 X-Anonymous-Id 头", async () => {
-  fetchResponder = (call) => {
-    if (call.url.includes("/api/explain-selection")) {
-      return new Response(
-        JSON.stringify({
-          chunk: { text: "wrapped up", translation: "搞定", explanation: "完成某事" },
-        }),
-        {
-          status: 200,
-          headers: {
-            "content-type": "application/json",
-            "X-Quota-Type": "explain_selection",
-            "X-Quota-Daily-Limit": "200",
-            "X-Quota-Daily-Remaining": "199",
-            "X-Quota-Session-Limit": "3",
-            "X-Quota-Session-Remaining": "2",
-            "X-Quota-Reset-At": "2026-05-29T00:00:00.000Z",
-          },
-        },
-      );
-    }
-    return new Response(null, { status: 204 });
-  };
-
+test("ShareScenePreviewClient 点击句子后详情面板切到该句和相关短语", async () => {
   const Component = getComponent();
-  const result = render(
-    <Component initialLesson={SAMPLE_LESSON} registerHref="/signup" />,
-  );
+  const result = render(<Component initialLesson={SAMPLE_LESSON} registerHref="/signup" />);
   await flushAsync();
-
-  const chunkButton = result.container.querySelector(
-    '[data-testid="share-scene-explain-chunk"]',
-  ) as HTMLElement;
-  assert.ok(chunkButton, "至少应该有一个 chunk 按钮");
 
   await act(async () => {
-    fireEvent.click(chunkButton);
+    fireEvent.click(result.getByText("That's a relief."));
   });
-  await flushAsync();
-
-  const explainCalls = findFetchCalls((url) => url.includes("/api/explain-selection"));
-  assert.equal(explainCalls.length, 1, "应该恰好 1 次 explain-selection 调用");
-  assert.equal(explainCalls[0].method, "POST");
-  assert.ok(
-    explainCalls[0].headers["x-anonymous-id"]?.length === 36,
-    `应该带 X-Anonymous-Id 头(实际:${explainCalls[0].headers["x-anonymous-id"]})`,
-  );
-
-  await waitFor(() =>
-    assert.ok(
-      result.container.querySelector('[data-testid="share-scene-explain-sheet"]'),
-      "成功响应后 sheet 应该展开",
-    ),
-  );
-});
-
-test("ShareScenePreviewClient 配额耗尽(429 ANON_QUOTA_EXCEEDED_SESSION)弹出 L3 阻断弹窗", async () => {
-  fetchResponder = (call) => {
-    if (call.url.includes("/api/explain-selection")) {
-      return new Response(
-        JSON.stringify({
-          code: "ANON_QUOTA_EXCEEDED_SESSION",
-          error: "session quota exceeded",
-          details: { capability: "explain_selection" },
-        }),
-        { status: 429, headers: { "content-type": "application/json" } },
-      );
-    }
-    return new Response(null, { status: 204 });
-  };
-
-  const Component = getComponent();
-  const result = render(
-    <Component initialLesson={SAMPLE_LESSON} registerHref="/signup" />,
-  );
-  await flushAsync();
-
-  const chunkButton = result.container.querySelector(
-    '[data-testid="share-scene-explain-chunk"]',
-  ) as HTMLElement;
-  await act(async () => {
-    fireEvent.click(chunkButton);
-  });
-  await flushAsync();
 
   await waitFor(() => {
-    const modal = result.container.querySelector('[data-testid="anonymous-block-modal"]');
-    assert.ok(modal, "429 ANON_QUOTA_EXCEEDED_SESSION 应该弹出 L3 block modal");
-    assert.equal(modal!.getAttribute("data-trigger"), "explain_quota_exhausted");
+    assert.ok(result.getByText("本轮相关短语"));
+    assert.ok(result.getAllByText("a relief").length >= 1);
   });
-
-  // L3 弹窗显示应该上报 anon_register_prompt_shown
-  const shownCalls = findFetchCalls((url) => url.includes("/api/anonymous/funnel-event")).filter(
-    (call) =>
-      typeof call.body === "object" &&
-      call.body !== null &&
-      (call.body as { event?: string }).event === "anon_register_prompt_shown" &&
-      (call.body as { payload?: { prompt_level?: string } }).payload?.prompt_level === "L3",
-  );
-  assert.ok(shownCalls.length >= 1, "L3 弹出时应上报 anon_register_prompt_shown");
 });
 
-test("ShareScenePreviewClient 点击顶栏注册按钮上报 anon_register_prompt_clicked L1", async () => {
+test("ShareScenePreviewClient 保存/加入复习只弹注册阻断,不调用 explain-selection", async () => {
   const Component = getComponent();
-  const result = render(
-    <Component initialLesson={SAMPLE_LESSON} registerHref="/signup" />,
-  );
+  const result = render(<Component initialLesson={SAMPLE_LESSON} registerHref="/signup" />);
   await flushAsync();
-
-  const banner = result.container.querySelector(
-    '[data-testid="anonymous-topbar-register-action"]',
-  ) as HTMLElement;
-  assert.ok(banner, "顶栏注册按钮应渲染");
 
   await act(async () => {
-    fireEvent.click(banner);
+    fireEvent.click(result.getByText("收藏短语"));
   });
   await flushAsync();
 
-  const clickedCalls = findFetchCalls((url) => url.includes("/api/anonymous/funnel-event")).filter(
-    (call) =>
-      typeof call.body === "object" &&
-      call.body !== null &&
-      (call.body as { event?: string }).event === "anon_register_prompt_clicked" &&
-      (call.body as { payload?: { prompt_level?: string } }).payload?.prompt_level === "L1",
-  );
-  assert.equal(clickedCalls.length, 1, "顶栏点击应触发 1 次 L1 clicked 上报");
+  const modal = result.container.querySelector('[data-testid="anonymous-block-modal"]');
+  assert.ok(modal, "保存表达应弹出阻断弹窗");
+  assert.equal(modal!.getAttribute("data-trigger"), "feature_disabled");
+  assert.ok(result.getByText("涉及功能: 保存表达"));
+  assert.equal(findFetchCalls((url) => url.includes("/api/explain-selection")).length, 0);
 });
 
-test("ShareScenePreviewClient 点击 inline upsell 注册按钮上报 anon_register_prompt_clicked L2", async () => {
+test("ShareScenePreviewClient 练习/变体占位入口只弹注册阻断", async () => {
   const Component = getComponent();
-  const result = render(
-    <Component initialLesson={SAMPLE_LESSON} registerHref="/signup" />,
-  );
+  const result = render(<Component initialLesson={SAMPLE_LESSON} registerHref="/signup" />);
   await flushAsync();
-
-  const inlineRegister = result.container.querySelector(
-    '[data-testid="anonymous-inline-upsell-register"]',
-  ) as HTMLElement;
-  assert.ok(inlineRegister, "inline upsell 注册按钮应渲染");
 
   await act(async () => {
-    fireEvent.click(inlineRegister);
+    fireEvent.click(result.getByTestId("trial-scene-practice-placeholder"));
   });
   await flushAsync();
 
-  const clickedCalls = findFetchCalls((url) => url.includes("/api/anonymous/funnel-event")).filter(
-    (call) =>
-      typeof call.body === "object" &&
-      call.body !== null &&
-      (call.body as { event?: string }).event === "anon_register_prompt_clicked" &&
-      (call.body as { payload?: { prompt_level?: string } }).payload?.prompt_level === "L2",
-  );
-  assert.equal(clickedCalls.length, 1, "inline upsell 点击应触发 1 次 L2 clicked 上报");
+  assert.ok(result.container.querySelector('[data-testid="anonymous-block-modal"]'));
+  assert.ok(result.getByText("涉及功能: 生成练习"));
 });
 
-// === 句子级 TTS 预生成播放 ===
-
-test("ShareScenePreviewClient 渲染每个 sentence 的播放按钮(初始 idle 状态)", async () => {
-  const Component = getComponent();
-  const result = render(
-    <Component initialLesson={SAMPLE_LESSON} registerHref="/signup" />,
-  );
-  await flushAsync();
-
-  const playButtons = result.container.querySelectorAll(
-    '[data-testid="share-scene-play-sentence"]',
-  );
-  assert.equal(playButtons.length, 2, "2 个 sentence 各一个播放按钮");
-  for (const button of playButtons) {
-    assert.equal(button.getAttribute("data-playback-state"), "idle");
-  }
-});
-
-test("ShareScenePreviewClient 点击播放按钮触发 GET /api/anonymous/tts/play 带 sceneSlug/sentenceId/text + 创建 Audio 播放", async () => {
+test("ShareScenePreviewClient 点击气泡朗读按钮触发匿名 TTS 播放", async () => {
   fetchResponder = (call) => {
     if (call.url.includes("/api/anonymous/tts/play")) {
       return new Response(
@@ -419,14 +318,14 @@ test("ShareScenePreviewClient 点击播放按钮触发 GET /api/anonymous/tts/pl
   };
 
   const Component = getComponent();
-  const result = render(
-    <Component initialLesson={SAMPLE_LESSON} registerHref="/signup" />,
-  );
+  const result = render(<Component initialLesson={SAMPLE_LESSON} registerHref="/signup" />);
   await flushAsync();
 
   const firstPlayButton = result.container.querySelector(
-    '[data-testid="share-scene-play-sentence"]',
+    'button[aria-label="朗读"]',
   ) as HTMLElement;
+  assert.ok(firstPlayButton, "气泡下方应有朗读按钮");
+
   await act(async () => {
     fireEvent.click(firstPlayButton);
   });
@@ -434,30 +333,16 @@ test("ShareScenePreviewClient 点击播放按钮触发 GET /api/anonymous/tts/pl
 
   const playCalls = findFetchCalls((url) => url.includes("/api/anonymous/tts/play"));
   assert.equal(playCalls.length, 1, "应该恰好 1 次 tts/play 调用");
-  assert.equal(playCalls[0].method, "GET");
   assert.match(playCalls[0].url, /kind=sentence/);
   assert.match(playCalls[0].url, /sceneSlug=share-sample/);
   assert.match(playCalls[0].url, /sentenceId=sen-1/);
-  assert.match(playCalls[0].url, /text=I\+just\+wrapped\+up\+the\+report\./);
-  assert.ok(
-    playCalls[0].headers["x-anonymous-id"]?.length === 36,
-    "应带 X-Anonymous-Id 头",
-  );
-
-  assert.equal(mockedAudios.length, 1, "成功响应后应该创建 1 个 Audio");
-  assert.match(mockedAudios[0].src, /signed\/sen-1\.mp3/);
+  assert.ok(playCalls[0].headers["x-anonymous-id"]?.length === 36);
+  assert.equal(mockedAudios.length, 1);
   assert.equal(mockedAudios[0].playInvocations, 1);
-
-  await waitFor(() =>
-    assert.equal(
-      firstPlayButton.getAttribute("data-playback-state"),
-      "playing",
-      "Audio.play() 后按钮 state 应该是 playing",
-    ),
-  );
+  await waitFor(() => assert.equal(firstPlayButton.getAttribute("data-audio-state"), "playing"));
 });
 
-test("ShareScenePreviewClient TTS 配额耗尽(429 ANON_QUOTA_EXCEEDED_SESSION)弹出 tts_quota_exhausted L3 modal", async () => {
+test("ShareScenePreviewClient TTS 配额耗尽弹出 tts_quota_exhausted 阻断弹窗", async () => {
   fetchResponder = (call) => {
     if (call.url.includes("/api/anonymous/tts/play")) {
       return new Response(
@@ -473,13 +358,11 @@ test("ShareScenePreviewClient TTS 配额耗尽(429 ANON_QUOTA_EXCEEDED_SESSION)�
   };
 
   const Component = getComponent();
-  const result = render(
-    <Component initialLesson={SAMPLE_LESSON} registerHref="/signup" />,
-  );
+  const result = render(<Component initialLesson={SAMPLE_LESSON} registerHref="/signup" />);
   await flushAsync();
 
   const firstPlayButton = result.container.querySelector(
-    '[data-testid="share-scene-play-sentence"]',
+    'button[aria-label="朗读"]',
   ) as HTMLElement;
   await act(async () => {
     fireEvent.click(firstPlayButton);
@@ -491,44 +374,5 @@ test("ShareScenePreviewClient TTS 配额耗尽(429 ANON_QUOTA_EXCEEDED_SESSION)�
     assert.ok(modal, "TTS 配额耗尽应弹出 block modal");
     assert.equal(modal!.getAttribute("data-trigger"), "tts_quota_exhausted");
   });
-
-  assert.equal(mockedAudios.length, 0, "配额耗尽不应创建 Audio 实例");
-});
-
-test("ShareScenePreviewClient TTS storage miss(404)按钮状态置为 unavailable,不弹 modal", async () => {
-  fetchResponder = (call) => {
-    if (call.url.includes("/api/anonymous/tts/play")) {
-      return new Response(
-        JSON.stringify({ code: "NOT_FOUND", error: "audio not found" }),
-        { status: 404, headers: { "content-type": "application/json" } },
-      );
-    }
-    return new Response(null, { status: 204 });
-  };
-
-  const Component = getComponent();
-  const result = render(
-    <Component initialLesson={SAMPLE_LESSON} registerHref="/signup" />,
-  );
-  await flushAsync();
-
-  const firstPlayButton = result.container.querySelector(
-    '[data-testid="share-scene-play-sentence"]',
-  ) as HTMLElement;
-  await act(async () => {
-    fireEvent.click(firstPlayButton);
-  });
-  await flushAsync();
-
-  await waitFor(() =>
-    assert.equal(
-      firstPlayButton.getAttribute("data-playback-state"),
-      "unavailable",
-      "404 后按钮 state 置为 unavailable",
-    ),
-  );
-
-  const modal = result.container.querySelector('[data-testid="anonymous-block-modal"]');
-  assert.equal(modal, null, "storage miss 不应弹 L3 modal(只是单句不可用)");
-  assert.equal(mockedAudios.length, 0, "storage miss 不应创建 Audio");
+  assert.equal(mockedAudios.length, 0);
 });

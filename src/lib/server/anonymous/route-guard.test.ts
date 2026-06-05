@@ -21,12 +21,16 @@ const VALID_ANON_ID = "11111111-2222-4333-8444-555555555555";
 const ORIGINAL_ENABLED = process.env.ALLOW_ANONYMOUS_TRIAL;
 const ORIGINAL_GLOBAL = process.env.ANON_QUOTA_GLOBAL_EXPLAIN_SELECTION;
 const ORIGINAL_SESSION = process.env.ANON_QUOTA_SESSION_EXPLAIN_SELECTION;
+const ORIGINAL_ALLOW = process.env.ANON_ALLOW_EXPLAIN_SELECTION;
 
 const enableTrial = () => {
   process.env.ALLOW_ANONYMOUS_TRIAL = "true";
 };
 const disableTrial = () => {
   process.env.ALLOW_ANONYMOUS_TRIAL = "false";
+};
+const allowExplainSelection = () => {
+  process.env.ANON_ALLOW_EXPLAIN_SELECTION = "true";
 };
 
 const restoreEnv = () => {
@@ -36,6 +40,8 @@ const restoreEnv = () => {
   else process.env.ANON_QUOTA_GLOBAL_EXPLAIN_SELECTION = ORIGINAL_GLOBAL;
   if (ORIGINAL_SESSION === undefined) delete process.env.ANON_QUOTA_SESSION_EXPLAIN_SELECTION;
   else process.env.ANON_QUOTA_SESSION_EXPLAIN_SELECTION = ORIGINAL_SESSION;
+  if (ORIGINAL_ALLOW === undefined) delete process.env.ANON_ALLOW_EXPLAIN_SELECTION;
+  else process.env.ANON_ALLOW_EXPLAIN_SELECTION = ORIGINAL_ALLOW;
 };
 
 const buildRequest = (headers: Record<string, string> = {}) =>
@@ -51,7 +57,7 @@ const buildRequest = (headers: Record<string, string> = {}) =>
 type SessionRow = { anon_id: string; ip_hash: string; created_at: string };
 
 const makeFakeAdmin = (state: { sessions: SessionRow[] }) => ({
-  from: (_table: string) => ({
+  from: () => ({
     select: (_fields: string, opts?: { count?: string; head?: boolean }) => ({
       eq: (field: string, value: string) => {
         if (opts?.head) {
@@ -199,6 +205,7 @@ test("ensureProfileOrAnonymousQuota 试用打开 + 匿名 + anonAllowed=false:�
 
 test("ensureProfileOrAnonymousQuota 试用打开 + 匿名 + 允许:返回 quotaResult,sessionRemaining 递减", async () => {
   enableTrial();
+  allowExplainSelection();
   const result = await ensureProfileOrAnonymousQuota(
     "explain_selection",
     buildRequest(),
@@ -218,6 +225,7 @@ test("ensureProfileOrAnonymousQuota 试用打开 + 匿名 + 允许:返回 quotaR
 
 test("ensureProfileOrAnonymousQuota 试用打开 + 匿名 + session 配额耗尽:抛 AnonQuotaExceededSessionError", async () => {
   enableTrial();
+  allowExplainSelection();
   for (let i = 0; i < 3; i += 1) {
     await ensureProfileOrAnonymousQuota(
       "explain_selection",
@@ -245,6 +253,7 @@ test("ensureProfileOrAnonymousQuota 试用打开 + 匿名 + session 配额耗尽
 
 test("ensureProfileOrAnonymousQuota 试用打开 + 紧急关闭:抛 HighCostCapabilityDisabledError", async () => {
   enableTrial();
+  allowExplainSelection();
   await assert.rejects(
     () =>
       ensureProfileOrAnonymousQuota(
@@ -264,6 +273,7 @@ test("ensureProfileOrAnonymousQuota 试用打开 + 紧急关闭:抛 HighCostCapa
 
 test("ensureProfileOrAnonymousQuota 搜索引擎爬虫不能触发付费 AI,透传原 AuthError", async () => {
   enableTrial();
+  allowExplainSelection();
   await assert.rejects(
     () =>
       ensureProfileOrAnonymousQuota(

@@ -14,8 +14,7 @@ import { ShareScenePreviewClient } from "@/features/anonymous-trial/components/s
  * - 开关打开 + 搜索引擎爬虫:渲染最小可索引引导态,不触发任何 AI/TTS 付费链路,
  *   也不会创建 anonymous_session(资源获取走 anon SELECT,RLS 自然只回 is_public=true)。
  * - 开关打开 + 真实匿名用户:SSR 直读 scenes 表(走 anon RLS),把 Lesson 数据
- *   传给 ShareScenePreviewClient,客户端做"看 + 选词 → AI 解释"最小闭环,
- *   触发 explain_selection 时按 anon 配额 200/3 拦截。
+ *   传给 ShareScenePreviewClient,客户端做"看 + 听预生成 TTS + 看公开短语详情"只读闭环。
  * - 场景找不到 / 不公开:走 notFound(),返回 404。
  *
  * 主入口(/today /scene /scenes /review /chunks /progress)在 middleware.ts 中
