@@ -391,7 +391,9 @@ test("ShareScenePreviewClient 点击气泡朗读按钮触发匿名 TTS 播放", 
   assert.equal(playCalls.length, 1, "应该恰好 1 次 tts/play 调用");
   assert.match(playCalls[0].url, /kind=sentence/);
   assert.match(playCalls[0].url, /sceneSlug=share-sample/);
-  assert.match(playCalls[0].url, /sentenceId=sen-1/);
+  assert.match(playCalls[0].url, /sentenceId=block-blk-1/);
+  assert.match(playCalls[0].url, /text=I\+just\+wrapped\+up\+the\+report\./);
+  assert.match(playCalls[0].url, /speaker=A/);
   assert.ok(playCalls[0].headers["x-anonymous-id"]?.length === 36);
   assert.equal(mockedAudios.length, 1);
   assert.equal(mockedAudios[0].playInvocations, 1);

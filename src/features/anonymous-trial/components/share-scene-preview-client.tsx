@@ -316,14 +316,12 @@ function ShareScenePreviewContent({
       text,
       speaker,
       chunkKey,
-      requestSentenceId,
     }: {
       targetKind: "sentence" | "chunk";
       targetId: string;
       text: string;
       speaker?: string;
       chunkKey?: string;
-      requestSentenceId?: string;
     }) => {
       const clean = text.trim();
       if (!clean) return;
@@ -348,7 +346,7 @@ function ShareScenePreviewContent({
         url.searchParams.set("text", clean);
         if (targetKind === "sentence") {
           url.searchParams.set("sceneSlug", readerLesson.slug);
-          url.searchParams.set("sentenceId", requestSentenceId ?? targetId);
+          url.searchParams.set("sentenceId", targetId);
           if (speaker) url.searchParams.set("speaker", speaker);
         } else {
           url.searchParams.set("chunkKey", chunkKey ?? buildChunkAudioKey(clean));
@@ -453,13 +451,13 @@ function ShareScenePreviewContent({
 
   const playBlockTts = useCallback(
     (block: LessonBlock) => {
-      const first = block.sentences[0];
+      const blockReadText = getBlockSpeakText(block);
+      if (!blockReadText) return;
       return playAnonymousTts({
         targetKind: "sentence",
         targetId: `block-${block.id}`,
-        text: first ? getSentenceSpeakText(first) : getBlockSpeakText(block),
-        speaker: first?.speaker ?? block.speaker,
-        requestSentenceId: first?.id,
+        text: blockReadText,
+        speaker: block.speaker ?? block.sentences[0]?.speaker,
       });
     },
     [playAnonymousTts],
