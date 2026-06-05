@@ -34,11 +34,11 @@ const buildClozeText = (sentenceText: string, chunk: string) => {
 const buildTrialClozeExercises = (lesson: Lesson): PracticeExercise[] => {
   const trialSceneId = getTrialSceneId(lesson);
   return getLessonSentences(lesson)
-    .map((sentence, index) => {
+    .flatMap((sentence, index) => {
       const chunk = getSentenceChunk(sentence);
-      if (!chunk) return null;
+      if (!chunk) return [];
       const chunkKey = toKey(chunk);
-      return {
+      return [{
         id: `trial-cloze-${toKey(sentence.id || `${index + 1}`)}-${chunkKey}`,
         type: "chunk_cloze",
         inputMode: "typing",
@@ -59,19 +59,18 @@ const buildTrialClozeExercises = (lesson: Lesson): PracticeExercise[] => {
           referenceSentence: sentence.text,
           practiceMode: "cloze",
         },
-      } satisfies PracticeExercise;
+      } satisfies PracticeExercise];
     })
-    .filter((exercise): exercise is PracticeExercise => Boolean(exercise))
     .slice(0, 8);
 };
 
 const buildTrialSentenceRecallModule = (lesson: Lesson): PracticeModule | null => {
   const trialSceneId = getTrialSceneId(lesson);
   const exercises = getLessonSentences(lesson)
-    .map((sentence, index) => {
+    .flatMap((sentence, index) => {
       const text = sentence.text.trim();
-      if (!text) return null;
-      return {
+      if (!text) return [];
+      return [{
         id: `trial-sentence-recall-${toKey(sentence.id || `${index + 1}`)}`,
         type: "translation_prompt",
         inputMode: "typing",
@@ -91,9 +90,8 @@ const buildTrialSentenceRecallModule = (lesson: Lesson): PracticeModule | null =
           fullSentenceText: text,
           translation: sentence.translation,
         },
-      } satisfies PracticeExercise;
+      } satisfies PracticeExercise];
     })
-    .filter((exercise): exercise is PracticeExercise => Boolean(exercise))
     .slice(0, 4);
 
   if (exercises.length === 0) return null;
