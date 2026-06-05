@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
 
@@ -27,7 +27,7 @@ function shouldHandleAnchorClick(event: MouseEvent, anchor: HTMLAnchorElement) {
   return !samePage;
 }
 
-export function RoutePendingOverlay() {
+function RoutePendingOverlayContent() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const routeKey = `${pathname}?${searchParams.toString()}`;
@@ -95,5 +95,13 @@ export function RoutePendingOverlay() {
         <Loader2 className="size-7 animate-spin text-blue-600" aria-hidden="true" />
       </div>
     </div>
+  );
+}
+
+export function RoutePendingOverlay() {
+  return (
+    <Suspense fallback={null}>
+      <RoutePendingOverlayContent />
+    </Suspense>
   );
 }
