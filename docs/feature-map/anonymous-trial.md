@@ -8,7 +8,7 @@
 
 ## 2. 输入
 
-- 首页试用入口（指向 `/trial`）或外部分享链接（指向 `/share/scene/[slug]` 灰度 URL）
+- 首页试用入口（指向 `/trial`，再跳默认 `/share/scene/[slug]`）或外部分享链接（指向 `/share/scene/[slug]` 灰度 URL）
 - 公共内容表（`scenes` is_public=true / `scene_variants` / `chunks` / `phrases` is_builtin|is_core）
 - 已上传的预生成 TTS 音频（Supabase Storage `tts-audio` bucket）
 - `X-Anonymous-Id` 请求头（前端 localStorage UUID v4 透传）
@@ -16,11 +16,11 @@
 
 ## 3. 输出
 
-- `/trial` 展示 4-5 条精选公开场景，进入 `/trial/scene/[slug]` 后渲染场景内容（标题 / 句子 / 中英对照）
-- `/share/scene/[slug]` 保留为单场景分享入口，继续复用同一匿名预览 UI
+- `/trial` 不再渲染独立列表，默认跳转到精选公开场景的 `/share/scene/[slug]`
+- `/trial/scene/[slug]` 不再渲染独立详情，直接跳转到同 slug 的 `/share/scene/[slug]`
+- `/share/scene/[slug]` 是唯一匿名场景预览 UI，渲染场景内容（标题 / 句子 / 中英对照）
 - 句子级 TTS 播放（点击触发，调 `/api/anonymous/tts/play`）
 - 选词触发 AI 表达解释（调 `/api/explain-selection` 带 X-Anonymous-Id 头）
-- 预生成练习题的本地作答体验（仅前端反馈，不提交、不写入、不加入复习）
 - 三层注册引导：L1 顶栏配额条 / L2 内联卡片 / L3 阻断弹窗
 - 8 个漏斗事件落盘到 `anonymous_funnel_events` 表
 - 每日 cron 聚合到 `daily_anon_cost_report`（转化率 + 单转化成本 + AI/TTS 调用量）
@@ -32,7 +32,7 @@
 - middleware `PROTECTED_PAGE_PREFIXES` 显式守护 today / scenes / scene / review / chunks / progress / settings / lesson / admin，匿名访问被强制重定向到 `/login`
 - 该列表**不得**加 `/share` 或 `/trial`；`/share/*` 与 `/trial/*` 由 middleware 透传到页面，页面自己判 env 开关
 - `SceneDetailClientPage`（主路由 `/scene/[slug]`）**不动**，匿名分支完全走独立的 `ShareScenePreviewClient`
-- `/trial/scene/[slug]` 可以传 `showPracticePreview` 开启本地练习区，但仍不得复用强依赖登录态 API 的主场景详情页
+- `/trial` 与 `/trial/scene/[slug]` 只做跳转，不承载独立试用 UI 或本地练习区
 
 ### 4.2 身份四道防线（按强度递增）
 
@@ -87,7 +87,7 @@
 - 飞书告警（同 IP session > 10 / 全站匿名 AI 池 18:00 UTC 前 > 80% / quota_blocked / session_created > 60%）
 
 **反向触发**：
-- 注册转化（`/signup?from=share&scene={slug}` / `/signup?from=trial&scene={slug}` 回跳路径）→ 后续 V2 接 `anon_registered` 事件
+- 注册转化（`/signup?from=share&scene={slug}` 回跳路径）→ 后续 V2 接 `anon_registered` 事件
 
 ## 6. 常见改动风险
 
@@ -111,13 +111,13 @@
 - **API 路由单测**:
   - `src/app/api/explain-selection/route.test.ts`(匿名分支挂 quota 头 + 配额耗尽)
   - `src/app/api/anonymous/tts/play/route.test.ts`(9 例,已登录命中/miss/匿名命中/配额耗尽/缺头/爬虫/query 校验)
-- **页面 audit 测试**:`src/app/share/scene/[slug]/page.audit.test.ts` + `src/app/trial/page.audit.test.ts`(SSR 路径 + 爬虫分支 + middleware Cache-Control 注入 + PROTECTED_PAGE_PREFIXES 不含 /share 和 /trial)
-- **客户端 interaction 测试**:`src/features/anonymous-trial/components/share-scene-preview-client.test.tsx`(渲染 + 选词 explain + L1/L2 注册点击 + TTS 播放 + 配额耗尽 + storage miss + 试用练习本地反馈/提交阻断)
+- **页面 audit 测试**:`src/app/share/scene/[slug]/page.audit.test.ts` + `src/app/trial/page.audit.test.ts`(SSR 路径 + `/trial` 跳转 + 爬虫分支 + middleware Cache-Control 注入 + PROTECTED_PAGE_PREFIXES 不含 /share 和 /trial)
+- **客户端 interaction 测试**:`src/features/anonymous-trial/components/share-scene-preview-client.test.tsx`(渲染 + 选词 explain + L1/L2 注册点击 + TTS 播放 + 配额耗尽 + storage miss)
 - **migration audit**:`src/lib/server/anonymous/funnel-daily-aggregation-audit.test.ts`(phase27 SQL 函数签名 + 单价常量 + 防除零)
 
 ## 8. 相关锚点
 
-- 实现:`src/features/anonymous-trial/`(client) + `src/lib/server/anonymous/`(server) + `src/app/api/anonymous/`(API) + `src/app/share/scene/[slug]/`(分享灰度页) + `src/app/trial/`(匿名试用列表与详情页)
+- 实现:`src/features/anonymous-trial/`(client) + `src/lib/server/anonymous/`(server) + `src/app/api/anonymous/`(API) + `src/app/share/scene/[slug]/`(分享灰度页) + `src/app/trial/`(试用入口跳转页)
 - Spec:`openspec/specs/anonymous-trial-mode/spec.md` + `openspec/specs/api-operational-guardrails/spec.md`
 - Migration:`supabase/sql/20260528_phase25_anonymous_trial_mode.sql`(三张表)+ `20260528_phase26_anonymous_rls_public_content.sql`(RLS)+ `20260528_phase27_anonymous_funnel_daily_aggregation.sql`(daily 聚合)
 - Env:`.env.example` "匿名试用灰度" 段(总开关 + daily salt + IP session 上限 + 各 capability 配额)

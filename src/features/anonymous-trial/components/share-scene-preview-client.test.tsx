@@ -159,8 +159,6 @@ let ClientModule: {
   ShareScenePreviewClient: (props: {
     initialLesson: Lesson;
     registerHref: string;
-    showPracticePreview?: boolean;
-    backHref?: string;
   }) => React.ReactElement | null;
 } | null = null;
 
@@ -182,23 +180,6 @@ const flushAsync = async () => {
 const findFetchCalls = (matcher: (url: string) => boolean) =>
   fetchCalls.filter((call) => matcher(call.url));
 
-const getSentenceAudioButton = (container: HTMLElement, sentenceId: string) => {
-  const sentenceNode = container.querySelector(`[data-sentence-id="${sentenceId}"]`);
-  assert.ok(sentenceNode, `应渲染句子 ${sentenceId}`);
-  const button = sentenceNode.parentElement?.querySelector("button[data-audio-state]");
-  assert.ok(button, `句子 ${sentenceId} 应渲染朗读按钮`);
-  return button as HTMLElement;
-};
-
-const getChunkButton = (
-  result: ReturnType<typeof render>,
-  chunkText: string,
-) => {
-  const buttons = result.getAllByRole("button", { name: chunkText });
-  assert.ok(buttons.length >= 1, `应渲染 chunk 按钮: ${chunkText}`);
-  return buttons[0] as HTMLElement;
-};
-
 test("ShareScenePreviewClient 渲染场景标题/句子/chunk 按钮", async () => {
   const Component = getComponent();
   const result = render(
@@ -209,10 +190,11 @@ test("ShareScenePreviewClient 渲染场景标题/句子/chunk 按钮", async () 
 
   assert.ok(result.getByText("Sharing a small win at work"));
   assert.ok(result.getByText("I just wrapped up the report."));
-  assert.ok(result.getAllByText("翻译").length >= 2);
-  for (const chunk of ["wrapped up", "the report", "a relief"]) {
-    assert.ok(result.getAllByRole("button", { name: chunk }).length >= 1);
-  }
+  assert.ok(result.getByText("我刚把报告搞定。"));
+  const chunkButtons = result.container.querySelectorAll(
+    '[data-testid="share-scene-explain-chunk"]',
+  );
+  assert.equal(chunkButtons.length, 3, "3 个 unique chunk 按钮(wrapped up / the report / a relief)");
 });
 
 test("ShareScenePreviewClient mount 后上报 anon_first_scene_viewed 并保证 anonId 已落盘", async () => {
@@ -267,7 +249,10 @@ test("ShareScenePreviewClient 点击 chunk 按钮触发 explain-selection 调用
   );
   await flushAsync();
 
-  const chunkButton = getChunkButton(result, "wrapped up");
+  const chunkButton = result.container.querySelector(
+    '[data-testid="share-scene-explain-chunk"]',
+  ) as HTMLElement;
+  assert.ok(chunkButton, "至少应该有一个 chunk 按钮");
 
   await act(async () => {
     fireEvent.click(chunkButton);
@@ -282,10 +267,12 @@ test("ShareScenePreviewClient 点击 chunk 按钮触发 explain-selection 调用
     `应该带 X-Anonymous-Id 头(实际:${explainCalls[0].headers["x-anonymous-id"]})`,
   );
 
-  await waitFor(() => {
-    assert.ok(result.getAllByText("搞定").length >= 1, "成功响应后应显示 AI 释义");
-    assert.ok(result.getAllByText("完成某事").length >= 1, "成功响应后应显示 AI 说明");
-  });
+  await waitFor(() =>
+    assert.ok(
+      result.container.querySelector('[data-testid="share-scene-explain-sheet"]'),
+      "成功响应后 sheet 应该展开",
+    ),
+  );
 });
 
 test("ShareScenePreviewClient 配额耗尽(429 ANON_QUOTA_EXCEEDED_SESSION)弹出 L3 阻断弹窗", async () => {
@@ -309,7 +296,9 @@ test("ShareScenePreviewClient 配额耗尽(429 ANON_QUOTA_EXCEEDED_SESSION)弹�
   );
   await flushAsync();
 
-  const chunkButton = getChunkButton(result, "wrapped up");
+  const chunkButton = result.container.querySelector(
+    '[data-testid="share-scene-explain-chunk"]',
+  ) as HTMLElement;
   await act(async () => {
     fireEvent.click(chunkButton);
   });
@@ -395,9 +384,12 @@ test("ShareScenePreviewClient 渲染每个 sentence 的播放按钮(初始 idle 
   );
   await flushAsync();
 
-  for (const sentenceId of ["sen-1", "sen-2"]) {
-    const button = getSentenceAudioButton(result.container, sentenceId);
-    assert.equal(button.getAttribute("data-audio-state"), "idle");
+  const playButtons = result.container.querySelectorAll(
+    '[data-testid="share-scene-play-sentence"]',
+  );
+  assert.equal(playButtons.length, 2, "2 个 sentence 各一个播放按钮");
+  for (const button of playButtons) {
+    assert.equal(button.getAttribute("data-playback-state"), "idle");
   }
 });
 
@@ -432,7 +424,9 @@ test("ShareScenePreviewClient 点击播放按钮触发 GET /api/anonymous/tts/pl
   );
   await flushAsync();
 
-  const firstPlayButton = getSentenceAudioButton(result.container, "sen-1");
+  const firstPlayButton = result.container.querySelector(
+    '[data-testid="share-scene-play-sentence"]',
+  ) as HTMLElement;
   await act(async () => {
     fireEvent.click(firstPlayButton);
   });
@@ -456,9 +450,9 @@ test("ShareScenePreviewClient 点击播放按钮触发 GET /api/anonymous/tts/pl
 
   await waitFor(() =>
     assert.equal(
-      firstPlayButton.getAttribute("data-audio-state"),
+      firstPlayButton.getAttribute("data-playback-state"),
       "playing",
-      "Audio.play() 后按钮音频状态应该是 playing",
+      "Audio.play() 后按钮 state 应该是 playing",
     ),
   );
 });
@@ -484,7 +478,9 @@ test("ShareScenePreviewClient TTS 配额耗尽(429 ANON_QUOTA_EXCEEDED_SESSION)�
   );
   await flushAsync();
 
-  const firstPlayButton = getSentenceAudioButton(result.container, "sen-1");
+  const firstPlayButton = result.container.querySelector(
+    '[data-testid="share-scene-play-sentence"]',
+  ) as HTMLElement;
   await act(async () => {
     fireEvent.click(firstPlayButton);
   });
@@ -499,7 +495,7 @@ test("ShareScenePreviewClient TTS 配额耗尽(429 ANON_QUOTA_EXCEEDED_SESSION)�
   assert.equal(mockedAudios.length, 0, "配额耗尽不应创建 Audio 实例");
 });
 
-test("ShareScenePreviewClient TTS storage miss(404)不弹 modal 且不创建 Audio", async () => {
+test("ShareScenePreviewClient TTS storage miss(404)按钮状态置为 unavailable,不弹 modal", async () => {
   fetchResponder = (call) => {
     if (call.url.includes("/api/anonymous/tts/play")) {
       return new Response(
@@ -516,59 +512,23 @@ test("ShareScenePreviewClient TTS storage miss(404)不弹 modal 且不创建 Aud
   );
   await flushAsync();
 
-  const firstPlayButton = getSentenceAudioButton(result.container, "sen-1");
+  const firstPlayButton = result.container.querySelector(
+    '[data-testid="share-scene-play-sentence"]',
+  ) as HTMLElement;
   await act(async () => {
     fireEvent.click(firstPlayButton);
   });
   await flushAsync();
 
+  await waitFor(() =>
+    assert.equal(
+      firstPlayButton.getAttribute("data-playback-state"),
+      "unavailable",
+      "404 后按钮 state 置为 unavailable",
+    ),
+  );
+
   const modal = result.container.querySelector('[data-testid="anonymous-block-modal"]');
   assert.equal(modal, null, "storage miss 不应弹 L3 modal(只是单句不可用)");
   assert.equal(mockedAudios.length, 0, "storage miss 不应创建 Audio");
-});
-
-test("ShareScenePreviewClient 试用练习只做本地反馈,提交保存会触发注册阻断", async () => {
-  const Component = getComponent();
-  const result = render(
-    <Component
-      initialLesson={SAMPLE_LESSON}
-      registerHref="/signup?from=trial&scene=share-sample"
-      showPracticePreview
-      backHref="/trial"
-    />,
-  );
-  await flushAsync();
-
-  assert.ok(result.getByText("← 返回试用场景"));
-  assert.ok(result.getByText("预生成练习题"));
-
-  const input = result.container.querySelector("input") as HTMLInputElement;
-  assert.ok(input, "应渲染本地练习输入框");
-  await act(async () => {
-    fireEvent.change(input, { target: { value: "wrapped up" } });
-  });
-
-  await act(async () => {
-    fireEvent.click(result.getAllByText("查看本地反馈")[0]);
-  });
-  assert.ok(result.getByText("答对了。这个结果只保存在当前页面。"));
-
-  const beforeSubmitCalls = fetchCalls.length;
-  await act(async () => {
-    fireEvent.click(result.getByText("提交并保存"));
-  });
-  await flushAsync();
-
-  const modal = result.container.querySelector('[data-testid="anonymous-block-modal"]');
-  assert.ok(modal, "提交保存必须弹注册阻断");
-  assert.equal(modal!.getAttribute("data-trigger"), "feature_disabled");
-  assert.equal(
-    fetchCalls.length,
-    beforeSubmitCalls + 1,
-    "提交保存只允许触发 L3 shown 漏斗事件,不得调用提交/保存 API",
-  );
-  assert.ok(
-    fetchCalls.at(-1)?.url.includes("/api/anonymous/funnel-event"),
-    "最后一次请求应为漏斗事件",
-  );
 });

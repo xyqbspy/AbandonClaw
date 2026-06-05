@@ -18,15 +18,18 @@ test("/trial 检查 ALLOW_ANONYMOUS_TRIAL 开关", () => {
   assert.match(scenePageSource, /isAnonymousTrialEnabled\(\)/);
 });
 
-test("/trial 列表读取精选公开场景,不走用户态 scenes 列表", () => {
-  assert.match(pageSource, /listPublicTrialScenes/);
+test("/trial 默认跳转到第一个 share scene,不渲染独立列表", () => {
+  assert.match(pageSource, /ANONYMOUS_TRIAL_SCENE_SLUGS/);
+  assert.match(pageSource, /redirect\(`\/share\/scene\/\$\{encodeURIComponent\(DEFAULT_TRIAL_SCENE_SLUG\)\}`\)/);
+  assert.doesNotMatch(pageSource, /listPublicTrialScenes/);
   assert.doesNotMatch(pageSource, /listScenes\(/);
 });
 
-test("/trial/scene/[slug] 复用匿名分享预览 UI,并打开本地练习预览", () => {
-  assert.match(scenePageSource, /ShareScenePreviewClient/);
-  assert.match(scenePageSource, /showPracticePreview/);
-  assert.match(scenePageSource, /backHref="\/trial"/);
+test("/trial/scene/[slug] 直接跳转到同 slug 的 share scene", () => {
+  assert.match(scenePageSource, /redirect\(`\/share\/scene\/\$\{encodeURIComponent\(slug\)\}`\)/);
+  assert.doesNotMatch(scenePageSource, /ShareScenePreviewClient/);
+  assert.doesNotMatch(scenePageSource, /showPracticePreview/);
+  assert.doesNotMatch(scenePageSource, /backHref="\/trial"/);
 });
 
 test("middleware 对 /trial/* 注入匿名 no-store 响应头", () => {

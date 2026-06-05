@@ -2,24 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import type { Lesson, LessonBlock, LessonSentence, SelectionChunkLayer } from "@/lib/types";
+import type { Lesson, LessonSentence } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import {
-  getChunkLayerFromLesson,
-  getFirstSentence,
-  getSentenceById,
-} from "@/lib/data/mock-lessons";
-import { getLessonBlocks, getLessonSentences } from "@/lib/shared/lesson-content";
-import { SentenceBlock } from "@/features/lesson/components/sentence-block";
-import { SelectionDetailPanel } from "@/features/lesson/components/selection-detail-panel";
-import { SelectionDetailSheet } from "@/features/lesson/components/selection-detail-sheet";
-import {
-  SCENE_PAGE_CONTENT_ANCHOR_CLASSNAME,
-  SCENE_PAGE_STACK_CLASSNAME,
-} from "@/features/scene/components/scene-page-styles";
-import { APPLE_META_TEXT, APPLE_SURFACE } from "@/lib/ui/apple-style";
 import {
   buildAnonymousHeaders,
   getOrCreateAnonymousId,
@@ -97,8 +83,6 @@ type SentencePlaybackState =
 export type ShareScenePreviewClientProps = {
   initialLesson: Lesson;
   registerHref: string;
-  showPracticePreview?: boolean;
-  backHref?: string;
 };
 
 const collectSentenceChunks = (sentence: LessonSentence): string[] => {
@@ -109,21 +93,6 @@ const collectSentenceChunks = (sentence: LessonSentence): string[] => {
   const merged = [...fromDetails, ...fromChunks];
   return Array.from(new Set(merged));
 };
-
-const withDisplayChunks = (lesson: Lesson): Lesson => ({
-  ...lesson,
-  sections: lesson.sections.map((section) => ({
-    ...section,
-    blocks: section.blocks.map((block) => ({
-      ...block,
-      sentences: block.sentences.map((sentence) => ({
-        ...sentence,
-        speaker: sentence.speaker ?? block.speaker,
-        chunks: collectSentenceChunks(sentence),
-      })),
-    })),
-  })),
-});
 
 const flattenSentences = (lesson: Lesson): LessonSentence[] => {
   const out: LessonSentence[] = [];
@@ -137,74 +106,6 @@ const flattenSentences = (lesson: Lesson): LessonSentence[] => {
   return out;
 };
 
-const hasSpeakerTag = (speaker?: string) =>
-  /^[A-Z]$/.test((speaker ?? "").trim().toUpperCase());
-
-const isDialogueLikeScene = (lesson: Lesson, blocks: LessonBlock[]) =>
-  lesson.sceneType === "dialogue" ||
-  blocks.some((block) => (block.kind ?? lesson.sceneType ?? "monologue") === "dialogue") ||
-  (blocks.length > 0 && blocks.every((block) => hasSpeakerTag(block.speaker)));
-
-const findSentenceBlock = (blocks: LessonBlock[], sentenceId: string | null) => {
-  if (!sentenceId) return null;
-  return (
-    blocks.find((block) => block.sentences.some((sentence) => sentence.id === sentenceId)) ??
-    null
-  );
-};
-
-const findSentenceForChunk = (
-  sentences: LessonSentence[],
-  chunkText: string,
-  preferredBlock?: LessonBlock | null,
-) => {
-  const normalized = chunkText.trim().toLowerCase();
-  if (!normalized) return null;
-  const candidates = preferredBlock?.sentences.length ? preferredBlock.sentences : sentences;
-  return (
-    candidates.find((sentence) =>
-      collectSentenceChunks(sentence).some((chunk) => chunk.toLowerCase() === normalized),
-    ) ??
-    sentences.find((sentence) =>
-      collectSentenceChunks(sentence).some((chunk) => chunk.toLowerCase() === normalized),
-    ) ??
-    null
-  );
-};
-
-const buildAiChunkDetail = ({
-  activeText,
-  fallback,
-  result,
-  errorMessage,
-}: {
-  activeText: string;
-  fallback: SelectionChunkLayer;
-  result: ExplainSuccessResponse | null;
-  errorMessage: string | null;
-}): SelectionChunkLayer => {
-  if (errorMessage) {
-    return {
-      ...fallback,
-      text: activeText,
-      translation: fallback.translation || "AI 解释暂不可用",
-      meaningInSentence: errorMessage,
-      usageNote: "可以先继续阅读场景,稍后再试一次。",
-    };
-  }
-
-  const chunk = result?.chunk;
-  if (!chunk) return fallback;
-
-  return {
-    ...fallback,
-    text: chunk.text?.trim() || activeText,
-    translation: chunk.translation?.trim() || fallback.translation,
-    meaningInSentence: chunk.explanation?.trim() || fallback.meaningInSentence,
-    usageNote: chunk.usageNote?.trim() || fallback.usageNote,
-  };
-};
-
 const errorCodeToTrigger = (code: string | undefined): AnonymousBlockTrigger | null => {
   if (code === "ANON_QUOTA_EXCEEDED_SESSION") return "explain_quota_exhausted";
   if (code === "ANON_QUOTA_EXCEEDED_GLOBAL") return "explain_quota_exhausted";
@@ -215,94 +116,22 @@ const errorCodeToTrigger = (code: string | undefined): AnonymousBlockTrigger | n
 export function ShareScenePreviewClient({
   initialLesson,
   registerHref,
-  showPracticePreview = false,
-  backHref,
 }: ShareScenePreviewClientProps) {
-  const lesson = useMemo(() => withDisplayChunks(initialLesson), [initialLesson]);
+  const lesson = initialLesson;
   const anonState = useAnonymousMode({ isAuthenticated: false });
-  const blocks = useMemo(() => getLessonBlocks(lesson), [lesson]);
-  const sentences = useMemo(() => getLessonSentences(lesson), [lesson]);
-  const firstSentence = useMemo(() => getFirstSentence(lesson) ?? null, [lesson]);
-  const dialogueScene = useMemo(
-    () => isDialogueLikeScene(lesson, blocks),
-    [blocks, lesson],
-  );
 
   const [activeChunk, setActiveChunk] = useState<{
     text: string;
     sentence: LessonSentence;
   } | null>(null);
-  const [activeSentenceId, setActiveSentenceId] = useState<string | null>(
-    () => flattenSentences(initialLesson)[0]?.id ?? null,
-  );
-  const [sheetOpen, setSheetOpen] = useState(false);
-  const [hoveredChunkKey, setHoveredChunkKey] = useState<string | null>(null);
   const [explainResult, setExplainResult] = useState<ExplainSuccessResponse | null>(null);
   const [explainLoading, setExplainLoading] = useState(false);
   const [explainError, setExplainError] = useState<string | null>(null);
   const [blockTrigger, setBlockTrigger] = useState<AnonymousBlockTrigger | null>(null);
   const [inlineCardVisible, setInlineCardVisible] = useState(true);
-  const [playbackState, setPlaybackState] = useState<SentencePlaybackState>({ kind: "idle" });
 
   const firstViewReportedRef = useRef(false);
   const promptShownReportedRef = useRef<Record<string, boolean>>({});
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-
-  useEffect(() => {
-    const nextFirstSentence = getFirstSentence(lesson) ?? null;
-    setActiveSentenceId(nextFirstSentence?.id ?? null);
-    setActiveChunk(null);
-    setExplainResult(null);
-    setExplainError(null);
-    setSheetOpen(false);
-  }, [lesson.id, lesson]);
-
-  const currentSentence = useMemo(() => {
-    if (!activeSentenceId) return firstSentence;
-    return getSentenceById(lesson, activeSentenceId) ?? firstSentence;
-  }, [activeSentenceId, firstSentence, lesson]);
-
-  const currentBlock = useMemo(
-    () => findSentenceBlock(blocks, currentSentence?.id ?? null),
-    [blocks, currentSentence?.id],
-  );
-
-  const relatedChunks = useMemo(() => {
-    if (dialogueScene && currentBlock) {
-      return Array.from(
-        new Set(currentBlock.sentences.flatMap((sentence) => collectSentenceChunks(sentence))),
-      );
-    }
-    return currentSentence ? collectSentenceChunks(currentSentence) : [];
-  }, [currentBlock, currentSentence, dialogueScene]);
-
-  const activeChunkDetail = useMemo<SelectionChunkLayer | null>(() => {
-    if (!activeChunk) return null;
-    const sentence = getSentenceById(lesson, activeChunk.sentence.id) ?? activeChunk.sentence;
-    const fallback = getChunkLayerFromLesson(lesson, sentence, activeChunk.text);
-    return buildAiChunkDetail({
-      activeText: activeChunk.text,
-      fallback,
-      result: explainResult,
-      errorMessage: explainError,
-    });
-  }, [activeChunk, explainError, explainResult, lesson]);
-
-  const speakingSentence = useMemo(
-    () =>
-      playbackState.kind === "playing"
-        ? (sentences.find((sentence) => sentence.id === playbackState.sentenceId) ?? null)
-        : null,
-    [playbackState, sentences],
-  );
-
-  const loadingSentence = useMemo(
-    () =>
-      playbackState.kind === "loading"
-        ? (sentences.find((sentence) => sentence.id === playbackState.sentenceId) ?? null)
-        : null,
-    [playbackState, sentences],
-  );
 
   useEffect(() => {
     if (firstViewReportedRef.current) return;
@@ -354,10 +183,8 @@ export function ShareScenePreviewClient({
       if (!chunkText.trim()) return;
       setExplainLoading(true);
       setExplainError(null);
-      setActiveSentenceId(sentence.id);
       setActiveChunk({ text: chunkText, sentence });
       setExplainResult(null);
-      setSheetOpen(true);
       // 确保 localStorage 里有 anonId(初次访问时即时生成)
       getOrCreateAnonymousId();
       try {
@@ -401,7 +228,16 @@ export function ShareScenePreviewClient({
     [anonState, lesson.difficulty, lesson.id, lesson.title],
   );
 
+  const handleCloseSheet = useCallback(() => {
+    setActiveChunk(null);
+    setExplainResult(null);
+    setExplainError(null);
+  }, []);
+
   // ---- 句子级 TTS 预生成播放 ----
+  const [playbackState, setPlaybackState] = useState<SentencePlaybackState>({ kind: "idle" });
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
   const stopCurrentAudio = useCallback(() => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -497,214 +333,84 @@ export function ShareScenePreviewClient({
     [anonState, lesson.slug, playbackState, stopCurrentAudio],
   );
 
-  const handleSentenceTap = useCallback((sentenceId: string) => {
-    setActiveSentenceId(sentenceId);
-    setActiveChunk(null);
-    setExplainResult(null);
-    setExplainError(null);
-    setSheetOpen(true);
-  }, []);
-
-  const handleSelectRelated = useCallback(
-    (chunkText: string) => {
-      const sentence = findSentenceForChunk(sentences, chunkText, currentBlock);
-      if (!sentence) return;
-      void handleExplain(chunkText, sentence);
-    },
-    [currentBlock, handleExplain, sentences],
-  );
-
-  const handleBlockedAction = useCallback(() => {
-    setBlockTrigger("feature_disabled");
-  }, []);
-
-  const handlePronounceCurrentSentence = useCallback(() => {
-    if (!currentSentence) return;
-    void handlePlaySentence(currentSentence);
-  }, [currentSentence, handlePlaySentence]);
-
-  const handleSentenceChunkSelect = useCallback(
-    (sentence: LessonSentence, chunkText: string) => {
-      void handleExplain(chunkText, sentence);
-    },
-    [handleExplain],
-  );
-
-  const sceneMetaLabel = `${lesson.difficulty} · ${lesson.estimatedMinutes} 分钟 · ${
-    dialogueScene ? `${sentences.length} 轮对话` : `${sentences.length} 句`
-  }`;
-
   return (
-    <div className="flex w-full flex-col bg-[#f8fafc]" data-testid="share-scene-preview">
+    <div className="flex w-full flex-col" data-testid="share-scene-preview">
       <AnonymousTopbarBanner
         isAnonymous
         primaryCapability="explain_selection"
         quotaByCapability={anonState.quotaByCapability}
         registerHref={registerHref}
-        className="sticky top-0 z-30"
         onRegisterClick={() => reportRegisterClicked("L1", { surface: "share_scene_topbar" })}
       />
 
-      <main className={SCENE_PAGE_STACK_CLASSNAME}>
-        <div className={SCENE_PAGE_CONTENT_ANCHOR_CLASSNAME}>
-          <div className="relative grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-8">
-            <div className="space-y-[var(--mobile-space-2xl)] overflow-x-hidden">
-              <Card className={APPLE_SURFACE}>
-                <CardContent className="space-y-4 p-5 sm:p-6">
-                  {backHref ? (
-                    <Link
-                      href={backHref}
-                      className={`inline-flex text-xs font-medium transition hover:text-foreground ${APPLE_META_TEXT}`}
-                    >
-                      ← 返回试用场景
-                    </Link>
-                  ) : null}
-                  <div className="space-y-2">
-                    <h1 className="text-3xl font-semibold sm:text-4xl">{lesson.title}</h1>
-                    {lesson.subtitle ? (
-                      <p className={`max-w-2xl sm:text-base ${APPLE_META_TEXT}`}>
-                        {lesson.subtitle}
-                      </p>
-                    ) : null}
-                  </div>
-                  <p className={APPLE_META_TEXT}>{sceneMetaLabel}</p>
-                  <p className={`text-xs ${APPLE_META_TEXT}`}>
-                    体验模式 · 可听读和查看短语详情,学习记录不会保存。
-                  </p>
-                </CardContent>
-              </Card>
+      <article className="mx-auto w-full max-w-3xl px-4 py-6 sm:py-8">
+        <header className="mb-6 space-y-1">
+          <h1 className="text-2xl font-semibold text-foreground sm:text-3xl">
+            {lesson.title}
+          </h1>
+          {lesson.subtitle ? (
+            <p className="text-base text-foreground/70">{lesson.subtitle}</p>
+          ) : null}
+          <p className="text-xs text-foreground/55">
+            体验模式 · 仅展示场景内容,所有学习态不会保存
+          </p>
+        </header>
 
-              <div className="space-y-[var(--mobile-space-2xl)]">
-                {lesson.sections.map((section) => (
-                  <section key={section.id} className="space-y-3">
-                    {section.title || section.summary ? (
-                      <div className="space-y-1 px-1">
-                        {section.title ? (
-                          <h2 className="text-xl font-semibold">{section.title}</h2>
-                        ) : null}
-                        {section.summary ? (
-                          <p className={APPLE_META_TEXT}>{section.summary}</p>
-                        ) : null}
-                      </div>
-                    ) : null}
-                    <div className="space-y-3">
-                      {section.blocks.map((block) => (
-                        <div key={block.id} className="space-y-2">
-                          {block.sentences.map((sentence) => (
-                            <SentenceBlock
-                              key={sentence.id}
-                              sentence={sentence}
-                              showSpeaker={dialogueScene}
-                              speaking={
-                                playbackState.kind === "playing" &&
-                                playbackState.sentenceId === sentence.id
-                              }
-                              loading={
-                                playbackState.kind === "loading" &&
-                                playbackState.sentenceId === sentence.id
-                              }
-                              activeChunkKey={
-                                activeChunk?.sentence.id === sentence.id
-                                  ? activeChunk.text
-                                  : null
-                              }
-                              hoveredChunkKey={hoveredChunkKey}
-                              onPronounce={() => handlePlaySentence(sentence)}
-                              onSelectText={(chunkText) =>
-                                handleSentenceChunkSelect(sentence, chunkText)
-                              }
-                              onHoverChunk={setHoveredChunkKey}
-                              onSentenceTap={handleSentenceTap}
-                              mobileTapEnabled
-                            />
-                          ))}
-                        </div>
-                      ))}
-                    </div>
-                  </section>
-                ))}
-              </div>
-
-              {showPracticePreview ? (
-                <AnonymousPracticePreview
-                  lesson={lesson}
-                  registerHref={registerHref}
-                  onBlocked={handleBlockedAction}
-                />
+        <div className="space-y-5">
+          {lesson.sections.map((section) => (
+            <section key={section.id} className="space-y-4">
+              {section.title ? (
+                <h2 className="text-sm font-medium text-foreground/65">{section.title}</h2>
               ) : null}
-
-              <AnonymousInlineUpsellCard
-                isAnonymous
-                visible={inlineCardVisible}
-                onDismiss={() => setInlineCardVisible(false)}
-                expressionCount={totalChunkCount}
-                registerHref={registerHref}
-                className="mt-8"
-                onRegisterClick={() =>
-                  reportRegisterClicked("L2", { surface: "share_scene_inline_card" })
-                }
-              />
-            </div>
-
-            <SelectionDetailPanel
-              currentBlock={dialogueScene ? currentBlock : null}
-              currentSentence={currentSentence}
-              chunkDetail={activeChunkDetail}
-              relatedChunks={relatedChunks}
-              loading={explainLoading}
-              speakingText={speakingSentence?.text ?? null}
-              loadingText={loadingSentence?.text ?? null}
-              onSave={handleBlockedAction}
-              onReview={handleBlockedAction}
-              saved={false}
-              onPronounce={handleBlockedAction}
-              onPronounceBlock={handlePronounceCurrentSentence}
-              onSelectRelated={handleSelectRelated}
-              hoveredChunkKey={hoveredChunkKey}
-              onHoverChunk={setHoveredChunkKey}
-              playingChunkKey={null}
-              loadingChunkKey={null}
-              showSpeaker={dialogueScene}
-              sentenceSectionLabel={dialogueScene ? "当前对话块" : "当前句子"}
-              showRelatedChunkAudio={false}
-            />
-          </div>
+              {section.blocks.map((block) => (
+                <div key={block.id} className="space-y-3">
+                  {block.sentences.map((sentence) => (
+                    <SentenceCard
+                      key={sentence.id}
+                      sentence={sentence}
+                      onExplain={(chunkText) => handleExplain(chunkText, sentence)}
+                      onPlay={() => handlePlaySentence(sentence)}
+                      playbackState={
+                        playbackState.kind !== "idle" &&
+                        playbackState.sentenceId === sentence.id
+                          ? playbackState.kind
+                          : "idle"
+                      }
+                    />
+                  ))}
+                </div>
+              ))}
+            </section>
+          ))}
         </div>
-      </main>
 
-      <SelectionDetailSheet
-        currentBlock={dialogueScene ? currentBlock : null}
-        currentSentence={currentSentence}
-        chunkDetail={activeChunkDetail}
-        relatedChunks={relatedChunks}
-        open={sheetOpen}
+        <div className="mt-8">
+          <AnonymousInlineUpsellCard
+            isAnonymous
+            visible={inlineCardVisible}
+            onDismiss={() => setInlineCardVisible(false)}
+            expressionCount={totalChunkCount}
+            registerHref={registerHref}
+            onRegisterClick={() =>
+              reportRegisterClicked("L2", { surface: "share_scene_inline_card" })
+            }
+          />
+        </div>
+      </article>
+
+      <ExplainResultSheet
+        open={activeChunk !== null}
+        chunk={activeChunk}
         loading={explainLoading}
-        speakingText={speakingSentence?.text ?? null}
-        loadingText={loadingSentence?.text ?? null}
-        onOpenChange={setSheetOpen}
-        onSave={handleBlockedAction}
-        onReview={handleBlockedAction}
-        saved={false}
-        onPronounce={handleBlockedAction}
-        onPronounceBlock={handlePronounceCurrentSentence}
-        onSelectRelated={handleSelectRelated}
-        hoveredChunkKey={hoveredChunkKey}
-        onHoverChunk={setHoveredChunkKey}
-        playingChunkKey={null}
-        loadingChunkKey={null}
-        showSpeaker={dialogueScene}
-        sentenceSectionLabel={dialogueScene ? "当前对话块" : "当前句子"}
-        showRelatedChunkAudio={false}
+        result={explainResult}
+        errorMessage={explainError}
+        registerHref={registerHref}
+        quotaSnapshot={explainSnapshot}
+        onClose={handleCloseSheet}
+        onRegisterClick={() =>
+          reportRegisterClicked("L2", { surface: "share_scene_explain_sheet" })
+        }
       />
-
-      {explainSnapshot && explainSnapshot.sessionLimit !== null ? (
-        <p
-          data-testid="share-scene-explain-quota-line"
-          className="sr-only"
-        >
-          体验模式剩 {explainSnapshot.sessionRemaining ?? 0}/{explainSnapshot.sessionLimit} 次
-        </p>
-      ) : null}
 
       <AnonymousBlockModal
         isAnonymous
@@ -720,143 +426,186 @@ export function ShareScenePreviewClient({
   );
 }
 
-type TrialPracticeExercise = {
-  id: string;
-  prompt: string;
-  answer: string;
-  hint: string;
-};
-
-const normalizePracticeAnswer = (value: string) =>
-  value
-    .trim()
-    .toLowerCase()
-    .replace(/[.,!?;:'"’]/g, "")
-    .replace(/\s+/g, " ");
-
-const buildTrialPracticeExercises = (lesson: Lesson): TrialPracticeExercise[] => {
-  const exercises: TrialPracticeExercise[] = [];
-  for (const sentence of flattenSentences(lesson)) {
-    const detail = sentence.chunkDetails?.find((item) => item.text.trim());
-    const chunkText = detail?.text?.trim() || sentence.chunks?.find((item) => item.trim())?.trim();
-    if (!chunkText) continue;
-    const displayText = sentence.text.replace(chunkText, "____");
-    exercises.push({
-      id: `${sentence.id}:${chunkText}`,
-      prompt: displayText === sentence.text ? sentence.translation : displayText,
-      answer: chunkText,
-      hint: sentence.translation || detail?.translation || "根据语境补出表达",
-    });
-    if (exercises.length >= 3) break;
-  }
-  return exercises;
-};
-
-function AnonymousPracticePreview({
-  lesson,
-  registerHref,
-  onBlocked,
+function SentenceCard({
+  sentence,
+  onExplain,
+  onPlay,
+  playbackState,
 }: {
-  lesson: Lesson;
-  registerHref: string;
-  onBlocked: () => void;
+  sentence: LessonSentence;
+  onExplain: (chunkText: string) => void;
+  onPlay: () => void;
+  playbackState: "idle" | "loading" | "playing" | "unavailable";
 }) {
-  const exercises = useMemo(() => buildTrialPracticeExercises(lesson), [lesson]);
-  const [answers, setAnswers] = useState<Record<string, string>>({});
-  const [checked, setChecked] = useState<Record<string, boolean>>({});
-
-  if (exercises.length === 0) {
-    return (
-      <section className="mt-8 rounded-lg border border-dashed border-border bg-card/70 p-4">
-        <p className="text-sm font-medium text-foreground">练习题将在注册后生成</p>
-        <p className="mt-1 text-sm leading-6 text-foreground/65">
-          这个场景暂时没有预生成练习题。注册后可以为自己的学习进度生成更多练习。
-        </p>
-        <Button asChild className="mt-4" radius="sm" size="sm">
-          <Link href={registerHref}>注册后练习</Link>
-        </Button>
-      </section>
-    );
-  }
-
+  const chunks = useMemo(() => collectSentenceChunks(sentence), [sentence]);
+  const playButtonLabel =
+    playbackState === "loading"
+      ? "加载中"
+      : playbackState === "playing"
+        ? "停止"
+        : playbackState === "unavailable"
+          ? "音频暂时不可用"
+          : "听一遍";
   return (
-    <section className="mt-8 rounded-lg border border-border/60 bg-card/80 p-4">
-      <div className="mb-4 flex flex-col gap-1">
-        <p className="text-sm font-semibold text-foreground">预生成练习题</p>
-        <p className="text-xs leading-5 text-foreground/55">
-          可以本地作答和查看答案,但体验模式不会提交或保存结果。
-        </p>
-      </div>
-      <div className="space-y-3">
-        {exercises.map((exercise, index) => {
-          const currentAnswer = answers[exercise.id] ?? "";
-          const hasChecked = checked[exercise.id] ?? false;
-          const isCorrect =
-            normalizePracticeAnswer(currentAnswer) ===
-            normalizePracticeAnswer(exercise.answer);
-          return (
-            <div
-              key={exercise.id}
-              className="rounded-lg border border-border/50 bg-background/60 p-3"
+    <Card size="sm" className="border border-border/50 bg-card/80">
+      <CardContent className="space-y-2 px-4 pb-4 text-sm leading-6">
+        {sentence.speaker ? (
+          <p className="text-xs font-medium uppercase tracking-wide text-foreground/55">
+            {sentence.speaker}
+          </p>
+        ) : null}
+        <p className="text-foreground">{sentence.text}</p>
+        {sentence.translation ? (
+          <p className="text-foreground/65">{sentence.translation}</p>
+        ) : null}
+        <div className="flex flex-wrap items-center gap-2 pt-1">
+          <Button
+            size="sm"
+            variant={playbackState === "playing" ? "default" : "outline"}
+            radius="sm"
+            data-testid="share-scene-play-sentence"
+            data-playback-state={playbackState}
+            onClick={onPlay}
+            disabled={playbackState === "loading" || playbackState === "unavailable"}
+            className="h-7 px-2 text-xs"
+          >
+            ▶ {playButtonLabel}
+          </Button>
+          {chunks.map((chunk) => (
+            <Button
+              key={chunk}
+              size="sm"
+              variant="outline"
+              radius="sm"
+              data-testid="share-scene-explain-chunk"
+              onClick={() => onExplain(chunk)}
+              className="h-7 px-2 text-xs"
             >
-              <p className="text-xs text-foreground/55">第 {index + 1} 题</p>
-              <p className="mt-1 text-sm leading-6 text-foreground">{exercise.prompt}</p>
-              <p className="mt-1 text-xs text-foreground/50">{exercise.hint}</p>
-              <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-                <input
-                  value={currentAnswer}
-                  onChange={(event) => {
-                    setAnswers((prev) => ({
-                      ...prev,
-                      [exercise.id]: event.target.value,
-                    }));
-                    setChecked((prev) => ({
-                      ...prev,
-                      [exercise.id]: false,
-                    }));
-                  }}
-                  className="min-h-9 flex-1 rounded-md border border-border bg-background px-3 text-sm outline-none transition focus:border-foreground/35"
-                  placeholder="输入缺失表达"
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  radius="sm"
-                  size="sm"
-                  onClick={() =>
-                    setChecked((prev) => ({
-                      ...prev,
-                      [exercise.id]: true,
-                    }))
-                  }
-                >
-                  查看本地反馈
-                </Button>
-              </div>
-              {hasChecked ? (
-                <p
-                  className={cn(
-                    "mt-2 text-xs",
-                    isCorrect ? "text-emerald-600" : "text-foreground/60",
-                  )}
-                >
-                  {isCorrect
-                    ? "答对了。这个结果只保存在当前页面。"
-                    : `参考答案: ${exercise.answer}`}
+              解释 · {chunk}
+            </Button>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ExplainResultSheet({
+  open,
+  chunk,
+  loading,
+  result,
+  errorMessage,
+  registerHref,
+  quotaSnapshot,
+  onClose,
+  onRegisterClick,
+}: {
+  open: boolean;
+  chunk: { text: string; sentence: LessonSentence } | null;
+  loading: boolean;
+  result: ExplainSuccessResponse | null;
+  errorMessage: string | null;
+  registerHref: string;
+  quotaSnapshot: AnonymousQuotaSnapshot | null;
+  onClose: () => void;
+  onRegisterClick?: () => void;
+}) {
+  if (!open || !chunk) return null;
+  return (
+    <div
+      data-testid="share-scene-explain-sheet-backdrop"
+      role="dialog"
+      aria-modal="true"
+      className="fixed inset-0 z-40 flex items-end justify-center bg-background/60 backdrop-blur-sm sm:items-center"
+      onClick={onClose}
+    >
+      <div
+        data-testid="share-scene-explain-sheet"
+        className={cn(
+          "max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-card p-5 shadow-xl ring-1 ring-foreground/10",
+          "sm:rounded-2xl",
+        )}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-xs text-foreground/55">来自</p>
+            <p className="mt-0.5 text-sm text-foreground/85">{chunk.sentence.text}</p>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            radius="sm"
+            onClick={onClose}
+            data-testid="share-scene-explain-close"
+          >
+            关
+          </Button>
+        </div>
+
+        <h3 className="mt-4 text-lg font-semibold text-foreground">{chunk.text}</h3>
+
+        <div className="mt-3 space-y-3 text-sm leading-6">
+          {loading ? (
+            <p
+              data-testid="share-scene-explain-loading"
+              className="text-foreground/65"
+            >
+              AI 正在生成解释…
+            </p>
+          ) : errorMessage ? (
+            <p
+              data-testid="share-scene-explain-error"
+              className="text-destructive"
+            >
+              {errorMessage}
+            </p>
+          ) : result?.chunk ? (
+            <div className="space-y-2 text-foreground/85">
+              {result.chunk.translation ? (
+                <p>
+                  <span className="text-foreground/55">中文意思:</span> {result.chunk.translation}
+                </p>
+              ) : null}
+              {result.chunk.explanation ? (
+                <p>
+                  <span className="text-foreground/55">用法说明:</span> {result.chunk.explanation}
+                </p>
+              ) : null}
+              {result.chunk.usageNote ? (
+                <p>
+                  <span className="text-foreground/55">使用提醒:</span> {result.chunk.usageNote}
                 </p>
               ) : null}
             </div>
-          );
-        })}
+          ) : null}
+        </div>
+
+        {quotaSnapshot && quotaSnapshot.sessionLimit !== null ? (
+          <p
+            data-testid="share-scene-explain-quota-line"
+            className="mt-4 text-xs text-foreground/55"
+          >
+            体验模式剩 {quotaSnapshot.sessionRemaining ?? 0}/{quotaSnapshot.sessionLimit} 次
+          </p>
+        ) : null}
+
+        <div className="mt-5 flex flex-row items-center justify-end gap-2">
+          <Button variant="ghost" size="sm" radius="sm" onClick={onClose}>
+            继续读
+          </Button>
+          <Button asChild size="sm" radius="sm">
+            <Link
+              href={registerHref}
+              data-testid="share-scene-explain-register"
+              onClick={onRegisterClick}
+            >
+              注册保存到表达库
+            </Link>
+          </Button>
+        </div>
       </div>
-      <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-xs leading-5 text-foreground/55">
-          提交记录、错题复习和加入复习需要注册账号。
-        </p>
-        <Button type="button" radius="sm" size="sm" onClick={onBlocked}>
-          提交并保存
-        </Button>
-      </div>
-    </section>
+    </div>
   );
 }

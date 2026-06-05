@@ -3,16 +3,17 @@
 ## Purpose
 TBD - created by archiving change expand-anonymous-trial-experience. Update Purpose after archive.
 ## Requirements
-### Requirement: 匿名试用必须提供独立场景列表入口
+### Requirement: 匿名试用入口必须复用分享场景页
 
-系统 MUST 提供独立于主应用场景列表的匿名试用入口，用于展示精选公开场景，并让未登录访客在不进入主应用登录态路由的前提下理解产品价值。
+系统 MUST 将匿名试用入口收敛为分享场景页的入口别名，让未登录访客在不进入主应用登录态路由的前提下体验默认公开场景，并避免维护第二套试用列表或详情 UI。
 
-#### Scenario: 未登录访客访问匿名试用列表
+#### Scenario: 未登录访客访问匿名试用入口
 
 - **WHEN** `ALLOW_ANONYMOUS_TRIAL=true`
 - **AND** 未登录访客访问 `/trial`
-- **THEN** 系统 MUST 展示 4-5 条精选公开场景
-- **AND** 每条场景 MUST 提供进入匿名详情页的入口
+- **THEN** 系统 MUST 跳转到默认精选公开场景的 `/share/scene/[slug]`
+- **AND** 页面 MUST 复用 `/share/scene/[slug]` 的匿名预览 UI
+- **AND** 系统 MUST NOT 渲染独立 `/trial` 场景列表
 - **AND** 系统 MUST NOT 查询或展示任何用户私有学习数据
 
 #### Scenario: 匿名试用关闭
@@ -28,7 +29,7 @@ TBD - created by archiving change expand-anonymous-trial-experience. Update Purp
 
 #### Scenario: 未登录访客进入匿名场景详情
 
-- **WHEN** 未登录访客从 `/trial` 进入 `/trial/scene/[slug]`
+- **WHEN** 未登录访客访问 `/share/scene/[slug]` 或从 `/trial/scene/[slug]` 跳转到同 slug 分享页
 - **AND** 该 slug 属于精选公开场景
 - **THEN** 系统 MUST 展示场景正文、句子列表和可公开的 detail/chunk 信息
 - **AND** 系统 MAY 允许播放已生成 TTS
@@ -39,30 +40,6 @@ TBD - created by archiving change expand-anonymous-trial-experience. Update Purp
 - **WHEN** 匿名详情页中的句子没有已生成 TTS
 - **THEN** 系统 MUST 展示受控空态或注册引导
 - **AND** MUST NOT 在匿名模式下触发实时 TTS 生成
-
-### Requirement: 匿名练习体验只能消费预生成题集且不得提交
-
-匿名试用 MAY 展示预生成练习题，并允许本地作答体验；系统 MUST 禁止匿名生成题目、提交结果和保存练习状态。
-
-#### Scenario: 匿名访客查看预生成练习题
-
-- **WHEN** 匿名访客访问包含预生成题集的匿名场景详情
-- **THEN** 系统 MAY 展示这些题目
-- **AND** MAY 在前端提供本地选择答案和本地反馈
-- **AND** MUST NOT 创建 practice run、写入答案、写入 progress 或加入复习
-
-#### Scenario: 匿名访客尝试提交练习
-
-- **WHEN** 匿名访客点击提交练习、保存结果或加入复习
-- **THEN** 系统 MUST 阻断操作并提示注册
-- **AND** 服务端 MUST 拒绝对应匿名写入请求
-- **AND** 不得执行任何业务写入
-
-#### Scenario: 场景没有预生成练习题
-
-- **WHEN** 匿名场景详情没有可读取的预生成题集
-- **THEN** 系统 MUST 展示注册后生成或注册后练习的引导
-- **AND** MUST NOT 调用练习生成接口
 
 ### Requirement: 匿名写入和生成能力必须提示注册并保持拒绝
 
@@ -97,4 +74,3 @@ TBD - created by archiving change expand-anonymous-trial-experience. Update Purp
 - **WHEN** 匿名访客尝试使用 AI 场景生成、练习生成或实时 TTS 生成
 - **THEN** 系统 MUST 按现有匿名高成本接口治理拒绝请求
 - **AND** 不得为 `/trial` 单独放宽额度
-
