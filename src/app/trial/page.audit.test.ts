@@ -19,6 +19,7 @@ test("/trial 检查 ALLOW_ANONYMOUS_TRIAL 开关", () => {
 });
 
 test("/trial 默认渲染匿名试用场景列表,不跳默认 share scene", () => {
+  assert.match(pageSource, /dynamic\s*=\s*["']force-dynamic["']/);
   assert.match(pageSource, /listPublicTrialSceneItems/);
   assert.match(pageSource, /TrialSceneListClient/);
   assert.doesNotMatch(pageSource, /ANONYMOUS_TRIAL_SCENE_SLUGS/);
